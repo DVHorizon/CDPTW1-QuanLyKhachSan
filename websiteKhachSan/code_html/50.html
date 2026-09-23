@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "primary": "#006c49",
+        "secondary-fixed-dim": "#89ceff",
+        "tertiary-container": "#fc7c78",
+        "secondary-container": "#39b8fd",
+        "surface-container-highest": "#dde4dd",
+        "inverse-on-surface": "#ebf3eb",
+        "on-tertiary-fixed": "#410005",
+        "error-container": "#ffdad6",
+        "on-error": "#ffffff",
+        "on-surface": "#161d19",
+        "surface-dim": "#d4dcd5",
+        "on-secondary": "#ffffff",
+        "surface-variant": "#dde4dd",
+        "on-secondary-container": "#004666",
+        "error": "#ba1a1a",
+        "primary-fixed": "#6ffbbe",
+        "surface-container-high": "#e3eae3",
+        "on-background": "#161d19",
+        "surface-container-lowest": "#ffffff",
+        "tertiary-fixed-dim": "#ffb3af",
+        "on-primary-container": "#00422b",
+        "outline-variant": "#bbcabf",
+        "primary-container": "#10b981",
+        "on-tertiary-fixed-variant": "#842225",
+        "on-primary-fixed": "#002113",
+        "on-error-container": "#93000a",
+        "outline": "#6c7a71",
+        "primary-fixed-dim": "#4edea3",
+        "on-surface-variant": "#3c4a42",
+        "surface-bright": "#f4fbf4",
+        "tertiary": "#a43a3a",
+        "on-secondary-fixed": "#001e2f",
+        "surface-container-low": "#eef6ee",
+        "surface-container": "#e8f0e9",
+        "on-tertiary": "#ffffff",
+        "on-primary": "#ffffff",
+        "surface": "#f4fbf4",
+        "inverse-surface": "#2b322d",
+        "tertiary-fixed": "#ffdad7",
+        "on-secondary-fixed-variant": "#004c6e",
+        "surface-tint": "#006c49",
+        "on-primary-fixed-variant": "#005236",
+        "on-tertiary-container": "#711419",
+        "inverse-primary": "#4edea3",
+        "secondary": "#006591",
+        "background": "#f4fbf4",
+        "secondary-fixed": "#c9e6ff"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "full": "9999px"
+      },
+      "spacing": {
+        "gutter": "1rem",
+        "space-md": "0.75rem",
+        "gutter-lg": "1.5rem",
+        "margin-md": "1.5rem",
+        "space-xs": "0.25rem",
+        "margin-lg": "2rem",
+        "space-lg": "1rem",
+        "space-xl": "1.5rem",
+        "margin": "1rem",
+        "space-sm": "0.5rem"
+      },
+      "fontFamily": {
+        "label-md": [
+          "Inter"
+        ],
+        "body-lg": [
+          "Inter"
+        ],
+        "headline-lg": [
+          "Playfair Display"
+        ],
+        "headline-md": [
+          "Inter"
+        ],
+        "body-sm": [
+          "Inter"
+        ],
+        "body-md": [
+          "Inter"
+        ],
+        "display-lg-mobile": [
+          "Playfair Display"
+        ],
+        "label-lg": [
+          "Inter"
+        ],
+        "label-sm": [
+          "Inter"
+        ],
+        "display-lg": [
+          "Playfair Display"
+        ],
+        "headline-sm": [
+          "Inter"
+        ]
+      },
+      "fontSize": {
+        "label-md": [
+          "0.75rem",
+          {
+            "lineHeight": "1rem",
+            "letterSpacing": "0.05em",
+            "fontWeight": "600"
+          }
+        ],
+        "body-lg": [
+          "1rem",
+          {
+            "lineHeight": "1.5rem",
+            "letterSpacing": "0",
+            "fontWeight": "400"
+          }
+        ],
+        "headline-lg": [
+          "1.75rem",
+          {
+            "lineHeight": "2.25rem",
+            "letterSpacing": "-0.01em",
+            "fontWeight": "500"
+          }
+        ],
+        "headline-md": [
+          "1.25rem",
+          {
+            "lineHeight": "1.75rem",
+            "letterSpacing": "-0.01em",
+            "fontWeight": "600"
+          }
+        ],
+        "body-sm": [
+          "0.75rem",
+          {
+            "lineHeight": "1rem",
+            "letterSpacing": "0.01em",
+            "fontWeight": "400"
+          }
+        ],
+        "body-md": [
+          "0.875rem",
+          {
+            "lineHeight": "1.25rem",
+            "letterSpacing": "0",
+            "fontWeight": "400"
+          }
+        ],
+        "display-lg-mobile": [
+          "1.75rem",
+          {
+            "lineHeight": "2.25rem",
+            "letterSpacing": "-0.01em",
+            "fontWeight": "600"
+          }
+        ],
+        "label-lg": [
+          "0.875rem",
+          {
+            "lineHeight": "1.25rem",
+            "letterSpacing": "0.02em",
+            "fontWeight": "600"
+          }
+        ],
+        "label-sm": [
+          "0.6875rem",
+          {
+            "lineHeight": "0.875rem",
+            "letterSpacing": "0.08em",
+            "fontWeight": "700"
+          }
+        ],
+        "display-lg": [
+          "2.25rem",
+          {
+            "lineHeight": "2.75rem",
+            "letterSpacing": "-0.02em",
+            "fontWeight": "600"
+          }
+        ],
+        "headline-sm": [
+          "1rem",
+          {
+            "lineHeight": "1.5rem",
+            "letterSpacing": "0",
+            "fontWeight": "600"
+          }
+        ]
+      }
+    }
+  }
+}</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-72 bg-inverse-surface text-inverse-on-surface z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex flex-col"><div class="px-gutter-lg pt-space-xl pb-space-lg flex items-center gap-space-sm"><div class="w-9 h-9 rounded-lg bg-primary-container flex items-center justify-center"><span class="material-symbols-outlined text-on-primary-container text-[22px]">hotel_class</span></div><div class="flex flex-col min-w-0"><span class="font-headline-sm text-headline-sm text-surface-bright tracking-tight truncate">Grand Horizon</span><span class="font-label-sm text-label-sm text-outline-variant tracking-wider uppercase truncate">Resort &amp; Suites • PMS</span></div></div><div class="px-gutter-lg py-space-xs"><div class="p-space-sm rounded-lg bg-surface-variant/10 flex items-center justify-between"><div class="flex items-center gap-space-xs"><span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span><span class="font-label-sm text-label-sm text-primary-fixed">TERMINAL ACTIVE</span></div><span class="font-label-sm text-label-sm text-outline-variant">CORE 4.8.2</span></div></div><nav class="flex flex-col gap-space-xs px-space-md mt-space-md" data-active-classes="bg-primary-container text-on-primary-container font-bold rounded-lg"><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="front-desk-operations" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">room_preferences</span><span class="font-label-lg text-label-lg">Front Desk</span></div><span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-primary-container text-on-primary-container">24 Arr</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="housekeeping-management" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">cleaning_services</span><span class="font-label-lg text-label-lg">Housekeeping</span></div><span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-tertiary-container text-on-tertiary-container">8 Dirty</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="engineering-maintenance" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">build</span><span class="font-label-lg text-label-lg">Engineering</span></div><span class="font-label-sm text-label-sm text-outline-variant">3 OOO</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="inventory-minibar" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">inventory_2</span><span class="font-label-lg text-label-lg">Inventory</span></div></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="billing-cashier-ledger" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span class="font-label-lg text-label-lg">Billing &amp; Folios</span></div></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="guest-crm-profiles" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">loyalty</span><span class="font-label-lg text-label-lg">Guest CRM</span></div><span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-secondary-container text-on-secondary-container">VIP 12</span></a><a aria-current="page" class="flex items-center justify-between px-space-md py-space-sm transition-colors bg-primary-container text-on-primary-container font-bold rounded-lg" data-path="transportation-concierge" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">directions_car</span><span class="font-label-lg text-label-lg">Transportation</span></div></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="security-night-audit" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">verified_user</span><span class="font-label-lg text-label-lg">Security Audit</span></div></a></nav></div><div class="p-space-md mx-space-md mb-space-lg rounded-xl bg-surface-variant/10 flex flex-col gap-space-xs"><div class="flex items-center justify-between"><span class="font-label-sm text-label-sm text-outline-variant uppercase">System Shift</span><span class="font-label-sm text-label-sm text-primary-fixed">AM / ROTATION</span></div><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-outline-variant text-[16px]">schedule</span><span class="font-label-md text-label-md text-inverse-on-surface">06:00 - 14:30 GMT+7</span></div></div></aside><div class="pl-72"><header class="fixed top-0 left-72 right-0 h-16 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-gutter-lg"><div class="flex items-center gap-gutter-lg"><div class="flex items-center gap-space-sm"><div class="w-2.5 h-2.5 rounded-full bg-primary-container"></div><div class="flex flex-col"><span class="font-label-md text-label-md text-on-surface leading-none">Phú Quốc Sanctuary</span><span class="font-label-sm text-label-sm text-outline leading-tight">Tower A • Ocean Wing</span></div></div><div class="h-6 w-px bg-surface-container-highest"></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs"><span class="font-label-sm text-label-sm text-on-surface-variant">OCC:</span><span class="font-headline-sm text-headline-sm text-primary leading-none">84%</span></div><div class="flex items-center gap-space-xs"><span class="font-label-sm text-label-sm text-on-surface-variant">REVPAR:</span><span class="font-headline-sm text-headline-sm text-on-surface leading-none">$428</span></div></div><div class="h-6 w-px bg-surface-container-highest"></div><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-space-md text-outline text-[18px]">search</span><input class="w-80 pl-9 pr-space-md py-1.5 rounded-lg bg-surface-container-low text-on-surface placeholder:text-outline font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest" placeholder="Search reservation, room, guest ID (⌘K)..." type="text"/></div></div><div class="flex items-center gap-space-lg"><button aria-label="Operational Notifications" class="relative p-space-xs rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-tertiary"></span></button><div class="h-6 w-px bg-surface-container-highest"></div><div class="flex items-center gap-space-md"><div class="flex flex-col text-right"><span class="font-label-lg text-label-lg text-on-surface leading-tight">Lê Minh Anh</span><span class="font-label-sm text-label-sm text-on-surface-variant leading-none">Front Desk Manager</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full px-gutter-lg pt-16 bg-surface min-h-screen"><div class="flex flex-col w-full pb-margin-lg">
+<!-- Status & Quick Bar -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md py-space-md">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs text-outline">
+<span class="font-label-sm text-label-sm tracking-widest uppercase">TERMINAL VẬN HÀNH</span>
+<span>/</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">MODULE 50</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight mt-0.5">
+        PHÂN HỆ 50 // TRUNG TÂM ĐIỀU PHỐI ĐỘI XE ĐƯA ĐÓN SÂN BAY &amp; XE ĐIỆN RESORT
+      </h1>
+</div>
+<!-- Quick Action Toolbelt -->
+<div class="flex flex-wrap items-center gap-space-xs">
+<button class="flex items-center gap-space-xs px-space-md py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md shadow-sm hover:opacity-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>+ ĐẶT CHUYẾN ĐƯA ĐÓN MỚI</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-2 rounded-lg bg-surface-container-highest text-on-surface font-label-md text-label-md shadow-sm hover:bg-surface-container-high transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">swap_horiz</span>
+<span>ĐIỀU PHỐI XE NHANH</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-2 rounded-lg bg-surface-container-highest text-on-surface font-label-md text-label-md shadow-sm hover:bg-surface-container-high transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">print</span>
+<span>XUẤT LỊCH TRÌNH TÀI XẾ</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-2 rounded-lg bg-secondary-container text-on-secondary-container font-label-md text-label-md shadow-sm" type="button">
+<span class="w-2 h-2 rounded-full bg-secondary animate-ping"></span>
+<span class="material-symbols-outlined text-[18px]">radio</span>
+<span>BỘ ĐÀM KÊNH 04 (CONCIERGE)</span>
+</button>
+</div>
+</div>
+<!-- Telemetry Metrics -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter-lg mt-space-sm">
+<!-- Card 1 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="absolute -right-6 -bottom-6 w-28 h-28 bg-primary/5 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Hôm Nay</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[20px]">commute</span>
+</div>
+<div class="mt-space-md">
+<span class="font-label-sm text-label-sm text-outline uppercase block">Tổng Chuyến Đón • Tiễn</span>
+<div class="flex items-baseline gap-space-xs mt-0.5">
+<span class="font-headline-lg text-headline-lg text-on-surface">18</span>
+<span class="font-label-md text-label-md text-primary font-bold">CHUYẾN</span>
+</div>
+</div>
+<div class="mt-space-md pt-space-xs bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between text-on-surface-variant">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[16px] text-secondary">flight_land</span>
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">12 Sân bay Phú Quốc (PQC)</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[16px] text-primary">tour</span>
+<span class="font-label-sm text-label-sm">6 Tour đảo</span>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="absolute -right-6 -bottom-6 w-28 h-28 bg-secondary/5 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary-container"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Đội Xe Sẵn Sàng</span>
+</div>
+<span class="material-symbols-outlined text-secondary text-[20px]">directions_car</span>
+</div>
+<div class="mt-space-md">
+<span class="font-label-sm text-label-sm text-outline uppercase block">Tình Trạng Phương Tiện</span>
+<div class="flex items-baseline gap-space-xs mt-0.5">
+<span class="font-headline-lg text-headline-lg text-on-surface">08<span class="text-outline-variant font-normal">/10</span></span>
+<span class="font-label-md text-label-md text-secondary font-bold">HOẠT ĐỘNG</span>
+</div>
+</div>
+<div class="mt-space-md pt-space-xs bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm text-on-surface">3 Maybach • 4 Limousine • 1 Carnival</span>
+<span class="font-label-sm text-label-sm text-tertiary font-bold">2 Bảo dưỡng</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="absolute -right-6 -bottom-6 w-28 h-28 bg-tertiary-container/10 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="w-2.5 h-2.5 rounded-full bg-primary-container"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Nhân Sự Ca Trực</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">badge</span>
+</div>
+<div class="mt-space-md">
+<span class="font-label-sm text-label-sm text-outline uppercase block">Chauffeur Chuyên Trách</span>
+<div class="flex items-baseline gap-space-xs mt-0.5">
+<span class="font-headline-lg text-headline-lg text-on-surface">08</span>
+<span class="font-label-md text-label-md text-on-primary-container font-bold">TÀI XẾ TRỰC TIẾP</span>
+</div>
+</div>
+<div class="mt-space-md pt-space-xs bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm text-primary font-semibold">4 Trên lộ trình</span>
+<span class="font-label-sm text-label-sm">2 Chờ PQC</span>
+<span class="font-label-sm text-label-sm text-outline">2 Túc trực sảnh</span>
+</div>
+</div>
+</div>
+<!-- Main Dispatch Canvas: Split Live Map & Flight Matrix -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-gutter-lg mt-margin-md">
+<!-- Left Column: GPS Visual Corridor & Fleet Telematics (5 Cols) -->
+<div class="xl:col-span-5 flex flex-col gap-space-md">
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Hải Trình &amp; GPS Radar Thời Gian Thực</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary bg-primary-container/20 px-space-sm py-0.5 rounded font-bold">GPS ACTIVE</span>
+</div>
+<!-- Route Meta Banner -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between text-on-surface">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">flight</span>
+<div>
+<p class="font-label-sm text-label-sm text-outline">ĐIỂM ĐÓN</p>
+<p class="font-label-md text-label-md font-bold">Sân bay PQC (Ga T1/T2)</p>
+</div>
+</div>
+<div class="flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-primary font-bold">24 KM • ~32 PHÚT</span>
+<div class="w-24 h-1 bg-surface-container-highest rounded-full overflow-hidden mt-1">
+<div class="w-2/3 h-full bg-primary rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center gap-space-xs text-right">
+<div>
+<p class="font-label-sm text-label-sm text-outline">ĐIỂM ĐẾN</p>
+<p class="font-label-md text-label-md font-bold">Grand Horizon Bãi Dài</p>
+</div>
+<span class="material-symbols-outlined text-primary text-[20px]">domain</span>
+</div>
+</div>
+<!-- Simulated Visual Map Route Display -->
+<div class="relative w-full h-80 rounded-xl overflow-hidden bg-surface-container">
+<div class="w-full h-full bg-cover bg-center" data-location="Phu Quoc International Airport, Vietnam" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDgbdhX_F-pwBkD8Kmj9ZDPTjA9N58T1X9itR6BOgGHWn45YmGNI53M-MMirnuwcPIi6eEkEST919WJR1v3ofZpog0jqr-1kt-jwJoCuscZxt-Im8VzP4tYz_peKzLYw71O86RZuPvHDZTn3oDogVbmJZmLzlnbZe8LSOv9ERr5kRi5Gi1nfh1XIfxyckMSs27-Ndzf4QOcU_eFob-0g9cmGsGCyEOX0PyMS2y9wn85MkkDOIF0UAvR')"></div>
+<!-- Route Overlay Overlay Card -->
+<div class="absolute top-space-sm left-space-sm p-space-sm bg-surface-container-lowest/90 backdrop-blur-md rounded-lg shadow-sm text-on-surface max-w-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-primary font-bold uppercase">Chuyến #TR-801</span>
+<span class="font-label-sm text-label-sm text-outline">14:18:20</span>
+</div>
+<p class="font-label-md text-label-md font-bold text-on-surface mt-1">Mercedes Maybach S450 • 68A-888.99</p>
+<div class="flex items-center justify-between mt-2 pt-2 bg-surface-container-low/60 rounded px-2 py-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Khoảng cách tới sảnh:</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">6.2 km (7 phút)</span>
+</div>
+</div>
+<!-- Radar ping on map -->
+<div class="absolute bottom-1/3 right-1/3 flex items-center justify-center">
+<span class="absolute w-8 h-8 rounded-full bg-primary/30 animate-ping"></span>
+<span class="relative w-4 h-4 rounded-full bg-primary flex items-center justify-center text-[10px] text-on-primary font-bold">VIP</span>
+</div>
+</div>
+<!-- Fleet Quick Telemetry Strip -->
+<div class="grid grid-cols-3 gap-space-xs pt-space-xs">
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Tốc độ trung bình</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">54 <span class="font-body-sm text-body-sm text-outline">km/h</span></span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Tắc nghẽn ĐT47</span>
+<span class="font-headline-sm text-headline-sm text-primary">Thông suốt</span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Xe Điện Buggy Sảnh</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">6/6 <span class="font-body-sm text-body-sm text-primary font-bold">Sạc 100%</span></span>
+</div>
+</div>
+</div>
+<!-- Chauffeur Spotlight Card -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex items-center gap-space-md">
+<img class="w-16 h-16 rounded-xl object-cover" data-alt="Chuyên viên vận chuyển cao cấp tài xế Đỗ Văn Sơn mặc vest đen chỉn chu, nở nụ cười đón khách bên cạnh chiếc Mercedes S450 màu đen sang trọng tại sảnh resort Phú Quốc trong ánh nắng chiều dịu nhẹ." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAE3y9nrGEaryc3SIm77VkYOIIizhUPxF9scINSKe0931Cw1wXdEpgZwnHlnXWTW8RZkpTLTMwBDDFwAWd6zlfSdr_Td3QxqSO1zLNwK343VAzeTk5kfcCZnKvNafuViujEAKdKBtBtpH5IKojSXhJp0S4aZieeZzTXGqSF5x0fOdUAltZghhUrJFpzbyHGHKP2R72xuEzdWc1sjWvbWrtkJoR11L21TzpbmZM_bemkY1vnX6WhB7Vg"/>
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-primary font-bold uppercase">Chauffeur Tiêu Biểu Ca Ngày</span>
+<span class="font-label-sm text-label-sm bg-surface-container-high px-2 py-0.5 rounded text-on-surface font-semibold">Đánh giá: 4.98 ★</span>
+</div>
+<h2 class="font-label-lg text-label-lg text-on-surface font-bold truncate">Đỗ Văn Sơn • Mã NV: CH-402</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Kinh nghiệm 12 năm • Thông thạo Anh - Việt • Đã hoàn tất 1,420 chặng an toàn</p>
+</div>
+</div>
+</div>
+<!-- Right Column: Transfer Schedule Matrix (7 Cols) -->
+<div class="xl:col-span-7 flex flex-col gap-space-md">
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-md">
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">BẢNG ĐIỀU ĐỘ THỜI GIAN THỰC</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Lịch Trình Chuyến Xe Đưa Đón (Transfer Schedule Matrix)</h2>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm bg-surface-container-high text-on-surface px-space-sm py-1 rounded">Bộ lọc: Tất cả</span>
+<span class="font-label-sm text-label-sm bg-surface-container-high text-on-surface px-space-sm py-1 rounded">Đến (Arrival)</span>
+<span class="font-label-sm text-label-sm bg-surface-container-high text-on-surface px-space-sm py-1 rounded">Đi (Departure)</span>
+</div>
+</div>
+<!-- Interactive Schedule List -->
+<div class="flex flex-col gap-space-sm">
+<!-- Item 1: In-transit -->
+<div class="p-space-md rounded-xl bg-surface-container-low hover:bg-surface-container transition-all flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]">near_me</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-primary text-on-primary font-bold">#TR-801</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-primary-container/20 text-on-primary-container font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                    ĐANG ĐÓN VỀ RESORT
+                  </span>
+<span class="font-label-sm text-label-sm text-outline">Chuyến bay: VN-1233 (14:10)</span>
+</div>
+<div class="mt-1 flex items-baseline gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface font-headline-lg">Arthur Dent</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-secondary-container text-on-secondary-container font-semibold">VIP Titan</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                  Mercedes Maybach S450 (<span class="font-semibold text-on-surface">68A-888.99</span>) • Tài xế: <span class="font-semibold text-on-surface">Đỗ Văn Sơn</span>
+</p>
+</div>
+</div>
+<div class="flex md:flex-col items-end justify-between md:justify-center shrink-0 text-right">
+<span class="font-label-sm text-label-sm text-outline">Khoảng cách thực tế</span>
+<span class="font-headline-sm text-headline-sm text-primary font-bold">6.2 km tới sảnh</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Dự kiến: 14:28</span>
+</div>
+</div>
+<!-- Item 2: Ready to depart -->
+<div class="p-space-md rounded-xl bg-surface-container-low hover:bg-surface-container transition-all flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]">departure_board</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-highest text-on-surface font-bold">#TR-802</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container font-bold">SẮP XUẤT BẾN SẢNH</span>
+<span class="font-label-sm text-label-sm text-outline">Đoàn 8 Khách</span>
+</div>
+<div class="mt-1 flex items-baseline gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface font-headline-lg">Đoàn Khách Gia Đình Phòng 618</span>
+<span class="font-label-sm text-label-sm text-outline">(Đón Sân Bay Ga Quốc Nội)</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                  Ford Transit Dcar Limousine (<span class="font-semibold text-on-surface">68B-123.45</span>) • Tài xế: <span class="font-semibold text-on-surface">Trần Quốc Bảo</span>
+</p>
+</div>
+</div>
+<div class="flex md:flex-col items-end justify-between md:justify-center shrink-0 text-right">
+<span class="font-label-sm text-label-sm text-outline">Khởi hành từ Bãi Xe</span>
+<span class="font-headline-sm text-headline-sm text-secondary font-bold">14:35</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Xe đã sẵn sàng ở sảnh A</span>
+</div>
+</div>
+<!-- Item 3: Awaiting Flight Arrival -->
+<div class="p-space-md rounded-xl bg-surface-container-low hover:bg-surface-container transition-all flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest text-on-surface-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]">flight_land</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-highest text-on-surface font-bold">#TR-803</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-bold">CHỜ CẤT CÁNH / HẠ CÁNH</span>
+<span class="font-label-sm text-label-sm text-outline">Chuyến bay SQ-22</span>
+</div>
+<div class="mt-1 flex items-baseline gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface font-headline-lg">Ngài Kenji Sato</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-primary-container text-on-primary-container font-semibold">Suite 1401 Penthouse</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                  Bảng đón VIP mạ vàng + Nước suối Evian lạnh đã cấp phát cho đội lễ tân sân bay.
+                </p>
+</div>
+</div>
+<div class="flex md:flex-col items-end justify-between md:justify-center shrink-0 text-right">
+<span class="font-label-sm text-label-sm text-outline">Dự kiến hạ cánh</span>
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold">16:30</span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">Tài xế đã có mặt tại PQC</span>
+</div>
+</div>
+<!-- Item 4: Completed -->
+<div class="p-space-md rounded-xl bg-surface-container-low hover:bg-surface-container transition-all flex flex-col md:flex-row md:items-center justify-between gap-space-md opacity-80">
+<div class="flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest text-outline flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]">task_alt</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-highest text-outline font-bold">#TR-804</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-high text-outline font-bold">HOÀN TẤT TIỄN KHÁCH</span>
+<span class="font-label-sm text-label-sm text-outline">Tiễn Sân Bay PQC</span>
+</div>
+<div class="mt-1 flex items-baseline gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface line-through font-headline-lg">Bà Clara Higgins</span>
+<span class="font-label-sm text-label-sm text-outline">Check-out Folio #9042</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                  Đã bàn giao hành lý tại Quầy Vietnam Airlines lúc 12:45. Xe đang trên đường quay lại Resort.
+                </p>
+</div>
+</div>
+<div class="flex md:flex-col items-end justify-between md:justify-center shrink-0 text-right">
+<span class="font-label-sm text-label-sm text-outline">Giờ hoàn thành</span>
+<span class="font-headline-sm text-headline-sm text-outline font-bold">12:45</span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">Ký nhận điện tử: ĐẠT</span>
+</div>
+</div>
+</div>
+<!-- Bottom Matrix Quick Controls -->
+<div class="mt-space-md pt-space-md flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm bg-surface-container-lowest">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-outline text-[18px]">sync</span>
+<span class="font-label-sm text-label-sm text-outline">Đồng bộ tự động với Hệ thống Sân bay Tân Sơn Nhất &amp; Phú Quốc mỗi 30 giây</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm hover:bg-surface-container-highest" type="button">Xem Tất Cả 18 Chuyến</button>
+</div>
+</div>
+</div>
+<!-- Luxury Vehicle Showcase Strip -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Phương Tiện Hạng Sang Trực Chiến (Dedicated Luxury Fleet)</h3>
+<span class="font-label-sm text-label-sm text-primary font-bold">8 Xe Sạch Tiêu Chuẩn 5 Sao</span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-center gap-space-sm">
+<img class="w-20 h-14 rounded-lg object-cover" data-alt="Chiếc xe sedan siêu sang Mercedes Maybach S450 màu đen bóng loáng đỗ trước sảnh khách sạn 5 sao sang trọng tại đảo ngọc Phú Quốc, phản chiếu ánh đèn chùm vàng ấm áp lộng lẫy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVX405g6YtOi-KQ5CjT4yMGG5DP2qZzkeYbVxc0A5KnGpDJL451S-RK_BOe1IilvAH6Fg8DZXzn2cQpq2gfMfZ_wk2wuT-kkIgI8xwUs5rWxKNs-IErw1dEd8P4P59x1cRR995oUjuMBYHM5eDWaWr9H5GSufiIFjGD0Edz3clI-jKMGsBCzC5qvR12B_SPvLPjtkEz7W3jKWmxwXln926CvgLwyKZuT4tq26vpMRhCyIvEj8xVWvX"/>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md font-bold text-on-surface truncate">Mercedes Maybach S450</span>
+<span class="font-body-sm text-body-sm text-primary font-semibold">Biển: 68A-888.99 • VIP 1:1</span>
+<span class="font-label-sm text-label-sm text-outline">Nhiên liệu: 92% • Wifi • Khăn Lạnh</span>
+</div>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-center gap-space-sm">
+<img class="w-20 h-14 rounded-lg object-cover" data-alt="Nội thất xe Ford Transit Dcar Limousine bọc da bò cao cấp màu kem, hệ thống đèn trần bầu trời sao lấp lánh, màn hình TV giải trí và ghế massage thương gia hiện đại." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2YvqK4B3uwhjwUL9AYnCRHk-g8lTGbQpGXU3xl_BoYXtbhqrYt6LpHa-0wvKCW2kZroeThowhplrV7R58k2HCRZwHRuveFxlxBOOU8K7z4ZyHteVdon7YAK8x9-750BZhBSvIxHboigYkwfJiRDAHTIM7lW38JDz9r-fIpErHyLWAb7jWrvKRfdQOZ27oKoKR8_BJ6ycHvZh59dlNqqKtJfKE99js_4tOPLai0dAh7KSyZL_drF-W"/>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md font-bold text-on-surface truncate">Transit Dcar Limousine</span>
+<span class="font-body-sm text-body-sm text-secondary font-semibold">Biển: 68B-123.45 • 9 Chỗ VIP</span>
+<span class="font-label-sm text-label-sm text-outline">Nhiên liệu: 88% • Ghế Massage</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Operational Protocol Footer Banner -->
+<div class="mt-space-lg p-space-md rounded-xl bg-surface-container-high text-on-surface flex flex-col md:flex-row md:items-center justify-between gap-space-md shadow-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-[20px]">verified</span>
+</div>
+<div>
+<p class="font-label-md text-label-md font-bold">TIÊU CHUẨN ĐÓN TIỄN CONCIERGE LUXURY • 100% ĐẠT CHUẨN FORBES TRAVEL GUIDE</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Kiểm tra áp suất lốp, khử khuẩn buồng lái, sạc điện thoại đa năng và ô che mưa cao cấp sẵn sàng trên từng xe.</p>
+</div>
+</div>
+<div class="flex items-center gap-space-xs shrink-0">
+<span class="font-label-sm text-label-sm text-outline">TRỰC BAN QUẢN LÝ XE:</span>
+<span class="font-label-md text-label-md font-bold text-primary">TRẦN ANH TUẤN (EXT: 884)</span>
+</div>
+</div>
+</div></main></div></body></html>

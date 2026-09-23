@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "primary": "#006c49",
+        "secondary-fixed-dim": "#89ceff",
+        "tertiary-container": "#fc7c78",
+        "secondary-container": "#39b8fd",
+        "surface-container-highest": "#dde4dd",
+        "inverse-on-surface": "#ebf3eb",
+        "on-tertiary-fixed": "#410005",
+        "error-container": "#ffdad6",
+        "on-error": "#ffffff",
+        "on-surface": "#161d19",
+        "surface-dim": "#d4dcd5",
+        "on-secondary": "#ffffff",
+        "surface-variant": "#dde4dd",
+        "on-secondary-container": "#004666",
+        "error": "#ba1a1a",
+        "primary-fixed": "#6ffbbe",
+        "surface-container-high": "#e3eae3",
+        "on-background": "#161d19",
+        "surface-container-lowest": "#ffffff",
+        "tertiary-fixed-dim": "#ffb3af",
+        "on-primary-container": "#00422b",
+        "outline-variant": "#bbcabf",
+        "primary-container": "#10b981",
+        "on-tertiary-fixed-variant": "#842225",
+        "on-primary-fixed": "#002113",
+        "on-error-container": "#93000a",
+        "outline": "#6c7a71",
+        "primary-fixed-dim": "#4edea3",
+        "on-surface-variant": "#3c4a42",
+        "surface-bright": "#f4fbf4",
+        "tertiary": "#a43a3a",
+        "on-secondary-fixed": "#001e2f",
+        "surface-container-low": "#eef6ee",
+        "surface-container": "#e8f0e9",
+        "on-tertiary": "#ffffff",
+        "on-primary": "#ffffff",
+        "surface": "#f4fbf4",
+        "inverse-surface": "#2b322d",
+        "tertiary-fixed": "#ffdad7",
+        "on-secondary-fixed-variant": "#004c6e",
+        "surface-tint": "#006c49",
+        "on-primary-fixed-variant": "#005236",
+        "on-tertiary-container": "#711419",
+        "inverse-primary": "#4edea3",
+        "secondary": "#006591",
+        "background": "#f4fbf4",
+        "secondary-fixed": "#c9e6ff"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "full": "9999px"
+      },
+      "spacing": {
+        "gutter": "1rem",
+        "space-md": "0.75rem",
+        "gutter-lg": "1.5rem",
+        "margin-md": "1.5rem",
+        "space-xs": "0.25rem",
+        "margin-lg": "2rem",
+        "space-lg": "1rem",
+        "space-xl": "1.5rem",
+        "margin": "1rem",
+        "space-sm": "0.5rem"
+      },
+      "fontFamily": {
+        "label-md": [
+          "Inter"
+        ],
+        "body-lg": [
+          "Inter"
+        ],
+        "headline-lg": [
+          "Playfair Display"
+        ],
+        "headline-md": [
+          "Inter"
+        ],
+        "body-sm": [
+          "Inter"
+        ],
+        "body-md": [
+          "Inter"
+        ],
+        "display-lg-mobile": [
+          "Playfair Display"
+        ],
+        "label-lg": [
+          "Inter"
+        ],
+        "label-sm": [
+          "Inter"
+        ],
+        "display-lg": [
+          "Playfair Display"
+        ],
+        "headline-sm": [
+          "Inter"
+        ]
+      },
+      "fontSize": {
+        "label-md": [
+          "0.75rem",
+          {
+            "lineHeight": "1rem",
+            "letterSpacing": "0.05em",
+            "fontWeight": "600"
+          }
+        ],
+        "body-lg": [
+          "1rem",
+          {
+            "lineHeight": "1.5rem",
+            "letterSpacing": "0",
+            "fontWeight": "400"
+          }
+        ],
+        "headline-lg": [
+          "1.75rem",
+          {
+            "lineHeight": "2.25rem",
+            "letterSpacing": "-0.01em",
+            "fontWeight": "500"
+          }
+        ],
+        "headline-md": [
+          "1.25rem",
+          {
+            "lineHeight": "1.75rem",
+            "letterSpacing": "-0.01em",
+            "fontWeight": "600"
+          }
+        ],
+        "body-sm": [
+          "0.75rem",
+          {
+            "lineHeight": "1rem",
+            "letterSpacing": "0.01em",
+            "fontWeight": "400"
+          }
+        ],
+        "body-md": [
+          "0.875rem",
+          {
+            "lineHeight": "1.25rem",
+            "letterSpacing": "0",
+            "fontWeight": "400"
+          }
+        ],
+        "display-lg-mobile": [
+          "1.75rem",
+          {
+            "lineHeight": "2.25rem",
+            "letterSpacing": "-0.01em",
+            "fontWeight": "600"
+          }
+        ],
+        "label-lg": [
+          "0.875rem",
+          {
+            "lineHeight": "1.25rem",
+            "letterSpacing": "0.02em",
+            "fontWeight": "600"
+          }
+        ],
+        "label-sm": [
+          "0.6875rem",
+          {
+            "lineHeight": "0.875rem",
+            "letterSpacing": "0.08em",
+            "fontWeight": "700"
+          }
+        ],
+        "display-lg": [
+          "2.25rem",
+          {
+            "lineHeight": "2.75rem",
+            "letterSpacing": "-0.02em",
+            "fontWeight": "600"
+          }
+        ],
+        "headline-sm": [
+          "1rem",
+          {
+            "lineHeight": "1.5rem",
+            "letterSpacing": "0",
+            "fontWeight": "600"
+          }
+        ]
+      }
+    }
+  }
+}</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-72 bg-inverse-surface text-inverse-on-surface z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex flex-col"><div class="px-gutter-lg pt-space-xl pb-space-lg flex items-center gap-space-sm"><div class="w-9 h-9 rounded-lg bg-primary-container flex items-center justify-center"><span class="material-symbols-outlined text-on-primary-container text-[22px]">hotel_class</span></div><div class="flex flex-col min-w-0"><span class="font-headline-sm text-headline-sm text-surface-bright tracking-tight truncate">Grand Horizon</span><span class="font-label-sm text-label-sm text-outline-variant tracking-wider uppercase truncate">Resort &amp; Suites • PMS</span></div></div><div class="px-gutter-lg py-space-xs"><div class="p-space-sm rounded-lg bg-surface-variant/10 flex items-center justify-between"><div class="flex items-center gap-space-xs"><span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span><span class="font-label-sm text-label-sm text-primary-fixed">TERMINAL ACTIVE</span></div><span class="font-label-sm text-label-sm text-outline-variant">CORE 4.8.2</span></div></div><nav class="flex flex-col gap-space-xs px-space-md mt-space-md" data-active-classes="bg-primary-container text-on-primary-container font-bold rounded-lg"><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="front-desk-operations" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">room_preferences</span><span class="font-label-lg text-label-lg">Front Desk</span></div><span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-primary-container text-on-primary-container">24 Arr</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="housekeeping-management" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">cleaning_services</span><span class="font-label-lg text-label-lg">Housekeeping</span></div><span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-tertiary-container text-on-tertiary-container">8 Dirty</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="engineering-maintenance" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">build</span><span class="font-label-lg text-label-lg">Engineering</span></div><span class="font-label-sm text-label-sm text-outline-variant">3 OOO</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="inventory-minibar" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">inventory_2</span><span class="font-label-lg text-label-lg">Inventory</span></div></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="billing-cashier-ledger" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span class="font-label-lg text-label-lg">Billing &amp; Folios</span></div></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="guest-crm-profiles" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">loyalty</span><span class="font-label-lg text-label-lg">Guest CRM</span></div><span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-secondary-container text-on-secondary-container">VIP 12</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-inverse-on-surface/80 hover:bg-surface-variant/20 hover:text-inverse-on-surface transition-colors" data-path="transportation-concierge" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">directions_car</span><span class="font-label-lg text-label-lg">Transportation</span></div></a><a aria-current="page" class="flex items-center justify-between px-space-md py-space-sm transition-colors bg-primary-container text-on-primary-container font-bold rounded-lg" data-path="security-night-audit" href="#"><div class="flex items-center gap-space-md"><span class="material-symbols-outlined text-[20px]">verified_user</span><span class="font-label-lg text-label-lg">Security Audit</span></div></a></nav></div><div class="p-space-md mx-space-md mb-space-lg rounded-xl bg-surface-variant/10 flex flex-col gap-space-xs"><div class="flex items-center justify-between"><span class="font-label-sm text-label-sm text-outline-variant uppercase">System Shift</span><span class="font-label-sm text-label-sm text-primary-fixed">AM / ROTATION</span></div><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-outline-variant text-[16px]">schedule</span><span class="font-label-md text-label-md text-inverse-on-surface">06:00 - 14:30 GMT+7</span></div></div></aside><div class="pl-72"><header class="fixed top-0 left-72 right-0 h-16 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-gutter-lg"><div class="flex items-center gap-gutter-lg"><div class="flex items-center gap-space-sm"><div class="w-2.5 h-2.5 rounded-full bg-primary-container"></div><div class="flex flex-col"><span class="font-label-md text-label-md text-on-surface leading-none">Phú Quốc Sanctuary</span><span class="font-label-sm text-label-sm text-outline leading-tight">Tower A • Ocean Wing</span></div></div><div class="h-6 w-px bg-surface-container-highest"></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs"><span class="font-label-sm text-label-sm text-on-surface-variant">OCC:</span><span class="font-headline-sm text-headline-sm text-primary leading-none">84%</span></div><div class="flex items-center gap-space-xs"><span class="font-label-sm text-label-sm text-on-surface-variant">REVPAR:</span><span class="font-headline-sm text-headline-sm text-on-surface leading-none">$428</span></div></div><div class="h-6 w-px bg-surface-container-highest"></div><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-space-md text-outline text-[18px]">search</span><input class="w-80 pl-9 pr-space-md py-1.5 rounded-lg bg-surface-container-low text-on-surface placeholder:text-outline font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest" placeholder="Search reservation, room, guest ID (⌘K)..." type="text"/></div></div><div class="flex items-center gap-space-lg"><button aria-label="Operational Notifications" class="relative p-space-xs rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-tertiary"></span></button><div class="h-6 w-px bg-surface-container-highest"></div><div class="flex items-center gap-space-md"><div class="flex flex-col text-right"><span class="font-label-lg text-label-lg text-on-surface leading-tight">Lê Minh Anh</span><span class="font-label-sm text-label-sm text-on-surface-variant leading-none">Front Desk Manager</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full px-gutter-lg pt-16 bg-surface min-h-screen"><div class="flex flex-col w-full pb-margin-lg">
+<div class="flex flex-col gap-space-lg">
+<!-- Top System Header Banner -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md p-space-lg rounded-xl bg-surface-container-lowest shadow-sm">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-surface-container text-on-surface-variant tracking-wider">PMS NOCTURNE OPS</span>
+<span class="font-label-sm text-label-sm text-outline">•</span>
+<span class="font-label-sm text-label-sm text-primary tracking-wide">PHÂN HỆ 49 // TÀI CHÍNH KẾ TOÁN LƯU TRÚ</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">
+          Trung Tâm Điều Hành Kiểm Toán Đêm &amp; Đóng Sổ Tài Chính Tự Động
+        </h1>
+<p class="font-body-md text-body-md text-on-surface-variant">
+          Kiểm toán doanh thu, đối soát cân bằng USALI, chốt sổ ca đêm và chuyển giao ngày kinh doanh tự động sang 25/10/2025.
+        </p>
+</div>
+<!-- Execution Countdown Pill Card -->
+<div class="flex items-center gap-space-lg p-space-md rounded-xl bg-surface-container-low shadow-sm">
+<div class="flex flex-col items-start lg:items-end">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-ping"></span>
+<span class="font-label-sm text-label-sm text-primary tracking-widest uppercase">TRẠNG THÁI: SẴN SÀNG KHỞI CHẠY (ARMED)</span>
+</div>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-display-lg text-display-lg text-on-surface tracking-tight" id="countdown-timer">05:18:42</span>
+<span class="font-label-sm text-label-sm text-outline">đến 02:00:00 SÁNG</span>
+</div>
+</div>
+<div class="w-12 h-12 rounded-lg bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[28px]">bedtime</span>
+</div>
+</div>
+</div>
+<!-- 4 Pre-Audit Metric Bento Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- Metric 1 -->
+<div class="flex flex-col p-space-md rounded-xl bg-surface-container-lowest shadow-sm gap-space-sm relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Doanh Thu Phòng Ghi Nhận</span>
+<span class="material-symbols-outlined text-primary text-[20px]">payments</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-lg text-headline-lg text-on-surface">726.000.000 đ</span>
+<span class="font-label-sm text-label-sm text-primary flex items-center gap-space-xs mt-0.5">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+            124/144 phòng có khách đêm nay
+          </span>
+</div>
+<div class="w-full bg-surface-container h-1 rounded-full overflow-hidden mt-space-xs">
+<div class="bg-primary h-full w-[86.4%] rounded-full"></div>
+</div>
+</div>
+<!-- Metric 2 -->
+<div class="flex flex-col p-space-md rounded-xl bg-surface-container-lowest shadow-sm gap-space-sm relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Công Suất Dự Kiến Chốt</span>
+<span class="material-symbols-outlined text-secondary text-[20px]">hotel</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-lg text-headline-lg text-on-surface">86.4%</span>
+<span class="font-label-sm text-label-sm text-secondary flex items-center gap-space-xs mt-0.5">
+<span class="material-symbols-outlined text-[14px]">trending_up</span>
+            Vượt +4.2% so với ngân sách RevPAR
+          </span>
+</div>
+<div class="w-full bg-surface-container h-1 rounded-full overflow-hidden mt-space-xs">
+<div class="bg-secondary-container h-full w-[86.4%] rounded-full"></div>
+</div>
+</div>
+<!-- Metric 3 -->
+<div class="flex flex-col p-space-md rounded-xl bg-surface-container-lowest shadow-sm gap-space-sm relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Hồ Sơ Mở Chưa Quyết Toán</span>
+<span class="material-symbols-outlined text-secondary text-[20px]">folder_open</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-lg text-headline-lg text-on-surface">44 Folios</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-space-xs mt-0.5">
+<span class="material-symbols-outlined text-primary text-[14px]">lock</span>
+            100% Khóa Pre-auth bảo đảm thẻ
+          </span>
+</div>
+<div class="w-full bg-surface-container h-1 rounded-full overflow-hidden mt-space-xs">
+<div class="bg-primary-container h-full w-full rounded-full"></div>
+</div>
+</div>
+<!-- Metric 4 -->
+<div class="flex flex-col p-space-md rounded-xl bg-surface-container-lowest shadow-sm gap-space-sm relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Cân Bằng Chuẩn USALI</span>
+<span class="material-symbols-outlined text-primary text-[20px]">verified</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-lg text-headline-lg text-primary">ĐẠT CHUẨN</span>
+<span class="font-label-sm text-label-sm text-primary flex items-center gap-space-xs mt-0.5">
+<span class="material-symbols-outlined text-[14px]">balance</span>
+            Sai lệch kiểm toán: 0 đ (Cân đối tuyệt đối)
+          </span>
+</div>
+<div class="w-full bg-surface-container h-1 rounded-full overflow-hidden mt-space-xs">
+<div class="bg-primary h-full w-full rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Main Operational Workspace Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- Left 7 Cols: 5-Step Automated Checklist -->
+<div class="lg:col-span-7 flex flex-col gap-space-md">
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-lg">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[24px]">fact_check</span>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface leading-tight">Quy Trình Kiểm Tra 5 Bước Tự Động</h2>
+<span class="font-label-sm text-label-sm text-outline tracking-wide">AUTOMATED PRE-AUDIT VERIFICATION GATEWAYS</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm px-space-sm py-1 rounded bg-primary-container text-on-primary-container font-semibold">
+              4/5 HOÀN TẤT
+            </span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<!-- Step 1 -->
+<div class="flex items-start justify-between p-space-md rounded-lg bg-surface-container-low transition-colors hover:bg-surface-container">
+<div class="flex items-start gap-space-md">
+<div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">point_of_sale</span>
+</div>
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Bước 1: Khóa sổ &amp; Đồng bộ điểm bán POS ngoại vi</span>
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-primary/15 text-primary">12/12 ĐIỂM ĐÃ ĐÓNG</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Toàn bộ hóa đơn nhà hàng Ocean Club, Sunset Bar, Serene Spa và Dịch vụ phòng đã chốt doanh thu cuối ngày.
+                  </p>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm shrink-0">
+<span class="material-symbols-outlined text-[16px]">done_all</span>
+                ĐẠT
+              </div>
+</div>
+<!-- Step 2 -->
+<div class="flex items-start justify-between p-space-md rounded-lg bg-surface-container-low transition-colors hover:bg-surface-container">
+<div class="flex items-start gap-space-md">
+<div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">receipt</span>
+</div>
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Bước 2: Ghi nhận cước phòng đêm &amp; Phí dịch vụ (Posting Room &amp; Tax)</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Tự động định khoản giá phòng hợp đồng, 8% VAT và 5% phí phục vụ vào Master Folio của từng phòng đang lưu trú.
+                  </p>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm shrink-0">
+<span class="material-symbols-outlined text-[16px]">done_all</span>
+                ĐẠT
+              </div>
+</div>
+<!-- Step 3: Pending Action Step -->
+<div class="flex items-start justify-between p-space-md rounded-lg bg-surface-container-high transition-colors">
+<div class="flex items-start gap-space-md">
+<div class="w-8 h-8 rounded-full bg-tertiary-container/40 text-on-tertiary-container flex items-center justify-center shrink-0 mt-0.5 animate-pulse">
+<span class="material-symbols-outlined text-[18px]">person_cancel</span>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-xs flex-wrap">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Bước 3: Rà soát &amp; Phê duyệt phòng No-show và Khách trễ hạn</span>
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-bold">CẦN XÁC NHẬN</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Phát hiện 02 phòng đặt chưa nhận phòng sau 23:59 (Phòng Ocean Suite #408 và Horizon Villa #102). Cần lệnh hủy hoặc giữ bảo lưu.
+                  </p>
+<div class="flex items-center gap-space-sm mt-space-xs">
+<button class="px-space-sm py-1 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm shadow-sm hover:bg-surface transition-colors flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]">visibility</span> Xem 2 Đặt Phòng
+                    </button>
+<button class="px-space-sm py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm shadow-sm hover:bg-primary-container transition-colors flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]">check</span> Chấp Nhận Tự Động Thu Phạt Đêm Đầu
+                    </button>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-surface-container-highest text-on-surface-variant font-label-sm text-label-sm shrink-0">
+<span class="material-symbols-outlined text-[16px] text-tertiary">hourglass_top</span>
+                ĐANG CHỜ
+              </div>
+</div>
+<!-- Step 4 -->
+<div class="flex items-start justify-between p-space-md rounded-lg bg-surface-container-low transition-colors hover:bg-surface-container">
+<div class="flex items-start gap-space-md">
+<div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">calendar_month</span>
+</div>
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Bước 4: Thiết lập chuyển ngày kế toán (Roll Business Date)</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Sẵn sàng tịnh tiến lịch hệ thống từ ngày 24/10/2025 sang 25/10/2025 sau khi toàn bộ bút toán được chốt.
+                  </p>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm shrink-0">
+<span class="material-symbols-outlined text-[16px]">done_all</span>
+                ĐẠT
+              </div>
+</div>
+<!-- Step 5 -->
+<div class="flex items-start justify-between p-space-md rounded-lg bg-surface-container-low transition-colors hover:bg-surface-container">
+<div class="flex items-start gap-space-md">
+<div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">cloud_sync</span>
+</div>
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Bước 5: Sao lưu dữ liệu đám mây &amp; Biên soạn tệp Management Reports</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Kênh lưu trữ bảo mật AWS Frankfurt &amp; Singapore sẵn sàng ghi snapshot. Tạo gói báo cáo cho Ban Giám Đốc.
+                  </p>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm shrink-0">
+<span class="material-symbols-outlined text-[16px]">done_all</span>
+                ĐẠT
+              </div>
+</div>
+</div>
+</div>
+<!-- System Audit Log Live Stream -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-outline text-[20px]">terminal</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Nhật Ký Phiên Kiểm Toán Trực Tiếp (Live Stream)</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">PORT 8443 // SECURE SSL</span>
+</div>
+<div class="flex flex-col gap-space-xs p-space-md rounded-lg bg-surface-container font-mono text-body-sm">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span>[20:45:11] SYNC_POS_OK: Nhà hàng Biển Sunset chốt sổ ca tối - 162 giao dịch.</span>
+<span class="text-primary font-semibold">KHỚP</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<span>[21:10:04] PRE_AUTH_VERIFY: Quét 44 thẻ mở thanh toán trực tuyến Visa/Master.</span>
+<span class="text-primary font-semibold">100% OK</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<span>[21:30:18] RATE_POST_SIM: Thử nghiệm ghi nhận giá phòng 124 khóa chìa.</span>
+<span class="text-primary font-semibold">KHÔNG LỖI</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<span>[21:42:50] USALI_MATRIX: Cân bằng tài khoản 1010-1290 đối soát tiền cọc.</span>
+<span class="text-primary font-semibold">0.00 VẬN HÀNH</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right 5 Cols: Financial Flow & Command Actions -->
+<div class="lg:col-span-5 flex flex-col gap-space-md">
+<!-- Revenue Distribution & Balancing Chart -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-lg">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface">Cân Đối Dòng Tiền &amp; Doanh Thu</span>
+<span class="font-label-sm text-label-sm text-outline">AUDIT BALANCING TIMELINE &amp; LEDGER</span>
+</div>
+<span class="material-symbols-outlined text-secondary text-[22px]">account_balance_wallet</span>
+</div>
+<!-- SVG Donut Chart and Ledger Breakdown -->
+<div class="flex items-center gap-space-lg">
+<div class="relative w-32 h-32 shrink-0 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 36 36">
+<!-- Background Ring -->
+<path class="text-surface-container" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.8"></path>
+<!-- Segment 1: Rooms (72%) -->
+<path class="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="72, 100" stroke-width="3.8"></path>
+<!-- Segment 2: F&B (18%) -->
+<path class="text-secondary-container" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="18, 100" stroke-dashoffset="-72" stroke-width="3.8"></path>
+<!-- Segment 3: Spa/Minibar/Trans (10%) -->
+<path class="text-tertiary-container" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="10, 100" stroke-dashoffset="-90" stroke-width="3.8"></path>
+</svg>
+<div class="absolute flex flex-col items-center justify-center">
+<span class="font-headline-sm text-headline-sm text-on-surface">1.01 Tỷ</span>
+<span class="font-label-sm text-label-sm text-outline">TỔNG DOANH SỐ</span>
+</div>
+</div>
+<div class="flex flex-col gap-space-xs flex-1">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="w-2.5 h-2.5 rounded-sm bg-primary"></span>
+<span class="font-body-sm text-body-sm text-on-surface">Doanh thu phòng</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">726.000.000 đ</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="w-2.5 h-2.5 rounded-sm bg-secondary-container"></span>
+<span class="font-body-sm text-body-sm text-on-surface">Ẩm thực (F&amp;B)</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">184.500.000 đ</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="w-2.5 h-2.5 rounded-sm bg-tertiary-container"></span>
+<span class="font-body-sm text-body-sm text-on-surface">Spa &amp; Dịch vụ khác</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">102.800.000 đ</span>
+</div>
+</div>
+</div>
+<!-- Cash Flow Reconciliation Bar -->
+<div class="flex flex-col gap-space-xs pt-space-sm border-t border-surface-container">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Đối Soát Thanh Toán Đã Nhận</span>
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-on-surface-variant">Tiền mặt &amp; Ngoại tệ quầy lễ tân:</span>
+<span class="font-mono font-medium text-on-surface">42.300.000 đ</span>
+</div>
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-on-surface-variant">Cổng thẻ tín dụng &amp; Chuyển khoản:</span>
+<span class="font-mono font-medium text-on-surface">871.000.000 đ</span>
+</div>
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-on-surface-variant">Bảo lãnh công ty đối tác (City Ledger):</span>
+<span class="font-mono font-medium text-on-surface">100.000.000 đ</span>
+</div>
+<div class="p-space-sm rounded bg-primary/10 flex items-center justify-between mt-space-xs">
+<span class="font-label-sm text-label-sm text-primary font-bold">Tổng thanh toán ghi nhận:</span>
+<span class="font-mono font-bold text-primary">1.013.300.000 đ</span>
+</div>
+</div>
+</div>
+<!-- Master Command & Control Actions -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[22px]">play_circle</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Bảng Điều Khiển Tác Vụ Khóa Sổ</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Khởi chạy kiểm toán đêm sẽ tự động khóa toàn bộ thao tác thu ngân trên toàn hệ thống trong thời gian xử lý khoảng 4 phút.
+          </p>
+<div class="flex flex-col gap-space-sm pt-space-xs">
+<!-- Run Night Audit Primary Button -->
+<button class="w-full py-3 px-space-lg rounded-lg bg-primary text-on-primary font-label-lg text-label-lg shadow-md hover:bg-primary-container hover:shadow-lg transition-all flex items-center justify-center gap-space-sm group" type="button">
+<span class="material-symbols-outlined text-[20px] group-hover:rotate-45 transition-transform">bolt</span>
+              KHỞI CHẠY KIỂM TOÁN ĐÊM NGAY (RUN NIGHT AUDIT)
+            </button>
+<!-- Export Reports Secondary Button -->
+<button class="w-full py-2.5 px-space-lg rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors flex items-center justify-center gap-space-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">download</span>
+              XUẤT BỘ BÁO CÁO NHẬT KÝ KIỂM TOÁN (EXCEL / PDF)
+            </button>
+</div>
+<!-- Security Certification Footer -->
+<div class="flex flex-col gap-space-xs pt-space-md border-t border-surface-container">
+<div class="flex items-center justify-between text-outline">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[16px] text-primary">security</span>
+<span class="font-label-sm text-label-sm uppercase">Chứng nhận bảo mật ISO 27001</span>
+</div>
+<span class="font-label-sm text-label-sm">TIÊU CHUẨN TÀI CHÍNH</span>
+</div>
+<div class="flex items-center justify-between text-outline">
+<span class="font-label-sm text-label-sm">CHỮ KÝ SỐ KIỂM TOÁN SHA-256:</span>
+<span class="font-mono text-body-sm text-on-surface-variant truncate max-w-[190px]">8f3c...d94a2b</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    let totalSeconds = 5 * 3600 + 18 * 60 + 42;
+    const timerElem = document.getElementById('countdown-timer');
+    if (timerElem) {
+      setInterval(function() {
+        if (totalSeconds > 0) {
+          totalSeconds--;
+          const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+          const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+          const secs = String(totalSeconds % 60).padStart(2, '0');
+          timerElem.textContent = hrs + ':' + mins + ':' + secs;
+        }
+      }, 1000);
+    }
+  })();
+</script></main></div></body></html>
