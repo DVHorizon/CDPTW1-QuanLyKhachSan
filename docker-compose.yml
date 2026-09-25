@@ -5,10 +5,8 @@ services:
     image: mysql:8.0
     container_name: hotel_mysql
     environment:
-      MYSQL_ROOT_PASSWORD: "rootpassword"
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
       MYSQL_DATABASE: hotel_management
-    ports:
-      - "127.0.0.1:3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -20,7 +18,7 @@ services:
       PMA_HOST: mysql
       PMA_PORT: 3306
     ports:
-      - "127.0.0.1:8080:80"
+      - "8080:80"
     volumes:
       - ./db/phpmyadmin-config.php:/etc/phpmyadmin/config.user.inc.php
     depends_on:
@@ -30,11 +28,11 @@ services:
     build: ./backend
     container_name: hotel_backend
     ports:
-      - "127.0.0.1:5000:5000"
+      - "5000:5000"
     environment:
       - DB_HOST=mysql
       - DB_USER=root
-      - DB_PASSWORD=rootpassword
+      - DB_PASSWORD=
       - DB_NAME=hotel_management
       - PORT=5000
     depends_on:
@@ -44,7 +42,7 @@ services:
     build: ./frontend
     container_name: hotel_frontend
     ports:
-      - "127.0.0.1:3000:80"
+      - "3000:80"
     depends_on:
       - backend
 
