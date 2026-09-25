@@ -19,7 +19,7 @@ Hệ thống ứng dụng web quản lý khách sạn và khu nghỉ dưỡng to
 ## 2. Cấu Trúc Thư Mục Dự Án (Monorepo)
 
 ```
-DOAN-CDPTW1-NhomC/
+CDPTW1-QuanLyKhachSan/
 ├── .gitignore                    # Cấu hình bỏ qua tệp tạm, dependencies, logs
 ├── docker-compose.yml            # Khởi chạy toàn bộ hệ sinh thái dịch vụ bằng Docker
 ├── README.md                     # Tài liệu hướng dẫn sử dụng và phát triển
