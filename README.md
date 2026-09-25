@@ -87,7 +87,7 @@ volumes:
    - **Giao diện Khách hàng & Quản trị:** [http://localhost:3000](http://localhost:3000)
    - **Máy chủ Backend API:** [http://localhost:5000/api/health](http://localhost:5000/api/health)
    - **Giao diện quản lý CSDL phpMyAdmin:** [http://localhost:8080](http://localhost:8080)  
-     _(Tài khoản: `hotel_user` / Mật khẩu: `hotel_password_123`, hoặc `root` / `root_password_123`)_
+     _(Tài khoản: `root` / Mật khẩu:)_
 
 ---
 

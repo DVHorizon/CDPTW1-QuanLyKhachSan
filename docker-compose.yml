@@ -21,6 +21,8 @@ services:
       PMA_PORT: 3306
     ports:
       - "8080:80"
+    volumes:
+      - ./db/phpmyadmin-config.php:/etc/phpmyadmin/config.user.inc.php
     depends_on:
       - mysql
 
