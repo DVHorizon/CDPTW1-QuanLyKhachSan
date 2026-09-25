@@ -1,0 +1,26 @@
+#!/bin/sh
+
+echo "📦 Đã kéo code mới nhất từ Master về."
+echo "🔄 Đang tự động cập nhật Backend và Frontend..."
+
+# --- 1. Xử lý Backend ---
+echo "⚙️  Đang cài đặt Backend..."
+cd backend || exit
+
+# Nếu lệnh npm install thất bại, in ra thông báo lỗi và dừng script (exit 1)
+npm install || { echo "❌ LỖI: Không thể cài đặt thư viện Backend. Vui lòng kiểm tra lại package.json!"; exit 1; }
+
+echo "🗄️  Đang chạy DB Migration..."
+npm run migrate || { echo "❌ LỖI: Migrate Database thất bại! Hãy check lại kết nối MySQL."; exit 1; }
+
+cd ..
+
+# --- 2. Xử lý Frontend ---
+echo "🎨 Đang cài đặt Frontend..."
+cd frontend || exit
+npm install || { echo "❌ LỖI: Không thể cài đặt thư viện Frontend!"; exit 1; }
+
+cd ..
+
+echo "✅ TẤT CẢ ĐÃ CẬP NHẬT THÀNH CÔNG!"
+echo "🚀 Bạn có thể bắt đầu chạy 'npm run dev' ở 2 thư mục để code tiếp."

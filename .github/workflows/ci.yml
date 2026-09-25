@@ -1,0 +1,33 @@
+name: Kiểm tra Code (CI)
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  test-code:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kéo code về máy chủ GitHub
+        uses: actions/checkout@v4 # Cập nhật lên v4
+
+      - name: Thiết lập Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18" # Bạn có thể đổi sang '20' tùy vào dự án của mình
+
+      - name: Kiểm tra Backend
+        run: |
+          cd backend
+          npm ci # Thay cho npm install
+          # npm run test (Bỏ comment nếu dự án backend có test)
+
+      - name: Kiểm tra Frontend
+        run: |
+          cd frontend
+          npm ci # Thay cho npm install
+          npm run build
