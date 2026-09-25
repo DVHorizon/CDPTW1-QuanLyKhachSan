@@ -1,9 +1,12 @@
 name: Kiểm tra Code (CI)
 
 on:
+  pull_request:
+    branches:
+      - master
   push:
     branches:
-      - main
+      - master
 
 jobs:
   test-code:
