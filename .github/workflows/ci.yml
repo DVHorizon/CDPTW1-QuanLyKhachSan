@@ -3,7 +3,7 @@ name: Kiểm tra Code (CI)
 on:
   push:
     branches:
-      - master # hoặc main
+      - main
 
 jobs:
   test-code:
