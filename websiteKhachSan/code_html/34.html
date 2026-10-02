@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-secondary": "#ffffff", "surface": "#f4fbf4", "on-error-container": "#93000a", "on-primary-fixed-variant": "#005236", "tertiary-container": "#fc7c78", "on-secondary-container": "#004666", "tertiary-fixed": "#ffdad7", "on-tertiary-fixed": "#410005", "surface-container-low": "#eef6ee", "on-tertiary-container": "#711419", "tertiary": "#a43a3a", "secondary-container": "#39b8fd", "on-primary-container": "#00422b", "error-container": "#ffdad6", "background": "#f4fbf4", "surface-variant": "#dde4dd", "tertiary-fixed-dim": "#ffb3af", "secondary-fixed-dim": "#89ceff", "primary-container": "#10b981", "on-secondary-fixed-variant": "#004c6e", "surface-container-lowest": "#ffffff", "on-secondary-fixed": "#001e2f", "outline-variant": "#bbcabf", "on-error": "#ffffff", "on-primary": "#ffffff", "outline": "#6c7a71", "on-tertiary": "#ffffff", "on-surface": "#161d19", "surface-container-high": "#e3eae3", "inverse-primary": "#4edea3", "inverse-on-surface": "#ebf3eb", "primary-fixed-dim": "#4edea3", "secondary-fixed": "#c9e6ff", "surface-container-highest": "#dde4dd", "surface-dim": "#d4dcd5", "secondary": "#006591", "primary": "#006c49", "surface-tint": "#006c49", "on-surface-variant": "#3c4a42", "surface-bright": "#f4fbf4", "primary-fixed": "#6ffbbe", "on-background": "#161d19", "surface-container": "#e8f0e9", "error": "#ba1a1a", "on-primary-fixed": "#002113", "on-tertiary-fixed-variant": "#842225", "inverse-surface": "#2b322d" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "gutter-lg": "1.5rem", "gutter": "1rem", "space-lg": "1rem", "margin-lg": "2rem", "space-md": "0.75rem", "margin-md": "1.5rem", "space-xl": "1.5rem", "margin": "1rem", "space-sm": "0.5rem", "space-xs": "0.25rem" }, fontFamily: { "label-md": ["Inter"], "label-sm": ["Inter"], "headline-lg": ["Playfair Display"], "display-lg": ["Playfair Display"], "display-lg-mobile": ["Playfair Display"], "headline-sm": ["Inter"], "body-sm": ["Inter"], "body-lg": ["Inter"], "label-lg": ["Inter"], "headline-md": ["Inter"], "body-md": ["Inter"] }, fontSize: { "label-md": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.05em", "fontWeight": "600" }], "label-sm": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.08em", "fontWeight": "700" }], "headline-lg": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "-0.01em", "fontWeight": "500" }], "display-lg": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.02em", "fontWeight": "600" }], "display-lg-mobile": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "-0.01em", "fontWeight": "600" }], "headline-sm": ["1rem", { "lineHeight": "1.5rem", "letterSpacing": "0", "fontWeight": "600" }], "body-sm": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.01em", "fontWeight": "400" }], "body-lg": ["1rem", { "lineHeight": "1.5rem", "letterSpacing": "0", "fontWeight": "400" }], "label-lg": ["0.875rem", { "lineHeight": "1.25rem", "letterSpacing": "0.02em", "fontWeight": "600" }], "headline-md": ["1.25rem", { "lineHeight": "1.75rem", "letterSpacing": "-0.01em", "fontWeight": "600" }], "body-md": ["0.875rem", { "lineHeight": "1.25rem", "letterSpacing": "0", "fontWeight": "400" }] } } } };</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-72 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between select-none"><div class="flex flex-col"><div class="h-16 px-space-xl flex items-center gap-space-md"><div class="w-9 h-9 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container shadow-[0_0_12px_rgba(16,185,129,0.25)]"><span class="material-symbols-outlined text-[20px]">domain</span></div><div class="flex flex-col min-w-0"><span class="font-headline-lg text-headline-sm text-primary font-bold tracking-tight truncate leading-tight">GRAND HORIZON</span><span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Resort &amp; Suites PMS</span></div></div><div class="px-space-md py-space-sm"><div class="px-space-sm py-space-xs mb-space-xs"><span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Phân hệ điều hành</span></div><nav class="space-y-1" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_0_10px_rgba(16,185,129,0.25)]"><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ban-lam-viec" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-label-lg text-label-lg">Bàn Làm Việc</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="le-tan-tien-sanh" href="#"><span class="material-symbols-outlined text-[20px]">concierge</span><span class="font-label-lg text-label-lg">Lễ Tân &amp; Tiền Sảnh</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="quan-ly-phong" href="#"><span class="material-symbols-outlined text-[20px]">meeting_room</span><span class="font-label-lg text-label-lg">Quản Lý Phòng</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="buong-phong-ky-thuat" href="#"><span class="material-symbols-outlined text-[20px]">cleaning_services</span><span class="font-label-lg text-label-lg">Buồng Phòng &amp; Kỹ Thuật</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dich-vu-spa" href="#"><span class="material-symbols-outlined text-[20px]">spa</span><span class="font-label-lg text-label-lg">Dịch Vụ &amp; Spa</span></a><a aria-current="page" class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg transition-colors bg-primary-container text-on-primary-container font-semibold shadow-[0_0_10px_rgba(16,185,129,0.25)]" data-path="fb-pos-goi-mon" href="#"><span class="material-symbols-outlined text-[20px]">restaurant</span><span class="font-label-lg text-label-lg">Ẩm Thực F&amp;B &amp; Bếp</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="tai-chinh-so-cai" href="#"><span class="material-symbols-outlined text-[20px]">account_balance_wallet</span><span class="font-label-lg text-label-lg">Tài Chính &amp; Sổ Cái</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ai-concierge-chatbot" href="#"><span class="material-symbols-outlined text-[20px]">smart_toy</span><span class="font-label-lg text-label-lg">AI Concierge &amp; Chatbot</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="quan-tri-he-thong" href="#"><span class="material-symbols-outlined text-[20px]">admin_panel_settings</span><span class="font-label-lg text-label-lg">Quản Trị Hệ Thống</span></a></nav></div></div><div class="p-space-md"><div class="bg-surface-container-low rounded-xl p-space-md flex flex-col gap-space-xs"><div class="flex items-center justify-between"><span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Khu Vực Vận Hành</span><span class="flex h-2 w-2 relative"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span></span></div><div class="font-label-md text-label-md text-on-surface font-semibold truncate">Phú Quốc Sanctuary</div><div class="flex items-center justify-between text-on-surface-variant pt-space-xs font-body-sm text-body-sm"><span>Công suất phòng</span><span class="font-label-md text-label-md text-primary font-bold">84%</span></div></div></div></aside><div class="pl-72"><header class="fixed top-0 left-72 right-0 h-16 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-space-xl"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm bg-surface-container-low px-space-md py-space-xs rounded-lg"><span class="material-symbols-outlined text-primary text-[18px]">pin_drop</span><span class="font-label-md text-label-md text-on-surface">Phú Quốc Sanctuary • Ca Chiều (14:00 - 22:00)</span></div><div class="hidden xl:flex items-center gap-space-xs bg-surface-container px-space-md py-space-xs rounded-full"><span class="w-2 h-2 rounded-full bg-primary-container shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span><span class="font-label-sm text-label-sm text-on-surface-variant font-semibold tracking-wide uppercase">Terminal Live • 84% OCC</span></div></div><div class="flex items-center gap-space-md"><div class="hidden md:flex items-center bg-surface-container-low px-space-md py-space-xs rounded-lg text-outline gap-space-sm"><span class="material-symbols-outlined text-[18px]">search</span><span class="font-body-sm text-body-sm text-outline">Tìm bàn, hóa đơn, món (⌘K)</span></div><button class="relative p-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-tertiary-container ring-2 ring-surface-container-lowest"></span></button><div class="h-6 w-px bg-outline-variant"></div><div class="flex items-center gap-space-md pl-space-xs"><div class="flex flex-col text-right hidden sm:flex"><span class="font-label-md text-label-md text-on-surface font-semibold">Lê Minh Anh</span><span class="font-label-sm text-label-sm text-on-surface-variant">Tổng Quản Lý Tiền Sảnh</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-sm"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-16 bg-surface"><div class="flex flex-col w-full p-space-lg gap-space-lg">
+<!-- Top Operational Banner: Live KPIs & Micro Cellar Telemetry -->
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-space-lg">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs text-primary font-label-sm uppercase tracking-widest">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+<span>MODULE 34 • DISPENSE &amp; SOMMELIER VAULT ENGINE</span>
+</div>
+<h1 class="font-headline-lg text-headline-md sm:text-headline-lg text-on-surface font-semibold tracking-tight">
+        Trạm Pha Chế Đồ Uống &amp; Điều Hành Hầm Rượu Sommelier
+      </h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+        Hệ thống giám sát vòi rót tự động IoT, định lượng cân tiểu ly điện tử và giải phóng tủ rượu vang định danh RFID.
+      </p>
+</div>
+<!-- Live Telemetry KPI Cards -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-space-md">
+<!-- Metric 1 -->
+<div class="bg-surface-container-low rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm uppercase tracking-wider">Hàng chờ pha</span>
+<span class="material-symbols-outlined text-[18px] text-primary">hourglass_top</span>
+</div>
+<div class="flex items-baseline gap-space-xs pt-space-xs">
+<span class="font-headline-md text-display-lg-mobile font-bold text-on-surface">14</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">phiếu trực tiếp</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant pt-space-xs flex items-center gap-space-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span>8 Phòng • 4 Lounge • 2 Bơi</span>
+</div>
+</div>
+<!-- Metric 2 -->
+<div class="bg-surface-container-low rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm uppercase tracking-wider">Tốc độ pha chế</span>
+<span class="material-symbols-outlined text-[18px] text-secondary">timer</span>
+</div>
+<div class="flex items-baseline gap-space-xs pt-space-xs">
+<span class="font-headline-md text-display-lg-mobile font-bold text-on-surface">3.4</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">phút/cocktail</span>
+</div>
+<div class="font-body-sm text-body-sm text-primary font-semibold pt-space-xs flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[14px]">trending_down</span>
+<span>-18s so với định mức ca</span>
+</div>
+</div>
+<!-- Metric 3 -->
+<div class="bg-surface-container-low rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm uppercase tracking-wider">Hầm rượu Cellar</span>
+<span class="material-symbols-outlined text-[18px] text-tertiary">thermostat</span>
+</div>
+<div class="flex items-baseline gap-space-xs pt-space-xs">
+<span class="font-headline-md text-display-lg-mobile font-bold text-on-surface">842</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">chai bảo tồn</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant pt-space-xs flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm text-primary font-semibold">13.2°C</span>
+<span>• 68% RH Chuẩn</span>
+</div>
+</div>
+<!-- Metric 4 -->
+<div class="bg-surface-container-low rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm uppercase tracking-wider">Hao hụt cảm biến</span>
+<span class="material-symbols-outlined text-[18px] text-primary-container">speed</span>
+</div>
+<div class="flex items-baseline gap-space-xs pt-space-xs">
+<span class="font-headline-md text-display-lg-mobile font-bold text-on-surface">1.2%</span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">Tốt</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant pt-space-xs flex items-center gap-space-xs">
+<span>Ngưỡng tối đa &lt; 2.0%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Primary 3-Column Tactical Workstation -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg w-full items-start">
+<!-- COLUMN 1: LIVE DRINK TICKET STREAM (30% -> col-span-12 lg:col-span-4 xl:col-span-3) -->
+<section class="lg:col-span-4 xl:col-span-4 flex flex-col gap-space-md">
+<!-- Section Header -->
+<div class="flex items-center justify-between bg-surface-container-low px-space-md py-space-sm rounded-lg">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
+<h2 class="font-label-lg text-label-lg text-on-surface font-bold uppercase tracking-wider">Phiếu Pha Chế Trực Tiếp</h2>
+</div>
+<span class="bg-primary-container text-on-primary-container text-label-sm font-label-sm px-space-sm py-0.5 rounded-full font-bold">
+          3 Phiếu Ưu Tiên
+        </span>
+</div>
+<!-- TICKET #BEV-1082: ROOM SERVICE (Active Working Ticket) -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-md space-y-space-sm transition-all">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">#BEV-1082</span>
+<span class="bg-tertiary-container text-on-tertiary-container text-label-sm font-label-sm px-space-xs py-0.5 rounded font-bold uppercase">Ưu Tiên VIP</span>
+</div>
+<span class="font-headline-sm text-headline-sm text-primary font-semibold mt-0.5">Phòng 804 • Khách Arthur Dent</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span> 2 phút trước
+          </span>
+</div>
+<div class="bg-surface-container-low rounded-lg p-space-sm flex flex-col gap-space-xs">
+<!-- Item 1 -->
+<div class="flex items-start justify-between py-1">
+<div class="flex flex-col pr-2">
+<span class="font-label-md text-label-md text-on-surface font-semibold">2x Nước khoáng San Pellegrino 750ml</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Ướp lạnh 4°C, kèm 2 ly pha lê viền chanh vàng Sicily</span>
+</div>
+<span class="bg-surface-container text-primary font-label-sm text-label-sm px-2 py-0.5 rounded font-semibold whitespace-nowrap">
+              ĐÃ RÓT XONG
+            </span>
+</div>
+<!-- Item 2 (Active Mixology Item) -->
+<div class="bg-surface-container-lowest p-space-sm rounded-md flex items-start justify-between">
+<div class="flex flex-col pr-2">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-ping"></span>
+<span class="font-label-md text-label-md text-primary font-bold">1x Smoky Mezcal Negroni</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Đá khối điêu khắc 50mm, vỏ cam đốt tinh dầu thơm</span>
+</div>
+<span class="bg-primary text-on-primary font-label-sm text-label-sm px-2 py-0.5 rounded font-semibold whitespace-nowrap animate-pulse">
+              ĐANG LẮC SHAKER
+            </span>
+</div>
+</div>
+<div class="pt-space-xs flex gap-space-sm">
+<button class="flex-1 bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md py-2 px-3 rounded-lg font-bold flex items-center justify-center gap-space-xs transition-colors shadow-sm" id="btnCompleteTicket">
+<span class="material-symbols-outlined text-[18px]">done_all</span>
+<span>HOÀN TẤT GIAO CHO RUNNER</span>
+</button>
+</div>
+</div>
+<!-- TICKET #BEV-1083: MAIN RESTAURANT (Cellar + Cocktail) -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">#BEV-1083</span>
+<span class="bg-surface-container-high text-on-surface-variant text-label-sm font-label-sm px-space-xs py-0.5 rounded font-medium">Grand Horizon Dining</span>
+</div>
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold mt-0.5">Bàn 08 • Bàn Trưởng Sommelier</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span> 5 phút trước
+          </span>
+</div>
+<div class="bg-surface-container-low rounded-lg p-space-sm flex flex-col gap-space-xs">
+<!-- Cellar Wine -->
+<div class="flex flex-col py-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-tertiary font-bold">1x Dom Pérignon Vintage 2013</span>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm px-2 py-0.5 rounded font-bold">
+                MỞ KHÓA TỦ C-14
+              </span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Xô đá bạc mạ sáng + 2 ly sâm-panh Lehmann Jamesse Grand Champagne</span>
+</div>
+<!-- Cocktails -->
+<div class="flex flex-col py-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface font-semibold">2x Espresso Martini</span>
+<span class="font-label-sm text-label-sm text-outline">Chờ sau món chính</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Kahlúa Especial, Vodka Ketel One, Crema bọt dày + 3 hạt Arabica Cầu Đất</span>
+</div>
+</div>
+<button class="w-full bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md py-2 px-3 rounded-lg font-semibold flex items-center justify-center gap-space-xs transition-colors">
+<span class="material-symbols-outlined text-[18px]">key</span>
+<span>YÊU CẦU MÃ XÁC THỰC LẤY CHAI DOM PÉRIGNON</span>
+</button>
+</div>
+<!-- TICKET #BEV-1084: ZEN POOL CABANA -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-sm opacity-90 hover:opacity-100 transition-opacity">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">#BEV-1084</span>
+<span class="bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm px-space-xs py-0.5 rounded font-medium">Zen Poolside</span>
+</div>
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold mt-0.5">Cabana 03 • Khách Đang Tắm Nắng</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span> 7 phút trước
+          </span>
+</div>
+<div class="bg-surface-container-low rounded-lg p-space-sm">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface font-semibold">2x Frozen Mango Margarita</span>
+<span class="bg-surface-container text-on-surface-variant font-label-sm text-label-sm px-2 py-0.5 rounded font-medium">Chờ máy xay</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant block mt-0.5">Xoài cát Hòa Lộc ướp tuyết, Tequila Reposado, viền muối ớt Tây Ninh thủ công</span>
+</div>
+<button class="w-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md py-1.5 px-3 rounded-lg font-medium flex items-center justify-center gap-space-xs transition-colors">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+<span>BẮT ĐẦU CHUẨN BỊ MÓN NÀY</span>
+</button>
+</div>
+</section>
+<!-- COLUMN 2: RECIPE SPECIFICATION & PRECISION MIXOLOGY MATRIX (40% -> col-span-12 lg:col-span-5 xl:col-span-5) -->
+<section class="lg:col-span-5 xl:col-span-5 flex flex-col gap-space-md">
+<!-- Active Drink Header -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="bg-primary-container text-on-primary-container font-label-sm text-label-sm px-2 py-0.5 rounded-full font-bold uppercase">
+                Món Đang Pha Chế #BEV-1082
+              </span>
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Standard Specs 120ml</span>
+</div>
+<h3 class="font-headline-lg text-headline-md sm:text-headline-lg font-bold text-on-surface mt-1">
+              Smoky Mezcal Negroni
+            </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Phiên bản khói đặc trưng hầm ủ sồi của Grand Horizon • Kỹ thuật Stirred on Hand-Carved Ice.
+            </p>
+</div>
+<!-- Financial Margin Chip -->
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col items-end min-w-32">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Biên Lợi Nhuận Gộp</span>
+<span class="font-headline-sm text-headline-sm text-primary font-bold">84.6%</span>
+<span class="font-body-sm text-body-sm text-outline">Cost: 75k / Bán: 480k</span>
+</div>
+</div>
+<!-- Glassware & Ice Craft Blueprint -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md bg-surface-container-low p-space-md rounded-xl">
+<div class="flex items-center gap-space-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container-lowest flex items-center justify-center text-primary shadow-sm">
+<span class="material-symbols-outlined text-[28px]">local_bar</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Ly Phục Vụ</span>
+<span class="font-label-md text-label-md text-on-surface font-bold">Ly Nick &amp; Nora Pha Lê</span>
+<span class="font-body-sm text-body-sm text-primary font-medium">Ướp đông sâu -14°C</span>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container-lowest flex items-center justify-center text-secondary shadow-sm">
+<span class="material-symbols-outlined text-[28px]">ac_unit</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Đá Khối &amp; Garnish</span>
+<span class="font-label-md text-label-md text-on-surface font-bold">Đá tảng trong suốt 50mm</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Vỏ cam vàng đốt tinh dầu</span>
+</div>
+</div>
+</div>
+<!-- Precision Electronic Scale Live Sync Panel -->
+<div class="bg-surface-container-highest p-space-md rounded-xl flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs text-on-surface">
+<span class="material-symbols-outlined text-primary text-[20px]">scale</span>
+<span class="font-label-md text-label-md font-bold uppercase tracking-wider">Cân Tiểu Ly Điện Tử Trực Tiếp (Smart Scale Tare)</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-primary-container shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+<span class="font-label-sm text-label-sm text-primary font-bold">BLUETOOTH LIVE</span>
+</div>
+</div>
+<div class="flex items-center justify-between bg-surface-container-lowest p-space-md rounded-lg">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Trọng lượng bình shaker thực tế:</span>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-display-lg text-display-lg font-bold text-on-surface tracking-tight" id="currentScaleWeight">148.6</span>
+<span class="font-label-lg text-label-lg text-on-surface-variant font-semibold">gam (g)</span>
+</div>
+</div>
+<div class="flex flex-col items-end gap-space-xs">
+<span class="font-label-sm text-label-sm text-primary font-semibold">Sai lệch đo: +0.2 ml (Hoàn hảo)</span>
+<button class="bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md px-space-md py-1.5 rounded-md font-semibold flex items-center gap-1 transition-colors" id="btnTareScale">
+<span class="material-symbols-outlined text-[16px]">restart_alt</span>
+<span>TỰ ĐỘNG HIỆU CHUẨN ZERO TARE</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Recipe Ingredients Matrix Table -->
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider px-1">
+            Định Mức Nguyên Liệu &amp; Cảm Biến Cân Tương Ứng
+          </span>
+<div class="bg-surface-container-low rounded-xl p-space-xs space-y-1">
+<!-- Row 1 -->
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-lowest">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center font-label-sm font-bold text-on-surface">1</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-on-surface font-bold truncate">Del Maguey Chichicapa Mezcal</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Rượu thủ công Mexico đun củi sồi</span>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="flex flex-col text-right">
+<span class="font-label-md text-label-md text-primary font-bold">30.0 ml</span>
+<span class="font-body-sm text-body-sm text-outline">Đạt: 30.2g</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-lowest">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center font-label-sm font-bold text-on-surface">2</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-on-surface font-bold truncate">Campari Bitter Liqueur</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Thảo mộc đắng Milan nguyên bản</span>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="flex flex-col text-right">
+<span class="font-label-md text-label-md text-primary font-bold">30.0 ml</span>
+<span class="font-body-sm text-body-sm text-outline">Đạt: 29.8g</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-lowest">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center font-label-sm font-bold text-on-surface">3</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-on-surface font-bold truncate">Carpano Antica Formula Vermouth</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Sweet Vermouth ủ nho Ý cao cấp</span>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="flex flex-col text-right">
+<span class="font-label-md text-label-md text-primary font-bold">30.0 ml</span>
+<span class="font-body-sm text-body-sm text-outline">Đạt: 30.0g</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+</div>
+</div>
+<!-- Row 4 -->
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-lowest">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center font-label-sm font-bold text-on-surface">4</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-on-surface font-bold truncate">Regan's Orange Bitters No. 6</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Tinh dầu vỏ cam cay đắng nồng ấm</span>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="flex flex-col text-right">
+<span class="font-label-md text-label-md text-primary font-bold">2 Giọt</span>
+<span class="font-body-sm text-body-sm text-outline">0.2 ml</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Recipe Guide Barista Notes -->
+<div class="bg-surface-container-low rounded-lg p-space-md flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[20px] mt-0.5">tips_and_updates</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-bold">Lưu ý nghiệp vụ Sommelier &amp; Bartender:</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Khuấy lạnh bằng thìa Barspoon tròn 45 vòng theo chiều kim đồng hồ để đạt độ loãng chuẩn xác 18%. Đốt nhẹ vỏ cam vàng bằng khò lửa trước khi miết quanh miệng ly và thả vào đồ uống.
+            </p>
+</div>
+</div>
+</div>
+</section>
+<!-- COLUMN 3: DRAFT SENSORS & SOMMELIER RFID CELLAR (30% -> col-span-12 lg:col-span-3 xl:col-span-3) -->
+<section class="lg:col-span-3 xl:col-span-3 flex flex-col gap-space-md">
+<!-- Draft & Dispense Flow Telemetry -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">water_voc</span>
+<h3 class="font-label-lg text-label-lg font-bold text-on-surface uppercase tracking-wider">Vòi Rót &amp; Dòng Chảy IoT</h3>
+</div>
+<span class="bg-surface-container text-on-surface-variant font-label-sm text-label-sm px-2 py-0.5 rounded font-semibold">4 Vòi Kép</span>
+</div>
+<!-- Flow Sensor Bars -->
+<div class="space-y-space-sm">
+<!-- Keg 1 -->
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md font-semibold text-on-surface">Bia Thủ Công Craft IPA (Vòi 01)</span>
+<span class="font-label-md text-label-md font-bold text-primary">78%</span>
+</div>
+<div class="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 78%"></div>
+</div>
+<div class="flex justify-between text-body-sm font-body-sm text-outline pt-0.5">
+<span>Nhiệt độ: 3.2°C • Áp suất CO2: 12 PSI</span>
+<span>Còn 23.4 Lít</span>
+</div>
+</div>
+<!-- Keg 2: Low warning -->
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1 border border-error-container">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md font-semibold text-tertiary">Bia Pilsner Đức Vàng (Vòi 02)</span>
+<span class="font-label-md text-label-md font-bold text-tertiary">24% (CẢNH BÁO)</span>
+</div>
+<div class="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
+<div class="bg-tertiary h-full rounded-full" style="width: 24%"></div>
+</div>
+<div class="flex justify-between text-body-sm font-body-sm text-tertiary pt-0.5">
+<span>Sắp hết bom bia • Đã báo kho phụ</span>
+<span>Còn 4.8 Lít</span>
+</div>
+</div>
+<!-- Keg 3 -->
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md font-semibold text-on-surface">Rượu Vang Prosecco DOC (Vòi 03)</span>
+<span class="font-label-md text-label-md font-bold text-secondary">62%</span>
+</div>
+<div class="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 62%"></div>
+</div>
+<div class="flex justify-between text-body-sm font-body-sm text-outline pt-0.5">
+<span>Hệ thống bảo quản khí Argon tinh khiết</span>
+<span>Còn 12.4 Lít</span>
+</div>
+</div>
+<!-- Keg 4 -->
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md font-semibold text-on-surface">Cà Phê Nitro Cold Brew (Vòi 04)</span>
+<span class="font-label-md text-label-md font-bold text-primary">89%</span>
+</div>
+<div class="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 89%"></div>
+</div>
+<div class="flex justify-between text-body-sm font-body-sm text-outline pt-0.5">
+<span>Bọt khí Ni-tơ mịn • Ủ lạnh 24 giờ</span>
+<span>Còn 17.8 Lít</span>
+</div>
+</div>
+</div>
+</div>
+<!-- High-Security RFID Sommelier Cellar Vault Matrix -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-tertiary text-[20px]">lock</span>
+<h3 class="font-label-lg text-label-lg font-bold text-on-surface uppercase tracking-wider">Khóa RFID Hầm Rượu Quý</h3>
+</div>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm px-2 py-0.5 rounded font-bold">VIP CELLAR</span>
+</div>
+<!-- Cellar Vault Compartments -->
+<div class="space-y-space-sm">
+<!-- Locker A-02 -->
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<span class="bg-surface-container-highest text-on-surface font-label-sm text-label-sm font-bold px-1.5 py-0.5 rounded">
+                NGĂN A-02
+              </span>
+<span class="font-label-md text-label-md font-bold text-tertiary">$2,840 / chai</span>
+</div>
+<div class="font-label-md text-label-md text-on-surface font-bold">
+              Château Margaux Premier Grand Cru 2015
+            </div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-tertiary">lock</span> Khóa bảo mật cao
+              </span>
+<button class="bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm px-2 py-1 rounded font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">pin</span>
+<span>PIN SOMMELIER</span>
+</button>
+</div>
+</div>
+<!-- Locker B-08 -->
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<span class="bg-surface-container-highest text-on-surface font-label-sm text-label-sm font-bold px-1.5 py-0.5 rounded">
+                NGĂN B-08
+              </span>
+<span class="font-label-md text-label-md font-bold text-tertiary">$1,450 / chai</span>
+</div>
+<div class="font-label-md text-label-md text-on-surface font-bold">
+              Tenuta San Guido Sassicaia Bolgheri 2018
+            </div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-outline">lock</span> Đang khóa điện tử
+              </span>
+<span class="font-label-sm text-label-sm text-outline">Sẵn sàng xuất kho</span>
+</div>
+</div>
+<!-- Locker C-14 (Unlocked for Ticket #BEV-1083) -->
+<div class="bg-primary/10 p-space-sm rounded-lg flex flex-col gap-1.5 border border-primary/30">
+<div class="flex items-center justify-between">
+<span class="bg-primary text-on-primary font-label-sm text-label-sm font-bold px-1.5 py-0.5 rounded">
+                NGĂN C-14
+              </span>
+<span class="font-label-sm text-label-sm text-primary font-bold animate-pulse flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">lock_open</span> ĐÃ MỞ KHÓA
+              </span>
+</div>
+<div class="font-label-md text-label-md text-on-surface font-bold">
+              Dom Pérignon Vintage 2013 Brut
+            </div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-body-sm text-body-sm text-primary font-medium">
+                Cấp phép cho Đơn #BEV-1083 (Bàn 08)
+              </span>
+<button class="bg-primary text-on-primary font-label-sm text-label-sm px-2.5 py-1 rounded font-bold hover:bg-primary-fixed-variant transition-colors">
+                XÁC NHẬN LẤY CHAI
+              </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Action Sommelier Audit Tool -->
+<div class="bg-surface-container-low rounded-xl p-space-md flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-on-surface">Kiểm Kê Rượu Trực Tuyến</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Quét mã vạch chai hầm rượu</span>
+</div>
+<button class="w-10 h-10 rounded-lg bg-surface-container-lowest flex items-center justify-center text-primary shadow-sm hover:bg-primary hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined text-[22px]">barcode_scanner</span>
+</button>
+</div>
+</section>
+</div>
+<!-- Interactive Terminal Micro-Logic -->
+<script>
+    (function() {
+      // Tare scale simulation
+      const btnTare = document.getElementById('btnTareScale');
+      const scaleDisplay = document.getElementById('currentScaleWeight');
+      
+      if (btnTare && scaleDisplay) {
+        btnTare.addEventListener('click', () => {
+          scaleDisplay.textContent = "0.0";
+          btnTare.classList.add('bg-primary-container', 'text-on-primary-container');
+          setTimeout(() => {
+            scaleDisplay.textContent = "120.0";
+            btnTare.classList.remove('bg-primary-container', 'text-on-primary-container');
+          }, 1200);
+        });
+      }
+
+      // Complete ticket action
+      const btnComplete = document.getElementById('btnCompleteTicket');
+      if (btnComplete) {
+        btnComplete.addEventListener('click', () => {
+          btnComplete.innerHTML = '<span class="material-symbols-outlined text-[18px]">verified</span> ĐÃ BÁO CHO RUNNER VẬN CHUYỂN';
+          btnComplete.classList.remove('bg-primary-container');
+          btnComplete.classList.add('bg-surface-container-high', 'text-primary');
+        });
+      }
+    })();
+  </script>
+</div></main></div></body></html>
