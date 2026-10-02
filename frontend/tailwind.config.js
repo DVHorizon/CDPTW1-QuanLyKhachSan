@@ -29,10 +29,22 @@ export default {
         "surface": "#f8f9ff",
         "surface-container-low": "#eff4ff",
         "primary-container": "#131b2e",
+        
+        // --- MÃ MÀU DÀNH RIÊNG CHO TRANG ADMIN PMS ---
+        // Sử dụng tiền tố "admin-" để không bị đụng chạm với trang chủ
+        "admin-primary": "#10b981", // Màu ngọc lục bảo chính của Admin
+        "admin-primary-container": "#05a98c",
+        "on-admin-primary": "#ffffff",
+        // ---------------------------------------------
+        
         "on-tertiary-fixed": "#002114",
         "on-error": "#ffffff",
         "primary-fixed": "#dae2fd",
+        
+        // --- MÃ MÀU CỦA TRANG CHỦ (GUEST) ---
         "primary": "#000000",
+        // ------------------------------------
+        
         "on-error-container": "#93000a",
         "surface-bright": "#f8f9ff",
         "inverse-on-surface": "#eaf1ff",
