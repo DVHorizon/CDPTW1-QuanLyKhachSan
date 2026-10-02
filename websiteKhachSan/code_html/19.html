@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "secondary": "#006591",
+        "on-primary": "#ffffff",
+        "surface-container-high": "#e3eae3",
+        "tertiary-fixed-dim": "#ffb3af",
+        "on-background": "#161d19",
+        "on-surface": "#161d19",
+        "outline-variant": "#bbcabf",
+        "secondary-container": "#39b8fd",
+        "secondary-fixed": "#c9e6ff",
+        "tertiary-fixed": "#ffdad7",
+        "primary-fixed-dim": "#4edea3",
+        "secondary-fixed-dim": "#89ceff",
+        "surface-tint": "#006c49",
+        "on-primary-fixed": "#002113",
+        "outline": "#6c7a71",
+        "tertiary-container": "#fc7c78",
+        "on-tertiary-container": "#711419",
+        "inverse-on-surface": "#ebf3eb",
+        "inverse-surface": "#2b322d",
+        "surface-container-highest": "#dde4dd",
+        "on-primary-container": "#00422b",
+        "surface-container": "#e8f0e9",
+        "surface": "#f4fbf4",
+        "on-secondary-fixed": "#001e2f",
+        "inverse-primary": "#4edea3",
+        "on-error": "#ffffff",
+        "on-tertiary": "#ffffff",
+        "on-tertiary-fixed": "#410005",
+        "primary-container": "#10b981",
+        "surface-variant": "#dde4dd",
+        "on-surface-variant": "#3c4a42",
+        "on-error-container": "#93000a",
+        "tertiary": "#a43a3a",
+        "surface-dim": "#d4dcd5",
+        "primary": "#006c49",
+        "background": "#f4fbf4",
+        "surface-bright": "#f4fbf4",
+        "error-container": "#ffdad6",
+        "on-secondary-fixed-variant": "#004c6e",
+        "on-tertiary-fixed-variant": "#842225",
+        "primary-fixed": "#6ffbbe",
+        "on-secondary-container": "#004666",
+        "surface-container-lowest": "#ffffff",
+        "on-primary-fixed-variant": "#005236",
+        "surface-container-low": "#eef6ee",
+        "error": "#ba1a1a",
+        "on-secondary": "#ffffff"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "full": "9999px"
+      },
+      "spacing": {
+        "gutter-lg": "1.5rem",
+        "space-md": "0.75rem",
+        "margin-lg": "2rem",
+        "space-sm": "0.5rem",
+        "margin-md": "1.5rem",
+        "space-lg": "1rem",
+        "space-xs": "0.25rem",
+        "margin": "1rem",
+        "gutter": "1rem",
+        "space-xl": "1.5rem"
+      },
+      "fontFamily": {
+        "body-lg": [
+          "Inter"
+        ],
+        "label-sm": [
+          "Inter"
+        ],
+        "display-lg": [
+          "Playfair Display"
+        ],
+        "headline-lg": [
+          "Playfair Display"
+        ],
+        "label-md": [
+          "Inter"
+        ],
+        "display-lg-mobile": [
+          "Playfair Display"
+        ],
+        "label-lg": [
+          "Inter"
+        ],
+        "body-md": [
+          "Inter"
+        ],
+        "headline-sm": [
+          "Inter"
+        ],
+        "body-sm": [
+          "Inter"
+        ],
+        "headline-md": [
+          "Inter"
+        ]
+      },
+      "fontSize": {
+        "body-lg": [
+          "1rem",
+          {
+            "lineHeight": "1.5rem",
+            "letterSpacing": "0",
+            "fontWeight": "400"
+          }
+        ],
+        "label-sm": [
+          "0.6875rem",
+          {
+            "lineHeight": "0.875rem",
+            "letterSpacing": "0.08em",
+            "fontWeight": "700"
+          }
+        ],
+        "display-lg": [
+          "2.25rem",
+          {
+            "lineHeight": "2.75rem",
+            "letterSpacing": "-0.02em",
+            "fontWeight": "600"
+          }
+        ],
+        "headline-lg": [
+          "1.75rem",
+          {
+            "lineHeight": "2.25rem",
+            "letterSpacing": "-0.01em",
+            "fontWeight": "500"
+          }
+        ],
+        "label-md": [
+          "0.75rem",
+          {
+            "lineHeight": "1rem",
+            "letterSpacing": "0.05em",
+            "fontWeight": "600"
+          }
+        ],
+        "display-lg-mobile": [
+          "1.75rem",
+          {
+            "lineHeight": "2.25rem",
+            "letterSpacing": "-0.01em",
+            "fontWeight": "600"
+          }
+        ],
+        "label-lg": [
+          "0.875rem",
+          {
+            "lineHeight": "1.25rem",
+            "letterSpacing": "0.02em",
+            "fontWeight": "600"
+          }
+        ],
+        "body-md": [
+          "0.875rem",
+          {
+            "lineHeight": "1.25rem",
+            "letterSpacing": "0",
+            "fontWeight": "400"
+          }
+        ],
+        "headline-sm": [
+          "1rem",
+          {
+            "lineHeight": "1.5rem",
+            "letterSpacing": "0",
+            "fontWeight": "600"
+          }
+        ],
+        "body-sm": [
+          "0.75rem",
+          {
+            "lineHeight": "1rem",
+            "letterSpacing": "0.01em",
+            "fontWeight": "400"
+          }
+        ],
+        "headline-md": [
+          "1.25rem",
+          {
+            "lineHeight": "1.75rem",
+            "letterSpacing": "-0.01em",
+            "fontWeight": "600"
+          }
+        ]
+      }
+    }
+  }
+}</script></head><body class="bg-background font-body-md text-body-md text-on-surface"><aside class="fixed left-0 top-0 h-full w-72 bg-surface-container-low z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex flex-col"><div class="px-space-lg pt-space-lg pb-space-md"><div class="flex items-center gap-space-sm mb-space-xs"><span class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span><span class="font-label-sm text-label-sm text-primary uppercase">Core Operational Console</span></div><h1 class="font-headline-sm text-headline-sm text-primary font-bold tracking-tight uppercase">Grand Horizon</h1><p class="font-label-sm text-label-sm text-on-surface-variant tracking-wider uppercase">Hospitality Suite</p></div><nav class="flex flex-col px-space-sm gap-space-xs mt-space-sm" data-active-classes="bg-primary-container text-on-primary-container font-headline-sm text-headline-sm rounded-lg"><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="ban-lam-viec" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span>Bàn Làm Việc</a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="danh-sach-dat-phong-va-truy-van-ho-so" href="#"><span class="material-symbols-outlined text-[20px]">desk</span>Lễ Tân &amp; Tiền Sảnh</a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="quan-ly-phong-va-hang-phong" href="#"><span class="material-symbols-outlined text-[20px]">king_bed</span>Quản Lý Phòng &amp; Hạng Phòng</a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="buong-phong-va-ky-thuat" href="#"><span class="material-symbols-outlined text-[20px]">cleaning_services</span>Buồng Phòng &amp; Kỹ Thuật</a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="am-thuc-fb" href="#"><span class="material-symbols-outlined text-[20px]">restaurant</span>Ẩm Thực F&amp;B</a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="dich-vu-va-spa" href="#"><span class="material-symbols-outlined text-[20px]">spa</span>Dịch Vụ &amp; Spa</a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="tai-chinh-va-so-cai" href="#"><span class="material-symbols-outlined text-[20px]">receipt_long</span>Tài Chính &amp; Sổ Cái</a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="quan-tri-he-thong-va-phan-quyen" href="#"><span class="material-symbols-outlined text-[20px]">admin_panel_settings</span>Quản Trị Hệ Thống</a></nav></div><div class="p-space-md m-space-sm rounded-xl bg-surface-container"><div class="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant mb-space-xs"><span class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[14px] text-primary">hourglass_top</span>Bàn Giao Ca</span><span class="font-bold text-on-surface">03h : 15m</span></div><div class="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant"><span class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[14px] text-secondary">sync_alt</span>Đồng bộ PMS</span><span class="font-bold text-on-surface">0.4s (Live)</span></div></div></aside><div class="pl-72"><header class="fixed top-0 left-72 right-0 h-16 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-gutter-lg"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-xs bg-surface-container-low px-space-md py-space-xs rounded-lg"><span class="material-symbols-outlined text-primary text-[18px]">location_city</span><span class="font-label-md text-label-md text-on-surface font-semibold">Grand Horizon Phú Quốc Sanctuary &amp; Villas</span><span class="material-symbols-outlined text-on-surface-variant text-[16px]">expand_more</span></div><div class="flex items-center gap-space-xs text-on-surface-variant font-label-md text-label-md"><span class="material-symbols-outlined text-[16px]">schedule</span><span>08:45 AM | Ca Trực Sáng</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-md py-space-xs rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-bold"><span class="w-2 h-2 rounded-full bg-primary"></span><span>CÔNG SUẤT 84%</span></div><div class="flex items-center gap-space-xs px-space-sm py-space-xs rounded-lg bg-surface-container-low text-on-surface font-label-sm text-label-sm"><span class="w-2 h-2 rounded-full bg-primary"></span><span>Terminal Live</span></div><button class="relative p-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span></button><div class="flex items-center gap-space-sm pl-space-sm border-l border-outline-variant/30"><div class="text-right"><div class="font-label-md text-label-md text-on-surface font-semibold">Lê Minh Anh</div><div class="font-label-sm text-label-sm text-on-surface-variant">Quản Lý Tiền Sảnh</div></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-16 bg-surface px-gutter-lg pb-margin-lg"><div class="flex flex-col w-full text-on-surface">
+<!-- Top Operational Context Banner -->
+<div class="relative overflow-hidden rounded-xl bg-inverse-surface text-inverse-on-surface p-space-lg shadow-xl mb-space-lg">
+<div class="absolute -right-16 -top-20 w-80 h-80 rounded-full bg-primary/20 blur-3xl pointer-events-none"></div>
+<div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="inline-flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-primary text-on-primary font-label-sm text-label-sm uppercase tracking-wider">
+<span class="material-symbols-outlined text-[14px]">tune</span> Vận Hành Tiền Sảnh
+          </span>
+<span class="font-label-sm text-label-sm text-inverse-on-surface/70 tracking-widest uppercase font-mono">
+            // PMS.ROOM-DISPATCH.v4.8 // DUAL-CONTROL
+          </span>
+<span class="inline-flex items-center gap-1 text-primary-fixed-dim font-label-sm text-label-sm font-mono">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-ping"></span> KẾT NỐI TỰ ĐỘNG KHÓA VINGCARD LIVE
+          </span>
+</div>
+<div class="flex flex-col sm:flex-row sm:items-baseline gap-space-sm mt-space-xs">
+<h2 class="font-headline-lg text-headline-lg font-bold tracking-tight text-white">
+            Điều Chỉnh Lưu Trú Cho Khách Đang Ở
+          </h2>
+<span class="font-label-md text-label-md text-inverse-on-surface/75 font-mono">
+            (In-House Modification &amp; Relocation Terminal)
+          </span>
+</div>
+</div>
+<!-- Quick Telemetry Chipset -->
+<div class="flex items-center gap-space-sm self-start lg:self-auto bg-white/5 backdrop-blur-md px-space-md py-space-sm rounded-lg border-0 shadow-inner">
+<div class="text-right">
+<div class="font-label-sm text-label-sm text-inverse-on-surface/60 uppercase">Phiên giao dịch</div>
+<div class="font-label-lg text-label-lg font-mono text-primary-fixed">#MOD-2024-9904</div>
+</div>
+<div class="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary-fixed">
+<span class="material-symbols-outlined text-[20px]">swap_horiz</span>
+</div>
+</div>
+</div>
+<!-- Active Guest Dossier Strip -->
+<div class="mt-space-md pt-space-md border-t border-white/10 grid grid-cols-1 md:grid-cols-4 gap-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center text-on-primary font-bold shadow-md">
+          TT
+        </div>
+<div class="min-w-0">
+<div class="font-label-sm text-label-sm text-inverse-on-surface/60">Hồ Sơ Khách Đang Lưu Trú</div>
+<div class="font-headline-sm text-headline-sm font-bold text-white truncate">HỒNG ĐĂNG THỦY TIÊN</div>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-secondary-container">
+<span class="material-symbols-outlined text-[20px]">villa</span>
+</div>
+<div>
+<div class="font-label-sm text-label-sm text-inverse-on-surface/60">Phòng Hiện Tại</div>
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-sm text-headline-sm font-bold text-secondary-container">V-201</span>
+<span class="font-label-sm text-label-sm text-inverse-on-surface/80">Biệt thự Vườn Bán Đảo</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-primary-fixed">
+<span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+</div>
+<div>
+<div class="font-label-sm text-label-sm text-inverse-on-surface/60">Mã Đặt Phòng (PMS ID)</div>
+<div class="font-label-lg text-label-lg font-mono font-bold text-white">#GH-2025-88219</div>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-tertiary-fixed">
+<span class="material-symbols-outlined text-[20px]">stars</span>
+</div>
+<div>
+<div class="font-label-sm text-label-sm text-inverse-on-surface/60">Hạng Thành Viên VIP</div>
+<div class="font-label-lg text-label-lg font-bold text-tertiary-fixed">BLACK DIAMOND RESERVE</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Big Segmented Mode Switcher -->
+<div class="bg-surface-container-high p-1.5 rounded-xl flex flex-col sm:flex-row gap-1.5 mb-space-lg shadow-sm">
+<button class="flex-1 py-space-sm px-space-md rounded-lg flex items-center justify-center gap-space-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" type="button">
+<span class="material-symbols-outlined text-[20px]">date_range</span>
+<div class="text-left">
+<div class="font-label-sm text-label-sm uppercase tracking-wider opacity-70">Chế độ 01</div>
+<div class="font-label-lg text-label-lg font-semibold">Gia Hạn Thời Gian Lưu Trú (Extend Duration)</div>
+</div>
+</button>
+<button class="flex-1 py-space-sm px-space-md rounded-lg flex items-center justify-center gap-space-sm bg-surface-container-lowest text-primary shadow-md" type="button">
+<span class="material-symbols-outlined text-[20px] text-primary" style="font-variation-settings: 'FILL' 1;">swap_calls</span>
+<div class="text-left">
+<div class="font-label-sm text-label-sm text-primary uppercase tracking-wider font-bold">Chế độ 02 (Đang chọn - Active)</div>
+<div class="font-label-lg text-label-lg font-bold text-on-surface">Chuyển Đổi Phòng Nghỉ / Room Relocation</div>
+</div>
+<span class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse ml-space-xs"></span>
+</button>
+</div>
+<!-- Operational Two-Column Workspace -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- LEFT PANEL: 45% (lg:col-span-5) -->
+<div class="lg:col-span-5 flex flex-col gap-space-lg">
+<!-- Current Room Status Card -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm relative overflow-hidden">
+<div class="flex items-center justify-between mb-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Phòng Cũ Cần Điều Chỉnh</span>
+</div>
+<span class="px-space-sm py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-semibold">
+            Báo Sự Cố Lúc 02:15
+          </span>
+</div>
+<div class="flex items-center gap-space-md mb-space-md">
+<div class="relative w-28 h-20 rounded-lg overflow-hidden shrink-0 shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Peninsula Garden Villa bedroom interior luxury tropical resort with king-size bed and modern wooden architecture at Grand Horizon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrHxwcQK4-01SEU_zY4S8sHSq62SrS-mdElCuw7-9RT_A4bQtqgfDk3D8VM2ASQvCzUoHN3f6tl2g8YMh8BzKdTUK8XtiTGjsmcHH0Bm0Bo_QYRQkbonkGhXtDClVy8jBwFVg4uQ1IAzMcOgfInzs4IZyHJz7fVRE2pVgngCdo-ZOUj9qEP3c6qwKlWoAgSS4sW1OHHJvpPkezUYAtQiQzGfn493CpWeesxMq72a1yqE6rpwE3j_CB"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-1.5">
+<span class="text-white font-label-sm text-label-sm font-mono">Villa V-201</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-headline-sm text-headline-sm font-bold text-on-surface truncate">Peninsula Garden Villa</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-space-xs">Căn số V-201 • Cụm Bán Đảo Phía Tây</p>
+<div class="flex items-center gap-space-sm font-label-sm text-label-sm text-on-surface-variant font-mono">
+<span>14/11 → 19/11</span>
+<span>•</span>
+<span class="text-primary font-bold">5 Đêm</span>
+</div>
+</div>
+</div>
+<!-- Metric micro-cards inside card -->
+<div class="grid grid-cols-2 gap-space-sm p-space-sm bg-surface-container rounded-lg font-mono mb-space-md">
+<div class="p-space-xs">
+<div class="font-label-sm text-label-sm text-on-surface-variant">Giá Phòng Hiện Tại</div>
+<div class="font-label-lg text-label-lg font-bold text-on-surface">6.850.000 đ<span class="font-body-sm text-body-sm text-on-surface-variant font-normal">/đêm</span></div>
+</div>
+<div class="p-space-xs">
+<div class="font-label-sm text-label-sm text-on-surface-variant">Dư Nợ Folio Tạm Tính</div>
+<div class="font-label-lg text-label-lg font-bold text-tertiary">12.450.000 đ</div>
+</div>
+</div>
+<!-- Housekeeping & Sensor live readings -->
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm pt-space-xs border-t border-surface-container">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-error">thermostat</span> Cảm biến Chiller: 28.4°C (Lỗi van)
+          </span>
+<span class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-[16px]">key</span> Khóa điện từ: Active (1 Thẻ)
+          </span>
+</div>
+</div>
+<!-- Relocation Details Form -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+<div class="flex items-center gap-space-sm mb-space-md">
+<span class="material-symbols-outlined text-primary text-[22px]">report_problem</span>
+<h3 class="font-headline-sm text-headline-sm font-bold text-on-surface">Lý Do Đổi Phòng &amp; Phê Duyệt</h3>
+</div>
+<div class="space-y-space-md">
+<!-- Dropdown Selection -->
+<div>
+<label class="block font-label-md text-label-md font-semibold text-on-surface mb-space-xs">
+              Nguyên Nhân / Danh Mục Chuyển Phòng <span class="text-error">*</span>
+</label>
+<div class="relative">
+<select class="w-full bg-surface-container-low text-on-surface font-body-md text-body-md rounded-lg px-space-md py-2.5 appearance-none focus:outline-none focus:ring-1 focus:ring-primary focus:bg-surface-container-lowest">
+<option selected="">Sự cố kỹ thuật điều hòa / Chiller rò rỉ ồn ào (Miễn phí đổi)</option>
+<option>Khách yêu cầu nâng hạng phòng có trả phí (Upsell Request)</option>
+<option>Khách muốn đổi sang hướng nhìn hoàng hôn (Sunset View Upgrade)</option>
+<option>Yêu cầu yên tĩnh tuyệt đối do sức khỏe</option>
+<option>Đổi phòng theo chỉ đạo Tổng Quản Lý (GM Courtesy)</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-3 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
+</div>
+</div>
+<!-- Notes Textarea -->
+<div>
+<label class="block font-label-md text-label-md font-semibold text-on-surface mb-space-xs">
+              Ghi Chú Điều Hành &amp; Nhật Ký Ca Trực
+            </label>
+<div class="bg-surface-container-low rounded-lg p-space-sm">
+<p class="font-body-sm text-body-sm text-on-surface leading-relaxed">
+                Khách phản ánh hệ thống máy lạnh phòng ngủ phát tiếng kêu lúc nửa đêm, kỹ sư đã kiểm tra xác nhận lỗi mô tơ. Đã được Quản lý ca <span class="font-semibold text-primary">Lê Minh Anh</span> phê duyệt đổi phòng tương đương hoặc tốt hơn miễn phí phụ thu.
+              </p>
+</div>
+</div>
+<!-- Porter & Baggage Handling -->
+<div>
+<label class="block font-label-md text-label-md font-semibold text-on-surface mb-space-xs">
+              Điều Phối Hành Lý (Baggage &amp; Porter Dispatch)
+            </label>
+<div class="space-y-space-xs bg-surface-container-low p-space-sm rounded-lg">
+<label class="flex items-center gap-space-sm cursor-pointer py-1">
+<input checked="" class="w-4 h-4 rounded text-primary focus:ring-0 accent-primary" type="checkbox"/>
+<span class="font-body-sm text-body-sm font-medium text-on-surface">Điều phối Bellman hỗ trợ vận chuyển hành lý &amp; dẫn khách sang phòng mới</span>
+</label>
+<label class="flex items-center gap-space-sm cursor-pointer py-1 opacity-60">
+<input class="w-4 h-4 rounded text-primary focus:ring-0 accent-primary" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface">Khách tự chuyển đồ sang phòng mới</span>
+</label>
+</div>
+</div>
+<!-- System Interlocks / Automated Security Guardrails -->
+<div>
+<div class="flex items-center justify-between mb-space-xs">
+<label class="font-label-md text-label-md font-semibold text-on-surface">
+                Khóa Liên Động Tự Động (System Interlocks)
+              </label>
+<span class="font-label-sm text-label-sm text-primary font-mono font-bold">3/3 KÍCH HOẠT</span>
+</div>
+<div class="space-y-space-xs bg-surface-container-high/50 p-space-sm rounded-lg">
+<div class="flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface">
+                  Tự động thu hồi mã khóa thẻ từ phòng cũ <strong>V-201</strong> sau khi hoàn tất check-in phòng mới.
+                </span>
+</div>
+<div class="flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface">
+                  Chuyển trạng thái V-201 sang <span class="text-error font-semibold font-mono">Bẩn / Chờ dọn &amp; Khóa kỹ thuật OOO</span>.
+                </span>
+</div>
+<div class="flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface">
+                  Tự động kiểm tra tiêu hao Minibar phòng cũ và đồng bộ sang Folio phòng mới.
+                </span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT PANEL: 55% (lg:col-span-7) -->
+<div class="lg:col-span-7 flex flex-col gap-space-lg">
+<!-- Replacement Matrix Section -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs mb-space-md">
+<div>
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">bedroom_parent</span>
+<h3 class="font-headline-sm text-headline-sm font-bold text-on-surface">Ma Trận Phòng Thay Thế Khả Dụng</h3>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Chỉ hiển thị phòng trống sạch đã kiểm định (Vacant Clean &amp; Inspected)</p>
+</div>
+<div class="flex items-center gap-space-xs self-start sm:self-auto">
+<span class="font-label-sm text-label-sm px-space-sm py-1 rounded bg-primary/10 text-primary font-bold font-mono">
+              3 PHÒNG SẴN SÀNG
+            </span>
+</div>
+</div>
+<!-- Replacement Room 1 (SELECTED CANDIDATE: Oceanfront Villa) -->
+<div class="relative bg-surface-container-low rounded-xl p-space-md mb-space-sm shadow-sm transition-all">
+<div class="absolute -top-2.5 right-4 px-space-sm py-0.5 rounded-full bg-primary text-on-primary font-label-sm text-label-sm font-bold tracking-wider shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">recommend</span> ĐỀ XUẤT TỐI ƯU
+          </div>
+<div class="flex flex-col md:flex-row gap-space-md">
+<div class="relative w-full md:w-44 h-28 rounded-lg overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="Oceanfront Sunset Pool Villa with private infinity pool overlooking the ocean at golden hour dusk ultra luxury sanctuary" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTMqiNJIOC4m8ZCj9surm1DfnbQje82Y_LAc826XOWqZ5ehWMjJFjzqvcLpdaQ5KUzlNAJH0jtRb6E1yrH0shUEFGa9beLzaeBX83a41J4WuN6i-8TUnsRP4LRUMlxJOSSruEC99Gf1TlPFYfRPFxgzzpVwLFkGDMEvW_dMJV3o-de6vchxLrsVKonz1LqXQutJUAFVoqYYd_bavYDiAS13gZ0iKjdVkivU2_zgBw0itA1LQUdPARs"/>
+<div class="absolute top-2 left-2 px-space-xs py-0.5 rounded bg-black/60 backdrop-blur-md text-white font-mono font-bold font-label-sm text-label-sm">
+                V-104
+              </div>
+</div>
+<div class="flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-baseline justify-between gap-space-sm mb-space-xs">
+<h4 class="font-headline-sm text-headline-sm font-bold text-on-surface">Oceanfront Sunset Pool Villa</h4>
+<span class="font-label-sm text-label-sm text-primary font-bold bg-primary/10 px-2 py-0.5 rounded">Sẵn sàng 100%</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mb-space-xs">
+                  Biệt thự Hướng Biển Hoàng Hôn • Có hồ bơi vô cực riêng • Bãi tắm riêng
+                </p>
+<div class="flex items-center gap-space-md font-mono text-label-sm">
+<span class="text-on-surface-variant">Giá niêm yết: <del>9.200.000 đ</del></span>
+<span class="text-primary font-bold">Phụ thu: 0 đ (Nâng hạng VIP miễn phí)</span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs mt-space-xs border-t border-outline-variant/30">
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-primary">verified</span> Đã Housekeeping kiểm duyệt lúc 08:10
+                </span>
+<button class="px-space-md py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm font-bold flex items-center gap-1 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span> CHỌN PHÒNG NÀY
+                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Replacement Room 2 (Horizon Grand Suite) -->
+<div class="bg-surface-container rounded-xl p-space-md mb-space-sm hover:bg-surface-container-high transition-colors">
+<div class="flex flex-col md:flex-row gap-space-md">
+<div class="relative w-full md:w-36 h-24 rounded-lg overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="Horizon Grand Suite modern penthouse bedroom panoramic bay view high rise hotel tower interior" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnOQniRpZ8uzdI9lpf0GZYzrsPPLadoVVd8bt2fsD2ieTqiGtXR2fpetJWXJCr_Nt017H_ORvN3QQ-X3ig9p2UkgKF3e_zDBvVGx1jx4qt5uUe4VgPaJCdEYRnuSlifXkGcwSlYA7BGqeRqtG9tSzkFLwBf1jTx8irypckdJLn1WGiN40IK5D_kh3g_SWl-z_6nEpa2cWCilPVKxvweJxKkMZJU0PFL3gxoO2Ev8Wt11lO0i7Jx-gP"/>
+<div class="absolute top-2 left-2 px-space-xs py-0.5 rounded bg-black/60 text-white font-mono font-bold font-label-sm text-label-sm">
+                S-306
+              </div>
+</div>
+<div class="flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-baseline justify-between gap-space-sm mb-space-xs">
+<h4 class="font-label-lg text-label-lg font-bold text-on-surface">Horizon Grand Suite (Tòa Tháp Cánh Đông)</h4>
+<span class="font-label-sm text-label-sm text-secondary font-mono">Tầng 3 • View Vịnh</span>
+</div>
+<div class="flex items-center gap-space-md font-mono text-label-sm text-on-surface-variant">
+<span>Giá chuẩn: 4.200.000 đ</span>
+<span class="text-tertiary font-medium">Chênh lệch: -2.650.000 đ/đêm</span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs mt-space-xs border-t border-outline-variant/20">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Thấp hơn hạng hiện tại (Không khuyến nghị)</span>
+<button class="px-space-md py-1 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+                  Chọn Phòng
+                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Replacement Room 3 (Same tier lateral move) -->
+<div class="bg-surface-container rounded-xl p-space-md hover:bg-surface-container-high transition-colors">
+<div class="flex flex-col md:flex-row gap-space-md">
+<div class="relative w-full md:w-36 h-24 rounded-lg overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="Peninsula Garden Villa lush garden setting peaceful luxury boutique resort villa exterior and veranda" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAhxMyx-UE5EnW3ylVkB6vJXJLGvbAS6y-Eh7LYD3Wd5oUQnWWhOpZPW3hn33xJKV2ck6XIdQsJygr9ax6N5Ip4aRUF6-IbMe8sWGqwYLxklZapJASmZDZSodE4xsVJtVMsCTPynvkXqbE308q8pszBcV48bUCchfhG5VLvSfpePBCQpvJM1tdBsnrwJ0mqP6YGpsw-sqzcgv615JJaYQEQ3LJTgbfYAw44UUFVHa_qICiStKM_RGeT"/>
+<div class="absolute top-2 left-2 px-space-xs py-0.5 rounded bg-black/60 text-white font-mono font-bold font-label-sm text-label-sm">
+                V-204
+              </div>
+</div>
+<div class="flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-baseline justify-between gap-space-sm mb-space-xs">
+<h4 class="font-label-lg text-label-lg font-bold text-on-surface">Peninsula Garden Villa (Đổi Ngang)</h4>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">Cùng tầng Bán Đảo</span>
+</div>
+<div class="flex items-center gap-space-md font-mono text-label-sm text-on-surface-variant">
+<span>Giá chuẩn: 6.850.000 đ</span>
+<span class="text-on-surface font-bold">Chênh lệch: 0 đ (Lateral Move)</span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs mt-space-xs border-t border-outline-variant/20">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Cấu hình trang bị tương đồng 100%</span>
+<button class="px-space-md py-1 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+                  Chọn Phòng
+                </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Extension Parameters Module -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+<div class="flex items-center justify-between mb-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">more_time</span>
+<h3 class="font-headline-sm text-headline-sm font-bold text-on-surface">Gia Hạn Thời Gian Lưu Trú Đi Kèm (Extension)</h3>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">Tự động hợp nhất Folio</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md mb-space-md">
+<div class="bg-surface-container-low p-space-md rounded-lg">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-1">Check-out Hiện Tại</div>
+<div class="font-label-lg text-label-lg font-bold font-mono text-on-surface">19/11/2024</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">12:00 Trưa (Mặc định)</div>
+</div>
+<div class="md:col-span-2 bg-surface-container-low p-space-md rounded-lg flex flex-col justify-between">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-space-xs">Chọn Thời Gian Gia Hạn</div>
+<div class="flex items-center gap-space-sm flex-wrap">
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container font-label-sm text-label-sm font-semibold hover:bg-surface-container-high transition-colors" type="button">
+                +1 Đêm (20/11)
+              </button>
+<button class="px-space-md py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm font-bold shadow-sm" type="button">
+                +2 Đêm (21/11) ✓
+              </button>
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container font-label-sm text-label-sm font-semibold hover:bg-surface-container-high transition-colors" type="button">
+                +3 Đêm (22/11)
+              </button>
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container font-label-sm text-label-sm font-semibold hover:bg-surface-container-high transition-colors flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]">edit_calendar</span> Tùy chỉnh
+              </button>
+</div>
+</div>
+</div>
+<!-- Financial Impact Calculation Ledger -->
+<div class="bg-surface-container rounded-xl p-space-md font-mono space-y-space-xs">
+<div class="flex justify-between text-body-sm text-on-surface-variant">
+<span>Tiền phòng phát sinh thêm (2 đêm x 6.850.000 đ):</span>
+<span class="font-semibold text-on-surface">+13.700.000 đ</span>
+</div>
+<div class="flex justify-between text-body-sm text-on-surface-variant">
+<span>Phụ thu chênh lệch nâng hạng Villa V-104 (Courtesy GM VIP):</span>
+<span class="font-semibold text-primary">0 đ (Miễn phí)</span>
+</div>
+<div class="flex justify-between text-body-sm text-on-surface-variant">
+<span>Dư nợ Folio hiện hành chuyển tiếp từ V-201:</span>
+<span class="font-semibold text-on-surface">12.450.000 đ</span>
+</div>
+<div class="pt-space-xs border-t border-outline-variant/30 flex justify-between items-baseline">
+<span class="font-label-md text-label-md font-bold text-on-surface font-sans uppercase">Tổng Dư Nợ Folio Mới Sau Điều Chỉnh:</span>
+<span class="font-headline-sm text-headline-sm font-bold text-primary">26.150.000 đ</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Command Bar & Execution Strip -->
+<div class="mt-space-lg bg-surface-container-highest rounded-xl p-space-md shadow-md flex flex-col md:flex-row items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md">
+<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[24px]">published_with_changes</span>
+</div>
+<div>
+<div class="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold tracking-wide">Tóm Tắt Lệnh Điều Hành Hệ Thống</div>
+<div class="font-body-md text-body-md font-bold text-on-surface flex items-center gap-space-xs flex-wrap">
+<span>Chuyển khách từ Phòng <strong class="text-error font-mono">V-201</strong> sang Phòng <strong class="text-primary font-mono">V-104</strong></span>
+<span class="text-on-surface-variant">•</span>
+<span class="text-on-surface-variant font-normal">Gia hạn lưu trú đến 21/11/2024</span>
+<span class="text-on-surface-variant">•</span>
+<span class="text-primary font-semibold">Miễn phụ thu nâng hạng</span>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center gap-space-sm w-full md:w-auto justify-end">
+<button class="px-space-lg py-2.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-md text-label-md font-semibold shadow-sm transition-colors" type="button">
+        Hủy Bỏ
+      </button>
+<button class="px-space-lg py-2.5 rounded-lg bg-secondary-fixed text-on-secondary-fixed hover:bg-secondary-fixed-dim font-label-md text-label-md font-bold flex items-center gap-space-xs shadow-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">nfc</span>
+        Nạp Lại Thẻ Từ Mới (V-104)
+      </button>
+<button class="px-space-xl py-2.5 rounded-lg bg-primary-container text-on-primary-container hover:brightness-105 font-label-md text-label-md font-bold flex items-center gap-space-xs shadow-md transition-all" type="button">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+<span>XÁC NHẬN CHUYỂN PHÒNG &amp; CẬP NHẬT HÓA ĐƠN</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</div></main></div></body></html>
