@@ -1,8 +1,20 @@
-import React, { useEffect } from 'react';
-import Navbar from './components/layout/Navbar';
+import React, { useState, useEffect } from 'react';
+import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
+import heroBg from './assets/hero-bg.jpg';
+import heroBeach from './assets/hero-beach.png';
 
 function App() {
+  const heroImages = [heroBg, heroBeach];
+  const [currentHeroImage, setCurrentHeroImage] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentHeroImage((prev) => (prev + 1) % heroImages.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     // Set min date to today for check-in
     const today = new Date().toISOString().split('T')[0];
@@ -17,20 +29,24 @@ function App() {
 
   return (
     <div className="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col">
-      <Navbar />
+      <Header />
 
       <main className="w-full pt-20 bg-background flex-1">
         <div className="flex flex-col w-full">
-          <section className="relative w-full -mt-20 pt-32 pb-24 lg:pb-32 overflow-hidden flex flex-col justify-between min-h-[942px]">
-            <div 
-              className="absolute inset-0 bg-cover bg-center -z-20" 
-              data-alt="Ultra luxury beachfront tropical resort at twilight sunset" 
-              style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=2070&auto=format&fit=crop")' }}
-            >
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-b from-primary-container/90 via-primary-container/40 to-background -z-10"></div>
-            <div className="absolute top-1/4 right-10 w-96 h-96 rounded-full bg-secondary-container/20 blur-3xl pointer-events-none -z-10"></div>
-            <div className="w-full px-margin max-w-7xl mx-auto text-center flex flex-col items-center pt-8 pb-12">
+
+          {/* Banner section */}
+          <section className="relative isolate w-full -mt-20 pt-32 pb-24 lg:pb-32 overflow-hidden flex flex-col justify-between min-h-[942px]">
+            {heroImages.map((img, index) => (
+              <div 
+                key={index}
+                className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ease-in-out ${currentHeroImage === index ? 'opacity-100' : 'opacity-0'}`} 
+                style={{ backgroundImage: `url(${img})` }}
+              >
+              </div>
+            ))}
+            <div className="absolute inset-0 bg-gradient-to-b from-primary-container/85 via-primary-container/45 to-primary-container/80"></div>
+            <div className="absolute top-1/4 right-10 w-96 h-96 rounded-full bg-secondary-container/20 blur-3xl pointer-events-none"></div>
+            <div className="relative z-10 w-full px-margin max-w-7xl mx-auto text-center flex flex-col items-center pt-8 pb-12">
               <div className="inline-flex items-center gap-space-sm px-space-md py-space-xs rounded-full bg-surface-container-lowest/85 backdrop-blur-md shadow-sm mb-space-lg animate-fade-in">
                 <span className="material-symbols-outlined text-secondary text-[18px]">verified</span>
                 <span className="font-label-sm text-label-sm uppercase tracking-widest text-secondary font-bold">Thương Hiệu Nghỉ Dưỡng Thượng Lưu Hàng Đầu Châu Á 2024</span>
@@ -42,7 +58,7 @@ function App() {
                 Trải nghiệm dịch vụ cá nhân hóa chuẩn 5 sao quốc tế, nghệ thuật ẩm thực tinh tế và không gian tĩnh tại tuyệt đối giữa thiên nhiên nguyên sơ Cam Ranh, Phú Quốc &amp; Đà Nẵng.
               </p>
             </div>
-            <div className="w-full px-margin max-w-6xl mx-auto mt-4">
+            <div className="relative z-10 w-full px-margin max-w-6xl mx-auto mt-40">
               <div className="bg-surface-container-lowest/95 backdrop-blur-xl rounded-xl shadow-xl p-space-md lg:p-space-lg">
                 <form className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-space-md items-end" onSubmit={(e) => e.preventDefault()}>
                   <div className="lg:col-span-3 flex flex-col gap-space-xs">
@@ -101,6 +117,7 @@ function App() {
             </div>
           </section>
 
+          {/* Room types section */}
           <section className="w-full py-space-xl bg-surface-container-lowest shadow-sm">
             <div className="w-full px-margin max-w-7xl mx-auto">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-gutter text-center divide-x-0 md:divide-x divide-surface-container">
@@ -139,6 +156,7 @@ function App() {
             </div>
           </section>
 
+          {/* Banner types section*/}
           <section className="w-full py-space-xl bg-background">
             <div className="w-full px-margin max-w-7xl mx-auto">
               <div className="flex flex-col md:flex-row md:items-end justify-between mb-space-xl gap-space-md">
