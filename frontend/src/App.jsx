@@ -1,408 +1,524 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
+import { fetchHomeData } from './api/hotelApi';
 
 function App() {
+  const [homeData, setHomeData] = useState({
+    branches: [],
+    featuredRoomTypes: [],
+    amenities: [],
+    reviews: [],
+    stats: null
+  });
+  const [loading, setLoading] = useState(true);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [checkInDate, setCheckInDate] = useState('');
+  const [checkOutDate, setCheckOutDate] = useState('');
+  const [guestOption, setGuestOption] = useState('2-0-1');
+  const [searchNotification, setSearchNotification] = useState('');
+
   useEffect(() => {
-    // Set min date to today for check-in
-    const today = new Date().toISOString().split('T')[0];
-    const dateInputs = document.querySelectorAll('input[type="date"]');
-    if (dateInputs.length >= 2) {
-      dateInputs[0].setAttribute('min', today);
-      dateInputs[0].addEventListener('change', function() {
-        dateInputs[1].setAttribute('min', this.value);
-      });
-    }
+    const today = new Date();
+    const checkIn = today.toISOString().split('T')[0];
+    const nextDate = new Date(today);
+    nextDate.setDate(nextDate.getDate() + 3);
+    const checkOut = nextDate.toISOString().split('T')[0];
+
+    setCheckInDate(checkIn);
+    setCheckOutDate(checkOut);
+
+    // Tải dữ liệu thực tế từ Database thông qua Backend MVC API
+    const loadData = async () => {
+      setLoading(true);
+      const data = await fetchHomeData();
+      if (data) {
+        setHomeData(data);
+        if (data.branches && data.branches.length > 0) {
+          setSelectedBranch(data.branches[0].BranchId);
+        }
+      }
+      setLoading(false);
+    };
+
+    loadData();
   }, []);
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    const branchObj = homeData.branches.find(b => String(b.BranchId) === String(selectedBranch));
+    const branchName = branchObj ? branchObj.BranchName : 'Chi nhánh đã chọn';
+    setSearchNotification(`Đang kiểm tra phòng trống tại "${branchName}" từ ${checkInDate} đến ${checkOutDate}...`);
+    
+    const roomSection = document.getElementById('room-collection');
+    if (roomSection) {
+      roomSection.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    setTimeout(() => {
+      setSearchNotification('');
+    }, 5000);
+  };
+
+  const displayBranches = homeData.branches.length > 0 ? homeData.branches : [
+    { BranchId: 1, BranchName: 'Grand Horizon Resort Phú Quốc Oasis' },
+    { BranchId: 2, BranchName: 'Grand Horizon Cam Ranh Sanctuary' },
+    { BranchId: 3, BranchName: 'Grand Horizon Đà Nẵng Heritage' }
+  ];
+
+  const displayRoomTypes = homeData.featuredRoomTypes.length > 0 ? homeData.featuredRoomTypes : [
+    {
+      RoomTypeId: 1,
+      TypeName: 'Deluxe Ocean View Suite',
+      Description: 'Không gian tĩnh tại với tầm nhìn panorama biển xanh, ban công tắm nắng riêng biệt và nội thất tinh tế.',
+      BasePrice: '1700000.00',
+      MaxOccupancy: 3,
+      AdultCapacity: 2,
+      ChildCapacity: 1,
+      ImageUrl: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop'
+    },
+    {
+      RoomTypeId: 2,
+      TypeName: 'Executive Beachfront Villa',
+      Description: 'Tầm nhìn 180 độ ôm trọn khoảnh khắc hoàng hôn rực rỡ, hồ bơi riêng tràn bờ và lối dạo biển biệt lập.',
+      BasePrice: '2400000.00',
+      MaxOccupancy: 4,
+      AdultCapacity: 3,
+      ChildCapacity: 1,
+      ImageUrl: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=1200&auto=format&fit=crop'
+    },
+    {
+      RoomTypeId: 3,
+      TypeName: 'Presidential Penthouse Residence',
+      Description: 'Đỉnh cao phong cách sống thượng lưu với dịch vụ quản gia cá nhân hóa 24/7 và tiện nghi hoàng gia.',
+      BasePrice: '4500000.00',
+      MaxOccupancy: 6,
+      AdultCapacity: 4,
+      ChildCapacity: 2,
+      ImageUrl: 'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop'
+    }
+  ];
+
+  const displayReviews = homeData.reviews.length > 0 ? homeData.reviews : [
+    {
+      ReviewId: 1,
+      ReviewTitle: 'Kỳ nghỉ hoàn hảo đến từng chi tiết',
+      ReviewBody: 'Đội ngũ concierge của Grand Horizon thấu hiểu từng mong muốn nhỏ nhất. Không gian tĩnh lặng và ẩm thực tinh hoa khó quên.',
+      ReviewerName: 'TS. Trần Hoàng & Phu Nhân',
+      TripClassification: 'Kỳ Nghỉ Thượng Lưu',
+      OverallRating: '5.0'
+    },
+    {
+      ReviewId: 2,
+      ReviewTitle: 'Đẳng cấp dịch vụ vượt ngoài mong đợi',
+      ReviewBody: 'Kiến trúc sang trọng hòa quyện cùng bờ biển ngọc lam nguyên sơ. Chắc chắn tôi sẽ quay lại Grand Horizon trong mọi chuyến công tác và nghỉ dưỡng.',
+      ReviewerName: 'Madame Mai Lan',
+      TripClassification: 'Hội Viên Grand Horizon Elite',
+      OverallRating: '5.0'
+    }
+  ];
+
   return (
-    <div className="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col">
+    <div className="font-sans antialiased text-[#373435] bg-[#fafaf8] min-h-screen flex flex-col selection:bg-[#b9a277] selection:text-white">
       <Navbar />
 
-      <main className="w-full pt-20 bg-background flex-1">
+      <main className="w-full pt-20 bg-[#fafaf8] flex-1">
         <div className="flex flex-col w-full">
-          <section className="relative w-full -mt-20 pt-32 pb-24 lg:pb-32 overflow-hidden flex flex-col justify-between min-h-[942px]">
+          {/* HERO BANNER SECTION */}
+          <section id="trang-chu" className="relative w-full -mt-20 pt-28 sm:pt-32 pb-12 sm:pb-16 lg:pb-20 overflow-hidden flex flex-col justify-between min-h-[780px] sm:min-h-[820px] lg:min-h-[880px] isolate">
+            {/* Background Image - Hoàng hôn resort Grand Horizon */}
             <div 
-              className="absolute inset-0 bg-cover bg-center -z-20" 
-              data-alt="Ultra luxury beachfront tropical resort at twilight sunset" 
-              style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=2070&auto=format&fit=crop")' }}
+              className="absolute inset-0 bg-cover bg-center -z-10 scale-100 transition-transform duration-1000" 
+              style={{ backgroundImage: 'url("/images/hero-banner.jpg")' }}
             >
             </div>
-            <div className="absolute inset-0 bg-gradient-to-b from-primary-container/90 via-primary-container/40 to-background -z-10"></div>
-            <div className="absolute top-1/4 right-10 w-96 h-96 rounded-full bg-secondary-container/20 blur-3xl pointer-events-none -z-10"></div>
-            <div className="w-full px-margin max-w-7xl mx-auto text-center flex flex-col items-center pt-8 pb-12">
-              <div className="inline-flex items-center gap-space-sm px-space-md py-space-xs rounded-full bg-surface-container-lowest/85 backdrop-blur-md shadow-sm mb-space-lg animate-fade-in">
-                <span className="material-symbols-outlined text-secondary text-[18px]">verified</span>
-                <span className="font-label-sm text-label-sm uppercase tracking-widest text-secondary font-bold">Thương Hiệu Nghỉ Dưỡng Thượng Lưu Hàng Đầu Châu Á 2024</span>
+            {/* Dark & Warm Sunset Gradient Overlay for optimal contrast & readability */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#14212b]/85 via-[#203044]/45 to-[#14212b]/85 -z-10"></div>
+            <div className="absolute top-1/4 right-10 w-96 h-96 rounded-full bg-[#b9a277]/25 blur-3xl pointer-events-none -z-10"></div>
+            
+            {/* Hero Heading & Subtitle */}
+            <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center flex flex-col items-center pt-4 sm:pt-8 pb-6 sm:pb-8 z-10">
+              <div className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 rounded-full bg-[#14212b]/70 backdrop-blur-md border border-white/20 shadow-md mb-4 sm:mb-6 animate-fade-in max-w-full">
+                <span className="material-symbols-outlined text-[#b9a277] text-[16px] sm:text-[18px] shrink-0">verified</span>
+                <span className="text-[10px] sm:text-[12px] uppercase tracking-widest text-[#fbf8f2] font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
+                  Grand Horizon Hotels &amp; Resorts — Refined for every journey
+                </span>
               </div>
-              <h1 className="font-display-lg text-display-lg-mobile lg:text-display-lg text-surface-container-lowest tracking-tight max-w-5xl drop-shadow-md mb-space-md">
-                Kỳ Nghỉ Thượng Lưu <br className="hidden sm:inline" /><span className="italic font-normal text-secondary-fixed-dim">Bên Bờ Biển</span> Thiên Đường
+
+              <h1 className="font-serif font-extrabold text-[30px] sm:text-[44px] lg:text-[54px] text-white tracking-tight max-w-4xl drop-shadow-[0_4px_16px_rgba(0,0,0,0.7)] leading-[1.2] mb-4 sm:mb-5 px-2">
+                Kỳ Nghỉ Thượng Lưu <br className="hidden sm:inline" />
+                <span className="italic font-normal text-[#ffd985]">Bên Bờ Biển</span>&nbsp;Thiên&nbsp;Đường
               </h1>
-              <p className="font-body-lg text-body-lg text-surface-container-lowest max-w-2xl text-center leading-relaxed drop-shadow-md">
-                Trải nghiệm dịch vụ cá nhân hóa chuẩn 5 sao quốc tế, nghệ thuật ẩm thực tinh tế và không gian tĩnh tại tuyệt đối giữa thiên nhiên nguyên sơ Cam Ranh, Phú Quốc &amp; Đà Nẵng.
+
+              <p className="text-[14px] sm:text-[15px] lg:text-[16px] text-white/95 max-w-2xl text-center leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)] font-normal px-2">
+                Khám phá chuẩn mực nghỉ dưỡng cao cấp với dịch vụ cá nhân hóa chuẩn 5 sao, nghệ thuật ẩm thực tinh hoa và không gian tĩnh tại thuần khiết.
               </p>
             </div>
-            <div className="w-full px-margin max-w-6xl mx-auto mt-4">
-              <div className="bg-surface-container-lowest/95 backdrop-blur-xl rounded-xl shadow-xl p-space-md lg:p-space-lg">
-                <form className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-space-md items-end" onSubmit={(e) => e.preventDefault()}>
-                  <div className="lg:col-span-3 flex flex-col gap-space-xs">
-                    <label className="font-label-sm text-label-sm text-on-surface-variant uppercase flex items-center gap-space-xs">
-                      <span className="material-symbols-outlined text-[16px] text-secondary">location_on</span>
+
+            {/* TOKEN-DRIVEN SEARCH BOX */}
+            <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mt-2 z-10">
+              <div className="bg-white/95 backdrop-blur-xl rounded-md shadow-[0_18px_50px_-28px_rgba(32,48,68,0.7)] p-4 sm:p-6 lg:p-7 border border-[#dedad0]">
+                <form className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3.5 lg:gap-4 items-end" onSubmit={handleSearch}>
+                  {/* Chi Nhánh (col-span-5 để mở rộng chiều dài tối đa, hiển thị trọn vẹn tên resort) */}
+                  <div className="md:col-span-1 lg:col-span-5 flex flex-col gap-1.5 min-w-0">
+                    <label className="text-[11px] text-[#203044] uppercase tracking-wider font-bold flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="material-symbols-outlined text-[16px] text-[#b9a277]">location_on</span>
                       Điểm Đến &amp; Chi Nhánh
                     </label>
-                    <div className="relative bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between">
-                      <select className="w-full bg-transparent font-title-md text-title-md text-on-surface focus:outline-none cursor-pointer appearance-none pr-6">
-                        <option value="cam-ranh">Grand Horizon Phú Quốc Oasis</option>
-                        <option value="nha-trang">Grand Horizon Cam Ranh Sanctuary</option>
-                        <option value="da-nang">Grand Horizon Đà Nẵng Heritage</option>
+                    <div className="relative bg-[#fbf8f2] border border-[#dedad0] rounded-sm px-3.5 h-[50px] flex items-center justify-between focus-within:border-[#b9a277] focus-within:ring-2 focus-within:ring-[#b9a277]/20 transition-all">
+                      <select 
+                        value={selectedBranch}
+                        onChange={(e) => setSelectedBranch(e.target.value)}
+                        className="w-full bg-transparent text-[13px] sm:text-[14px] text-[#203044] font-semibold focus:outline-none cursor-pointer appearance-none pr-6"
+                      >
+                        {displayBranches.map((b) => (
+                          <option key={b.BranchId} value={b.BranchId}>
+                            {b.BranchName}
+                          </option>
+                        ))}
                       </select>
-                      <span className="material-symbols-outlined absolute right-3 pointer-events-none text-on-surface-variant text-[18px]">arrow_drop_down</span>
+                      <span className="material-symbols-outlined absolute right-3 pointer-events-none text-[#8a8782] text-[18px]">expand_more</span>
                     </div>
                   </div>
-                  <div className="lg:col-span-4 flex flex-col gap-space-xs">
-                    <label className="font-label-sm text-label-sm text-on-surface-variant uppercase flex items-center gap-space-xs">
-                      <span className="material-symbols-outlined text-[16px] text-secondary">calendar_today</span>
+
+                  {/* Thời Gian Lưu Trú (col-span-3 thu nhỏ chiều rộng lại theo yêu cầu) */}
+                  <div className="md:col-span-1 lg:col-span-3 flex flex-col gap-1.5 min-w-0">
+                    <label className="text-[11px] text-[#203044] uppercase tracking-wider font-bold flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="material-symbols-outlined text-[16px] text-[#b9a277]">calendar_today</span>
                       Thời Gian Lưu Trú
                     </label>
-                    <div className="grid grid-cols-2 gap-space-xs bg-surface-container-low rounded-lg p-space-sm">
-                      <div className="flex flex-col">
-                        <span className="font-label-sm text-label-sm text-outline">Nhận phòng</span>
-                        <input className="bg-transparent font-title-md text-title-md text-on-surface focus:outline-none cursor-pointer text-[14px]" type="date" defaultValue="2025-04-12" min="2026-09-16" />
+                    <div className="flex items-center justify-between bg-[#fbf8f2] border border-[#dedad0] rounded-sm px-2.5 h-[50px] focus-within:border-[#b9a277] focus-within:ring-2 focus-within:ring-[#b9a277]/20 transition-all">
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-[9px] text-[#8a8782] font-semibold uppercase tracking-wider leading-none mb-0.5">Nhận phòng</span>
+                        <input 
+                          className="bg-transparent text-[12px] font-semibold text-[#203044] focus:outline-none cursor-pointer w-full p-0 leading-tight" 
+                          type="date" 
+                          value={checkInDate}
+                          onChange={(e) => {
+                            setCheckInDate(e.target.value);
+                            if (e.target.value >= checkOutDate) {
+                              const next = new Date(e.target.value);
+                              next.setDate(next.getDate() + 1);
+                              setCheckOutDate(next.toISOString().split('T')[0]);
+                            }
+                          }}
+                        />
                       </div>
-                      <div className="flex flex-col pl-2 border-l border-surface-container-high">
-                        <span className="font-label-sm text-label-sm text-outline">Trả phòng</span>
-                        <input className="bg-transparent font-title-md text-title-md text-on-surface focus:outline-none cursor-pointer text-[14px]" type="date" defaultValue="2025-04-16" />
+                      <div className="h-6 w-[1px] bg-[#dedad0] mx-1.5 shrink-0"></div>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-[9px] text-[#8a8782] font-semibold uppercase tracking-wider leading-none mb-0.5">Trả phòng</span>
+                        <input 
+                          className="bg-transparent text-[12px] font-semibold text-[#203044] focus:outline-none cursor-pointer w-full p-0 leading-tight" 
+                          type="date" 
+                          value={checkOutDate}
+                          min={checkInDate}
+                          onChange={(e) => setCheckOutDate(e.target.value)}
+                        />
                       </div>
                     </div>
                   </div>
-                  <div className="lg:col-span-3 flex flex-col gap-space-xs">
-                    <label className="font-label-sm text-label-sm text-on-surface-variant uppercase flex items-center gap-space-xs">
-                      <span className="material-symbols-outlined text-[16px] text-secondary">group</span>
-                      Số Khách &amp; Buồng Phòng
+
+                  {/* Số Khách & Phòng (col-span-2) */}
+                  <div className="md:col-span-1 lg:col-span-2 flex flex-col gap-1.5 min-w-0">
+                    <label className="text-[11px] text-[#203044] uppercase tracking-wider font-bold flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="material-symbols-outlined text-[16px] text-[#b9a277]">group</span>
+                      Số Khách &amp; Phòng
                     </label>
-                    <div className="relative bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between">
-                      <select className="w-full bg-transparent font-title-md text-title-md text-on-surface focus:outline-none cursor-pointer appearance-none pr-6">
+                    <div className="relative bg-[#fbf8f2] border border-[#dedad0] rounded-sm px-2.5 h-[50px] flex items-center justify-between focus-within:border-[#b9a277] focus-within:ring-2 focus-within:ring-[#b9a277]/20 transition-all">
+                      <select 
+                        value={guestOption}
+                        onChange={(e) => setGuestOption(e.target.value)}
+                        className="w-full bg-transparent text-[13px] text-[#203044] font-semibold focus:outline-none cursor-pointer appearance-none pr-5 truncate"
+                      >
                         <option value="2-0-1">2 Người lớn • 1 Phòng</option>
-                        <option value="2-1-1">2 Người lớn, 1 Bé • 1 Phòng</option>
-                        <option value="4-2-2">4 Người lớn • Villa 2 Phòng</option>
-                        <option value="6-3-3">Biệt thự Tổng Thống (VIP)</option>
+                        <option value="2-1-1">2 Người lớn, 1 Trẻ em</option>
+                        <option value="4-2-2">4 Người lớn • Villa 2P</option>
+                        <option value="6-3-3">Villa Presidential</option>
                       </select>
-                      <span className="material-symbols-outlined absolute right-3 pointer-events-none text-on-surface-variant text-[18px]">expand_more</span>
+                      <span className="material-symbols-outlined absolute right-2 pointer-events-none text-[#8a8782] text-[18px]">expand_more</span>
                     </div>
                   </div>
-                  <div className="lg:col-span-2">
-                    <button className="w-full h-14 rounded-lg bg-secondary hover:bg-on-secondary-container text-on-secondary flex items-center justify-center gap-space-xs font-label-lg text-label-lg transition-all shadow-md hover:shadow-lg" type="button">
+
+                  {/* Nút Tìm Phòng (col-span-2) */}
+                  <div className="md:col-span-1 lg:col-span-2">
+                    <button 
+                      className="w-full h-[50px] rounded-sm bg-[#b9a277] hover:bg-[#a68e64] text-white flex items-center justify-center gap-2 text-[14px] font-bold transition-all shadow-[0_12px_32px_-8px_rgba(185,162,119,0.7)] hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap" 
+                      type="submit"
+                    >
                       <span className="material-symbols-outlined text-[20px]">search</span>
-                      <span className="">Tìm Phòng Trống</span>
+                      <span className="whitespace-nowrap">Tìm Phòng</span>
                     </button>
                   </div>
                 </form>
+
+                {searchNotification && (
+                  <div className="mt-4 p-3 bg-[#fbf8f2] text-[#203044] rounded-sm text-[13px] font-medium flex items-center gap-2 border border-[#b9a277]/40 animate-fade-in shadow-sm">
+                    <span className="material-symbols-outlined text-[#b9a277] text-[18px]">info</span>
+                    <span>{searchNotification}</span>
+                  </div>
+                )}
               </div>
             </div>
           </section>
 
-          <section className="w-full py-space-xl bg-surface-container-lowest shadow-sm">
-            <div className="w-full px-margin max-w-7xl mx-auto">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-gutter text-center divide-x-0 md:divide-x divide-surface-container">
-                <div className="flex flex-col items-center justify-center p-space-md">
-                  <div className="flex items-center gap-space-xs mb-space-xs">
-                    <span className="font-display-sm text-display-sm text-on-surface">4.9</span>
-                    <span className="text-secondary text-headline-sm font-headline-sm">★</span>
+          {/* DYNAMIC SYSTEM STATS SECTION (100k records live stats) */}
+          <section className="w-full py-12 bg-white border-y border-[#dedad0]/80">
+            <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center divide-x-0 md:divide-x divide-[#dedad0]">
+                <div className="flex flex-col items-center justify-center p-3">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-[32px] text-[#203044] font-extrabold tracking-tight">
+                      {homeData.stats?.avgRating ? homeData.stats.avgRating.toFixed(1) : '5.0'}
+                    </span>
+                    <span className="text-[#b9a277] text-[24px]">★</span>
                   </div>
-                  <span className="font-title-md text-title-md text-on-surface font-semibold">Đánh Giá TripAdvisor</span>
-                  <span className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Dựa trên 2.450+ đánh giá xác thực</span>
+                  <span className="text-[14px] text-[#203044] font-bold">Hài Lòng Xuất Sắc</span>
+                  <span className="text-[12px] text-[#8a8782] mt-0.5">
+                    Hơn {homeData.stats?.totalBookings ? homeData.stats.totalBookings.toLocaleString('vi-VN') : '100.000'} lượt khách tin chọn
+                  </span>
                 </div>
-                <div className="flex flex-col items-center justify-center p-space-md">
-                  <div className="flex items-center gap-space-xs mb-space-xs">
-                    <span className="font-display-sm text-display-sm text-on-surface">98.4</span>
-                    <span className="text-secondary text-headline-sm font-headline-sm">%</span>
+
+                <div className="flex flex-col items-center justify-center p-3">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-[32px] text-[#203044] font-extrabold tracking-tight">
+                      {homeData.stats?.totalRooms ? homeData.stats.totalRooms.toLocaleString('vi-VN') : '100.000'}
+                    </span>
+                    <span className="text-[#b9a277] text-[20px] font-bold self-end mb-1">+</span>
                   </div>
-                  <span className="font-title-md text-title-md text-on-surface font-semibold">Hài Lòng Tuyệt Đối</span>
-                  <span className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Khách quay lại nghỉ dưỡng hàng năm</span>
+                  <span className="text-[14px] text-[#203044] font-bold">Phòng &amp; Biệt Thự Biển</span>
+                  <span className="text-[12px] text-[#8a8782] mt-0.5">
+                    Tại {homeData.stats?.totalBranches ? homeData.stats.totalBranches.toLocaleString('vi-VN') : '3'} chi nhánh nghỉ dưỡng
+                  </span>
                 </div>
-                <div className="flex flex-col items-center justify-center p-space-md">
-                  <div className="flex items-center gap-space-xs mb-space-xs text-secondary">
-                    <span className="material-symbols-outlined text-[36px]">concierge</span>
+
+                <div className="flex flex-col items-center justify-center p-3">
+                  <div className="flex items-center gap-1 mb-1 text-[#b9a277]">
+                    <span className="material-symbols-outlined text-[32px]">concierge</span>
                   </div>
-                  <span className="font-title-md text-title-md text-on-surface font-semibold">Quản Gia 24/7 Riêng</span>
-                  <span className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Chuẩn mực dịch vụ Hoàng gia riêng biệt</span>
+                  <span className="text-[14px] text-[#203044] font-bold">Quản Gia Riêng 24/7</span>
+                  <span className="text-[12px] text-[#8a8782] mt-0.5">
+                    Chuẩn mực phục vụ tận tâm, tinh tế
+                  </span>
                 </div>
-                <div className="flex flex-col items-center justify-center p-space-md">
-                  <div className="flex items-center gap-space-xs mb-space-xs">
-                    <span className="font-display-sm text-display-sm text-on-surface">1.2</span>
-                    <span className="text-secondary font-title-lg text-title-lg font-bold self-end mb-1">KM</span>
+
+                <div className="flex flex-col items-center justify-center p-3">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-[32px] text-[#203044] font-extrabold tracking-tight">100%</span>
                   </div>
-                  <span className="font-title-md text-title-md text-on-surface font-semibold">Bãi Biển Độc Quyền</span>
-                  <span className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Bờ cát mịn tự nhiên &amp; biển ngọc lam</span>
+                  <span className="text-[14px] text-[#203044] font-bold">Bãi Biển Độc Quyền</span>
+                  <span className="text-[12px] text-[#8a8782] mt-0.5">
+                    Cát trắng mịn màng &amp; biển ngọc lam
+                  </span>
                 </div>
               </div>
             </div>
           </section>
 
-          <section className="w-full py-space-xl bg-background">
-            <div className="w-full px-margin max-w-7xl mx-auto">
-              <div className="flex flex-col md:flex-row md:items-end justify-between mb-space-xl gap-space-md">
+          {/* DYNAMIC ROOM TYPES COLLECTION (Từ Database bảng RoomTypes) */}
+          <section id="room-collection" className="w-full py-16 lg:py-20 bg-[#fafaf8] scroll-mt-24">
+            <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+              <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
                 <div>
-                  <span className="font-label-sm text-label-sm uppercase tracking-widest text-secondary font-bold">Không Gian Nghỉ Dưỡng Thượng Đỉnh</span>
-                  <h2 className="font-headline-lg text-headline-lg text-on-surface mt-space-xs">Bộ Sưu Tập Biệt Thự &amp; Phòng Suite</h2>
+                  <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
+                    Không Gian Nghỉ Dưỡng Tinh Hoa
+                  </span>
+                  <h2 className="font-serif text-[28px] lg:text-[34px] text-[#203044] mt-1 font-bold tracking-tight">
+                    Bộ Sưu Tập Biệt Thự &amp; Phòng Suite
+                  </h2>
                 </div>
-                <p className="font-body-md text-body-md text-on-surface-variant max-w-md">
-                  Mỗi không gian là một tác phẩm kiến trúc hòa quyện cùng thiên nhiên nhiệt đới, kiến tạo sự riêng tư vô hạn và thư thái an nhiên.
+                <p className="text-[14px] text-[#373435]/80 max-w-md leading-relaxed">
+                  Được thiết kế tinh tế với vật liệu tự nhiên, hồ bơi riêng tư và không gian mở đón trọn hơi thở đại dương.
                 </p>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
-                <div className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
-                  <div className="relative w-full aspect-[16/10] overflow-hidden">
-                    <img className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="Villa 1" src="https://images.unsplash.com/photo-1582719478250-c89404bb2a15?q=80&w=2070&auto=format&fit=crop" />
-                    <div className="absolute top-space-sm left-space-sm px-space-sm py-space-xs bg-primary-container/90 backdrop-blur-md rounded text-secondary-fixed font-label-sm text-label-sm font-semibold uppercase tracking-wider">
-                      Signature Villa
-                    </div>
-                    <div className="absolute bottom-space-sm right-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded-lg font-label-sm text-label-sm text-on-surface flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-[16px]">pool</span> Hồ bơi vô cực riêng
-                    </div>
-                  </div>
-                  <div className="p-space-lg flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-space-sm text-on-surface-variant font-body-sm text-body-sm mb-space-xs">
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">straighten</span> 180 m²</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">king_bed</span> 1 King Bed</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">visibility</span> Trực diện biển</span>
-                      </div>
-                      <h3 className="font-headline-sm text-headline-sm text-on-surface group-hover:text-secondary transition-colors mb-space-xs">
-                        Oceanfront Pool Villa
-                      </h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mb-space-md line-clamp-2">
-                        Biệt thự trực diện biển với hồ bơi tràn bờ riêng tư, sân tắm nắng bằng gỗ teak và lối đi thẳng ra bờ cát trắng mịn.
-                      </p>
-                      <div className="flex flex-wrap gap-space-xs mb-space-lg">
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Bữa sáng thượng hạng</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Đưa đón sân bay VIP</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Trà chiều bãi biển</span>
-                      </div>
-                    </div>
-                    <div className="pt-space-md border-t border-surface-container-high flex items-center justify-between mt-auto">
-                      <div>
-                        <span className="font-label-sm text-label-sm text-outline block">Giá chỉ từ</span>
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-title-lg text-title-lg text-on-surface font-bold">8.500.000₫</span>
-                          <span className="font-body-sm text-body-sm text-outline">/đêm</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-space-xs">
-                        <button className="px-space-md py-space-sm rounded-lg bg-surface-container-high hover:bg-secondary-container text-on-surface font-label-md text-label-md transition-colors" type="button">
-                          Chi Tiết
-                        </button>
-                        <button className="px-space-md py-space-sm rounded-lg bg-secondary text-on-secondary hover:bg-on-secondary-container font-label-md text-label-md transition-colors shadow-sm" type="button">
-                          Đặt Ngay
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
-                  <div className="relative w-full aspect-[16/10] overflow-hidden">
-                    <img className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="Suite 2" src="https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=2070&auto=format&fit=crop" />
-                    <div className="absolute top-space-sm left-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded text-secondary font-label-sm text-label-sm font-semibold uppercase tracking-wider">
-                      Khuyên Chọn
+              {loading ? (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} className="bg-white rounded-md overflow-hidden shadow-sm p-4 border border-[#dedad0] animate-pulse">
+                      <div className="w-full aspect-[16/10] bg-[#eae8df] rounded-sm mb-4"></div>
+                      <div className="h-5 bg-[#eae8df] rounded w-3/4 mb-2"></div>
+                      <div className="h-4 bg-[#eae8df] rounded w-1/2 mb-4"></div>
+                      <div className="h-10 bg-[#eae8df] rounded w-full"></div>
                     </div>
-                    <div className="absolute bottom-space-sm right-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded-lg font-label-sm text-label-sm text-on-surface flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-[16px]">hot_tub</span> Bồn tắm Jacuzzi
-                    </div>
-                  </div>
-                  <div className="p-space-lg flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-space-sm text-on-surface-variant font-body-sm text-body-sm mb-space-xs">
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">straighten</span> 95 m²</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">king_bed</span> 1 King Bed</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">wb_twilight</span> Hướng Hoàng Hôn</span>
-                      </div>
-                      <h3 className="font-headline-sm text-headline-sm text-on-surface group-hover:text-secondary transition-colors mb-space-xs">
-                        Horizon Grand Suite
-                      </h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mb-space-md line-clamp-2">
-                        Tầm nhìn 180 độ ôm trọn khoảnh khắc hoàng hôn rực rỡ, trang bị bồn tắm sục đôi ngắm vịnh biển thơ mộng.
-                      </p>
-                      <div className="flex flex-wrap gap-space-xs mb-space-lg">
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Bữa sáng Buffet</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Cocktail Sunset Bar</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Dịch vụ giặt là nhẹ</span>
-                      </div>
-                    </div>
-                    <div className="pt-space-md border-t border-surface-container-high flex items-center justify-between mt-auto">
-                      <div>
-                        <span className="font-label-sm text-label-sm text-outline block">Giá chỉ từ</span>
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-title-lg text-title-lg text-on-surface font-bold">4.200.000₫</span>
-                          <span className="font-body-sm text-body-sm text-outline">/đêm</span>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {displayRoomTypes.map((rt, idx) => (
+                    <div 
+                      key={rt.RoomTypeId || idx} 
+                      className="group bg-white rounded-md overflow-hidden shadow-[0_10px_30px_-22px_rgba(32,48,68,0.5)] hover:shadow-[0_18px_50px_-28px_rgba(32,48,68,0.7)] transition-all duration-300 flex flex-col justify-between border border-[#dedad0] hover:-translate-y-1"
+                    >
+                      {/* Image Thumbnail */}
+                      <div className="relative w-full aspect-[16/10] overflow-hidden bg-[#203044]">
+                        <img 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-95 group-hover:opacity-100" 
+                          alt={rt.TypeName} 
+                          src={rt.ImageUrl || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop'} 
+                        />
+                        <div className="absolute top-3 left-3 px-3 py-1 bg-[#203044]/90 backdrop-blur-md rounded-xs text-[#b9a277] text-[11px] font-bold uppercase tracking-wider">
+                          {idx === 0 ? 'Signature Suite' : idx === 1 ? 'Khuyên Chọn' : 'Đẳng Cấp 5 Sao'}
+                        </div>
+                        <div className="absolute bottom-3 right-3 px-2.5 py-1 bg-white/95 backdrop-blur-md rounded-xs text-[11px] font-semibold text-[#203044] flex items-center gap-1 shadow-sm">
+                          <span className="material-symbols-outlined text-[#b9a277] text-[15px]">pool</span> Hồ bơi riêng &amp; View biển
                         </div>
                       </div>
-                      <div className="flex items-center gap-space-xs">
-                        <button className="px-space-md py-space-sm rounded-lg bg-surface-container-high hover:bg-secondary-container text-on-surface font-label-md text-label-md transition-colors" type="button">
-                          Chi Tiết
-                        </button>
-                        <button className="px-space-md py-space-sm rounded-lg bg-secondary text-on-secondary hover:bg-on-secondary-container font-label-md text-label-md transition-colors shadow-sm" type="button">
-                          Đặt Ngay
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
-                  <div className="relative w-full aspect-[16/10] overflow-hidden">
-                    <img className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="Bungalow" src="https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?q=80&w=2070&auto=format&fit=crop" />
-                    <div className="absolute top-space-sm left-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded text-secondary font-label-sm text-label-sm font-semibold uppercase tracking-wider">
-                      An Nhiên &amp; Tĩnh Tại
-                    </div>
-                    <div className="absolute bottom-space-sm right-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded-lg font-label-sm text-label-sm text-on-surface flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-[16px]">nature_people</span> Vườn Nhiệt Đới
-                    </div>
-                  </div>
-                  <div className="p-space-lg flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-space-sm text-on-surface-variant font-body-sm text-body-sm mb-space-xs">
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">straighten</span> 75 m²</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">king_bed</span> 1 King / 2 Twin</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">yard</span> Hoa cỏ nội khu</span>
-                      </div>
-                      <h3 className="font-headline-sm text-headline-sm text-on-surface group-hover:text-secondary transition-colors mb-space-xs">
-                        Garden Sanctuary Bungalow
-                      </h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mb-space-md line-clamp-2">
-                        Ẩn mình giữa rừng dương và rặng hoa sứ ngát hương, mang lại không gian thiền định, tách biệt hoàn toàn ồn ào đô thị.
-                      </p>
-                      <div className="flex flex-wrap gap-space-xs mb-space-lg">
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Bữa sáng lành mạnh</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Lớp Yoga sáng sớm</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Xe đạp dạo khu nghỉ</span>
-                      </div>
-                    </div>
-                    <div className="pt-space-md border-t border-surface-container-high flex items-center justify-between mt-auto">
-                      <div>
-                        <span className="font-label-sm text-label-sm text-outline block">Giá chỉ từ</span>
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-title-lg text-title-lg text-on-surface font-bold">2.900.000₫</span>
-                          <span className="font-body-sm text-body-sm text-outline">/đêm</span>
+                      {/* Content Body */}
+                      <div className="p-6 flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 text-[#8a8782] text-[12px] font-semibold mb-2">
+                            <span className="flex items-center gap-1 text-[#203044]">
+                              <span className="material-symbols-outlined text-[15px] text-[#b9a277]">group</span> 
+                              Tối đa {rt.MaxOccupancy || 2} khách
+                            </span>
+                            <span>•</span>
+                            <span>{rt.AdultCapacity || 2} Người lớn</span>
+                            <span>•</span>
+                            <span>{rt.ChildCapacity || 1} Trẻ em</span>
+                          </div>
+
+                          <h3 className="text-[18px] text-[#203044] font-bold group-hover:text-[#b9a277] transition-colors mb-2">
+                            {rt.TypeName}
+                          </h3>
+                          <p className="text-[13px] text-[#373435]/80 mb-4 line-clamp-2 leading-relaxed">
+                            {rt.Description || 'Không gian nghỉ dưỡng tuyệt mỹ giữa biển xanh cát trắng, phong cách sống đẳng cấp tại Grand Horizon.'}
+                          </p>
+
+                          <div className="flex flex-wrap gap-1.5 mb-6">
+                            <span className="px-2.5 py-0.5 rounded-xs bg-[#fbf8f2] border border-[#dedad0] text-[11px] font-medium text-[#203044]">Bữa sáng buffet</span>
+                            <span className="px-2.5 py-0.5 rounded-xs bg-[#fbf8f2] border border-[#dedad0] text-[11px] font-medium text-[#203044]">Đưa đón Limousine</span>
+                            <span className="px-2.5 py-0.5 rounded-xs bg-[#fbf8f2] border border-[#dedad0] text-[11px] font-medium text-[#203044]">Trà chiều bãi biển</span>
+                          </div>
+                        </div>
+
+                        {/* Price & Actions */}
+                        <div className="pt-4 border-t border-[#dedad0] flex items-center justify-between mt-auto">
+                          <div>
+                            <span className="text-[10px] text-[#8a8782] font-semibold uppercase block">Giá từ</span>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-[18px] font-extrabold text-[#203044]">
+                                {Number(rt.BasePrice || 1700000).toLocaleString('vi-VN')}₫
+                              </span>
+                              <span className="text-[11px] text-[#8a8782]">/đêm</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button className="px-3.5 py-2 rounded-xs bg-[#fbf8f2] hover:bg-[#eae8df] text-[#203044] text-[13px] font-semibold border border-[#dedad0] transition-colors" type="button">
+                              Chi Tiết
+                            </button>
+                            <button className="px-4 py-2 rounded-xs bg-[#b9a277] hover:bg-[#a68e64] text-white text-[13px] font-bold shadow-sm transition-all" type="button">
+                              Đặt Ngay
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-space-xs">
-                        <button className="px-space-md py-space-sm rounded-lg bg-surface-container-high hover:bg-secondary-container text-on-surface font-label-md text-label-md transition-colors" type="button">
-                          Chi Tiết
-                        </button>
-                        <button className="px-space-md py-space-sm rounded-lg bg-secondary text-on-secondary hover:bg-on-secondary-container font-label-md text-label-md transition-colors shadow-sm" type="button">
-                          Đặt Ngay
-                        </button>
-                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              </div>
-              <div className="mt-space-xl text-center">
-                <a className="inline-flex items-center gap-space-sm px-space-xl py-space-md rounded-lg bg-surface-container-lowest text-secondary font-label-lg text-label-lg shadow-sm hover:shadow-md transition-all" href="#">
-                  <span className="">Xem Toàn Bộ 12 Hạng Phòng &amp; Biệt Thự</span>
+              )}
+
+              <div className="mt-12 text-center">
+                <a className="inline-flex items-center gap-2 px-6 py-3 rounded-sm bg-white text-[#203044] hover:text-[#b9a277] text-[14px] font-bold shadow-sm hover:shadow-md transition-all border border-[#dedad0]" href="#room-collection">
+                  <span>Xem Toàn Bộ Hạng Phòng &amp; Biệt Thự Grand Horizon</span>
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                 </a>
               </div>
             </div>
           </section>
 
-          <section className="w-full py-space-xl bg-surface-container-low">
-            <div className="w-full px-margin max-w-7xl mx-auto">
-              <div className="text-center max-w-3xl mx-auto mb-space-xl">
-                <span className="font-label-sm text-label-sm uppercase tracking-widest text-secondary font-bold">Đặc Quyền Nghỉ Dưỡng</span>
-                <h2 className="font-headline-lg text-headline-lg text-on-surface mt-space-xs">Trải Nghiệm Thượng Lưu Độc Bản</h2>
-                <p className="font-body-md text-body-md text-on-surface-variant mt-space-xs">
-                  Mỗi khoảnh khắc tại Grand Horizon được thêu dệt tỉ mỉ, đánh thức trọn vẹn năm giác quan bằng sự thăng hoa văn hóa và tiện nghi vượt bậc.
+          {/* TRẢI NGHIỆM ĐẶC QUYỀN GRAND HORIZON */}
+          <section id="trai-nghiem" className="w-full py-16 bg-[#fbf8f2] border-t border-[#dedad0]/80">
+            <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+              <div className="text-center max-w-2xl mx-auto mb-12">
+                <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">Đặc Quyền Nghỉ Dưỡng</span>
+                <h2 className="font-serif text-[28px] lg:text-[34px] text-[#203044] mt-1 font-bold tracking-tight">Trải Nghiệm Độc Bản Tại Grand Horizon</h2>
+                <p className="text-[14px] text-[#373435]/80 mt-2 leading-relaxed">
+                  Mỗi khoảnh khắc tại Grand Horizon Hotels &amp; Resorts được chăm chút chu đáo, mang đến sự tĩnh tại và thăng hoa tinh thần.
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
-                <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:-translate-y-1.5 transition-transform duration-300 flex flex-col">
-                  <div className="h-52 w-full overflow-hidden relative">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-white rounded-md overflow-hidden shadow-sm hover:-translate-y-1.5 transition-transform duration-300 flex flex-col border border-[#dedad0]">
+                  <div className="h-48 w-full overflow-hidden relative">
                     <img className="w-full h-full object-cover" alt="Spa" src="https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <span className="absolute bottom-3 left-3 text-surface-container-lowest font-label-md text-label-md flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-[18px]">spa</span> Trị Liệu Trẻ Hóa
+                    <span className="absolute bottom-3 left-3 text-white text-[12px] font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[#b9a277] text-[18px]">spa</span> Trị Liệu Trẻ Hóa
                     </span>
                   </div>
-                  <div className="p-space-md flex-1 flex flex-col justify-between">
+                  <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-title-lg text-title-lg text-on-surface font-semibold mb-space-xs">Lotus Lotus Spa &amp; Wellness</h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant">
-                        Liệu pháp bấm huyệt cổ truyền Việt Nam kết hợp tinh dầu thảo mộc bản địa, giải tỏa mọi căng thẳng.
+                      <h3 className="text-[16px] text-[#203044] font-bold mb-1">Grand Horizon Wellness &amp; Spa</h3>
+                      <p className="text-[13px] text-[#373435]/80 leading-relaxed">
+                        Liệu pháp bấm huyệt cổ truyền kết hợp tinh dầu thảo mộc bản địa, tái tạo nguồn năng lượng sống.
                       </p>
                     </div>
-                    <a className="inline-flex items-center gap-1 font-label-md text-label-md text-secondary hover:text-on-secondary-container mt-space-md pt-space-xs" href="#">
+                    <a className="inline-flex items-center gap-1 text-[13px] font-bold text-[#b9a277] hover:text-[#203044] mt-4" href="#">
                       Đặt Lịch Trị Liệu <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                     </a>
                   </div>
                 </div>
 
-                <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:-translate-y-1.5 transition-transform duration-300 flex flex-col">
-                  <div className="h-52 w-full overflow-hidden relative">
+                <div className="bg-white rounded-md overflow-hidden shadow-sm hover:-translate-y-1.5 transition-transform duration-300 flex flex-col border border-[#dedad0]">
+                  <div className="h-48 w-full overflow-hidden relative">
                     <img className="w-full h-full object-cover" alt="Dining" src="https://images.unsplash.com/photo-1514933651103-005eec06c04b?q=80&w=1974&auto=format&fit=crop" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <span className="absolute bottom-3 left-3 text-surface-container-lowest font-label-md text-label-md flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-[18px]">restaurant</span> Hải Sản Fine Dining
+                    <span className="absolute bottom-3 left-3 text-white text-[12px] font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[#b9a277] text-[18px]">restaurant</span> Hải Sản Fine Dining
                     </span>
                   </div>
-                  <div className="p-space-md flex-1 flex flex-col justify-between">
+                  <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-title-lg text-title-lg text-on-surface font-semibold mb-space-xs">Nhà Hàng Biển 'The Azure'</h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant">
-                        Bữa tiệc vị giác với hải sản tươi đánh bắt trong ngày, chuẩn bị bởi các bếp trưởng đạt sao Michelin danh tiếng.
+                      <h3 className="text-[16px] text-[#203044] font-bold mb-1">Nhà Hàng Biển 'The Azure'</h3>
+                      <p className="text-[13px] text-[#373435]/80 leading-relaxed">
+                        Hải sản tươi sống đánh bắt trong ngày chế biến theo phong cách fusion chuẩn Michelin danh tiếng.
                       </p>
                     </div>
-                    <a className="inline-flex items-center gap-1 font-label-md text-label-md text-secondary hover:text-on-secondary-container mt-space-md pt-space-xs" href="#">
+                    <a className="inline-flex items-center gap-1 text-[13px] font-bold text-[#b9a277] hover:text-[#203044] mt-4" href="#">
                       Khám Phá Thực Đơn <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                     </a>
                   </div>
                 </div>
 
-                <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:-translate-y-1.5 transition-transform duration-300 flex flex-col">
-                  <div className="h-52 w-full overflow-hidden relative">
+                <div className="bg-white rounded-md overflow-hidden shadow-sm hover:-translate-y-1.5 transition-transform duration-300 flex flex-col border border-[#dedad0]">
+                  <div className="h-48 w-full overflow-hidden relative">
                     <img className="w-full h-full object-cover" alt="Pool" src="https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?q=80&w=2070&auto=format&fit=crop" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <span className="absolute bottom-3 left-3 text-surface-container-lowest font-label-md text-label-md flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-[18px]">waves</span> Thư Giãn Đỉnh Cao
+                    <span className="absolute bottom-3 left-3 text-white text-[12px] font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[#b9a277] text-[18px]">waves</span> Thư Giãn Đỉnh Cao
                     </span>
                   </div>
-                  <div className="p-space-md flex-1 flex flex-col justify-between">
+                  <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-title-lg text-title-lg text-on-surface font-semibold mb-space-xs">Hồ Bơi Vô Cực Đa Tầng</h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant">
-                        Cụm 3 hồ bơi nước mặn và nước ngọt nhìn thẳng ra đường chân trời biển rộng, thưởng thức cocktail sảng khoái.
+                      <h3 className="text-[16px] text-[#203044] font-bold mb-1">Hồ Bơi Vô Cực Biển</h3>
+                      <p className="text-[13px] text-[#373435]/80 leading-relaxed">
+                        Hồ bơi nước mặn hướng thẳng đường chân trời, thưởng thức cocktail mát lạnh bên quầy bar nổi.
                       </p>
                     </div>
-                    <a className="inline-flex items-center gap-1 font-label-md text-label-md text-secondary hover:text-on-secondary-container mt-space-md pt-space-xs" href="#">
-                      Xem Tiện Ích Hồ Bơi <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    <a className="inline-flex items-center gap-1 text-[13px] font-bold text-[#b9a277] hover:text-[#203044] mt-4" href="#">
+                      Xem Tiện Ích <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                     </a>
                   </div>
                 </div>
 
-                <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:-translate-y-1.5 transition-transform duration-300 flex flex-col">
-                  <div className="h-52 w-full overflow-hidden relative">
+                <div className="bg-white rounded-md overflow-hidden shadow-sm hover:-translate-y-1.5 transition-transform duration-300 flex flex-col border border-[#dedad0]">
+                  <div className="h-48 w-full overflow-hidden relative">
                     <img className="w-full h-full object-cover" alt="Yacht" src="https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?q=80&w=2070&auto=format&fit=crop" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <span className="absolute bottom-3 left-3 text-surface-container-lowest font-label-md text-label-md flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-[18px]">sailing</span> Du Thuyền Riêng Biệt
+                    <span className="absolute bottom-3 left-3 text-white text-[12px] font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[#b9a277] text-[18px]">sailing</span> Du Thuyền Riêng Biệt
                     </span>
                   </div>
-                  <div className="p-space-md flex-1 flex flex-col justify-between">
+                  <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-title-lg text-title-lg text-on-surface font-semibold mb-space-xs">Du Thuyền Hoàng Hôn VIP</h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant">
-                        Hành trình lướt sóng ngắm ráng chiều tuyệt mỹ trên vịnh biển, kèm rượu vang Champagne và đồ ăn canapé cao cấp.
+                      <h3 className="text-[16px] text-[#203044] font-bold mb-1">Du Thuyền Hoàng Hôn VIP</h3>
+                      <p className="text-[13px] text-[#373435]/80 leading-relaxed">
+                        Hành trình thưởng lãm hoàng hôn vịnh biển kèm rượu vang thượng hạng và tiệc canapé riêng tư.
                       </p>
                     </div>
-                    <a className="inline-flex items-center gap-1 font-label-md text-label-md text-secondary hover:text-on-secondary-container mt-space-md pt-space-xs" href="#">
-                      Đặt Chuyến Hải Trình <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    <a className="inline-flex items-center gap-1 text-[13px] font-bold text-[#b9a277] hover:text-[#203044] mt-4" href="#">
+                      Đặt Hải Trình <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                     </a>
                   </div>
                 </div>
@@ -410,93 +526,94 @@ function App() {
             </div>
           </section>
 
-          <section className="w-full py-space-xl bg-background">
-            <div className="w-full px-margin max-w-7xl mx-auto">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-center">
-                <div className="lg:col-span-7 flex flex-col gap-space-lg">
+          {/* DYNAMIC CUSTOMER REVIEWS (Từ Database bảng Reviews) */}
+          <section className="w-full py-16 lg:py-20 bg-white">
+            <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                <div className="lg:col-span-7 flex flex-col gap-6">
                   <div>
-                    <span className="font-label-sm text-label-sm uppercase tracking-widest text-secondary font-bold">Chia Sẻ Từ Thượng Khách</span>
-                    <h2 className="font-headline-lg text-headline-lg text-on-surface mt-space-xs">Dấu Ấn Kỷ Niệm Khó Phai</h2>
+                    <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
+                      Chia Sẻ Từ Thượng Khách
+                    </span>
+                    <h2 className="font-serif text-[28px] lg:text-[34px] text-[#203044] mt-1 font-bold tracking-tight">
+                      Dấu Ấn Kỷ Niệm Khó Phai
+                    </h2>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
-                    <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
-                      <div>
-                        <div className="flex text-secondary mb-space-sm text-[16px]">
-                          <span className="">★</span><span className="">★</span><span className="">★</span><span className="">★</span><span className="">★</span>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {displayReviews.map((rev, idx) => (
+                      <div key={rev.ReviewId || idx} className="bg-[#fafaf8] p-6 rounded-md shadow-sm flex flex-col justify-between border border-[#dedad0]">
+                        <div>
+                          <div className="flex text-[#b9a277] mb-2 text-[15px]">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <span key={i}>★</span>
+                            ))}
+                          </div>
+                          <h4 className="text-[15px] font-bold text-[#203044] mb-2">{rev.ReviewTitle}</h4>
+                          <p className="text-[13px] text-[#373435]/80 italic mb-4 line-clamp-3 leading-relaxed">
+                            "{rev.ReviewBody}"
+                          </p>
                         </div>
-                        <p className="font-body-md text-body-md text-on-surface-variant italic mb-space-md">
-                          "Kỳ nghỉ tuần trăng mật vượt ngoài mong đợi. Đội ngũ quản gia thấu hiểu từng thói quen nhỏ nhất, từ loại gối lông vũ đến sở thích thưởng thức bữa sáng bên bờ sóng vỗ."
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-space-sm pt-space-sm border-t border-surface-container">
-                        <div className="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center font-bold text-on-secondary-container font-label-md text-label-md">
-                          TH
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-title-md text-title-md text-on-surface font-semibold leading-tight">TS. Trần Hoàng &amp; Phu Nhân</span>
-                          <span className="font-label-sm text-label-sm text-outline">Oceanfront Villa • Tháng 01/2025</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
-                      <div>
-                        <div className="flex text-secondary mb-space-sm text-[16px]">
-                          <span className="">★</span><span className="">★</span><span className="">★</span><span className="">★</span><span className="">★</span>
-                        </div>
-                        <p className="font-body-md text-body-md text-on-surface-variant italic mb-space-md">
-                          "Không gian tĩnh mịch và dịch vụ chuẩn mực 5 sao đích thực. Nhà hàng The Azure phục vụ món tôm hùm sốt bơ nướng ngon nhất tôi từng thưởng thức tại châu Á."
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-space-sm pt-space-sm border-t border-surface-container">
-                        <div className="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center font-bold text-on-secondary-container font-label-md text-label-md">
-                          ML
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-title-md text-title-md text-on-surface font-semibold leading-tight">Madame Mai Lan</span>
-                          <span className="font-label-sm text-label-sm text-outline">Grand Suite • Hội Viên Elite Black</span>
+                        <div className="flex items-center gap-3 pt-3 border-t border-[#dedad0]">
+                          <div className="w-9 h-9 rounded-full bg-[#203044] text-[#b9a277] flex items-center justify-center font-bold text-[12px]">
+                            {(rev.ReviewerName || 'KH').substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[13px] text-[#203044] font-bold leading-tight">
+                              {rev.ReviewerName || 'Thượng Khách VIP'}
+                            </span>
+                            <span className="text-[11px] text-[#8a8782]">
+                              {rev.TripClassification || 'Khách Nghỉ Dưỡng'} • Đánh giá 5 sao
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-space-lg pt-space-xs text-on-surface-variant">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-secondary text-[24px]">verified_user</span>
-                      <span className="font-label-sm text-label-sm">Bảo lưu và hoàn cọc linh hoạt 48h</span>
+
+                  <div className="flex items-center gap-6 pt-2 text-[#373435]/80">
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[#b9a277] text-[20px]">verified_user</span>
+                      <span className="text-[12px] font-medium">Bảo lưu và hoàn cọc linh hoạt 48h</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-secondary text-[24px]">lock</span>
-                      <span className="font-label-sm text-label-sm">Thanh toán bảo mật chuẩn SSL 256-bit</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[#b9a277] text-[20px]">lock</span>
+                      <span className="text-[12px] font-medium">Thanh toán bảo mật chuẩn SSL 256-bit</span>
                     </div>
                   </div>
                 </div>
-                <div className="lg:col-span-5">
-                  <div className="relative bg-primary-container text-surface-container-lowest p-space-xl rounded-xl overflow-hidden shadow-xl">
-                    <div className="absolute -top-16 -right-16 w-60 h-60 rounded-full bg-secondary/30 blur-2xl pointer-events-none"></div>
+
+                {/* MEMBERSHIP SIGNUP CARD */}
+                <div id="hoi-vien" className="lg:col-span-5">
+                  <div className="relative bg-[#203044] text-white p-8 rounded-md overflow-hidden shadow-[0_18px_50px_-28px_rgba(32,48,68,0.7)] border border-[#203044]">
+                    <div className="absolute -top-16 -right-16 w-60 h-60 rounded-full bg-[#b9a277]/20 blur-2xl pointer-events-none"></div>
                     <div className="relative z-10 flex flex-col">
-                      <div className="w-12 h-12 rounded-lg bg-secondary-container/20 flex items-center justify-center mb-space-md">
-                        <span className="material-symbols-outlined text-secondary-fixed text-[28px]">stars</span>
+                      <div className="w-10 h-10 rounded-sm bg-[#b9a277]/20 flex items-center justify-center mb-4">
+                        <span className="material-symbols-outlined text-[#b9a277] text-[24px]">stars</span>
                       </div>
-                      <span className="font-label-sm text-label-sm uppercase tracking-widest text-secondary-fixed font-bold">Grand Horizon Elite Club</span>
-                      <h3 className="font-headline-md text-headline-md text-surface-container-lowest mt-1 mb-space-xs">
+                      <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
+                        Grand Horizon Elite Club
+                      </span>
+                      <h3 className="text-[22px] text-white mt-1 mb-2 font-bold leading-snug">
                         Đăng Ký Hội Viên &amp; Nhận Ngay Ưu Đãi 10%
                       </h3>
-                      <p className="font-body-sm text-body-sm text-primary-fixed-dim mb-space-lg">
-                        Đặc quyền nhận chiết khấu trực tiếp trên giá phòng, nâng cấp hạng phòng miễn phí tùy tình trạng và thưởng thức dịch vụ đưa đón bằng xe riêng Limousine.
+                      <p className="text-[13px] text-white/80 mb-6 leading-relaxed">
+                        Đặc quyền chiết khấu trực tiếp trên giá phòng, nâng cấp hạng phòng miễn phí tùy tình trạng và dịch vụ xe đưa đón Limousine.
                       </p>
-                      <form className="flex flex-col gap-space-sm" onSubmit={(e) => e.preventDefault()}>
-                        <div className="flex flex-col gap-1">
-                          <input className="w-full h-12 px-space-md rounded-lg bg-surface-container-lowest/10 text-surface-container-lowest placeholder-primary-fixed-dim text-body-md focus:outline-none focus:bg-surface-container-lowest/20 transition-all" placeholder="Họ và tên của Quý khách" type="text" />
+                      <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); alert('Chúc mừng Quý khách đã đăng ký Hội viên Grand Horizon Elite thành công!'); }}>
+                        <div>
+                          <input className="w-full h-11 px-3.5 rounded-sm bg-white/10 text-white placeholder-white/50 text-[13px] focus:outline-none focus:bg-white/20 transition-all border border-white/15" placeholder="Họ và tên của Quý khách" type="text" required />
                         </div>
-                        <div className="flex flex-col gap-1">
-                          <input className="w-full h-12 px-space-md rounded-lg bg-surface-container-lowest/10 text-surface-container-lowest placeholder-primary-fixed-dim text-body-md focus:outline-none focus:bg-surface-container-lowest/20 transition-all" placeholder="Địa chỉ email cá nhân" type="email" />
+                        <div>
+                          <input className="w-full h-11 px-3.5 rounded-sm bg-white/10 text-white placeholder-white/50 text-[13px] focus:outline-none focus:bg-white/20 transition-all border border-white/15" placeholder="Địa chỉ email cá nhân" type="email" required />
                         </div>
-                        <button className="w-full h-12 mt-space-xs rounded-lg bg-secondary text-on-secondary font-label-lg text-label-lg hover:bg-secondary-container hover:text-on-secondary-container transition-all flex items-center justify-center gap-space-xs shadow-md" type="submit">
-                          <span className="">Trở Thành Hội Viên Thượng Lưu</span>
-                          <span className="material-symbols-outlined text-[18px]">card_membership</span>
+                        <button className="w-full h-11 mt-1 rounded-sm bg-[#b9a277] hover:bg-[#a68e64] text-white text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 shadow-md" type="submit">
+                          <span>Trở Thành Hội Viên Grand Horizon Elite</span>
+                          <span className="material-symbols-outlined text-[16px]">card_membership</span>
                         </button>
                       </form>
-                      <p className="font-label-sm text-label-sm text-on-primary-container text-center mt-space-md">
-                        Không thu phí thường niên • Hủy đăng ký nhận thư bất kỳ lúc nào
+                      <p className="text-[11px] text-white/60 text-center mt-3">
+                        Không thu phí thường niên • Bảo mật dữ liệu cá nhân theo chuẩn quốc tế
                       </p>
                     </div>
                   </div>
