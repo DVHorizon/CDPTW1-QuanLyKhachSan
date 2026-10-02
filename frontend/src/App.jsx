@@ -18,16 +18,9 @@ function App() {
   const [guestOption, setGuestOption] = useState('2-0-1');
   const [searchNotification, setSearchNotification] = useState('');
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   useEffect(() => {
-    const today = new Date();
-    const checkIn = today.toISOString().split('T')[0];
-    const nextDate = new Date(today);
-    nextDate.setDate(nextDate.getDate() + 3);
-    const checkOut = nextDate.toISOString().split('T')[0];
-
-    setCheckInDate(checkIn);
-    setCheckOutDate(checkOut);
-
     // Tải dữ liệu thực tế từ Database thông qua Backend MVC API
     const loadData = async () => {
       setLoading(true);
@@ -48,7 +41,10 @@ function App() {
     e.preventDefault();
     const branchObj = homeData.branches.find(b => String(b.BranchId) === String(selectedBranch));
     const branchName = branchObj ? branchObj.BranchName : 'Chi nhánh đã chọn';
-    setSearchNotification(`Đang kiểm tra phòng trống tại "${branchName}" từ ${checkInDate} đến ${checkOutDate}...`);
+    const datesText = (checkInDate && checkOutDate) 
+      ? `từ ${checkInDate.split('-').reverse().join('/')} đến ${checkOutDate.split('-').reverse().join('/')}` 
+      : 'thời gian linh hoạt';
+    setSearchNotification(`Đang kiểm tra phòng trống tại "${branchName}" (${datesText})...`);
     
     const roomSection = document.getElementById('room-collection');
     if (roomSection) {
@@ -157,15 +153,15 @@ function App() {
 
             {/* TOKEN-DRIVEN SEARCH BOX */}
             <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mt-2 z-10">
-              <div className="bg-white/95 backdrop-blur-xl rounded-md shadow-[0_18px_50px_-28px_rgba(32,48,68,0.7)] p-4 sm:p-6 lg:p-7 border border-[#dedad0]">
+              <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_-20px_rgba(20,33,43,0.35)] p-4 sm:p-6 lg:p-7 border border-[#dedad0]">
                 <form className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3.5 lg:gap-4 items-end" onSubmit={handleSearch}>
-                  {/* Chi Nhánh (col-span-5 để mở rộng chiều dài tối đa, hiển thị trọn vẹn tên resort) */}
-                  <div className="md:col-span-1 lg:col-span-5 flex flex-col gap-1.5 min-w-0">
+                  {/* Chi Nhánh (col-span-4) */}
+                  <div className="md:col-span-1 lg:col-span-4 flex flex-col gap-1.5 min-w-0">
                     <label className="text-[11px] text-[#203044] uppercase tracking-wider font-bold flex items-center gap-1.5 whitespace-nowrap">
                       <span className="material-symbols-outlined text-[16px] text-[#b9a277]">location_on</span>
                       Điểm Đến &amp; Chi Nhánh
                     </label>
-                    <div className="relative bg-[#fbf8f2] border border-[#dedad0] rounded-sm px-3.5 h-[50px] flex items-center justify-between focus-within:border-[#b9a277] focus-within:ring-2 focus-within:ring-[#b9a277]/20 transition-all">
+                    <div className="relative bg-[#fbf8f2] border border-[#dedad0] rounded-xl px-3.5 h-[50px] flex items-center justify-between hover:border-[#b9a277] focus-within:border-[#b9a277] focus-within:ring-2 focus-within:ring-[#b9a277]/25 shadow-sm transition-all">
                       <select 
                         value={selectedBranch}
                         onChange={(e) => setSelectedBranch(e.target.value)}
@@ -177,42 +173,71 @@ function App() {
                           </option>
                         ))}
                       </select>
-                      <span className="material-symbols-outlined absolute right-3 pointer-events-none text-[#8a8782] text-[18px]">expand_more</span>
+                      <span className="material-symbols-outlined absolute right-3.5 pointer-events-none text-[#8a8782] text-[18px]">expand_more</span>
                     </div>
                   </div>
 
-                  {/* Thời Gian Lưu Trú (col-span-3 thu nhỏ chiều rộng lại theo yêu cầu) */}
-                  <div className="md:col-span-1 lg:col-span-3 flex flex-col gap-1.5 min-w-0">
+                  {/* Thời Gian Lưu Trú (col-span-4) - Bo góc xịn sò, NHẬN PHÒNG & TRẢ PHÒNG */}
+                  <div className="md:col-span-1 lg:col-span-4 flex flex-col gap-1.5 min-w-0">
                     <label className="text-[11px] text-[#203044] uppercase tracking-wider font-bold flex items-center gap-1.5 whitespace-nowrap">
                       <span className="material-symbols-outlined text-[16px] text-[#b9a277]">calendar_today</span>
                       Thời Gian Lưu Trú
                     </label>
-                    <div className="flex items-center justify-between bg-[#fbf8f2] border border-[#dedad0] rounded-sm px-2.5 h-[50px] focus-within:border-[#b9a277] focus-within:ring-2 focus-within:ring-[#b9a277]/20 transition-all">
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-[9px] text-[#8a8782] font-semibold uppercase tracking-wider leading-none mb-0.5">Nhận phòng</span>
+                    <div className="grid grid-cols-2 bg-[#fbf8f2] border border-[#dedad0] rounded-xl h-[50px] relative divide-x divide-[#dedad0] hover:border-[#b9a277] focus-within:border-[#b9a277] focus-within:ring-2 focus-within:ring-[#b9a277]/25 shadow-sm transition-all">
+                      {/* NHẬN PHÒNG */}
+                      <div 
+                        onClick={(e) => {
+                          try { e.currentTarget.querySelector('input')?.showPicker(); } catch (err) {}
+                        }}
+                        className="relative flex flex-col justify-center px-3.5 sm:px-4 h-full cursor-pointer hover:bg-black/[0.03] transition-colors rounded-l-xl group overflow-hidden select-none"
+                      >
+                        <span className="text-[9px] sm:text-[10px] text-[#8a8782] font-bold uppercase tracking-wider leading-none mb-1">
+                          NHẬN PHÒNG
+                        </span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="material-symbols-outlined text-[16px] text-[#b9a277] shrink-0 group-hover:scale-105 transition-transform">calendar_today</span>
+                          <span className={`text-[12px] sm:text-[13px] truncate ${checkInDate ? 'font-semibold text-[#203044]' : 'text-[#8a8782] font-normal'}`}>
+                            {checkInDate ? checkInDate.split('-').reverse().join('/') : 'Ngày đến'}
+                          </span>
+                        </div>
                         <input 
-                          className="bg-transparent text-[12px] font-semibold text-[#203044] focus:outline-none cursor-pointer w-full p-0 leading-tight" 
-                          type="date" 
+                          type="date"
+                          min={todayStr}
                           value={checkInDate}
                           onChange={(e) => {
                             setCheckInDate(e.target.value);
-                            if (e.target.value >= checkOutDate) {
+                            if (!checkOutDate || e.target.value >= checkOutDate) {
                               const next = new Date(e.target.value);
                               next.setDate(next.getDate() + 1);
                               setCheckOutDate(next.toISOString().split('T')[0]);
                             }
                           }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
                         />
                       </div>
-                      <div className="h-6 w-[1px] bg-[#dedad0] mx-1.5 shrink-0"></div>
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-[9px] text-[#8a8782] font-semibold uppercase tracking-wider leading-none mb-0.5">Trả phòng</span>
+
+                      {/* PHÒNG ĐI */}
+                      <div 
+                        onClick={(e) => {
+                          try { e.currentTarget.querySelector('input')?.showPicker(); } catch (err) {}
+                        }}
+                        className="relative flex flex-col justify-center px-3.5 sm:px-4 h-full cursor-pointer hover:bg-black/[0.03] transition-colors rounded-r-xl group overflow-hidden select-none"
+                      >
+                        <span className="text-[9px] sm:text-[10px] text-[#8a8782] font-bold uppercase tracking-wider leading-none mb-1">
+                          TRẢ PHÒNG
+                        </span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="material-symbols-outlined text-[16px] text-[#b9a277] shrink-0 group-hover:scale-105 transition-transform">calendar_today</span>
+                          <span className={`text-[12px] sm:text-[13px] truncate ${checkOutDate ? 'font-semibold text-[#203044]' : 'text-[#8a8782] font-normal'}`}>
+                            {checkOutDate ? checkOutDate.split('-').reverse().join('/') : 'Ngày đi'}
+                          </span>
+                        </div>
                         <input 
-                          className="bg-transparent text-[12px] font-semibold text-[#203044] focus:outline-none cursor-pointer w-full p-0 leading-tight" 
-                          type="date" 
+                          type="date"
+                          min={checkInDate || todayStr}
                           value={checkOutDate}
-                          min={checkInDate}
                           onChange={(e) => setCheckOutDate(e.target.value)}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
                         />
                       </div>
                     </div>
@@ -224,7 +249,7 @@ function App() {
                       <span className="material-symbols-outlined text-[16px] text-[#b9a277]">group</span>
                       Số Khách &amp; Phòng
                     </label>
-                    <div className="relative bg-[#fbf8f2] border border-[#dedad0] rounded-sm px-2.5 h-[50px] flex items-center justify-between focus-within:border-[#b9a277] focus-within:ring-2 focus-within:ring-[#b9a277]/20 transition-all">
+                    <div className="relative bg-[#fbf8f2] border border-[#dedad0] rounded-xl px-3.5 h-[50px] flex items-center justify-between hover:border-[#b9a277] focus-within:border-[#b9a277] focus-within:ring-2 focus-within:ring-[#b9a277]/25 shadow-sm transition-all">
                       <select 
                         value={guestOption}
                         onChange={(e) => setGuestOption(e.target.value)}
@@ -235,14 +260,14 @@ function App() {
                         <option value="4-2-2">4 Người lớn • Villa 2P</option>
                         <option value="6-3-3">Villa Presidential</option>
                       </select>
-                      <span className="material-symbols-outlined absolute right-2 pointer-events-none text-[#8a8782] text-[18px]">expand_more</span>
+                      <span className="material-symbols-outlined absolute right-3 pointer-events-none text-[#8a8782] text-[18px]">expand_more</span>
                     </div>
                   </div>
 
                   {/* Nút Tìm Phòng (col-span-2) */}
                   <div className="md:col-span-1 lg:col-span-2">
                     <button 
-                      className="w-full h-[50px] rounded-sm bg-[#b9a277] hover:bg-[#a68e64] text-white flex items-center justify-center gap-2 text-[14px] font-bold transition-all shadow-[0_12px_32px_-8px_rgba(185,162,119,0.7)] hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap" 
+                      className="w-full h-[50px] rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white flex items-center justify-center gap-2 text-[14px] font-bold transition-all shadow-[0_12px_32px_-8px_rgba(185,162,119,0.7)] hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap" 
                       type="submit"
                     >
                       <span className="material-symbols-outlined text-[20px]">search</span>
@@ -252,7 +277,7 @@ function App() {
                 </form>
 
                 {searchNotification && (
-                  <div className="mt-4 p-3 bg-[#fbf8f2] text-[#203044] rounded-sm text-[13px] font-medium flex items-center gap-2 border border-[#b9a277]/40 animate-fade-in shadow-sm">
+                  <div className="mt-4 p-3 bg-[#fbf8f2] text-[#203044] rounded-xl text-[13px] font-medium flex items-center gap-2 border border-[#b9a277]/40 animate-fade-in shadow-sm">
                     <span className="material-symbols-outlined text-[#b9a277] text-[18px]">info</span>
                     <span>{searchNotification}</span>
                   </div>
