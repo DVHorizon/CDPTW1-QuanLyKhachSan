@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api/admin', adminMenuRoutes);
+app.use('/api/v1', adminMenuRoutes);
 
 // Base route for testing
 app.get('/', (req, res) => {

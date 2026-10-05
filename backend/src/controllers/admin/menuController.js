@@ -3,7 +3,7 @@ const { MenuItem, MenuCategory } = require('../../models');
 // Get all Menu Items
 exports.getMenuItems = async (req, res) => {
   try {
-    const items = await MenuItem.findAll({ 
+    const items = await MenuItem.findAll({
       include: MenuCategory,
       limit: 500,
       order: [['MenuItemId', 'DESC']]
@@ -99,7 +99,7 @@ exports.deleteMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
     const item = await MenuItem.findByPk(id);
-    
+
     if (!item) {
       return res.status(404).json({ code: 'ERROR_0004_NOT_FOUND', message: 'Không tìm thấy món ăn' });
     }
@@ -113,6 +113,32 @@ exports.deleteMenuItem = async (req, res) => {
 
   } catch (error) {
     console.error('Error deleting menu item:', error);
+    return res.status(500).json({ code: 'ERROR_0500_INTERNAL', message: 'Lỗi hệ thống' });
+  }
+};
+
+exports.updateMenuItemStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({ code: 'ERROR_0005_VALIDATION', message: 'Trạng thái không được để trống' });
+    }
+    
+    const item = await MenuItem.findByPk(id);
+    if (!item) {
+      return res.status(404).json({ code: 'ERROR_0004_NOT_FOUND', message: 'Không tìm thấy món ăn' });
+    }
+    
+    await item.update({ Status: status, UpdatedAt: new Date() });
+    
+    return res.status(200).json({ 
+      code: 'SUCCESS_0004_STATUS_UPDATED', 
+      message: 'Đã cập nhật trạng thái món ăn' 
+    });
+  } catch (error) {
+    console.error('Error updating status:', error);
     return res.status(500).json({ code: 'ERROR_0500_INTERNAL', message: 'Lỗi hệ thống' });
   }
 };

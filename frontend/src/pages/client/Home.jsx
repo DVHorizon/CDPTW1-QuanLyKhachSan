@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import Navbar from '../../components/client/layout/Navbar';
-import Footer from '../../components/client/layout/Footer';
+import Header from '../../components/layout/Header';
+import Footer from '../../components/layout/Footer';
 
 function Home() {
   useEffect(() => {
@@ -17,7 +17,7 @@ function Home() {
 
   return (
     <div className="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col">
-      <Navbar />
+      <Header />
 
       <main className="w-full pt-20 bg-background flex-1">
         <div className="flex flex-col w-full">

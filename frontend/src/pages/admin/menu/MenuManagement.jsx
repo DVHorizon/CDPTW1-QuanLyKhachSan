@@ -20,7 +20,7 @@ const MenuManagement = () => {
 
   const fetchMenu = () => {
     setLoading(true);
-    fetch('http://localhost:5000/api/admin/menu-items')
+    fetch('http://localhost:5000/api/v1/menu-items')
       .then(res => res.json())
       .then(res => {
         if (res.success) setMenuItems(res.data);
@@ -45,8 +45,8 @@ const MenuManagement = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     const url = editingItem
-      ? `http://localhost:5000/api/admin/menu-items/${editingItem.MenuItemId}`
-      : 'http://localhost:5000/api/admin/menu-items';
+      ? `http://localhost:5000/api/v1/menu-items/${editingItem.MenuItemId}`
+      : 'http://localhost:5000/api/v1/menu-items';
 
     try {
       const response = await fetch(url, {
@@ -77,7 +77,7 @@ const MenuManagement = () => {
     const id = confirmModal.itemId;
     setConfirmModal({ isOpen: false, itemId: null });
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/menu-items/${id}`, { method: 'DELETE' });
+      const response = await fetch(`http://localhost:5000/api/v1/menu-items/${id}`, { method: 'DELETE' });
       const result = await response.json();
       setMessageModal({
         isOpen: true,
