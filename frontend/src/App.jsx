@@ -222,21 +222,21 @@ function App() {
               Hòa mình giữa đại dương ngọc bích, dịch vụ ẩm thực Fine Dining đỉnh cao và quản gia 24/7.
             </p>
 
-            {/* 3 Highlighted Feature Tags */}
+            {/* 3 Brand Highlights */}
             <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-8 mt-5 text-white/95 text-[13px] font-medium">
               <span className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[#ffd985] text-[18px]">beach_access</span>
-                Bãi biển riêng tư
+                <span className="material-symbols-outlined text-[#ffd985] text-[18px]">verified</span>
+                Chuẩn mực 5 sao quốc tế
+              </span>
+              <span className="text-white/40">•</span>
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[#ffd985] text-[18px]">payments</span>
+                Đảm bảo giá tốt nhất
               </span>
               <span className="text-white/40">•</span>
               <span className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[#ffd985] text-[18px]">support_agent</span>
-                Quản gia riêng 24/7
-              </span>
-              <span className="text-white/40">•</span>
-              <span className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[#ffd985] text-[18px]">pool</span>
-                Hồ bơi vô cực
+                Đặc quyền phục vụ 24/7
               </span>
             </div>
 
@@ -255,15 +255,16 @@ function App() {
                       <select
                         value={selectedBranch}
                         onChange={(e) => setSelectedBranch(e.target.value)}
-                        className="w-full bg-transparent text-[13.5px] font-bold text-[#203044] focus:outline-none cursor-pointer pr-6 truncate"
+                        className="w-full bg-transparent text-[13px] font-bold text-[#203044] focus:outline-none cursor-pointer pr-6 truncate"
                       >
                         {homeData.branches.map(branch => {
-                          const cityLabel = branch.City
+                          const rawCity = branch.City
                             ? branch.City.split(',')[0].trim()
                             : (branch.Address ? branch.Address.split(',').pop()?.trim() : '');
+                          const cityClean = rawCity ? rawCity.replace(/^(Tỉnh|Thành phố|TP\.?)\s+/i, '') : '';
                           return (
                             <option key={branch.BranchId} value={branch.BranchId} className="text-[#203044]">
-                              {branch.BranchName} {cityLabel ? `(${cityLabel})` : ''}
+                              {branch.BranchName} {cityClean ? `(${cityClean})` : ''}
                             </option>
                           );
                         })}
@@ -275,7 +276,7 @@ function App() {
                   </div>
 
                   {/* Ngày nhận - Ngày trả */}
-                  <div className="lg:col-span-4 flex flex-col gap-1.5">
+                  <div className="lg:col-span-3 flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-[#8a8782] uppercase tracking-wider flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-[#b9a277]">calendar_today</span>
                       Thời Gian Lưu Trú
@@ -288,7 +289,7 @@ function App() {
                           value={checkInDate}
                           min={todayStr}
                           onChange={(e) => setCheckInDate(e.target.value)}
-                          className="bg-transparent text-[12.5px] font-bold text-[#203044] focus:outline-none cursor-pointer"
+                          className="bg-transparent text-[12px] font-bold text-[#203044] focus:outline-none cursor-pointer"
                         />
                       </div>
                       <div className="flex flex-col pl-2 border-l border-[#dedad0]">
@@ -298,14 +299,14 @@ function App() {
                           value={checkOutDate}
                           min={checkInDate || todayStr}
                           onChange={(e) => setCheckOutDate(e.target.value)}
-                          className="bg-transparent text-[12.5px] font-bold text-[#203044] focus:outline-none cursor-pointer"
+                          className="bg-transparent text-[12px] font-bold text-[#203044] focus:outline-none cursor-pointer"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Số Khách & Phòng */}
-                  <div className="lg:col-span-2 flex flex-col gap-1.5">
+                  <div className="lg:col-span-3 flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-[#8a8782] uppercase tracking-wider flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-[#b9a277]">group</span>
                       Số Khách
@@ -314,7 +315,7 @@ function App() {
                       <select
                         value={guestOption}
                         onChange={(e) => setGuestOption(e.target.value)}
-                        className="w-full bg-transparent text-[13px] font-bold text-[#203044] focus:outline-none cursor-pointer pr-5"
+                        className="w-full bg-transparent text-[13px] font-bold text-[#203044] focus:outline-none cursor-pointer pr-6 truncate"
                       >
                         <option value="2-0-1">2 Người lớn, 1 Phòng</option>
                         <option value="1-0-1">1 Người lớn, 1 Phòng</option>
