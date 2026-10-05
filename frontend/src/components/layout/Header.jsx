@@ -1,15 +1,84 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
+/**
+ * Từ điển ngôn ngữ cho thanh Header
+ */
+const I18N = {
+  vi: {
+    home: 'Trang Chủ',
+    rooms: 'Bộ Sưu Tập Phòng',
+    offers: 'Gói Ưu Đãi',
+    amenities: 'Dịch Vụ & Tiện Ích',
+    dining: 'Ẩm Thực',
+    elite: 'Hội Viên Elite',
+    faq: 'FAQ',
+    bookNow: 'Đặt Phòng Ngay',
+    memberTitle: 'Hội viên Elite',
+    hotline: 'Hotline: 1900 6868',
+    wishlistTitle: 'Danh sách phòng yêu thích'
+  },
+  en: {
+    home: 'Home',
+    rooms: 'Rooms & Suites',
+    offers: 'Special Offers',
+    amenities: 'Amenities',
+    dining: 'Dining',
+    elite: 'Elite Club',
+    faq: 'FAQ',
+    bookNow: 'Book Now',
+    memberTitle: 'Elite Member',
+    hotline: 'Hotline: 1900 6868',
+    wishlistTitle: 'Saved Rooms'
+  }
+};
 
 /**
  * Component Header / Navbar dùng chung cho toàn bộ dự án Grand Horizon
- * Tích hợp hiệu ứng cuộn trang thông minh (tự ẩn khi cuộn xuống, hiện khi cuộn lên),
+ * Tích hợp Language Switcher (VN / ENG), hiệu ứng cuộn trang thông minh,
  * Wishlist counter, User profile và Mobile Drawer.
  */
-const Header = ({ wishlistCount = 0, onWishlistClick }) => {
+const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguageChange }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [isTop, setIsTop] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+
+  // Ngôn ngữ hiện tại (mặc định 'vi')
+  const [currentLang, setCurrentLang] = useState(() => {
+    return propLang || localStorage.getItem('app_lang') || 'vi';
+  });
+
+  useEffect(() => {
+    if (propLang && propLang !== currentLang) {
+      setCurrentLang(propLang);
+    }
+  }, [propLang]);
+
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  const langDropdownRef = useRef(null);
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(event.target)) {
+        setIsLangOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectLang = (lang) => {
+    setCurrentLang(lang);
+    localStorage.setItem('app_lang', lang);
+    setIsLangOpen(false);
+    if (onLanguageChange) {
+      onLanguageChange(lang);
+    }
+    window.dispatchEvent(new CustomEvent('appLanguageChange', { detail: lang }));
+  };
+
+  const t = I18N[currentLang] || I18N.vi;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -52,25 +121,25 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
         {/* Navigation Menu for Desktop */}
         <nav className="hidden xl:flex items-center gap-5 2xl:gap-7 shrink-0 mx-auto">
           <a className="text-[13.5px] font-semibold text-[#203044] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#trang-chu">
-            Trang Chủ
+            {t.home}
           </a>
           <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#room-collection">
-            Bộ Sưu Tập Phòng
+            {t.rooms}
           </a>
           <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#uu-dai">
-            Gói Ưu Đãi
+            {t.offers}
           </a>
           <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#trai-nghiem">
-            Dịch Vụ &amp; Tiện Ích
+            {t.amenities}
           </a>
           <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#am-thuc">
-            Ẩm Thực
+            {t.dining}
           </a>
           <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#hoi-vien">
-            Hội Viên Elite
+            {t.elite}
           </a>
           <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#faq">
-            FAQ
+            {t.faq}
           </a>
         </nav>
 
@@ -90,7 +159,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
             href="#room-collection"
             onClick={onWishlistClick}
             className="relative w-9 h-9 rounded-xl bg-white border border-[#dedad0] hover:border-[#b9a277] text-[#203044] hover:text-rose-500 flex items-center justify-center transition-all shadow-xs"
-            title="Danh sách phòng yêu thích"
+            title={t.wishlistTitle}
           >
             <span className={`material-symbols-outlined text-[19px] ${wishlistCount > 0 ? 'text-rose-500 fill-current' : ''}`}>
               favorite
@@ -102,19 +171,70 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
             )}
           </a>
 
+          {/* Language Selector (VN / ENG) */}
+          <div className="relative" ref={langDropdownRef}>
+            <button
+              onClick={() => setIsLangOpen(!isLangOpen)}
+              className="flex items-center gap-1.5 h-9 px-2.5 rounded-xl bg-white border border-[#dedad0] hover:border-[#b9a277] text-[#203044] text-[12px] font-bold transition-all shadow-xs cursor-pointer select-none"
+              title="Chọn ngôn ngữ / Select Language"
+              type="button"
+            >
+              <span className="text-[14px] leading-none">{currentLang === 'vi' ? '🇻🇳' : '🇬🇧'}</span>
+              <span>{currentLang === 'vi' ? 'VN' : 'ENG'}</span>
+              <span className={`material-symbols-outlined text-[16px] text-[#8a8782] transition-transform duration-200 ${isLangOpen ? 'rotate-180 text-[#b9a277]' : ''}`}>
+                expand_more
+              </span>
+            </button>
+
+            {isLangOpen && (
+              <div className="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)] border border-[#dedad0] py-1.5 z-50 animate-fade-in">
+                <button
+                  type="button"
+                  onClick={() => handleSelectLang('vi')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-[12.5px] font-semibold text-left transition-colors cursor-pointer ${
+                    currentLang === 'vi' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-[15px]">🇻🇳</span>
+                    <span>Tiếng Việt</span>
+                  </span>
+                  {currentLang === 'vi' && (
+                    <span className="material-symbols-outlined text-[16px] text-[#b9a277]">check</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectLang('en')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-[12.5px] font-semibold text-left transition-colors cursor-pointer ${
+                    currentLang === 'en' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-[15px]">🇬🇧</span>
+                    <span>English</span>
+                  </span>
+                  {currentLang === 'en' && (
+                    <span className="material-symbols-outlined text-[16px] text-[#b9a277]">check</span>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Đặt Phòng Button */}
           <a
             className="hidden sm:inline-flex items-center justify-center px-4 py-2 bg-[#b9a277] text-white rounded-xl text-[13px] font-bold hover:bg-[#a68e64] transition-all shadow-[0_4px_14px_rgba(185,162,119,0.35)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
             href="#room-collection"
           >
-            Đặt Phòng Ngay
+            {t.bookNow}
           </a>
 
           {/* User Profile Badge */}
           <div className="flex items-center gap-2 pl-2 border-l border-[#dedad0] shrink-0">
             <div className="hidden lg:flex flex-col text-right shrink-0">
               <span className="text-[12px] text-[#203044] font-bold leading-tight whitespace-nowrap">Nguyễn Văn An</span>
-              <span className="text-[10px] text-[#b9a277] font-bold uppercase tracking-wider whitespace-nowrap">Hội viên Elite</span>
+              <span className="text-[10px] text-[#b9a277] font-bold uppercase tracking-wider whitespace-nowrap">{t.memberTitle}</span>
             </div>
             <div className="w-8 h-8 rounded-full bg-[#203044] text-[#b9a277] flex items-center justify-center font-bold text-[12px] shadow-sm shrink-0 border border-[#b9a277]/40">
               VA
@@ -141,40 +261,63 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
           <div className="flex flex-col gap-1 pb-4 border-b border-[#dedad0]">
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-semibold text-[#203044] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#trang-chu">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">home</span>
-              <span>Trang Chủ</span>
+              <span>{t.home}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#room-collection">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">meeting_room</span>
-              <span>Bộ Sưu Tập Phòng</span>
+              <span>{t.rooms}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#uu-dai">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">loyalty</span>
-              <span>Gói Ưu Đãi &amp; Khuyến Mãi</span>
+              <span>{t.offers}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#trai-nghiem">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">spa</span>
-              <span>Dịch Vụ &amp; Tiện Ích</span>
+              <span>{t.amenities}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#am-thuc">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">restaurant</span>
-              <span>Ẩm Thực Fine Dining</span>
+              <span>{t.dining}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#hoi-vien">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">stars</span>
-              <span>Ưu Đãi Hội Viên Elite</span>
+              <span>{t.elite}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#faq">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">help_outline</span>
-              <span>Câu Hỏi Thường Gặp (FAQ)</span>
+              <span>{t.faq}</span>
             </a>
           </div>
 
           <div className="flex items-center justify-between pt-2">
             <a className="text-[13px] text-[#203044] font-semibold flex items-center gap-1.5" href="tel:19006868">
               <span className="material-symbols-outlined text-[#b9a277] text-[18px]">support_agent</span>
-              <span>Hotline 24/7: 1900 6868</span>
+              <span>1900 6868</span>
             </a>
-            <span className="text-[12px] text-[#8a8782] font-medium">🇻🇳 Tiếng Việt</span>
+
+            {/* Mobile Language Switcher */}
+            <div className="flex items-center p-0.5 rounded-lg bg-[#f5f4ef] border border-[#dedad0]">
+              <button
+                type="button"
+                onClick={() => handleSelectLang('vi')}
+                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  currentLang === 'vi' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
+                }`}
+              >
+                <span>🇻🇳</span>
+                <span>VN</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectLang('en')}
+                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  currentLang === 'en' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
+                }`}
+              >
+                <span>🇬🇧</span>
+                <span>ENG</span>
+              </button>
+            </div>
           </div>
 
           <div className="pt-2 sm:hidden">
@@ -184,7 +327,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
               href="#room-collection"
             >
               <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-              <span>Đặt Phòng Ngay</span>
+              <span>{t.bookNow}</span>
             </a>
           </div>
         </div>
