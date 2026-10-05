@@ -730,19 +730,20 @@ function App() {
         {/* ================= 7. GUEST REVIEWS & ELITE MEMBERSHIP ================= */}
         <section className="w-full py-20 lg:py-24 bg-[#fafaf8] border-t border-[#dedad0]">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Section Heading placed above grid so both columns align at the top */}
+            <div className="mb-8">
+              <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
+                Lưu Giữ Khoảnh Khắc
+              </span>
+              <h2 className="font-serif text-[28px] lg:text-[36px] text-[#203044] mt-1 font-bold tracking-tight leading-[1.25]">
+                Dấu Ấn Kỷ Niệm Khó Phai
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
               
               {/* REVIEWS COLUMN */}
-              <div className="lg:col-span-7 flex flex-col gap-6">
-                <div>
-                  <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
-                    Lưu Giữ Khoảnh Khắc
-                  </span>
-                  <h2 className="font-serif text-[28px] lg:text-[36px] text-[#203044] mt-1 font-bold tracking-tight leading-[1.25]">
-                    Dấu Ấn Kỷ Niệm Khó Phai
-                  </h2>
-                </div>
-
+              <div className="lg:col-span-7 flex flex-col justify-between gap-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {homeData.reviews.slice(0, 4).map((rev) => (
                     <div
@@ -756,7 +757,7 @@ function App() {
                           ))}
                         </div>
                         <h4 className="font-bold text-[14px] text-[#203044] mb-1 leading-snug">
-                          {rev.ReviewTitle || 'Kỳ nghỉ tuyệt vời'}
+                          {rev.ReviewTitle ? rev.ReviewTitle.replace(/\s*#\d+$/, '').trim() : 'Kỳ nghỉ tuyệt vời'}
                         </h4>
                         <p className="text-[12.5px] text-[#373435]/85 leading-relaxed line-clamp-4 mb-4">
                           "{rev.ReviewBody}"
@@ -779,7 +780,7 @@ function App() {
                   ))}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-6 pt-2 text-[#373435]/80">
+                <div className="flex flex-wrap items-center gap-6 pt-1 text-[#373435]/80">
                   <div className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[#b9a277] text-[20px]">verified_user</span>
                     <span className="text-[12px] font-medium">Bảo lưu và hoàn cọc linh hoạt 48h</span>
@@ -792,68 +793,72 @@ function App() {
               </div>
 
               {/* MEMBERSHIP SIGNUP CARD */}
-              <div id="hoi-vien" className="lg:col-span-5">
-                <div className="relative bg-[#203044] text-white p-7 sm:p-9 rounded-2xl overflow-hidden shadow-[0_18px_50px_-28px_rgba(32,48,68,0.7)] border border-[#203044]">
+              <div id="hoi-vien" className="lg:col-span-5 flex flex-col">
+                <div className="relative bg-[#203044] text-white p-7 sm:p-9 rounded-2xl overflow-hidden shadow-[0_18px_50px_-28px_rgba(32,48,68,0.7)] border border-[#203044] h-full flex flex-col justify-between">
                   <div className="absolute -top-16 -right-16 w-60 h-60 rounded-full bg-[#b9a277]/20 blur-2xl pointer-events-none" />
-                  <div className="relative z-10 flex flex-col">
-                    <div className="w-11 h-11 rounded-xl bg-[#b9a277]/20 flex items-center justify-center mb-4">
-                      <span className="material-symbols-outlined text-[#b9a277] text-[26px]">stars</span>
-                    </div>
-                    <span className="text-[11px] uppercase tracking-widest text-[#ffd985] font-bold">
-                      Grand Horizon Elite Club
-                    </span>
-                    <h3 className="text-[22px] text-white mt-1 mb-2 font-bold leading-snug">
-                      Đăng Ký Hội Viên &amp; Nhận Ngay Ưu Đãi 10%
-                    </h3>
-                    <p className="text-[13px] text-white/80 mb-6 leading-relaxed">
-                      Đặc quyền chiết khấu trực tiếp trên giá phòng, nâng cấp hạng phòng miễn phí tùy tình trạng và dịch vụ xe đưa đón Limousine.
-                    </p>
-
-                    {newsletterSuccess ? (
-                      <div className="p-4 rounded-xl bg-emerald-500/20 border border-emerald-400 text-emerald-200 text-[13px] flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                        <span>Đăng ký thành công! Mã ưu đãi ELITE10 đã được gửi đến email của bạn.</span>
+                  <div className="relative z-10 flex flex-col justify-between h-full">
+                    <div>
+                      <div className="w-11 h-11 rounded-xl bg-[#b9a277]/20 flex items-center justify-center mb-4">
+                        <span className="material-symbols-outlined text-[#b9a277] text-[26px]">stars</span>
                       </div>
-                    ) : (
-                      <form className="flex flex-col gap-3" onSubmit={(e) => {
-                        e.preventDefault();
-                        if (newsletterEmail) {
-                          setNewsletterSuccess(true);
-                        }
-                      }}>
-                        <div>
-                          <input
-                            className="w-full h-11 px-3.5 rounded-xl bg-white/10 text-white placeholder-white/50 text-[13px] focus:outline-none focus:bg-white/20 transition-all border border-white/15"
-                            placeholder="Họ và tên của Quý khách"
-                            type="text"
-                            value={newsletterName}
-                            onChange={(e) => setNewsletterName(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <input
-                            className="w-full h-11 px-3.5 rounded-xl bg-white/10 text-white placeholder-white/50 text-[13px] focus:outline-none focus:bg-white/20 transition-all border border-white/15"
-                            placeholder="Địa chỉ email cá nhân"
-                            type="email"
-                            value={newsletterEmail}
-                            onChange={(e) => setNewsletterEmail(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <button
-                          className="w-full h-11 mt-1 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 shadow-md"
-                          type="submit"
-                        >
-                          <span>Trở Thành Hội Viên Grand Horizon Elite</span>
-                          <span className="material-symbols-outlined text-[16px]">card_membership</span>
-                        </button>
-                      </form>
-                    )}
+                      <span className="text-[11px] uppercase tracking-widest text-[#ffd985] font-bold">
+                        Grand Horizon Elite Club
+                      </span>
+                      <h3 className="text-[22px] text-white mt-1 mb-2 font-bold leading-snug">
+                        Đăng Ký Hội Viên &amp; Nhận Ngay Ưu Đãi 10%
+                      </h3>
+                      <p className="text-[13px] text-white/80 mb-6 leading-relaxed">
+                        Đặc quyền chiết khấu trực tiếp trên giá phòng, nâng cấp hạng phòng miễn phí tùy tình trạng và dịch vụ xe đưa đón Limousine.
+                      </p>
+                    </div>
 
-                    <p className="text-[11px] text-white/60 text-center mt-3">
-                      Không thu phí thường niên • Bảo mật dữ liệu cá nhân theo chuẩn quốc tế
-                    </p>
+                    <div>
+                      {newsletterSuccess ? (
+                        <div className="p-4 rounded-xl bg-emerald-500/20 border border-emerald-400 text-emerald-200 text-[13px] flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                          <span>Đăng ký thành công! Mã ưu đãi ELITE10 đã được gửi đến email của bạn.</span>
+                        </div>
+                      ) : (
+                        <form className="flex flex-col gap-3" onSubmit={(e) => {
+                          e.preventDefault();
+                          if (newsletterEmail) {
+                            setNewsletterSuccess(true);
+                          }
+                        }}>
+                          <div>
+                            <input
+                              className="w-full h-11 px-3.5 rounded-xl bg-white/10 text-white placeholder-white/50 text-[13px] focus:outline-none focus:bg-white/20 transition-all border border-white/15"
+                              placeholder="Họ và tên của Quý khách"
+                              type="text"
+                              value={newsletterName}
+                              onChange={(e) => setNewsletterName(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <input
+                              className="w-full h-11 px-3.5 rounded-xl bg-white/10 text-white placeholder-white/50 text-[13px] focus:outline-none focus:bg-white/20 transition-all border border-white/15"
+                              placeholder="Địa chỉ email cá nhân"
+                              type="email"
+                              value={newsletterEmail}
+                              onChange={(e) => setNewsletterEmail(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <button
+                            className="w-full h-11 mt-1 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-95"
+                            type="submit"
+                          >
+                            <span>Trở Thành Hội Viên Grand Horizon Elite</span>
+                            <span className="material-symbols-outlined text-[16px]">card_membership</span>
+                          </button>
+                        </form>
+                      )}
+
+                      <p className="text-[11px] text-white/60 text-center mt-4">
+                        Không thu phí thường niên • Bảo mật dữ liệu cá nhân theo chuẩn quốc tế
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
