@@ -1,78 +1,128 @@
 import React from 'react';
 
+/**
+ * Component Footer dùng chung cho toàn bộ dự án Grand Horizon
+ * Cung cấp thông tin thương hiệu, danh mục liên kết, chi nhánh liên hệ và phương thức thanh toán
+ */
 const Footer = () => {
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <footer className="w-full bg-[#fbf8f2] text-[#373435] pt-12 pb-8 border-t border-[#dedad0]/80">
+    <footer className="w-full bg-[#fbf8f2] text-[#373435] pt-14 pb-8 border-t border-[#dedad0]">
       <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-gutter mb-12">
-          {/* Brand Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 mb-12">
+          
+          {/* Brand Info & Vision (col-span-4) */}
           <div className="lg:col-span-4 flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-sm bg-[#203044] flex items-center justify-center text-[#b9a277]">
-                <span className="material-symbols-outlined text-[20px]">hotel</span>
+              <div className="w-10 h-10 rounded-xl bg-[#203044] flex items-center justify-center text-[#b9a277] shadow-sm">
+                <span className="material-symbols-outlined text-[22px]">hotel</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-sans font-bold text-[18px] text-[#203044] leading-tight">Grand Horizon Hotels &amp; Resorts</span>
-                <span className="font-sans text-[11px] text-[#b9a277] uppercase tracking-wider font-semibold">Refined for every journey</span>
+                <span className="font-serif font-bold text-[19px] text-[#203044] leading-tight">
+                  Grand Horizon
+                </span>
+                <span className="text-[10.5px] text-[#b9a277] uppercase tracking-widest font-bold">
+                  Hotels &amp; Resorts
+                </span>
               </div>
             </div>
-            <p className="text-[14px] text-[#373435]/80 leading-relaxed max-w-sm">
-              Chuỗi khách sạn và biệt thự nghỉ dưỡng cao cấp chuẩn mực quốc tế. Trải nghiệm lưu trú tĩnh tại, ẩm thực tinh hoa và dịch vụ chu đáo tinh tế cho mỗi hành trình.
+            
+            <p className="text-[13.5px] text-[#373435]/80 leading-relaxed max-w-sm">
+              Chuỗi khách sạn và biệt thự nghỉ dưỡng ven biển cao cấp chuẩn 5 sao quốc tế. Kiến tạo không gian tĩnh tại thuần khiết, ẩm thực tinh hoa và dịch vụ tận tâm cho mỗi hành trình thăng hoa.
             </p>
-            <div className="flex items-center gap-3 text-[#b9a277]">
+            
+            <div className="flex items-center gap-3 text-[#b9a277] pt-1">
               <span className="material-symbols-outlined text-[20px]">award_star</span>
               <span className="material-symbols-outlined text-[20px]">verified</span>
               <span className="material-symbols-outlined text-[20px]">hotel_class</span>
-              <span className="text-[12px] text-[#203044] font-medium">Chứng nhận Dịch Vụ Xuất Sắc 2024</span>
+              <span className="text-[12px] text-[#203044] font-semibold">Top Luxury Resorts Vietnam 2026</span>
             </div>
           </div>
 
-          {/* Navigation Links */}
+          {/* Quick Links (col-span-2) */}
           <div className="lg:col-span-2 flex flex-col gap-2.5">
-            <h3 className="text-[14px] font-bold text-[#203044] uppercase tracking-wider mb-1">Khám Phá</h3>
-            <a className="text-[14px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="https://grandhorizon.vn" target="_blank" rel="noopener noreferrer">Về chúng tôi</a>
-            <a className="text-[14px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#">Chính sách &amp; Hủy phòng</a>
-            <a className="text-[14px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#">Quy định lưu trú</a>
-            <a className="text-[14px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#">Tuyển dụng tài năng</a>
+            <h3 className="text-[13px] font-bold text-[#203044] uppercase tracking-wider mb-1">
+              Khám Phá
+            </h3>
+            <a className="text-[13.5px] text-[#373435]/80 hover:text-[#b9a277] transition-colors" href="#trang-chu">Trang chủ</a>
+            <a className="text-[13.5px] text-[#373435]/80 hover:text-[#b9a277] transition-colors" href="#room-collection">Bộ sưu tập phòng</a>
+            <a className="text-[13.5px] text-[#373435]/80 hover:text-[#b9a277] transition-colors" href="#uu-dai">Gói khuyến mãi</a>
+            <a className="text-[13.5px] text-[#373435]/80 hover:text-[#b9a277] transition-colors" href="#trai-nghiem">Dịch vụ Spa &amp; Yoga</a>
+            <a className="text-[13.5px] text-[#373435]/80 hover:text-[#b9a277] transition-colors" href="#am-thuc">Ẩm thực The Azure</a>
+            <a className="text-[13.5px] text-[#373435]/80 hover:text-[#b9a277] transition-colors" href="#faq">Câu hỏi thường gặp</a>
           </div>
 
-          {/* Contact Details */}
+          {/* Contact Details (col-span-3) */}
           <div className="lg:col-span-3 flex flex-col gap-2.5">
-            <h3 className="text-[14px] font-bold text-[#203044] uppercase tracking-wider mb-1">Liên Hệ</h3>
-            <p className="text-[14px] text-[#373435]/85 flex items-start gap-2">
+            <h3 className="text-[13px] font-bold text-[#203044] uppercase tracking-wider mb-1">
+              Điểm Đến &amp; Liên Hệ
+            </h3>
+            <p className="text-[13.5px] text-[#373435]/85 flex items-start gap-2">
               <span className="material-symbols-outlined text-[#b9a277] text-[18px] shrink-0 mt-0.5">location_on</span>
-              Hệ thống Grand Horizon tại Phú Quốc, Cam Ranh, Đà Nẵng
+              <span>Hệ thống tại Phú Quốc, Cam Ranh, Đà Nẵng &amp; Hạ Long</span>
             </p>
-            <p className="text-[14px] text-[#373435]/85 flex items-center gap-2">
+            <p className="text-[13.5px] text-[#373435]/85 flex items-center gap-2">
               <span className="material-symbols-outlined text-[#b9a277] text-[18px] shrink-0">mail</span>
-              concierge@grandhorizon.vn
+              <span>concierge@grandhorizon.vn</span>
             </p>
-            <p className="text-[14px] text-[#373435]/85 flex items-center gap-2">
+            <p className="text-[13.5px] text-[#373435]/85 flex items-center gap-2">
               <span className="material-symbols-outlined text-[#b9a277] text-[18px] shrink-0">call</span>
-              Hotline: 1900 6868 - (028) 7300 8888
+              <span>Tổng đài: 1900 6868 - (028) 7300 8888</span>
             </p>
-            <p className="text-[12px] text-[#8a8782] mt-1">Website chính thức: https://grandhorizon.vn</p>
+            <div className="pt-2">
+              <span className="text-[12px] text-[#8a8782] block mb-1">Giờ tiếp nhận hỗ trợ:</span>
+              <span className="text-[12.5px] font-semibold text-[#203044]">Phục vụ 24/7 không ngày nghỉ</span>
+            </div>
           </div>
 
-          {/* Security & Payment */}
+          {/* Security & Payment (col-span-3) */}
           <div className="lg:col-span-3 flex flex-col gap-3">
-            <h3 className="text-[14px] font-bold text-[#203044] uppercase tracking-wider">Bảo Mật &amp; Thanh Toán</h3>
-            <p className="text-[13px] text-[#373435]/80">Cổng giao dịch mã hóa chuẩn SSL 256-bit và PCI-DSS quốc tế.</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-1 bg-white border border-[#dedad0] rounded-xs text-[11px] font-semibold text-[#203044]">VietQR</span>
-              <span className="px-2.5 py-1 bg-white border border-[#dedad0] rounded-xs text-[11px] font-semibold text-[#203044]">VISA</span>
-              <span className="px-2.5 py-1 bg-white border border-[#dedad0] rounded-xs text-[11px] font-semibold text-[#203044]">Mastercard</span>
-              <span className="px-2.5 py-1 bg-white border border-[#dedad0] rounded-xs text-[11px] font-semibold text-[#203044]">VNPAY</span>
+            <h3 className="text-[13px] font-bold text-[#203044] uppercase tracking-wider">
+              Bảo Mật &amp; Thanh Toán
+            </h3>
+            <p className="text-[13px] text-[#373435]/80">
+              Giao dịch trực tuyến được mã hóa bảo mật chuẩn SSL 256-bit và PCI-DSS quốc tế.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="px-3 py-1 bg-white border border-[#dedad0] rounded-lg text-[11px] font-bold text-[#203044] shadow-xs">
+                VietQR
+              </span>
+              <span className="px-3 py-1 bg-white border border-[#dedad0] rounded-lg text-[11px] font-bold text-[#203044] shadow-xs">
+                VNPAY
+              </span>
+              <span className="px-3 py-1 bg-white border border-[#dedad0] rounded-lg text-[11px] font-bold text-[#203044] shadow-xs">
+                MoMo
+              </span>
+              <span className="px-3 py-1 bg-white border border-[#dedad0] rounded-lg text-[11px] font-bold text-[#203044] shadow-xs">
+                VISA / Master
+              </span>
+            </div>
+
+            <div className="pt-3">
+              <button 
+                onClick={scrollToTop}
+                className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#b9a277] hover:text-[#203044] transition-colors"
+                type="button"
+              >
+                <span>Về đầu trang</span>
+                <span className="material-symbols-outlined text-[16px]">arrow_upward</span>
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="pt-6 border-t border-[#dedad0]/80 flex flex-col md:flex-row items-center justify-between gap-4 text-[12px] text-[#8a8782]">
-          <span>© 2026 Grand Horizon Hotels &amp; Resorts. Refined for every journey. All rights reserved.</span>
+        {/* Bottom Copyright & Terms */}
+        <div className="pt-6 border-t border-[#dedad0] flex flex-col md:flex-row items-center justify-between gap-4 text-[12px] text-[#8a8782]">
+          <span>© 2026 Grand Horizon Hotels &amp; Resorts. Refined for every journey. Bảo lưu mọi quyền.</span>
           <div className="flex items-center gap-4">
             <a href="#" className="hover:text-[#203044] transition-colors">Điều khoản dịch vụ</a>
             <span>•</span>
             <a href="#" className="hover:text-[#203044] transition-colors">Chính sách bảo mật</a>
+            <span>•</span>
+            <a href="#" className="hover:text-[#203044] transition-colors">Chính sách hoàn hủy</a>
           </div>
         </div>
       </div>
