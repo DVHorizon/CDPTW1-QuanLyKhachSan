@@ -48,9 +48,40 @@ function App() {
         if (liveData) {
           setHomeData(prev => ({
             ...prev,
-            branches: liveData.branches?.length ? liveData.branches : mockBranches,
-            featuredRoomTypes: liveData.featuredRoomTypes?.length ? liveData.featuredRoomTypes : mockRoomTypes,
-            amenities: liveData.amenities?.length ? liveData.amenities : mockAmenities,
+            branches: liveData.branches?.length
+              ? liveData.branches.map((b, idx) => {
+                  const fallback = mockBranches[idx % mockBranches.length] || {};
+                  return {
+                    ...fallback,
+                    ...b,
+                    City: b.City || (b.Address ? b.Address.split(',').pop()?.trim() : '') || fallback.City || 'Việt Nam'
+                  };
+                })
+              : mockBranches,
+            featuredRoomTypes: liveData.featuredRoomTypes?.length
+              ? liveData.featuredRoomTypes.map((rt, idx) => {
+                  const fallback = mockRoomTypes[idx % mockRoomTypes.length] || {};
+                  return {
+                    ...fallback,
+                    ...rt,
+                    BasePrice: Number(rt.BasePrice || fallback.BasePrice || 1850000),
+                    Category: rt.Category || fallback.Category || 'deluxe',
+                    Gallery: rt.Gallery?.length ? rt.Gallery : [rt.ImageUrl || fallback.ImageUrl].filter(Boolean),
+                    Rating: rt.Rating || fallback.Rating || 5.0,
+                    TotalReviews: rt.TotalReviews || fallback.TotalReviews || 99
+                  };
+                })
+              : mockRoomTypes,
+            amenities: liveData.amenities?.length
+              ? liveData.amenities.map((a, idx) => {
+                  const fallback = mockAmenities[idx % mockAmenities.length] || {};
+                  return {
+                    ...fallback,
+                    ...a,
+                    IconName: a.IconName || a.IconUrl || fallback.IconName || 'hotel'
+                  };
+                })
+              : mockAmenities,
             offers: liveData.offers?.length ? liveData.offers : mockSpecialOffers,
             reviews: liveData.reviews?.length ? liveData.reviews : mockReviews,
             stats: liveData.stats || mockStats
@@ -77,8 +108,9 @@ function App() {
       nights = Math.max(1, Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)));
     }
 
+    const formatDisplayDate = (d) => (d && typeof d === 'string' && d.includes('-') ? d.split('-').reverse().join('/') : (d || ''));
     const datesText = (checkInDate && checkOutDate)
-      ? `${nights} đêm (${checkInDate.split('-').reverse().join('/')} đến ${checkOutDate.split('-').reverse().join('/')})`
+      ? `${nights} đêm (${formatDisplayDate(checkInDate)} đến ${formatDisplayDate(checkOutDate)})`
       : 'thời gian linh hoạt';
 
     setSearchNotification(`Đã tìm thấy phòng trống sẵn sàng tại "${branchName}" cho ${datesText}. Vui lòng chọn hạng phòng bên dưới!`);
@@ -165,11 +197,16 @@ function App() {
                         onChange={(e) => setSelectedBranch(e.target.value)}
                         className="w-full bg-transparent text-[13.5px] font-bold text-[#203044] focus:outline-none cursor-pointer pr-6 truncate"
                       >
-                        {homeData.branches.map(branch => (
-                          <option key={branch.BranchId} value={branch.BranchId} className="text-[#203044]">
-                            {branch.BranchName} ({branch.City.split(',')[0]})
-                          </option>
-                        ))}
+                        {homeData.branches.map(branch => {
+                          const cityLabel = branch.City
+                            ? branch.City.split(',')[0].trim()
+                            : (branch.Address ? branch.Address.split(',').pop()?.trim() : '');
+                          return (
+                            <option key={branch.BranchId} value={branch.BranchId} className="text-[#203044]">
+                              {branch.BranchName} {cityLabel ? `(${cityLabel})` : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                       <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#8a8782] text-[18px]">
                         expand_more
