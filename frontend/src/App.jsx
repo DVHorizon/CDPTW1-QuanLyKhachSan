@@ -14,6 +14,41 @@ import {
   mockExperiences
 } from './data/mockHomeData';
 
+// Helper làm sạch tên tiện ích và gán Material Symbol chuẩn (tránh URL dài làm tràn vỡ layout)
+const mapAmenityIcon = (name, rawIcon) => {
+  if (rawIcon && !rawIcon.startsWith('http') && !rawIcon.includes('/') && !rawIcon.includes('.')) {
+    return rawIcon;
+  }
+  const n = (name || '').toLowerCase();
+  if (n.includes('hồ bơi') || n.includes('bể bơi')) return 'pool';
+  if (n.includes('spa') || n.includes('xông hơi') || n.includes('trị liệu')) return 'spa';
+  if (n.includes('biển') || n.includes('bãi biển')) return 'beach_access';
+  if (n.includes('nhà hàng') || n.includes('ẩm thực') || n.includes('buffet') || n.includes('ăn')) return 'restaurant';
+  if (n.includes('thể hình') || n.includes('gym') || n.includes('fitness') || n.includes('yoga')) return 'fitness_center';
+  if (n.includes('du thuyền') || n.includes('thuyền') || n.includes('yacht')) return 'sailing';
+  if (n.includes('xe') || n.includes('sân bay') || n.includes('limousine') || n.includes('đưa đón')) return 'airport_shuttle';
+  if (n.includes('quản gia') || n.includes('concierge') || n.includes('phục vụ')) return 'concierge';
+  if (n.includes('wifi') || n.includes('mạng')) return 'wifi';
+  if (n.includes('bồn tắm') || n.includes('tắm') || n.includes('jacuzzi')) return 'bathtub';
+  if (n.includes('minibar') || n.includes('rượu') || n.includes('bar')) return 'local_bar';
+  if (n.includes('cà phê') || n.includes('coffee') || n.includes('nespresso')) return 'coffee';
+  if (n.includes('ban công') || n.includes('sân')) return 'deck';
+  if (n.includes('tv') || n.includes('truyền hình')) return 'tv';
+  return 'hotel';
+};
+
+const cleanAmenityTitle = (name, fallbackName) => {
+  if (!name) return fallbackName || 'Tiện Nghi Nghỉ Dưỡng';
+  return name.replace(/\s*#\d+$/i, '').trim();
+};
+
+const cleanAmenityDesc = (desc, fallbackDesc) => {
+  if (!desc || desc.includes('số hiệu')) {
+    return fallbackDesc || 'Chuẩn mực tiện nghi sang trọng và đẳng cấp quốc tế phục vụ riêng cho thượng khách.';
+  }
+  return desc;
+};
+
 function App() {
   const [homeData, setHomeData] = useState({
     branches: mockBranches,
@@ -78,10 +113,13 @@ function App() {
             amenities: liveData.amenities?.length
               ? liveData.amenities.map((a, idx) => {
                   const fallback = mockAmenities[idx % mockAmenities.length] || {};
+                  const cleanName = cleanAmenityTitle(a.AmenityName, fallback.AmenityName);
                   return {
                     ...fallback,
-                    ...a,
-                    IconName: a.IconName || a.IconUrl || fallback.IconName || 'hotel'
+                    AmenityId: a.AmenityId || idx + 1,
+                    AmenityName: cleanName,
+                    Description: cleanAmenityDesc(a.Description, fallback.Description),
+                    IconName: mapAmenityIcon(cleanName, a.IconName || fallback.IconName)
                   };
                 })
               : mockAmenities,
@@ -610,9 +648,9 @@ function App() {
                   className="bg-white rounded-2xl p-6 border border-[#dedad0] hover:border-[#b9a277] hover:shadow-md transition-all group flex flex-col justify-between"
                 >
                   <div>
-                    <div className="w-12 h-12 rounded-xl bg-[#203044] text-[#b9a277] flex items-center justify-center mb-4 group-hover:scale-105 group-hover:bg-[#b9a277] group-hover:text-white transition-all shadow-xs">
+                    <div className="w-12 h-12 rounded-xl bg-[#203044] text-[#b9a277] flex items-center justify-center mb-4 group-hover:scale-105 group-hover:bg-[#b9a277] group-hover:text-white transition-all shadow-xs overflow-hidden shrink-0">
                       <span className="material-symbols-outlined text-[26px]">
-                        {amenity.IconName || 'star'}
+                        {amenity.IconName || 'hotel'}
                       </span>
                     </div>
                     <h3 className="font-serif text-[17px] text-[#203044] font-bold mb-2 group-hover:text-[#b9a277] transition-colors">
