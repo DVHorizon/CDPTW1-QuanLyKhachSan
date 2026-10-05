@@ -408,7 +408,7 @@ function App() {
                 <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
                   Không Gian Nghỉ Dưỡng Tinh Hoa
                 </span>
-                <h2 className="font-serif text-[28px] lg:text-[36px] text-[#203044] mt-1 font-bold tracking-tight">
+                <h2 className="font-serif text-[28px] lg:text-[36px] text-[#203044] mt-1 font-bold tracking-tight leading-[1.25]">
                   Bộ Sưu Tập Biệt Thự &amp; Phòng Suite
                 </h2>
               </div>
@@ -571,14 +571,14 @@ function App() {
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#203044]/60 rounded-full blur-3xl pointer-events-none" />
 
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
-            <div className="text-center max-w-2xl mx-auto mb-14">
+            <div className="text-center max-w-3xl mx-auto mb-14">
               <span className="text-[11px] uppercase tracking-widest text-[#ffd985] font-bold">
                 Đặc Quyền Nghỉ Dưỡng
               </span>
-              <h2 className="font-serif text-[30px] lg:text-[40px] text-white mt-1.5 font-bold tracking-tight">
+              <h2 className="font-serif text-[28px] sm:text-[34px] lg:text-[40px] text-white mt-1.5 font-bold tracking-tight leading-[1.25]">
                 Gói Ưu Đãi &amp; Khuyến Mãi Đặc Biệt
               </h2>
-              <p className="text-[14px] text-white/80 mt-2 font-light leading-relaxed">
+              <p className="text-[14px] text-white/80 mt-2 font-light leading-relaxed max-w-2xl mx-auto">
                 Trọn vẹn từng khoảnh khắc sum vầy với những ưu đãi nghỉ dưỡng, ẩm thực và chăm sóc sức khỏe độc quyền.
               </p>
             </div>
@@ -597,7 +597,7 @@ function App() {
                     <span className="text-[26px] font-extrabold text-[#ffd985] block mb-1">
                       {offer.DiscountText}
                     </span>
-                    <h3 className="font-serif text-[19px] text-white font-bold mb-1 group-hover:text-[#ffd985] transition-colors">
+                    <h3 className="font-serif text-[19px] text-white font-bold mb-1 leading-snug group-hover:text-[#ffd985] transition-colors">
                       {offer.Title}
                     </h3>
                     <p className="text-[12.5px] text-[#ffd985]/80 font-semibold mb-3">
@@ -629,14 +629,14 @@ function App() {
         {/* ================= 5. RESORT AMENITIES SECTION ================= */}
         <section id="trai-nghiem" className="w-full py-20 lg:py-24 bg-[#fafaf8] border-t border-[#dedad0]">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-            <div className="text-center max-w-2xl mx-auto mb-14">
+            <div className="text-center max-w-3xl mx-auto mb-14">
               <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
                 Tiện Nghi Đẳng Cấp 5 Sao
               </span>
-              <h2 className="font-serif text-[30px] lg:text-[40px] text-[#203044] mt-1.5 font-bold tracking-tight">
+              <h2 className="font-serif text-[28px] sm:text-[34px] lg:text-[40px] text-[#203044] mt-1.5 font-bold tracking-tight leading-[1.25]">
                 Chuẩn Mực Nghỉ Dưỡng 5 Sao Quốc Tế
               </h2>
-              <p className="text-[14px] text-[#373435]/80 mt-2 leading-relaxed">
+              <p className="text-[14px] text-[#373435]/80 mt-2 leading-relaxed max-w-2xl mx-auto">
                 Tận hưởng phong cách sống thượng lưu với chuỗi tiện ích chăm sóc sức khỏe, giải trí và ẩm thực chuẩn quốc tế.
               </p>
             </div>
@@ -653,7 +653,7 @@ function App() {
                         {amenity.IconName || 'hotel'}
                       </span>
                     </div>
-                    <h3 className="font-serif text-[17px] text-[#203044] font-bold mb-2 group-hover:text-[#b9a277] transition-colors">
+                    <h3 className="font-serif text-[17px] text-[#203044] font-bold mb-2 leading-snug group-hover:text-[#b9a277] transition-colors">
                       {amenity.AmenityName}
                     </h3>
                     <p className="text-[13px] text-[#373435]/80 leading-relaxed">
@@ -673,14 +673,14 @@ function App() {
         {/* ================= 6. FEATURED EXPERIENCES SECTION (4 PHOTO CARDS) ================= */}
         <section id="am-thuc" className="w-full py-20 lg:py-24 bg-[#fbf8f2] border-t border-[#dedad0]">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-            <div className="text-center max-w-2xl mx-auto mb-14">
+            <div className="text-center max-w-3xl mx-auto mb-14">
               <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
                 Trải Nghiệm Độc Bản
               </span>
-              <h2 className="font-serif text-[30px] lg:text-[40px] text-[#203044] mt-1.5 font-bold tracking-tight">
+              <h2 className="font-serif text-[28px] sm:text-[34px] lg:text-[40px] text-[#203044] mt-1.5 font-bold tracking-tight leading-[1.25]">
                 Trải Nghiệm Đặc Sắc Tại Grand Horizon
               </h2>
-              <p className="text-[14px] text-[#373435]/80 mt-2 leading-relaxed">
+              <p className="text-[14px] text-[#373435]/80 mt-2 leading-relaxed max-w-2xl mx-auto">
                 Khám phá các hành trình ẩm thực, chăm sóc sức khỏe và du ngoạn biển được thiết kế riêng biệt cho từng thượng khách.
               </p>
             </div>
@@ -704,7 +704,7 @@ function App() {
 
                   <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-serif text-[17px] font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors mb-2">
+                      <h3 className="font-serif text-[17px] font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors mb-2 leading-snug">
                         {exp.title}
                       </h3>
                       <p className="text-[13px] text-[#373435]/80 leading-relaxed line-clamp-3 mb-4">
@@ -737,7 +737,7 @@ function App() {
                   <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
                     Lưu Giữ Khoảnh Khắc
                   </span>
-                  <h2 className="font-serif text-[28px] lg:text-[36px] text-[#203044] mt-1 font-bold tracking-tight">
+                  <h2 className="font-serif text-[28px] lg:text-[36px] text-[#203044] mt-1 font-bold tracking-tight leading-[1.25]">
                     Dấu Ấn Kỷ Niệm Khó Phai
                   </h2>
                 </div>
@@ -867,7 +867,7 @@ function App() {
               <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
                 Giải Đáp Thắc Mắc
               </span>
-              <h2 className="font-serif text-[26px] lg:text-[34px] text-[#203044] mt-1 font-bold tracking-tight">
+              <h2 className="font-serif text-[26px] lg:text-[34px] text-[#203044] mt-1 font-bold tracking-tight leading-[1.25]">
                 Câu Hỏi Thường Gặp
               </h2>
               <p className="text-[13.5px] text-[#373435]/80 mt-1">
