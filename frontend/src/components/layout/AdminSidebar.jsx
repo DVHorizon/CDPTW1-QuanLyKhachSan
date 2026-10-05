@@ -3,15 +3,16 @@ import { NavLink } from 'react-router-dom';
 
 // Danh sách menu sidebar với route tương ứng
 const NAV_ITEMS = [
-  { icon: 'grid_view',          label: 'Bàn Làm Việc',              to: '/admin/ban-lam-viec' },
-  { icon: 'room_service',       label: 'Lễ Tân & Tiền Sảnh',        to: '/admin/le-tan' },
-  { icon: 'bedroom_parent',     label: 'Quản Lý Phòng & Hạng Phòng',to: '/admin/room-types' },
-  { icon: 'cleaning_services',  label: 'Buồng Phòng & Kỹ Thuật',    to: '/admin/buong-phong' },
-  { icon: 'spa',                label: 'Dịch Vụ & Spa',              to: '/admin/dich-vu-spa' },
-  { icon: 'restaurant',         label: 'Ẩm Thực F&B & Bếp',         to: '/admin' },
-  { icon: 'account_balance',    label: 'Tài Chính & Sổ Cái',         to: '/admin/tai-chinh' },
-  { icon: 'neurology',          label: 'AI Concierge & Chatbot',      to: '/admin/ai-concierge' },
-  { icon: 'admin_panel_settings',label: 'Quản Trị Hệ Thống',         to: '/admin/quan-tri' },
+  { icon: 'grid_view', label: 'Bàn Làm Việc', to: '/admin/ban-lam-viec' },
+  { icon: 'room_service', label: 'Lễ Tân & Tiền Sảnh', to: '/admin/le-tan' },
+  { icon: 'bedroom_parent', label: 'Quản Lý Phòng & Hạng Phòng', to: '/admin/room-types' },
+  { icon: 'meeting_room', label: 'Quản Lý Phòng Vật Lý', to: '/admin/rooms' },
+  { icon: 'cleaning_services', label: 'Buồng Phòng & Kỹ Thuật', to: '/admin/buong-phong' },
+  { icon: 'spa', label: 'Dịch Vụ & Spa', to: '/admin/dich-vu-spa' },
+  { icon: 'restaurant', label: 'Ẩm Thực F&B & Bếp', to: '/admin' },
+  { icon: 'account_balance', label: 'Tài Chính & Sổ Cái', to: '/admin/tai-chinh' },
+  { icon: 'neurology', label: 'AI Concierge & Chatbot', to: '/admin/ai-concierge' },
+  { icon: 'admin_panel_settings', label: 'Quản Trị Hệ Thống', to: '/admin/quan-tri' },
 ];
 
 const AdminSidebar = () => {

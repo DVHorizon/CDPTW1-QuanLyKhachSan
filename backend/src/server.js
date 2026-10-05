@@ -19,6 +19,9 @@ app.get('/api/health', (req, res) => {
 // Route quản lý loại phòng
 app.use('/api/loai-phong', require('./routes/roomTypes'));
 
+// Route quản lý phòng vật lý
+app.use('/api/phong', require('./routes/rooms'));
+
 app.listen(PORT, () => {
   console.log(`Backend server is running on port ${PORT}`);
 });

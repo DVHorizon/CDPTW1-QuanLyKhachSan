@@ -5,7 +5,6 @@ import {
   performSemanticSearch,
   generateRagAnswer,
   trackUserInteraction,
-  getUserPreferences,
 } from '../utils/semanticRagSearch';
 
 
