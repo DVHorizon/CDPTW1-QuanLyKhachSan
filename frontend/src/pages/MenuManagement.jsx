@@ -804,4 +804,3 @@ const MenuManagement = () => {
   );
 };
 
-export default MenuManagement;
