@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { icon: 'restaurant',          label: 'Ẩm Thực F&B & Bếp',          to: '/admin' },
   { icon: 'account_balance',     label: 'Tài Chính & Sổ Cái',          to: '/admin/tai-chinh' },
   { icon: 'neurology',           label: 'AI Concierge & Chatbot',      to: '/admin/ai-concierge' },
+  { icon: 'badge',               label: 'Tài Khoản & Phân Quyền',      to: '/admin/staff' },
   { icon: 'admin_panel_settings',label: 'Quản Trị Hệ Thống',          to: '/admin/quan-tri' },
 ];
 
