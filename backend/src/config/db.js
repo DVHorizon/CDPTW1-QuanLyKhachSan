@@ -1,9 +1,9 @@
-require('dotenv').config();
+const { Sequelize } = require('sequelize');
 
-module.exports = {
-  host: process.env.DB_HOST || '127.0.0.1',
-  username: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
+const sequelize = new Sequelize({
   dialect: 'sqlite',
   storage: './database.sqlite',
-};
+  logging: false,
+});
+
+module.exports = sequelize;
