@@ -11,6 +11,43 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
   const [isTop, setIsTop] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
+  // Ngôn ngữ hiện tại (mặc định 'vi')
+  const [currentLang, setCurrentLang] = useState(() => {
+    return propLang || localStorage.getItem('app_lang') || 'vi';
+  });
+
+  useEffect(() => {
+    if (propLang && propLang !== currentLang) {
+      setCurrentLang(propLang);
+    }
+  }, [propLang]);
+
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  const langDropdownRef = useRef(null);
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(event.target)) {
+        setIsLangOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectLang = (lang) => {
+    setCurrentLang(lang);
+    localStorage.setItem('app_lang', lang);
+    setIsLangOpen(false);
+    if (onLanguageChange) {
+      onLanguageChange(lang);
+    }
+    window.dispatchEvent(new CustomEvent('appLanguageChange', { detail: lang }));
+  };
+
+  const t = I18N[currentLang] || I18N.vi;
+
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
@@ -101,6 +138,57 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
               </span>
             )}
           </a>
+
+          {/* Language Selector (VN / ENG) */}
+          <div className="relative shrink-0" ref={langDropdownRef}>
+            <button
+              onClick={() => setIsLangOpen(!isLangOpen)}
+              className="flex items-center gap-1.5 h-8.5 px-2 rounded-lg bg-white border border-[#dedad0] hover:border-[#b9a277] text-[#203044] text-[12px] font-bold transition-all shadow-xs cursor-pointer select-none"
+              title="Chọn ngôn ngữ / Select Language"
+              type="button"
+            >
+              {currentLang === 'vi' ? <FlagVN /> : <FlagEN />}
+              <span>{currentLang === 'vi' ? 'VN' : 'ENG'}</span>
+              <span className={`material-symbols-outlined text-[15px] text-[#8a8782] transition-transform duration-200 ${isLangOpen ? 'rotate-180 text-[#b9a277]' : ''}`}>
+                expand_more
+              </span>
+            </button>
+
+            {isLangOpen && (
+              <div className="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)] border border-[#dedad0] py-1.5 z-50 animate-fade-in">
+                <button
+                  type="button"
+                  onClick={() => handleSelectLang('vi')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${
+                    currentLang === 'vi' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <FlagVN className="w-4 h-2.5" />
+                    <span>Tiếng Việt</span>
+                  </span>
+                  {currentLang === 'vi' && (
+                    <span className="material-symbols-outlined text-[15px] text-[#b9a277]">check</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectLang('en')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${
+                    currentLang === 'en' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <FlagEN className="w-4 h-2.5" />
+                    <span>English</span>
+                  </span>
+                  {currentLang === 'en' && (
+                    <span className="material-symbols-outlined text-[15px] text-[#b9a277]">check</span>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Đặt Phòng Button */}
           <a

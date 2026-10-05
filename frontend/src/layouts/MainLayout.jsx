@@ -13,6 +13,8 @@ const MainLayout = ({ children, wishlistCount = 0, onWishlistClick }) => {
       <Header 
         wishlistCount={wishlistCount} 
         onWishlistClick={onWishlistClick} 
+        lang={lang}
+        onLanguageChange={onLanguageChange}
       />
 
       {/* Main Page Content */}
