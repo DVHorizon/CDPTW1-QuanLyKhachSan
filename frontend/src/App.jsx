@@ -10,7 +10,8 @@ import {
   mockSpecialOffers,
   mockReviews,
   mockFaqs,
-  mockStats
+  mockStats,
+  mockExperiences
 } from './data/mockHomeData';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
     featuredRoomTypes: mockRoomTypes,
     amenities: mockAmenities,
     offers: mockSpecialOffers,
+    experiences: mockExperiences,
     reviews: mockReviews,
     faqs: mockFaqs,
     stats: mockStats
@@ -36,6 +38,7 @@ function App() {
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [openFaqId, setOpenFaqId] = useState(1);
   const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterName, setNewsletterName] = useState('');
   const [newsletterSuccess, setNewsletterSuccess] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -83,6 +86,7 @@ function App() {
                 })
               : mockAmenities,
             offers: liveData.offers?.length ? liveData.offers : mockSpecialOffers,
+            experiences: mockExperiences,
             reviews: liveData.reviews?.length ? liveData.reviews : mockReviews,
             stats: liveData.stats || mockStats
           }));
@@ -150,9 +154,9 @@ function App() {
     >
       <div className="flex flex-col w-full">
 
-        {/* ================= HERO BANNER SECTION ================= */}
-        <section id="trang-chu" className="relative isolate w-full pt-28 pb-20 lg:pb-28 overflow-hidden min-h-[680px] lg:min-h-[760px] flex items-center justify-center">
-          {/* Background image & overlay */}
+        {/* ================= 1. HERO BANNER SECTION ================= */}
+        <section id="trang-chu" className="relative isolate w-full pt-32 pb-24 lg:pb-32 overflow-hidden min-h-[720px] lg:min-h-[820px] flex items-center justify-center">
+          {/* Background image & gradient overlay */}
           <div
             className="absolute inset-0 bg-cover bg-center -z-20"
             data-alt="Ultra luxury beachfront tropical resort at twilight sunset"
@@ -160,32 +164,50 @@ function App() {
               backgroundImage: 'url("https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=2070&auto=format&fit=crop")'
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#203044]/80 via-[#203044]/55 to-[#203044]/85 -z-10" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#131b2e]/85 via-[#203044]/60 to-[#131b2e]/85 -z-10" />
 
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center flex flex-col items-center">
             {/* Prestige Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-[#ffd985] text-[12px] font-semibold tracking-wider uppercase mb-6 animate-fade-in">
-              <span className="material-symbols-outlined text-[18px]">verified</span>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-[#ffd985] text-[11.5px] font-semibold tracking-wider uppercase mb-6 animate-fade-in shadow-sm">
+              <span className="material-symbols-outlined text-[17px]">verified</span>
               <span>Thương Hiệu Nghỉ Dưỡng Thượng Lưu Hàng Đầu Châu Á 2026</span>
             </div>
 
             {/* Main Headline */}
-            <h1 className="font-serif text-[38px] sm:text-[54px] lg:text-[68px] text-white font-bold leading-[1.12] tracking-tight max-w-4xl text-shadow-md">
-              Chạm Vào Đỉnh Cao <br />
-              <span className="italic font-normal text-[#ffd985]">Nghỉ Dưỡng Biển Sang Trọng</span>
+            <h1 className="font-serif text-[40px] sm:text-[56px] lg:text-[70px] text-white font-bold leading-[1.12] tracking-tight max-w-4xl text-shadow-md">
+              Kỳ Nghỉ Thượng Lưu <br />
+              <span className="italic font-normal text-[#ffd985]">Bên Bờ Biển Thiên Đường</span>
             </h1>
 
             <p className="mt-5 text-[15px] sm:text-[17px] text-white/90 max-w-2xl font-light leading-relaxed">
-              Trải nghiệm thiên đường riêng tư tại 4 ốc đảo nhiệt đới danh tiếng.
+              Trải nghiệm thiên đường riêng tư tại các ốc đảo nhiệt đới danh tiếng.
               Hòa mình giữa đại dương ngọc bích, dịch vụ ẩm thực Fine Dining đỉnh cao và quản gia 24/7.
             </p>
 
-            {/* QUICK BOOKING SEARCH BAR */}
+            {/* 3 Highlighted Feature Tags */}
+            <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-8 mt-5 text-white/95 text-[13px] font-medium">
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[#ffd985] text-[18px]">beach_access</span>
+                Bãi biển riêng tư
+              </span>
+              <span className="text-white/40">•</span>
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[#ffd985] text-[18px]">support_agent</span>
+                Quản gia riêng 24/7
+              </span>
+              <span className="text-white/40">•</span>
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[#ffd985] text-[18px]">pool</span>
+                Hồ bơi vô cực
+              </span>
+            </div>
+
+            {/* FLOATING BOOKING SEARCH BAR */}
             <div className="w-full max-w-5xl mt-10">
               <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] p-4 sm:p-6 border border-[#dedad0]">
                 <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4 items-end text-left">
                   
-                  {/* Chi nhánh */}
+                  {/* Điểm đến / Chi nhánh */}
                   <div className="lg:col-span-4 flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-[#8a8782] uppercase tracking-wider flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-[#b9a277]">location_on</span>
@@ -291,7 +313,7 @@ function App() {
           </div>
         </section>
 
-        {/* ================= FEATURE HIGHLIGHTS & STATS ================= */}
+        {/* ================= 2. FEATURE HIGHLIGHTS & STATS ================= */}
         <section className="w-full py-12 bg-white border-b border-[#dedad0]">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center divide-y lg:divide-y-0 lg:divide-x divide-[#dedad0]">
@@ -340,7 +362,7 @@ function App() {
           </div>
         </section>
 
-        {/* ================= ROOM COLLECTION SECTION ================= */}
+        {/* ================= 3. ROOM COLLECTION SECTION ================= */}
         <section id="room-collection" className="w-full py-16 lg:py-24 bg-[#fafaf8] scroll-mt-24">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
@@ -380,7 +402,7 @@ function App() {
               ))}
             </div>
 
-            {/* Room Cards Grid */}
+            {/* Room Cards Grid (6 items) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
               {filteredRooms.map((rt) => {
                 const isWishlisted = wishlist.includes(rt.RoomTypeId);
@@ -504,53 +526,57 @@ function App() {
           </div>
         </section>
 
-        {/* ================= SPECIAL OFFERS SECTION ================= */}
-        <section id="uu-dai" className="w-full py-16 lg:py-24 bg-white border-t border-[#dedad0]">
-          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-            <div className="text-center max-w-2xl mx-auto mb-12">
-              <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
+        {/* ================= 4. SPECIAL OFFERS SECTION (DARK NAVY LUXURY) ================= */}
+        <section id="uu-dai" className="w-full py-20 lg:py-24 bg-[#131b2e] text-white border-t border-slate-800 relative overflow-hidden">
+          {/* Subtle glow background */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-[#b9a277]/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#203044]/60 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
+            <div className="text-center max-w-2xl mx-auto mb-14">
+              <span className="text-[11px] uppercase tracking-widest text-[#ffd985] font-bold">
                 Đặc Quyền Nghỉ Dưỡng
               </span>
-              <h2 className="font-serif text-[28px] lg:text-[36px] text-[#203044] mt-1 font-bold tracking-tight">
-                Gói Ưu Đãi Mùa Lễ Hội 2026
+              <h2 className="font-serif text-[30px] lg:text-[40px] text-white mt-1.5 font-bold tracking-tight">
+                Gói Ưu Đãi &amp; Khuyến Mãi Đặc Biệt
               </h2>
-              <p className="text-[14px] text-[#373435]/80 mt-2">
+              <p className="text-[14px] text-white/80 mt-2 font-light leading-relaxed">
                 Trọn vẹn từng khoảnh khắc sum vầy với những ưu đãi nghỉ dưỡng, ẩm thực và chăm sóc sức khỏe độc quyền.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-7">
               {homeData.offers.map((offer) => (
                 <div
                   key={offer.OfferId}
-                  className="bg-[#fafaf8] rounded-2xl p-7 border border-[#dedad0] hover:border-[#b9a277] transition-all hover:shadow-[0_12px_32px_-8px_rgba(185,162,119,0.3)] flex flex-col justify-between relative overflow-hidden"
+                  className="bg-[#203044]/80 backdrop-blur-md rounded-2xl p-7 border border-white/10 hover:border-[#b9a277] transition-all hover:shadow-[0_12px_32px_-8px_rgba(185,162,119,0.3)] flex flex-col justify-between relative overflow-hidden group"
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#b9a277]/10 rounded-bl-full pointer-events-none" />
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#b9a277]/10 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
                   <div>
-                    <div className="inline-block px-3 py-1 rounded-full bg-[#203044] text-[#ffd985] text-[11px] font-bold uppercase mb-4 shadow-xs">
+                    <div className="inline-block px-3 py-1 rounded-full bg-white/10 text-[#ffd985] text-[11px] font-bold uppercase mb-4 border border-white/10 shadow-xs">
                       {offer.Badge || 'Đặc Biệt'}
                     </div>
-                    <span className="text-[24px] font-extrabold text-[#b9a277] block mb-1">
+                    <span className="text-[26px] font-extrabold text-[#ffd985] block mb-1">
                       {offer.DiscountText}
                     </span>
-                    <h3 className="font-serif text-[18px] text-[#203044] font-bold mb-1">
+                    <h3 className="font-serif text-[19px] text-white font-bold mb-1 group-hover:text-[#ffd985] transition-colors">
                       {offer.Title}
                     </h3>
-                    <p className="text-[12.5px] text-[#8a8782] font-semibold mb-3">
+                    <p className="text-[12.5px] text-[#ffd985]/80 font-semibold mb-3">
                       {offer.Subtitle}
                     </p>
-                    <p className="text-[13px] text-[#373435]/80 leading-relaxed mb-6">
+                    <p className="text-[13px] text-white/75 leading-relaxed mb-6">
                       {offer.Description}
                     </p>
                   </div>
 
-                  <div className="pt-4 border-t border-[#dedad0] flex items-center justify-between">
-                    <span className="text-[11px] text-[#8a8782] font-medium">
+                  <div className="pt-4 border-t border-white/15 flex items-center justify-between">
+                    <span className="text-[11.5px] text-white/60 font-medium">
                       {offer.ExpiryDate}
                     </span>
                     <a
                       href="#room-collection"
-                      className="inline-flex items-center gap-1 text-[13px] font-bold text-[#203044] hover:text-[#b9a277] transition-colors"
+                      className="inline-flex items-center gap-1.5 text-[13px] font-bold text-[#ffd985] hover:text-white transition-colors"
                     >
                       <span>Áp Dụng</span>
                       <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -562,19 +588,17 @@ function App() {
           </div>
         </section>
 
-        {/* ================= RESORT AMENITIES SECTION ================= */}
-        <section id="trai-nghiem" className="w-full py-16 lg:py-24 bg-[#fafaf8] border-t border-[#dedad0]">
+        {/* ================= 5. RESORT AMENITIES SECTION ================= */}
+        <section id="trai-nghiem" className="w-full py-20 lg:py-24 bg-[#fafaf8] border-t border-[#dedad0]">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
-              <div>
-                <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
-                  Tiện Nghi Đẳng Cấp 5 Sao
-                </span>
-                <h2 className="font-serif text-[28px] lg:text-[36px] text-[#203044] mt-1 font-bold tracking-tight">
-                  Trải Nghiệm Độc Quyền Tại Resort
-                </h2>
-              </div>
-              <p className="text-[14px] text-[#373435]/80 max-w-md leading-relaxed">
+            <div className="text-center max-w-2xl mx-auto mb-14">
+              <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
+                Tiện Nghi Đẳng Cấp 5 Sao
+              </span>
+              <h2 className="font-serif text-[30px] lg:text-[40px] text-[#203044] mt-1.5 font-bold tracking-tight">
+                Chuẩn Mực Nghỉ Dưỡng 5 Sao Quốc Tế
+              </h2>
+              <p className="text-[14px] text-[#373435]/80 mt-2 leading-relaxed">
                 Tận hưởng phong cách sống thượng lưu với chuỗi tiện ích chăm sóc sức khỏe, giải trí và ẩm thực chuẩn quốc tế.
               </p>
             </div>
@@ -599,8 +623,8 @@ function App() {
                     </p>
                   </div>
                   <div className="pt-4 mt-4 border-t border-[#dedad0]/60 flex items-center text-[12px] font-bold text-[#b9a277] gap-1">
-                    <span>Phục vụ không giới hạn</span>
-                    <span className="material-symbols-outlined text-[14px]">check</span>
+                    <span>Đặc quyền phục vụ 24/7</span>
+                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
                   </div>
                 </div>
               ))}
@@ -608,70 +632,64 @@ function App() {
           </div>
         </section>
 
-        {/* ================= FINE DINING / CUISINE SECTION ================= */}
-        <section id="am-thuc" className="w-full py-16 lg:py-24 bg-[#203044] text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-[#b9a277]/10 rounded-full blur-3xl pointer-events-none" />
-          
+        {/* ================= 6. FEATURED EXPERIENCES SECTION (4 PHOTO CARDS) ================= */}
+        <section id="am-thuc" className="w-full py-20 lg:py-24 bg-[#fbf8f2] border-t border-[#dedad0]">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-              <div className="lg:col-span-6 flex flex-col gap-4">
-                <span className="text-[11px] uppercase tracking-widest text-[#ffd985] font-bold">
-                  Nghệ Thuật Ẩm Thực Tinh Tế
-                </span>
-                <h2 className="font-serif text-[30px] lg:text-[42px] font-bold leading-tight">
-                  Nhà Hàng Biển Fine Dining <br />
-                  <span className="italic text-[#ffd985] font-normal">The Azure &amp; Wine Cellar</span>
-                </h2>
-                <p className="text-[14px] text-white/80 leading-relaxed">
-                  Hành trình vị giác đỉnh cao với hải sản tươi sống được đánh bắt trong ngày, kết hợp cùng kỹ nghệ ẩm thực đương đại của các bếp trưởng 5 sao quốc tế. Hầm rượu ngầm lưu trữ hơn 300 dòng vang quý hiếm.
-                </p>
+            <div className="text-center max-w-2xl mx-auto mb-14">
+              <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
+                Trải Nghiệm Độc Bản
+              </span>
+              <h2 className="font-serif text-[30px] lg:text-[40px] text-[#203044] mt-1.5 font-bold tracking-tight">
+                Trải Nghiệm Đặc Sắc Tại Grand Horizon
+              </h2>
+              <p className="text-[14px] text-[#373435]/80 mt-2 leading-relaxed">
+                Khám phá các hành trình ẩm thực, chăm sóc sức khỏe và du ngoạn biển được thiết kế riêng biệt cho từng thượng khách.
+              </p>
+            </div>
 
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                    <span className="text-[#ffd985] text-[20px] font-bold block">07:00 - 23:00</span>
-                    <span className="text-[12px] text-white/70">Phục vụ điểm tâm buffet &amp; A la carte</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {homeData.experiences.map((exp) => (
+                <div
+                  key={exp.id}
+                  className="bg-white rounded-2xl overflow-hidden border border-[#dedad0] hover:border-[#b9a277] hover:shadow-lg transition-all flex flex-col justify-between group"
+                >
+                  <div className="relative aspect-[4/3] overflow-hidden bg-[#203044]">
+                    <img
+                      src={exp.imageUrl}
+                      alt={exp.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
+                    <div className="absolute top-3 left-3 px-2.5 py-1 bg-[#203044]/90 backdrop-blur-md rounded-md text-[#ffd985] text-[10px] font-bold uppercase tracking-wider">
+                      {exp.tag}
+                    </div>
                   </div>
-                  <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                    <span className="text-[#ffd985] text-[20px] font-bold block">Michelin Star</span>
-                    <span className="text-[12px] text-white/70">Đầu bếp khách mời quốc tế định kỳ</span>
+
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-serif text-[17px] font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors mb-2">
+                        {exp.title}
+                      </h3>
+                      <p className="text-[13px] text-[#373435]/80 leading-relaxed line-clamp-3 mb-4">
+                        {exp.description}
+                      </p>
+                    </div>
+
+                    <a
+                      href="#room-collection"
+                      className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#b9a277] hover:text-[#203044] transition-colors pt-2 border-t border-[#dedad0]/60"
+                    >
+                      <span>Khám Phá Chi Tiết</span>
+                      <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </a>
                   </div>
                 </div>
-
-                <div className="pt-4 flex items-center gap-4">
-                  <a
-                    href="#room-collection"
-                    className="px-6 py-3 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[13.5px] font-bold shadow-md transition-all inline-flex items-center gap-2"
-                  >
-                    <span>Đặt Bàn Ngay</span>
-                    <span className="material-symbols-outlined text-[18px]">table_bar</span>
-                  </a>
-                  <a
-                    href="tel:19006868"
-                    className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[13.5px] font-bold border border-white/20 transition-all inline-flex items-center gap-2"
-                  >
-                    <span>Hotline Đặt Bàn</span>
-                  </a>
-                </div>
-              </div>
-
-              <div className="lg:col-span-6 grid grid-cols-2 gap-4">
-                <img
-                  className="w-full h-64 sm:h-80 object-cover rounded-2xl shadow-xl"
-                  alt="Fine dining restaurant view"
-                  src="https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=800&auto=format&fit=crop"
-                />
-                <img
-                  className="w-full h-64 sm:h-80 object-cover rounded-2xl shadow-xl mt-8"
-                  alt="Wine tasting and dishes"
-                  src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800&auto=format&fit=crop"
-                />
-              </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* ================= GUEST REVIEWS & ELITE MEMBERSHIP ================= */}
-        <section className="w-full py-16 lg:py-24 bg-[#fafaf8]">
+        {/* ================= 7. GUEST REVIEWS & ELITE MEMBERSHIP ================= */}
+        <section className="w-full py-20 lg:py-24 bg-[#fafaf8] border-t border-[#dedad0]">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
@@ -679,10 +697,10 @@ function App() {
               <div className="lg:col-span-7 flex flex-col gap-6">
                 <div>
                   <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
-                    Cảm Nhận Từ Thượng Khách
+                    Lưu Giữ Khoảnh Khắc
                   </span>
-                  <h2 className="font-serif text-[28px] lg:text-[34px] text-[#203044] mt-1 font-bold tracking-tight">
-                    Khoảnh Khắc Hạnh Phúc Tại Grand Horizon
+                  <h2 className="font-serif text-[28px] lg:text-[36px] text-[#203044] mt-1 font-bold tracking-tight">
+                    Dấu Ấn Kỷ Niệm Khó Phai
                   </h2>
                 </div>
 
@@ -769,6 +787,8 @@ function App() {
                             className="w-full h-11 px-3.5 rounded-xl bg-white/10 text-white placeholder-white/50 text-[13px] focus:outline-none focus:bg-white/20 transition-all border border-white/15"
                             placeholder="Họ và tên của Quý khách"
                             type="text"
+                            value={newsletterName}
+                            onChange={(e) => setNewsletterName(e.target.value)}
                             required
                           />
                         </div>
@@ -802,7 +822,7 @@ function App() {
           </div>
         </section>
 
-        {/* ================= FREQUENTLY ASKED QUESTIONS (FAQ) ================= */}
+        {/* ================= 8. FREQUENTLY ASKED QUESTIONS (FAQ) ================= */}
         <section id="faq" className="w-full py-16 lg:py-20 bg-[#fbf8f2] border-t border-[#dedad0]">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
             <div className="text-center mb-10">

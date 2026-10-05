@@ -394,3 +394,35 @@ export const mockStats = {
   totalBranches: 4,
   returnRate: '99.2%'
 };
+
+export const mockExperiences = [
+  {
+    id: 1,
+    tag: 'SPA & CHĂM SÓC SỨC KHỎE',
+    title: 'Grand Horizon Spa & Wellness',
+    description: 'Trị liệu cổ truyền kết hợp tinh dầu hữu cơ bản địa, xông hơi đá muối Himalaya mang lại sự tái sinh trọn vẹn.',
+    imageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=800&auto=format&fit=crop'
+  },
+  {
+    id: 2,
+    tag: 'ẨM THỰC THƯỢNG HẠNG',
+    title: 'Ẩm Thực Fine Dining The Azure',
+    description: 'Hải sản tươi sống cao cấp hòa quyện kỹ nghệ ẩm thực đương đại cùng hầm vang với hơn 300 niên vụ danh tiếng.',
+    imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800&auto=format&fit=crop'
+  },
+  {
+    id: 3,
+    tag: 'THƯ GIÃN NHIỆT ĐỚI',
+    title: 'Hồ Bơi Chân Mây & Pool Bar',
+    description: 'Hồ bơi nước mặn vô cực nối liền đại dương bao la, quầy bar chìm phục vụ cocktail nhiệt đới ngắm hoàng hôn.',
+    imageUrl: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=800&auto=format&fit=crop'
+  },
+  {
+    id: 4,
+    tag: 'DU NGOẠN ĐỘC BẢN',
+    title: 'Du Thuyền Hoàng Hôn VIP',
+    description: 'Hải trình ngắm hoàng hôn vịnh biển trên du thuyền tư nhân thượng lưu, tiệc trà chiều canapé và sâm banh Pháp.',
+    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=800&auto=format&fit=crop'
+  }
+];
+
