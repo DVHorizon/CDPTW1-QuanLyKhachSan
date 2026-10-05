@@ -294,7 +294,7 @@ router.delete("/:id", async (req, res) => {
 
     // Kiểm tra xem có phòng thực tế nào đang thuộc loại phòng này không
     try {
-      const [linkedRooms] = await pool.query("SELECT id FROM Rooms WHERE type = ? LIMIT 1", [existing[0].ma_loai]);
+      const [linkedRooms] = await pool.query("SELECT id FROM physical_rooms WHERE ma_loai = ? LIMIT 1", [existing[0].ma_loai]);
       if (linkedRooms && linkedRooms.length > 0) {
         return res.status(400).json({
           success: false,
@@ -316,3 +316,4 @@ router.delete("/:id", async (req, res) => {
 });
 
 module.exports = router;
+
