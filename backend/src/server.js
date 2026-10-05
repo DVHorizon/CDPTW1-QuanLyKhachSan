@@ -1,21 +1,16 @@
-const express = require('express');
-const cors = require('cors');
 require('dotenv').config();
+const app = require('./app');
+const db = require('./models');
 
-const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
-app.use(express.json());
-
-app.get('/', (req, res) => {
-  res.send('Backend is running!');
-});
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Backend is healthy' });
-});
-
-app.listen(PORT, () => {
-  console.log(`Backend server is running on port ${PORT}`);
+// Test DB and sync
+db.sequelize.sync({ force: false }).then(() => {
+  console.log('Database connected and synced.');
+  
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}.`);
+  });
+}).catch(err => {
+  console.error('Failed to sync db: ' + err.message);
 });

@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Home from './pages/Home';
-import MenuManagement from './pages/MenuManagement';
+import Home from './pages/client/Home';
+import MenuManagement from './pages/admin/menu/MenuManagement';
 
 function App() {
   return (
