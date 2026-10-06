@@ -19,6 +19,10 @@ app.get('/api/health', (req, res) => {
 // Routes API trang chủ
 app.use('/api', require('./routes/homeRoutes'));
 
+// Routes API Xác thực & Người dùng (Authentication)
+app.use('/api/v1/auth', require('./routes/authRoutes'));
+app.use('/api/auth', require('./routes/authRoutes'));
+
 // Route quản lý loại phòng
 app.use('/api/loai-phong', require('./routes/roomTypes'));
 
