@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import RoomDetailModal from '../components/modals/RoomDetailModal';
 import QuickBookingModal from '../components/modals/QuickBookingModal';
@@ -50,6 +51,7 @@ const cleanAmenityDesc = (desc, fallbackDesc) => {
 };
 
 function Home() {
+  const navigate = useNavigate();
   const [homeData, setHomeData] = useState({
     branches: mockBranches,
     featuredRoomTypes: mockRoomTypes,
@@ -137,34 +139,38 @@ function Home() {
     loadData();
   }, []);
 
-  // Xử lý Tìm Phòng
+  // Xử lý Tìm Phòng (FEAT-GUEST-02)
   const handleSearch = (e) => {
     e.preventDefault();
-    const branchObj = homeData.branches.find(b => String(b.BranchId) === String(selectedBranch));
-    const branchName = branchObj ? branchObj.BranchName : 'Chi nhánh đã chọn';
 
-    let nights = 0;
-    if (checkInDate && checkOutDate) {
-      const d1 = new Date(checkInDate);
-      const d2 = new Date(checkOutDate);
-      nights = Math.max(1, Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)));
+    if (!checkInDate) {
+      setSearchNotification('Vui lòng chọn ngày nhận phòng.');
+      return;
     }
 
-    const formatDisplayDate = (d) => (d && typeof d === 'string' && d.includes('-') ? d.split('-').reverse().join('/') : (d || ''));
-    const datesText = (checkInDate && checkOutDate)
-      ? `${nights} đêm (${formatDisplayDate(checkInDate)} đến ${formatDisplayDate(checkOutDate)})`
-      : 'thời gian linh hoạt';
-
-    setSearchNotification(`Đã tìm thấy phòng trống sẵn sàng tại "${branchName}" cho ${datesText}. Vui lòng chọn hạng phòng bên dưới!`);
-
-    const roomSection = document.getElementById('room-collection');
-    if (roomSection) {
-      roomSection.scrollIntoView({ behavior: 'smooth' });
+    // TC01: Ngày quá khứ
+    if (checkInDate < todayStr) {
+      setSearchNotification('Ngày nhận phòng không được ở trong quá khứ');
+      return;
     }
 
-    setTimeout(() => {
-      setSearchNotification('');
-    }, 8000);
+    // TC02: Ngày trả cùng ngày nhận hoặc quá khứ
+    if (!checkOutDate || checkOutDate <= checkInDate) {
+      setSearchNotification('Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm');
+      return;
+    }
+
+    // TC03: Lưu trú quá 30 đêm
+    const d1 = new Date(checkInDate + 'T00:00:00');
+    const d2 = new Date(checkOutDate + 'T00:00:00');
+    const nights = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    if (nights > 30) {
+      setSearchNotification('Hệ thống chỉ hỗ trợ đặt phòng tối đa 30 đêm trực tuyến');
+      return;
+    }
+
+    const guests = parseInt(guestOption.split('-')[0], 10) || 2;
+    navigate(`/rooms?branchId=${selectedBranch}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}&totalGuests=${guests}`);
   };
 
   // Toggle Wishlist
