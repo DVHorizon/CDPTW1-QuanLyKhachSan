@@ -291,23 +291,41 @@ export default function SearchRooms() {
                 <div className="flex items-center gap-space-sm flex-1">
                   <span className="material-symbols-outlined text-secondary text-[24px]">calendar_today</span>
                   <div className="flex flex-col flex-1">
-                    <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Nhận phòng — Trả phòng</span>
+                    <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Nhận phòng — Trả phòng (dd/mm/yyyy)</span>
                     <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        min={todayStr}
-                        value={checkInDate}
-                        onChange={(e) => handleCheckInChange(e.target.value)}
-                        className="bg-transparent text-[13.5px] font-semibold text-on-surface focus:outline-none cursor-pointer w-[122px]"
-                      />
-                      <span className="text-secondary font-bold">—</span>
-                      <input
-                        type="date"
-                        min={addDays(checkInDate, 1)}
-                        value={checkOutDate}
-                        onChange={(e) => handleCheckOutChange(e.target.value)}
-                        className="bg-transparent text-[13.5px] font-semibold text-on-surface focus:outline-none cursor-pointer w-[122px]"
-                      />
+                      <div className="relative group cursor-pointer inline-flex items-center">
+                        <span className="text-[13.5px] font-semibold text-on-surface group-hover:text-secondary transition-colors select-none py-0.5">
+                          {formatDisplayDate(checkInDate) || 'dd/mm/yyyy'}
+                        </span>
+                        <input
+                          type="date"
+                          min={todayStr}
+                          value={checkInDate}
+                          onChange={(e) => handleCheckInChange(e.target.value)}
+                          onClick={(e) => {
+                            try { e.target.showPicker(); } catch (_) {}
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          title="Chọn ngày nhận phòng (dd/mm/yyyy)"
+                        />
+                      </div>
+                      <span className="text-secondary font-bold select-none">—</span>
+                      <div className="relative group cursor-pointer inline-flex items-center">
+                        <span className="text-[13.5px] font-semibold text-on-surface group-hover:text-secondary transition-colors select-none py-0.5">
+                          {formatDisplayDate(checkOutDate) || 'dd/mm/yyyy'}
+                        </span>
+                        <input
+                          type="date"
+                          min={addDays(checkInDate, 1)}
+                          value={checkOutDate}
+                          onChange={(e) => handleCheckOutChange(e.target.value)}
+                          onClick={(e) => {
+                            try { e.target.showPicker(); } catch (_) {}
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          title="Chọn ngày trả phòng (dd/mm/yyyy)"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -678,6 +696,10 @@ export default function SearchRooms() {
                   <span className="mx-space-xs w-1.5 h-1.5 rounded-full bg-secondary"></span>
                   <span className="font-label-sm text-label-sm text-on-tertiary-container font-semibold">
                     {currentBranchName}
+                  </span>
+                  <span className="mx-space-xs text-outline">•</span>
+                  <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
+                    {formatDisplayDate(checkInDate)} — {formatDisplayDate(checkOutDate)} ({numberOfNights} đêm)
                   </span>
                   {keyword && (
                     <span className="ml-2 px-2 py-0.5 bg-secondary/10 text-secondary text-xs rounded-full font-semibold">

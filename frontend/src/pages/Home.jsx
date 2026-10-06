@@ -285,27 +285,41 @@ function Home() {
                   <div className="lg:col-span-3 flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-[#8a8782] uppercase tracking-wider flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-[#b9a277]">calendar_today</span>
-                      Thời Gian Lưu Trú
+                      Thời Gian Lưu Trú (dd/mm/yyyy)
                     </label>
                     <div className="grid grid-cols-2 gap-2 bg-[#fbf8f2] rounded-xl border border-[#dedad0] px-3 py-1.5">
-                      <div className="flex flex-col">
+                      <div className="relative flex flex-col cursor-pointer group">
                         <span className="text-[10px] text-[#8a8782] font-semibold">Nhận phòng</span>
+                        <span className="text-[12px] font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors select-none py-0.5">
+                          {checkInDate ? checkInDate.split('-').reverse().join('/') : 'dd/mm/yyyy'}
+                        </span>
                         <input
                           type="date"
                           value={checkInDate}
                           min={todayStr}
                           onChange={(e) => setCheckInDate(e.target.value)}
-                          className="bg-transparent text-[12px] font-bold text-[#203044] focus:outline-none cursor-pointer"
+                          onClick={(e) => {
+                            try { e.target.showPicker(); } catch (_) {}
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          title="Chọn ngày nhận phòng (dd/mm/yyyy)"
                         />
                       </div>
-                      <div className="flex flex-col pl-2 border-l border-[#dedad0]">
+                      <div className="relative flex flex-col pl-2 border-l border-[#dedad0] cursor-pointer group">
                         <span className="text-[10px] text-[#8a8782] font-semibold">Trả phòng</span>
+                        <span className="text-[12px] font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors select-none py-0.5">
+                          {checkOutDate ? checkOutDate.split('-').reverse().join('/') : 'dd/mm/yyyy'}
+                        </span>
                         <input
                           type="date"
                           value={checkOutDate}
                           min={checkInDate || todayStr}
                           onChange={(e) => setCheckOutDate(e.target.value)}
-                          className="bg-transparent text-[12px] font-bold text-[#203044] focus:outline-none cursor-pointer"
+                          onClick={(e) => {
+                            try { e.target.showPicker(); } catch (_) {}
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          title="Chọn ngày trả phòng (dd/mm/yyyy)"
                         />
                       </div>
                     </div>
