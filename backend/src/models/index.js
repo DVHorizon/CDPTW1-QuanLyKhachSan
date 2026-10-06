@@ -1,55 +1,65 @@
-const { Sequelize } = require('sequelize');
-const sequelize = require('../config/db');
+const sequelize = require('../config/sequelize');
 
-const db = {};
-db.Sequelize = Sequelize;
-db.sequelize = sequelize;
-
-// Menu Models (HEAD)
-db.MenuCategory = require('./MenuCategory')(sequelize);
-db.MenuItem = require('./MenuItem')(sequelize);
-
-// Menu Associations
-db.MenuCategory.hasMany(db.MenuItem, { foreignKey: 'CategoryId' });
-db.MenuItem.belongsTo(db.MenuCategory, { foreignKey: 'CategoryId' });
-
-// Other Models (Master)
+// Import model definitions
 const defineBranch = require('./Branch');
 const defineRoomType = require('./RoomType');
 const defineRoom = require('./Room');
 const defineAmenity = require('./Amenity');
+const defineRole = require('./Role');
+const defineMembershipTier = require('./MembershipTier');
 const defineUser = require('./User');
 const defineBooking = require('./Booking');
 const defineReview = require('./Review');
 
 // Initialize models
-db.Branch = defineBranch(sequelize);
-db.RoomType = defineRoomType(sequelize);
-db.Room = defineRoom(sequelize);
-db.Amenity = defineAmenity(sequelize);
-db.User = defineUser(sequelize);
-db.Booking = defineBooking(sequelize);
-db.Review = defineReview(sequelize);
+const Branch = defineBranch(sequelize);
+const RoomType = defineRoomType(sequelize);
+const Room = defineRoom(sequelize);
+const Amenity = defineAmenity(sequelize);
+const Role = defineRole(sequelize);
+const MembershipTier = defineMembershipTier(sequelize);
+const User = defineUser(sequelize);
+const Booking = defineBooking(sequelize);
+const Review = defineReview(sequelize);
 
 // Setup Relationships / Associations
-// 1. Branch & Room
-db.Branch.hasMany(db.Room, { foreignKey: 'BranchId', as: 'rooms' });
-db.Room.belongsTo(db.Branch, { foreignKey: 'BranchId', as: 'branch' });
+// 1. Role & User
+Role.hasMany(User, { foreignKey: 'RoleId', as: 'users' });
+User.belongsTo(Role, { foreignKey: 'RoleId', as: 'role' });
 
-// 2. RoomType & Room
-db.RoomType.hasMany(db.Room, { foreignKey: 'RoomTypeId', as: 'rooms' });
-db.Room.belongsTo(db.RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
+// 2. MembershipTier & User
+MembershipTier.hasMany(User, { foreignKey: 'TierId', as: 'users' });
+User.belongsTo(MembershipTier, { foreignKey: 'tier', as: 'membershipTier' });
 
-// 3. User & Booking
-db.User.hasMany(db.Booking, { foreignKey: 'UserId', as: 'bookings' });
-db.Booking.belongsTo(db.User, { foreignKey: 'UserId', as: 'user' });
+// 3. Branch & Room
+Branch.hasMany(Room, { foreignKey: 'BranchId', as: 'rooms' });
+Room.belongsTo(Branch, { foreignKey: 'BranchId', as: 'branch' });
 
-// 4. RoomType & Booking
-db.RoomType.hasMany(db.Booking, { foreignKey: 'RoomTypeId', as: 'bookings' });
-db.Booking.belongsTo(db.RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
+// 4. RoomType & Room
+RoomType.hasMany(Room, { foreignKey: 'RoomTypeId', as: 'rooms' });
+Room.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
 
-// 5. User & Review
-db.User.hasMany(db.Review, { foreignKey: 'UserId', as: 'reviews' });
-db.Review.belongsTo(db.User, { foreignKey: 'UserId', as: 'user' });
+// 5. User & Booking
+User.hasMany(Booking, { foreignKey: 'UserId', as: 'bookings' });
+Booking.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 
-module.exports = db;
+// 6. RoomType & Booking
+RoomType.hasMany(Booking, { foreignKey: 'RoomTypeId', as: 'bookings' });
+Booking.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
+
+// 7. User & Review
+User.hasMany(Review, { foreignKey: 'UserId', as: 'reviews' });
+Review.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+
+module.exports = {
+  sequelize,
+  Branch,
+  RoomType,
+  Room,
+  Amenity,
+  Role,
+  MembershipTier,
+  User,
+  Booking,
+  Review
+};

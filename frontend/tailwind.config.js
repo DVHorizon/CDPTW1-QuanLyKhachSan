@@ -96,13 +96,21 @@ export default {
         "admin-primary-container": PALETTE.admin.container,
         "on-admin-primary": PALETTE.neutral.white,
 
-        // --- 4. SYSTEM STATUS ---
+        // --- 4. SYSTEM STATUS & TERTIARY ---
         "error": PALETTE.status.error,
         "error-container": PALETTE.status.errorContainer,
         "on-error": PALETTE.neutral.white,
         "on-error-container": PALETTE.status.onErrorContainer,
+        "tertiary": "#000000",
+        "on-tertiary": "#ffffff",
+        "tertiary-container": "#002114",
+        "on-tertiary-container": "#069669",
+        "tertiary-fixed": "#85f8c4",
+        "tertiary-fixed-dim": "#68dba9",
         "on-tertiary-fixed": "#002114",
-        "on-tertiary-container": "#069669"
+        "on-tertiary-fixed-variant": "#005137",
+        "surface-dim": "#cbdbf5",
+        "surface-variant": "#d3e4fe"
       },
 
       fontFamily: {
