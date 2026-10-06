@@ -630,3 +630,57 @@ exports.getRoomDetail = async (req, res) => {
     });
   }
 };
+
+/**
+ * Suggester Endpoint (Autocomplete tìm kiếm tức thì theo 1-2 ký tự)
+ * GET /api/v1/rooms/suggest?q=...
+ */
+exports.suggestRooms = async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || typeof q !== 'string') {
+      return res.json({
+        success: true,
+        data: {
+          keyword: '',
+          roomSuggestions: [],
+          amenitySuggestions: [],
+          keywordSuggestions: [],
+          totalCount: 0
+        }
+      });
+    }
+
+    // Lấy danh sách hạng phòng đang hoạt động
+    const roomTypes = await RoomType.findAll({
+      where: { Status: 'Active', IsDeleted: false },
+      attributes: ['RoomTypeId', 'TypeName', 'Description', 'BasePrice', 'ImageUrl', 'MaxOccupancy'],
+      limit: 50
+    });
+
+    const roomList = roomTypes.map(rt => {
+      const meta = ROOM_METADATA[rt.RoomTypeId] || {};
+      return {
+        ...rt.toJSON(),
+        Category: meta.category || (rt.MaxOccupancy >= 5 ? 'Villa Riêng Tư' : rt.MaxOccupancy >= 4 ? 'Suite Cao Cấp' : 'Deluxe Hướng Biển'),
+        Badge: meta.badge || 'Grand Horizon',
+        View: meta.view || 'Hướng biển',
+        amenities: meta.amenities || []
+      };
+    });
+
+    const suggestions = searchEngine.suggest(roomList, q);
+
+    return res.json({
+      success: true,
+      data: suggestions
+    });
+  } catch (error) {
+    console.error('Lỗi khi lấy gợi ý tìm kiếm:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi máy chủ khi lấy gợi ý'
+    });
+  }
+};
+

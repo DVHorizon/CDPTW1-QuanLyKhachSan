@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import RoomDetailModal from '../components/modals/RoomDetailModal';
 import QuickBookingModal from '../components/modals/QuickBookingModal';
-import { searchRoomsApi, getBranchesApi } from '../api/roomApi';
+import { searchRoomsApi, getBranchesApi, suggestRoomsApi } from '../api/roomApi';
 
 // Helper format VND
 const formatVND = (num) => {
@@ -80,6 +80,48 @@ export default function SearchRooms() {
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
+
+  // Suggester Autocomplete state (hỗ trợ hiển thị gợi ý từ 1-2 ký tự)
+  const [suggestions, setSuggestions] = useState(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchInputContainerRef = useRef(null);
+
+  // Lắng nghe thay đổi từ khóa để sinh gợi ý Autocomplete tức thì (từ 1-2 ký tự)
+  useEffect(() => {
+    if (!keyword || keyword.trim().length === 0) {
+      setSuggestions(null);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const data = await suggestRoomsApi(keyword);
+        if (data && data.totalCount > 0) {
+          setSuggestions(data);
+          setShowSuggestions(true);
+        } else {
+          setSuggestions(null);
+          setShowSuggestions(false);
+        }
+      } catch (_) {
+        setSuggestions(null);
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [keyword]);
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchInputContainerRef.current && !searchInputContainerRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Tính số đêm lưu trú
   const numberOfNights = useMemo(() => {
@@ -423,37 +465,165 @@ export default function SearchRooms() {
 
             {/* Keyword Input & Search Engine indicator strip */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-space-sm pt-1 border-t border-dashed border-[#dedad0]/60">
-              <div className="w-full sm:w-auto flex-1 flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-lg border border-transparent focus-within:border-secondary/40">
-                <span className="material-symbols-outlined text-[18px] text-secondary">manage_search</span>
-                <input
-                  type="text"
-                  placeholder="Tìm theo từ khóa (Deluxe, Villa, Hồ bơi, Bãi biển, Jacuzzi, Buffet...)"
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') executeSearch();
-                  }}
-                  className="bg-transparent text-xs w-full text-on-surface focus:outline-none placeholder:text-outline"
-                />
-                {keyword && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setKeyword('');
-                      executeSearch({ keyword: '' });
+              <div 
+                ref={searchInputContainerRef}
+                className="relative w-full sm:w-auto flex-1"
+              >
+                <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-lg border border-transparent focus-within:border-secondary/40">
+                  <span className="material-symbols-outlined text-[18px] text-secondary">manage_search</span>
+                  <input
+                    type="text"
+                    placeholder="Tìm theo từ khóa (Deluxe, Villa, Hồ bơi, Bãi biển, Jacuzzi, Buffet...)"
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    onFocus={() => {
+                      if (suggestions && suggestions.totalCount > 0) setShowSuggestions(true);
                     }}
-                    className="text-outline hover:text-on-surface"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">close</span>
-                  </button>
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setShowSuggestions(false);
+                        executeSearch();
+                      } else if (e.key === 'Escape') {
+                        setShowSuggestions(false);
+                      }
+                    }}
+                    className="bg-transparent text-xs w-full text-on-surface focus:outline-none placeholder:text-outline"
+                  />
+                  {keyword && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setKeyword('');
+                        setSuggestions(null);
+                        setShowSuggestions(false);
+                        executeSearch({ keyword: '' });
+                      }}
+                      className="text-outline hover:text-on-surface"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">close</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Autocomplete Suggestions Dropdown (Hiển thị ngay khi gõ từ 1-2 ký tự) */}
+                {showSuggestions && suggestions && suggestions.totalCount > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-xl shadow-2xl border border-[#dedad0] overflow-hidden animate-fade-in max-h-[380px] overflow-y-auto">
+                    <div className="px-3 py-2 border-b border-[#dedad0]/60 bg-[#fbf8f2] flex items-center justify-between text-[11px] font-semibold text-[#8a8782]">
+                      <span className="flex items-center gap-1.5 text-secondary font-bold">
+                        <span className="material-symbols-outlined text-[15px]">auto_awesome</span>
+                        Gợi ý tìm kiếm tức thì ({suggestions.totalCount})
+                      </span>
+                      {suggestions.isFullWidth && (
+                        <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full font-bold border border-amber-200">
+                          Full-width ➔ Half-width
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Room Suggestions */}
+                    {suggestions.roomSuggestions && suggestions.roomSuggestions.length > 0 && (
+                      <div className="p-2">
+                        <div className="text-[10px] uppercase font-bold text-outline px-2 py-1 tracking-wider">
+                          Hạng Phòng &amp; Biệt Thự Phù Hợp
+                        </div>
+                        {suggestions.roomSuggestions.map((item, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              setKeyword(item.text);
+                              setShowSuggestions(false);
+                              executeSearch({ keyword: item.text });
+                            }}
+                            className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="material-symbols-outlined text-secondary text-[20px] group-hover:scale-110 transition-transform">
+                                bedroom_parent
+                              </span>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-xs font-bold text-on-surface group-hover:text-secondary truncate">
+                                  {item.text}
+                                </span>
+                                <span className="text-[11px] text-on-surface-variant truncate">
+                                  {item.subText}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary/10 text-secondary font-semibold shrink-0">
+                              {item.badge}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Amenity Suggestions */}
+                    {suggestions.amenitySuggestions && suggestions.amenitySuggestions.length > 0 && (
+                      <div className="p-2 border-t border-[#dedad0]/40">
+                        <div className="text-[10px] uppercase font-bold text-outline px-2 py-1 tracking-wider">
+                          Tiện Ích &amp; Đặc Quyền Đề Xuất
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 px-2 py-1">
+                          {suggestions.amenitySuggestions.map((item, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setKeyword(item.text);
+                                setShowSuggestions(false);
+                                executeSearch({ keyword: item.text });
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-surface-container-low hover:bg-secondary hover:text-white transition-colors text-on-surface border border-[#dedad0]/60 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">{item.icon || 'verified'}</span>
+                              <span>{item.text}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Popular Search Terms */}
+                    {suggestions.keywordSuggestions && suggestions.keywordSuggestions.length > 0 && (
+                      <div className="p-2 border-t border-[#dedad0]/40">
+                        <div className="text-[10px] uppercase font-bold text-outline px-2 py-1 tracking-wider">
+                          Cụm Từ Tìm Kiếm Phổ Biến
+                        </div>
+                        {suggestions.keywordSuggestions.map((item, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              setKeyword(item.text);
+                              setShowSuggestions(false);
+                              executeSearch({ keyword: item.text });
+                            }}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors text-xs text-on-surface group"
+                          >
+                            <span className="material-symbols-outlined text-[16px] text-outline group-hover:text-secondary">
+                              trending_up
+                            </span>
+                            <span className="group-hover:text-secondary font-medium">{item.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
               {/* Search Engine Badge */}
               {searchEngineMeta && (
-                <div className="flex items-center gap-1.5 text-[11px] text-on-tertiary-container font-semibold bg-[#e8f7f0] px-3 py-1 rounded-full shrink-0">
-                  <span className="material-symbols-outlined text-[15px]">neurology</span>
-                  <span>Search Engine: {searchEngineMeta.engine} ({searchEngineMeta.executionTimeMs}ms)</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-[11px] text-on-tertiary-container font-semibold bg-[#e8f7f0] px-3 py-1 rounded-full shrink-0 border border-[#b7eb8f]/40">
+                    <span className="material-symbols-outlined text-[15px]">neurology</span>
+                    <span>Search Engine: {searchEngineMeta.engine} ({searchEngineMeta.executionTimeMs}ms)</span>
+                  </div>
+                  {searchEngineMeta.isFullWidthInput && (
+                    <div className="flex items-center gap-1 text-[11px] text-[#d48806] font-semibold bg-[#fffbe6] border border-[#ffe58f] px-2.5 py-1 rounded-full shrink-0 animate-fade-in">
+                      <span className="material-symbols-outlined text-[14px]">translate</span>
+                      <span>Full-width (全角): "{searchEngineMeta.query}" ➔ Half-width: "{searchEngineMeta.normalizedQuery}"</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

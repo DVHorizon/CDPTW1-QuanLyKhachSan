@@ -92,3 +92,21 @@ export const getRoomDetailApi = async (id) => {
     return null;
   }
 };
+
+/**
+ * Gọi API Gợi ý Autocomplete thông minh (Elasticsearch & Solr Suggester)
+ * GET /api/v1/rooms/suggest?q=...
+ */
+export const suggestRoomsApi = async (q) => {
+  if (!q || !q.trim()) return null;
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/rooms/suggest?q=${encodeURIComponent(q.trim())}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data;
+  } catch (err) {
+    console.error('Lỗi khi fetch gợi ý:', err);
+    return null;
+  }
+};
+
