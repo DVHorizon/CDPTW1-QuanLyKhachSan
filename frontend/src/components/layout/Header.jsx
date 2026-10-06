@@ -1,15 +1,117 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+
+/**
+ * Từ điển ngôn ngữ cho thanh Header
+ */
+const I18N = {
+  vi: {
+    home: 'Trang Chủ',
+    rooms: 'Bộ Sưu Tập Phòng',
+    offers: 'Gói Ưu Đãi',
+    amenities: 'Dịch Vụ & Tiện Ích',
+    dining: 'Ẩm Thực',
+    elite: 'Hội Viên Elite',
+    faq: 'FAQ',
+    bookNow: 'Đặt Phòng Ngay',
+    memberTitle: 'Hội viên Elite',
+    hotline: 'Hotline: 1900 6868',
+    wishlistTitle: 'Danh sách phòng yêu thích'
+  },
+  en: {
+    home: 'Home',
+    rooms: 'Rooms & Suites',
+    offers: 'Special Offers',
+    amenities: 'Amenities',
+    dining: 'Dining',
+    elite: 'Elite Club',
+    faq: 'FAQ',
+    bookNow: 'Book Now',
+    memberTitle: 'Elite Member',
+    hotline: 'Hotline: 1900 6868',
+    wishlistTitle: 'Saved Rooms'
+  }
+};
+
+// Biểu tượng cờ Việt Nam (Vector SVG chuẩn, hiển thị sắc nét trên mọi hệ điều hành)
+const FlagVN = ({ className = "w-4 h-2.5" }) => (
+  <svg className={`${className} rounded-[2px] shadow-xs shrink-0 object-cover`} viewBox="0 0 30 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="30" height="20" fill="#DA251D" rx="2" />
+    <polygon points="15,4 17.35,11.24 11.2,6.76 18.8,6.76 12.65,11.24" fill="#FFEB3B" />
+  </svg>
+);
+
+// Biểu tượng cờ Anh / Vương Quốc Anh (Vector SVG chuẩn)
+const FlagEN = ({ className = "w-4 h-2.5" }) => (
+  <svg className={`${className} rounded-[2px] shadow-xs shrink-0 object-cover`} viewBox="0 0 60 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <clipPath id="uk-flag-clip">
+      <rect width="60" height="30" rx="2" />
+    </clipPath>
+    <g clipPath="url(#uk-flag-clip)">
+      <rect width="60" height="30" fill="#012169" />
+      <path d="M0 0L60 30M60 0L0 30" stroke="#FFFFFF" strokeWidth="6" />
+      <path d="M0 0L60 30M60 0L0 30" stroke="#C8102E" strokeWidth="4" />
+      <path d="M30 0V30M0 15H60" stroke="#FFFFFF" strokeWidth="10" />
+      <path d="M30 0V30M0 15H60" stroke="#C8102E" strokeWidth="6" />
+    </g>
+  </svg>
+);
 
 /**
  * Component Header / Navbar dùng chung cho toàn bộ dự án Grand Horizon
- * Tích hợp hiệu ứng cuộn trang thông minh (tự ẩn khi cuộn xuống, hiện khi cuộn lên),
+ * Tích hợp Language Switcher (VN / ENG), hiệu ứng cuộn trang thông minh,
  * Wishlist counter, User profile và Mobile Drawer.
  */
-const Header = ({ wishlistCount = 0, onWishlistClick }) => {
+const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguageChange }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [isTop, setIsTop] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+
+  // Ngôn ngữ hiện tại (mặc định 'vi')
+  const [currentLang, setCurrentLang] = useState(() => {
+    return propLang || localStorage.getItem('app_lang') || 'vi';
+  });
+
+  useEffect(() => {
+    if (propLang && propLang !== currentLang) {
+      setCurrentLang(propLang);
+    }
+  }, [propLang]);
+
+  const { user, isAuthenticated, logout } = useAuth();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  const langDropdownRef = useRef(null);
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(event.target)) {
+        setIsLangOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectLang = (lang) => {
+    setCurrentLang(lang);
+    localStorage.setItem('app_lang', lang);
+    setIsLangOpen(false);
+    if (onLanguageChange) {
+      onLanguageChange(lang);
+    }
+    window.dispatchEvent(new CustomEvent('appLanguageChange', { detail: lang }));
+  };
+
+  const t = I18N[currentLang] || I18N.vi;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -32,56 +134,56 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${isVisible ? 'translate-y-0' : '-translate-y-full'} ${isTop ? 'bg-[#fafaf8]/95 backdrop-blur-md shadow-none border-b border-[#dedad0]/60' : 'bg-[#fafaf8]/98 backdrop-blur-xl shadow-[0_2px_15px_rgba(32,48,68,0.08)] border-b border-[#dedad0]'}`}>
-      <div className="h-20 w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between max-w-7xl mx-auto gap-3 sm:gap-6">
+      <div className="h-20 w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between max-w-[1440px] mx-auto gap-2 lg:gap-4">
 
         {/* Brand Logo & Tagline */}
         <a href="#trang-chu" className="flex items-center gap-2.5 sm:gap-3 shrink-0 group">
-          <div className="w-10 h-10 rounded-xl bg-[#203044] flex items-center justify-center text-[#b9a277] shadow-[0_4px_12px_rgba(32,48,68,0.25)] group-hover:scale-105 group-hover:bg-[#b9a277] group-hover:text-white transition-all duration-300 shrink-0">
-            <span className="material-symbols-outlined text-[24px]">hotel</span>
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#203044] flex items-center justify-center text-[#b9a277] shadow-[0_4px_12px_rgba(32,48,68,0.25)] group-hover:scale-105 group-hover:bg-[#b9a277] group-hover:text-white transition-all duration-300 shrink-0">
+            <span className="material-symbols-outlined text-[22px] sm:text-[24px]">hotel</span>
           </div>
           <div className="flex flex-col shrink-0">
-            <span className="font-serif font-bold text-[17px] sm:text-[19px] text-[#203044] tracking-tight leading-tight group-hover:text-[#b9a277] transition-colors whitespace-nowrap">
+            <span className="font-serif font-bold text-[17px] sm:text-[18px] text-[#203044] tracking-tight leading-tight group-hover:text-[#b9a277] transition-colors whitespace-nowrap">
               Grand Horizon
             </span>
-            <span className="text-[10px] sm:text-[10.5px] text-[#b9a277] uppercase tracking-widest font-bold whitespace-nowrap">
+            <span className="text-[9.5px] sm:text-[10px] text-[#b9a277] uppercase tracking-widest font-bold whitespace-nowrap">
               Hotels &amp; Resorts
             </span>
           </div>
         </a>
 
         {/* Navigation Menu for Desktop */}
-        <nav className="hidden xl:flex items-center gap-5 2xl:gap-7 shrink-0 mx-auto">
-          <a className="text-[13.5px] font-semibold text-[#203044] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#trang-chu">
-            Trang Chủ
+        <nav className="hidden xl:flex items-center gap-3.5 2xl:gap-5 shrink-0">
+          <a className="text-[13px] font-semibold text-[#203044] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#trang-chu">
+            {t.home}
           </a>
-          <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#room-collection">
-            Bộ Sưu Tập Phòng
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#room-collection">
+            {t.rooms}
           </a>
-          <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#uu-dai">
-            Gói Ưu Đãi
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#uu-dai">
+            {t.offers}
           </a>
-          <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#trai-nghiem">
-            Dịch Vụ &amp; Tiện Ích
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#trai-nghiem">
+            {t.amenities}
           </a>
-          <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#am-thuc">
-            Ẩm Thực
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#am-thuc">
+            {t.dining}
           </a>
-          <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#hoi-vien">
-            Hội Viên Elite
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#hoi-vien">
+            {t.elite}
           </a>
-          <a className="text-[13.5px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#faq">
-            FAQ
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#faq">
+            {t.faq}
           </a>
         </nav>
 
         {/* Right CTA & Account Actions */}
-        <div className="flex items-center gap-2 sm:gap-3.5 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           {/* Hotline */}
           <a
-            className="hidden 2xl:flex items-center gap-1.5 text-[#373435] hover:text-[#b9a277] transition-colors px-2 py-1 text-[13px] font-semibold whitespace-nowrap shrink-0"
+            className="hidden 2xl:flex items-center gap-1.5 text-[#373435] hover:text-[#b9a277] transition-colors px-2 py-1 text-[12.5px] font-semibold whitespace-nowrap shrink-0"
             href="tel:19006868"
           >
-            <span className="material-symbols-outlined text-[18px] text-[#b9a277]">support_agent</span>
+            <span className="material-symbols-outlined text-[17px] text-[#b9a277]">support_agent</span>
             <span>1900 6868</span>
           </a>
 
@@ -89,10 +191,10 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
           <a
             href="#room-collection"
             onClick={onWishlistClick}
-            className="relative w-9 h-9 rounded-xl bg-white border border-[#dedad0] hover:border-[#b9a277] text-[#203044] hover:text-rose-500 flex items-center justify-center transition-all shadow-xs"
-            title="Danh sách phòng yêu thích"
+            className="relative w-8.5 h-8.5 rounded-lg bg-white border border-[#dedad0] hover:border-[#b9a277] text-[#203044] hover:text-rose-500 flex items-center justify-center transition-all shadow-xs shrink-0"
+            title={t.wishlistTitle}
           >
-            <span className={`material-symbols-outlined text-[19px] ${wishlistCount > 0 ? 'text-rose-500 fill-current' : ''}`}>
+            <span className={`material-symbols-outlined text-[18px] ${wishlistCount > 0 ? 'text-rose-500 fill-current' : ''}`}>
               favorite
             </span>
             {wishlistCount > 0 && (
@@ -102,33 +204,141 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
             )}
           </a>
 
+          {/* Language Selector (VN / ENG) */}
+          <div className="relative shrink-0" ref={langDropdownRef}>
+            <button
+              onClick={() => setIsLangOpen(!isLangOpen)}
+              className="flex items-center gap-1.5 h-8.5 px-2 rounded-lg bg-white border border-[#dedad0] hover:border-[#b9a277] text-[#203044] text-[12px] font-bold transition-all shadow-xs cursor-pointer select-none"
+              title="Chọn ngôn ngữ / Select Language"
+              type="button"
+            >
+              {currentLang === 'vi' ? <FlagVN /> : <FlagEN />}
+              <span>{currentLang === 'vi' ? 'VN' : 'ENG'}</span>
+              <span className={`material-symbols-outlined text-[15px] text-[#8a8782] transition-transform duration-200 ${isLangOpen ? 'rotate-180 text-[#b9a277]' : ''}`}>
+                expand_more
+              </span>
+            </button>
+
+            {isLangOpen && (
+              <div className="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)] border border-[#dedad0] py-1.5 z-50 animate-fade-in">
+                <button
+                  type="button"
+                  onClick={() => handleSelectLang('vi')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${currentLang === 'vi' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
+                    }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <FlagVN className="w-4 h-2.5" />
+                    <span>Tiếng Việt</span>
+                  </span>
+                  {currentLang === 'vi' && (
+                    <span className="material-symbols-outlined text-[15px] text-[#b9a277]">check</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectLang('en')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${currentLang === 'en' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
+                    }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <FlagEN className="w-4 h-2.5" />
+                    <span>English</span>
+                  </span>
+                  {currentLang === 'en' && (
+                    <span className="material-symbols-outlined text-[15px] text-[#b9a277]">check</span>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Đặt Phòng Button */}
           <a
-            className="hidden sm:inline-flex items-center justify-center px-4 py-2 bg-[#b9a277] text-white rounded-xl text-[13px] font-bold hover:bg-[#a68e64] transition-all shadow-[0_4px_14px_rgba(185,162,119,0.35)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
+            className="hidden sm:inline-flex items-center justify-center h-8.5 px-3.5 bg-[#b9a277] text-white rounded-lg text-[12.5px] font-bold hover:bg-[#a68e64] transition-all shadow-[0_4px_12px_rgba(185,162,119,0.3)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
             href="#room-collection"
           >
-            Đặt Phòng Ngay
+            {t.bookNow}
           </a>
 
-          {/* User Profile Badge */}
-          <div className="flex items-center gap-2 pl-2 border-l border-[#dedad0] shrink-0">
-            <div className="hidden lg:flex flex-col text-right shrink-0">
-              <span className="text-[12px] text-[#203044] font-bold leading-tight whitespace-nowrap">Nguyễn Văn An</span>
-              <span className="text-[10px] text-[#b9a277] font-bold uppercase tracking-wider whitespace-nowrap">Hội viên Elite</span>
+          {/* User Profile / Login Button */}
+          {isAuthenticated && user ? (
+            <div className="relative pl-2 border-l border-[#dedad0] shrink-0" ref={userMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center gap-2 cursor-pointer select-none group"
+                title={`${user.fullName} (${user.tierName || 'Elite'})`}
+              >
+                <div className="hidden 2xl:flex flex-col text-right shrink-0">
+                  <span className="text-[11.5px] text-[#203044] font-bold leading-tight whitespace-nowrap group-hover:text-[#b9a277] transition-colors">
+                    {user.fullName}
+                  </span>
+                  <span className="text-[9.5px] text-[#b9a277] font-bold uppercase tracking-wider whitespace-nowrap">
+                    Hạng {user.tierName || t.memberTitle}
+                  </span>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-[#203044] text-[#fedeb2] flex items-center justify-center font-bold text-[11px] shadow-sm shrink-0 border border-[#b9a277]/40 group-hover:border-[#b9a277] transition-all">
+                  {user.fullName ? user.fullName.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() : 'GH'}
+                </div>
+              </button>
+
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-60 bg-white rounded-xl shadow-[0_15px_35px_-5px_rgba(0,0,0,0.2)] border border-[#dedad0] py-2 z-50 animate-fade-in text-left">
+                  <div className="px-3.5 py-2.5 border-b border-[#dedad0]/60">
+                    <p className="text-xs font-bold text-[#203044] truncate">{user.fullName}</p>
+                    <p className="text-[11px] text-[#8a8782] truncate">{user.email}</p>
+                    <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fedeb2]/30 text-[#725b38] text-[10px] font-bold uppercase tracking-wider border border-[#b9a277]/30">
+                      <span className="material-symbols-outlined text-[12px]">stars</span>
+                      <span>Hạng {user.tierName || 'Standard'}</span>
+                    </div>
+                  </div>
+
+                  {(user.roleId === 1 || user.roleName === 'Admin') && (
+                    <Link
+                      to="/admin"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-base text-[#b9a277]">dashboard</span>
+                      <span>Quản Trị Khách Sạn</span>
+                    </Link>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors text-left cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-base">logout</span>
+                    <span>Đăng Xuất</span>
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="w-8 h-8 rounded-full bg-[#203044] text-[#b9a277] flex items-center justify-center font-bold text-[12px] shadow-sm shrink-0 border border-[#b9a277]/40">
-              VA
+          ) : (
+            <div className="flex items-center gap-1.5 pl-2 border-l border-[#dedad0] shrink-0">
+              <Link
+                to="/auth"
+                className="flex items-center gap-1.5 h-8.5 px-3 rounded-lg bg-[#203044] hover:bg-[#131b2e] text-[#fedeb2] text-[12px] font-bold transition-all shadow-xs shrink-0 border border-[#b9a277]/40 hover:border-[#b9a277]"
+              >
+                <span className="material-symbols-outlined text-[16px]">account_circle</span>
+                <span>Đăng Nhập</span>
+              </Link>
             </div>
-          </div>
+          )}
 
           {/* Hamburger button for Tablet & Mobile (< 1280px) */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="xl:hidden w-9 h-9 rounded-xl bg-white border border-[#dedad0] flex items-center justify-center text-[#203044] hover:text-[#b9a277] transition-colors shrink-0 shadow-xs"
+            className="xl:hidden w-8.5 h-8.5 rounded-lg bg-white border border-[#dedad0] flex items-center justify-center text-[#203044] hover:text-[#b9a277] transition-colors shrink-0 shadow-xs"
             type="button"
             aria-label="Toggle Navigation Menu"
           >
-            <span className="material-symbols-outlined text-[22px]">
+            <span className="material-symbols-outlined text-[20px]">
               {isMobileMenuOpen ? 'close' : 'menu'}
             </span>
           </button>
@@ -141,40 +351,107 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
           <div className="flex flex-col gap-1 pb-4 border-b border-[#dedad0]">
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-semibold text-[#203044] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#trang-chu">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">home</span>
-              <span>Trang Chủ</span>
+              <span>{t.home}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#room-collection">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">meeting_room</span>
-              <span>Bộ Sưu Tập Phòng</span>
+              <span>{t.rooms}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#uu-dai">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">loyalty</span>
-              <span>Gói Ưu Đãi &amp; Khuyến Mãi</span>
+              <span>{t.offers}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#trai-nghiem">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">spa</span>
-              <span>Dịch Vụ &amp; Tiện Ích</span>
+              <span>{t.amenities}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#am-thuc">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">restaurant</span>
-              <span>Ẩm Thực Fine Dining</span>
+              <span>{t.dining}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#hoi-vien">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">stars</span>
-              <span>Ưu Đãi Hội Viên Elite</span>
+              <span>{t.elite}</span>
             </a>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#faq">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">help_outline</span>
-              <span>Câu Hỏi Thường Gặp (FAQ)</span>
+              <span>{t.faq}</span>
             </a>
           </div>
 
           <div className="flex items-center justify-between pt-2">
             <a className="text-[13px] text-[#203044] font-semibold flex items-center gap-1.5" href="tel:19006868">
               <span className="material-symbols-outlined text-[#b9a277] text-[18px]">support_agent</span>
-              <span>Hotline 24/7: 1900 6868</span>
+              <span>1900 6868</span>
             </a>
-            <span className="text-[12px] text-[#8a8782] font-medium">🇻🇳 Tiếng Việt</span>
+
+            {/* Mobile Language Switcher */}
+            <div className="flex items-center p-0.5 rounded-lg bg-[#f5f4ef] border border-[#dedad0]">
+              <button
+                type="button"
+                onClick={() => handleSelectLang('vi')}
+                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${currentLang === 'vi' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
+                  }`}
+              >
+                <FlagVN className="w-3.5 h-2.5" />
+                <span>VN</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectLang('en')}
+                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${currentLang === 'en' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
+                  }`}
+              >
+                <FlagEN className="w-3.5 h-2.5" />
+                <span>ENG</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Auth Button */}
+          <div className="pt-2 border-t border-[#dedad0]">
+            {isAuthenticated && user ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f5f4ef]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-[#203044] text-[#fedeb2] flex items-center justify-center font-bold text-xs">
+                      {user.fullName ? user.fullName.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() : 'GH'}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-[#203044]">{user.fullName}</p>
+                      <p className="text-[10px] text-[#725b38] font-bold">Hạng {user.tierName || 'Standard'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="text-xs text-red-600 font-semibold px-2 py-1 rounded hover:bg-red-50"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+                {(user.roleId === 1 || user.roleName === 'Admin') && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full py-2 px-3 rounded-lg bg-[#203044] text-[#fedeb2] text-xs font-bold text-center"
+                  >
+                    Vào Trang Quản Trị Khách Sạn
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <Link
+                to="/auth"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-full h-10 bg-[#203044] text-[#fedeb2] rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">account_circle</span>
+                <span>Đăng Nhập / Đăng Ký Hội Viên</span>
+              </Link>
+            )}
           </div>
 
           <div className="pt-2 sm:hidden">
@@ -184,7 +461,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick }) => {
               href="#room-collection"
             >
               <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-              <span>Đặt Phòng Ngay</span>
+              <span>{t.bookNow}</span>
             </a>
           </div>
         </div>
