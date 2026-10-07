@@ -23,6 +23,10 @@ app.use('/api', require('./routes/homeRoutes'));
 app.use('/api/v1/auth', require('./routes/authRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 
+// Route tìm kiếm phòng & chi nhánh (FEAT-GUEST-02 / A2)
+app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
+app.use('/api/rooms', require('./routes/roomSearchRoutes'));
+
 // Route quản lý loại phòng
 app.use('/api/loai-phong', require('./routes/roomTypes'));
 

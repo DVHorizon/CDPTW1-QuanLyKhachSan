@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import RoomDetailModal from '../../components/modals/RoomDetailModal';
 import QuickBookingModal from '../../components/modals/QuickBookingModal';
@@ -50,6 +51,7 @@ const cleanAmenityDesc = (desc, fallbackDesc) => {
 };
 
 function Home() {
+  const navigate = useNavigate();
   const [homeData, setHomeData] = useState({
     branches: mockBranches,
     featuredRoomTypes: mockRoomTypes,
@@ -137,34 +139,38 @@ function Home() {
     loadData();
   }, []);
 
-  // Xử lý Tìm Phòng
+  // Xử lý Tìm Phòng (FEAT-GUEST-02)
   const handleSearch = (e) => {
     e.preventDefault();
-    const branchObj = homeData.branches.find(b => String(b.BranchId) === String(selectedBranch));
-    const branchName = branchObj ? branchObj.BranchName : 'Chi nhánh đã chọn';
 
-    let nights = 0;
-    if (checkInDate && checkOutDate) {
-      const d1 = new Date(checkInDate);
-      const d2 = new Date(checkOutDate);
-      nights = Math.max(1, Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)));
+    if (!checkInDate) {
+      setSearchNotification('Vui lòng chọn ngày nhận phòng.');
+      return;
     }
 
-    const formatDisplayDate = (d) => (d && typeof d === 'string' && d.includes('-') ? d.split('-').reverse().join('/') : (d || ''));
-    const datesText = (checkInDate && checkOutDate)
-      ? `${nights} đêm (${formatDisplayDate(checkInDate)} đến ${formatDisplayDate(checkOutDate)})`
-      : 'thời gian linh hoạt';
-
-    setSearchNotification(`Đã tìm thấy phòng trống sẵn sàng tại "${branchName}" cho ${datesText}. Vui lòng chọn hạng phòng bên dưới!`);
-
-    const roomSection = document.getElementById('room-collection');
-    if (roomSection) {
-      roomSection.scrollIntoView({ behavior: 'smooth' });
+    // TC01: Ngày quá khứ
+    if (checkInDate < todayStr) {
+      setSearchNotification('Ngày nhận phòng không được ở trong quá khứ');
+      return;
     }
 
-    setTimeout(() => {
-      setSearchNotification('');
-    }, 8000);
+    // TC02: Ngày trả cùng ngày nhận hoặc quá khứ
+    if (!checkOutDate || checkOutDate <= checkInDate) {
+      setSearchNotification('Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm');
+      return;
+    }
+
+    // TC03: Lưu trú quá 30 đêm
+    const d1 = new Date(checkInDate + 'T00:00:00');
+    const d2 = new Date(checkOutDate + 'T00:00:00');
+    const nights = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    if (nights > 30) {
+      setSearchNotification('Hệ thống chỉ hỗ trợ đặt phòng tối đa 30 đêm trực tuyến');
+      return;
+    }
+
+    const guests = parseInt(guestOption.split('-')[0], 10) || 2;
+    navigate(`/rooms?branchId=${selectedBranch}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}&totalGuests=${guests}`);
   };
 
   // Toggle Wishlist
@@ -279,27 +285,41 @@ function Home() {
                   <div className="lg:col-span-3 flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-[#8a8782] uppercase tracking-wider flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-[#b9a277]">calendar_today</span>
-                      Thời Gian Lưu Trú
+                      Thời Gian Lưu Trú (dd/mm/yyyy)
                     </label>
                     <div className="grid grid-cols-2 gap-2 bg-[#fbf8f2] rounded-xl border border-[#dedad0] px-3 py-1.5">
-                      <div className="flex flex-col">
+                      <div className="relative flex flex-col cursor-pointer group">
                         <span className="text-[10px] text-[#8a8782] font-semibold">Nhận phòng</span>
+                        <span className="text-[12px] font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors select-none py-0.5">
+                          {checkInDate ? checkInDate.split('-').reverse().join('/') : 'dd/mm/yyyy'}
+                        </span>
                         <input
                           type="date"
                           value={checkInDate}
                           min={todayStr}
                           onChange={(e) => setCheckInDate(e.target.value)}
-                          className="bg-transparent text-[12px] font-bold text-[#203044] focus:outline-none cursor-pointer"
+                          onClick={(e) => {
+                            try { e.target.showPicker(); } catch (_) {}
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          title="Chọn ngày nhận phòng (dd/mm/yyyy)"
                         />
                       </div>
-                      <div className="flex flex-col pl-2 border-l border-[#dedad0]">
+                      <div className="relative flex flex-col pl-2 border-l border-[#dedad0] cursor-pointer group">
                         <span className="text-[10px] text-[#8a8782] font-semibold">Trả phòng</span>
+                        <span className="text-[12px] font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors select-none py-0.5">
+                          {checkOutDate ? checkOutDate.split('-').reverse().join('/') : 'dd/mm/yyyy'}
+                        </span>
                         <input
                           type="date"
                           value={checkOutDate}
                           min={checkInDate || todayStr}
                           onChange={(e) => setCheckOutDate(e.target.value)}
-                          className="bg-transparent text-[12px] font-bold text-[#203044] focus:outline-none cursor-pointer"
+                          onClick={(e) => {
+                            try { e.target.showPicker(); } catch (_) {}
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          title="Chọn ngày trả phòng (dd/mm/yyyy)"
                         />
                       </div>
                     </div>
