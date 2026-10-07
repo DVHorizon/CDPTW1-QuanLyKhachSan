@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import MainLayout from '../layouts/MainLayout';
-import RoomDetailModal from '../components/modals/RoomDetailModal';
-import QuickBookingModal from '../components/modals/QuickBookingModal';
-import { fetchHomeData } from '../api/hotelApi';
+import MainLayout from '../../layouts/MainLayout';
+import RoomDetailModal from '../../components/modals/RoomDetailModal';
+import QuickBookingModal from '../../components/modals/QuickBookingModal';
+import { fetchHomeData } from '../../api/hotelApi';
 import {
   mockBranches,
   mockRoomTypes,
@@ -12,7 +12,7 @@ import {
   mockFaqs,
   mockStats,
   mockExperiences
-} from '../data/mockHomeData';
+} from '../../data/mockHomeData';
 
 // Helper làm sạch tên tiện ích và gán Material Symbol chuẩn (tránh URL dài làm tràn vỡ layout)
 const mapAmenityIcon = (name, rawIcon) => {

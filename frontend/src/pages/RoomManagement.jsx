@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import AdminLayout from '../components/layout/AdminLayout';
+import AdminLayout from '../components/admin/layout/AdminLayout';
 
 // ─── Hằng số & dữ liệu mẫu ──────────────────────────────────────────────────
 const STORAGE_KEY = 'qlks_rooms';
