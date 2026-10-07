@@ -16,7 +16,8 @@ function App() {
           <Route path="/auth" element={<Auth />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/register" element={<Auth />} />
-          <Route path="/admin" element={<MenuManagement />} />
+          <Route path="/admin" element={<Navigate to="/admin/menu" replace />} />
+          <Route path="/admin/menu" element={<MenuManagement />} />
           <Route path="/admin/room-types" element={<RoomTypeManagement />} />
           <Route path="/admin/rooms" element={<RoomManagement />} />
           {/* Redirect everything else to home for now */}

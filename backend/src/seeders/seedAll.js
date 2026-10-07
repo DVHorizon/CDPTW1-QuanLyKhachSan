@@ -37,6 +37,12 @@ async function seed() {
 
     for (let i = 1; i <= count; i++) {
       const nameIdx = i % names.length;
+      
+      const servingTimes = ['Ăn Sáng', 'Cả Ngày', 'Tối'];
+      const stations = ['Trạm 1', 'Trạm 2', 'Trạm 3', 'Trạm 4'];
+      const ingredientsList = ['Thịt bò, Muối', 'Cá, Rau, Tiêu', 'Đường, Sữa, Trứng', 'Gạo, Hải sản'];
+      const allergensList = ['Đậu phộng', 'Hải sản', 'Sữa', 'Không có'];
+      
       menuItemsChunk.push({
         CategoryId: categories[i % categories.length],
         ItemName: `${names[nameIdx]} Thượng Hạng ${i}`,
@@ -44,6 +50,11 @@ async function seed() {
         Description: `Món ăn đặc biệt chuẩn 5 sao (Mã hệ thống: ${i})`,
         ImageUrl: `https://loremflickr.com/320/240/food,dish?lock=${i}`,
         Status: statuses[Math.floor(Math.random() * statuses.length)],
+        SKU: `SKU-100${i}`,
+        Ingredients: ingredientsList[Math.floor(Math.random() * ingredientsList.length)],
+        Allergens: allergensList[Math.floor(Math.random() * allergensList.length)],
+        ServingTime: servingTimes[Math.floor(Math.random() * servingTimes.length)],
+        KitchenStation: stations[Math.floor(Math.random() * stations.length)]
       });
 
       // Insert chunk
