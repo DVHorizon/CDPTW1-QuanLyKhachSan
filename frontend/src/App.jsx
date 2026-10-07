@@ -7,6 +7,7 @@ import Auth from './pages/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
+import LoyaltyManagement from './pages/LoyaltyManagement';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="/admin/menu" element={<MenuManagement />} />
           <Route path="/admin/room-types" element={<RoomTypeManagement />} />
           <Route path="/admin/rooms" element={<RoomManagement />} />
+          <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
           {/* Redirect everything else to home for now */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
