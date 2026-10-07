@@ -10,6 +10,8 @@ const defineMembershipTier = require('./MembershipTier');
 const defineUser = require('./User');
 const defineBooking = require('./Booking');
 const defineReview = require('./Review');
+const defineMenuCategory = require('./MenuCategory');
+const defineMenuItem = require('./MenuItem');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -21,6 +23,8 @@ const MembershipTier = defineMembershipTier(sequelize);
 const User = defineUser(sequelize);
 const Booking = defineBooking(sequelize);
 const Review = defineReview(sequelize);
+const MenuCategory = defineMenuCategory(sequelize);
+const MenuItem = defineMenuItem(sequelize);
 
 // Setup Relationships / Associations
 // 1. Role & User
@@ -51,6 +55,10 @@ Booking.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
 User.hasMany(Review, { foreignKey: 'UserId', as: 'reviews' });
 Review.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 
+// 8. MenuCategory & MenuItem
+MenuCategory.hasMany(MenuItem, { foreignKey: 'CategoryId' });
+MenuItem.belongsTo(MenuCategory, { foreignKey: 'CategoryId' });
+
 module.exports = {
   sequelize,
   Branch,
@@ -61,5 +69,7 @@ module.exports = {
   MembershipTier,
   User,
   Booking,
-  Review
+  Review,
+  MenuCategory,
+  MenuItem
 };

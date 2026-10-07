@@ -46,3 +46,7 @@ Thumbs.db
 .npm
 .eslintcache
 .vite/
+
+# 9. Cơ sở dữ liệu cục bộ
+*.sqlite
+database.sqlite

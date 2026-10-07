@@ -224,9 +224,8 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                 <button
                   type="button"
                   onClick={() => handleSelectLang('vi')}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${
-                    currentLang === 'vi' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
-                  }`}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${currentLang === 'vi' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
+                    }`}
                 >
                   <span className="flex items-center gap-2">
                     <FlagVN className="w-4 h-2.5" />
@@ -239,9 +238,8 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                 <button
                   type="button"
                   onClick={() => handleSelectLang('en')}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${
-                    currentLang === 'en' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
-                  }`}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${currentLang === 'en' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
+                    }`}
                 >
                   <span className="flex items-center gap-2">
                     <FlagEN className="w-4 h-2.5" />
@@ -392,9 +390,8 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
               <button
                 type="button"
                 onClick={() => handleSelectLang('vi')}
-                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  currentLang === 'vi' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
-                }`}
+                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${currentLang === 'vi' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
+                  }`}
               >
                 <FlagVN className="w-3.5 h-2.5" />
                 <span>VN</span>
@@ -402,9 +399,8 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
               <button
                 type="button"
                 onClick={() => handleSelectLang('en')}
-                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  currentLang === 'en' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
-                }`}
+                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${currentLang === 'en' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
+                  }`}
               >
                 <FlagEN className="w-3.5 h-2.5" />
                 <span>ENG</span>
