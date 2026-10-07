@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
-import AdminLayout from '../components/layout/AdminLayout';
+import AdminLayout from '../components/admin/layout/AdminLayout';
 import {
   performSemanticSearch,
   generateRagAnswer,
