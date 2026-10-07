@@ -500,7 +500,7 @@ exports.searchRooms = async (req, res) => {
         : amenitiesFilter.split(',').map(a => a.trim().toLowerCase());
       if (amenitiesList.length > 0) {
         filteredResults = filteredResults.filter(r =>
-          amenitiesList.some(amenity =>
+          amenitiesList.every(amenity =>
             (r.amenities || []).some(a => a.toLowerCase().includes(amenity))
           )
         );
