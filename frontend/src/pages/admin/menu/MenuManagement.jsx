@@ -5,6 +5,10 @@ import MenuForm from './MenuForm';
 const MenuManagement = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [keyword, setKeyword] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [servingTime, setServingTime] = useState('');
+  const [stockStatus, setStockStatus] = useState('');
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, itemId: null });
   const [messageModal, setMessageModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,15 +24,37 @@ const MenuManagement = () => {
 
   const fetchMenu = () => {
     setLoading(true);
-    fetch('http://localhost:5000/api/v1/menu-items')
+    let url = 'http://localhost:5000/api/v1/menu-items';
+    const params = new URLSearchParams();
+    if (keyword) params.append('keyword', keyword);
+    if (selectedCategory) params.append('category', selectedCategory);
+    if (servingTime) params.append('servingTime', servingTime);
+    if (stockStatus) params.append('stockStatus', stockStatus);
+    if (params.toString()) url += `?${params.toString()}`;
+
+    fetch(url)
       .then(res => res.json())
       .then(res => {
-        if (res.success) setMenuItems(res.data);
+        if (res.success) {
+          setMenuItems(res.data);
+        } else {
+          setMenuItems([]);
+        }
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Fetch error:", error);
+        setMenuItems([]);
         setLoading(false);
       });
   };
 
-  useEffect(() => { fetchMenu(); }, []);
+  useEffect(() => { 
+    const timer = setTimeout(() => {
+      fetchMenu();
+    }, 300); // Debounce search
+    return () => clearTimeout(timer);
+  }, [keyword, selectedCategory, servingTime, stockStatus]);
 
   const openAddModal = () => {
     setEditingItem(null);
@@ -213,29 +239,61 @@ const MenuManagement = () => {
             {/*  Filter Segmented Tabs & Instant Keyword Search  */}
             <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-space-md">
               <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-space-sm">
-                {/*  Meal Period Badges  */}
+                {/*  Meal Period Badges / Categories  */}
                 <div className="inline-flex p-1 bg-surface-container rounded-lg gap-1 overflow-x-auto">
-                  <button className="px-space-sm py-1 rounded bg-surface-container-lowest shadow-sm text-admin-primary font-label-md text-label-md font-bold whitespace-nowrap" type="button">
-                    Tất Cả Menu (64)
+                  <button onClick={() => setSelectedCategory('')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                    Tất Cả Món
                   </button>
-                  <button className="px-space-sm py-1 rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md whitespace-nowrap" type="button">
-                    Ăn Sáng (06:00-11:00)
+                  <button onClick={() => setSelectedCategory('1')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '1' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                    Bếp Nóng
                   </button>
-                  <button className="px-space-sm py-1 rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md whitespace-nowrap" type="button">
-                    Cả Ngày A La Carte
+                  <button onClick={() => setSelectedCategory('2')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '2' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                    Bếp Lạnh
                   </button>
-                  <button className="px-space-sm py-1 rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md whitespace-nowrap" type="button">
-                    In-Room Đêm
+                  <button onClick={() => setSelectedCategory('3')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '3' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                    Tráng Miệng
                   </button>
-                  <button className="px-space-sm py-1 rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md whitespace-nowrap" type="button">
-                    Pool Bar
+                  <button onClick={() => setSelectedCategory('4')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '4' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                    Đồ Uống / Bar
                   </button>
                 </div>
-                {/*  SKU Quick Lookup Field  */}
-                <div className="relative min-w-[200px]">
-                  <span className="material-symbols-outlined absolute left-2.5 top-2 text-[18px] text-on-surface-variant">search</span>
-                  <input className="w-full bg-surface pl-8 pr-12 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Tìm tên món, mã SKU..." type="text" value="Cá tuyết" />
-                  <span className="absolute right-2 top-2 font-mono text-[10px] text-outline-variant bg-surface-container px-1 rounded">⌘K</span>
+                
+                {/* Advanced Filters */}
+                <div className="flex gap-2 items-center w-full md:w-auto">
+                  <select 
+                    value={servingTime}
+                    onChange={(e) => setServingTime(e.target.value)}
+                    className="bg-surface pl-3 pr-8 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary border border-surface-container shadow-sm"
+                  >
+                    <option value="">Khung Giờ</option>
+                    <option value="Ăn Sáng">Ăn Sáng (06-10)</option>
+                    <option value="Cả Ngày">Cả Ngày</option>
+                    <option value="Tối">In-Room Đêm</option>
+                  </select>
+
+                  <select 
+                    value={stockStatus}
+                    onChange={(e) => setStockStatus(e.target.value)}
+                    className="bg-surface pl-3 pr-8 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary border border-surface-container shadow-sm"
+                  >
+                    <option value="">Tồn Kho</option>
+                    <option value="Available">Đang Bán</option>
+                    <option value="OutOfStock">Hết Hàng (86'd)</option>
+                    <option value="Inactive">Ngừng Bán</option>
+                  </select>
+
+                  {/*  SKU Quick Lookup Field  */}
+                  <div className="relative flex-1 min-w-[250px]">
+                    <span className="material-symbols-outlined absolute left-2.5 top-2 text-[18px] text-on-surface-variant">search</span>
+                    <input 
+                      className="w-full bg-surface pl-8 pr-12 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary shadow-sm border border-surface-container" 
+                      placeholder="Tìm mã SKU, tên, dị ứng, nguyên liệu..." 
+                      type="text" 
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)} 
+                    />
+                    <span className="absolute right-2 top-2 font-mono text-[10px] text-outline-variant bg-surface-container px-1 rounded">⌘K</span>
+                  </div>
                 </div>
               </div>
               {/*  Catalog Data Table  */}
@@ -277,7 +335,7 @@ const MenuManagement = () => {
                           </td>
                           <td className="py-3 px-3">
                             <span className="inline-flex items-center gap-1 font-label-sm text-label-sm bg-surface-container text-on-surface px-2 py-0.5 rounded">
-                              <span className="w-1.5 h-1.5 rounded-full bg-tertiary"></span> {item.MenuCategory ? item.MenuCategory.categoryName : 'Chưa phân loại'}
+                              <span className="w-1.5 h-1.5 rounded-full bg-tertiary"></span> {item.MenuCategory ? item.MenuCategory.CategoryName : 'Chưa phân loại'}
                             </span>
                           </td>
                           <td className="py-3 px-3 text-center font-mono font-semibold text-on-surface">15'</td>

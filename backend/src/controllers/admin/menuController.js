@@ -1,31 +1,68 @@
 const { MenuItem, MenuCategory } = require('../../models');
 
+const { Op } = require('sequelize');
+
 // Get all Menu Items
 exports.getMenuItems = async (req, res) => {
   try {
-    const { category } = req.query;
+    const { category, keyword, stockStatus, servingTime, kitchenStation } = req.query;
     const whereClause = { IsDeleted: false };
     
     if (category) {
-      whereClause.CategoryId = category; // Assuming category is the ID. If it's a string, we might need a join or adjust accordingly.
+      whereClause.CategoryId = category;
+    }
+
+    if (stockStatus) {
+      whereClause.Status = stockStatus;
+    }
+
+    if (servingTime) {
+      whereClause.ServingTime = servingTime;
+    }
+
+    if (kitchenStation) {
+      whereClause.KitchenStation = kitchenStation;
+    }
+
+    if (keyword) {
+      whereClause[Op.or] = [
+        { ItemName: { [Op.like]: `%${keyword}%` } },
+        { Description: { [Op.like]: `%${keyword}%` } },
+        { SKU: { [Op.like]: `%${keyword}%` } },
+        { Ingredients: { [Op.like]: `%${keyword}%` } },
+        { Allergens: { [Op.like]: `%${keyword}%` } }
+      ];
     }
 
     const items = await MenuItem.findAll({
       where: whereClause,
       include: MenuCategory,
-      limit: 500,
       order: [['MenuItemId', 'DESC']]
     });
-    res.json({ success: true, data: items });
+
+    if (items.length === 0) {
+      if (keyword) {
+        return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn phù hợp với từ khóa.' });
+      }
+      if (category) {
+        return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn trong danh mục đã chọn.' });
+      }
+      if (stockStatus) {
+        return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không có món ăn phù hợp với tình trạng đã chọn.' });
+      }
+    }
+
+    res.status(200).json({ success: true, data: items });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Error fetching menu items:', error);
+    res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể tải danh sách món ăn.' });
   }
 };
 
 // Create Item
 exports.createMenuItem = async (req, res) => {
   try {
-    const { CategoryId, ItemName, Price, Description, ImageUrl, Status } = req.body;
+    const { CategoryId, ItemName, Price, Description, ImageUrl, Status, SKU, Ingredients, Allergens, ServingTime, KitchenStation } = req.body;
 
     // Validate required fields & constraints
     if (!ItemName || ItemName.trim() === '') {
@@ -53,7 +90,7 @@ exports.createMenuItem = async (req, res) => {
     }
 
     const newItem = await MenuItem.create({
-      CategoryId, ItemName, Price, Description, ImageUrl, Status
+      CategoryId, ItemName, Price, Description, ImageUrl, Status, SKU, Ingredients, Allergens, ServingTime, KitchenStation
     });
 
     return res.status(201).json({
@@ -72,7 +109,7 @@ exports.createMenuItem = async (req, res) => {
 exports.updateMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const { CategoryId, ItemName, Price, Description, ImageUrl, Status } = req.body;
+    const { CategoryId, ItemName, Price, Description, ImageUrl, Status, SKU, Ingredients, Allergens, ServingTime, KitchenStation } = req.body;
 
     const item = await MenuItem.findByPk(id);
     if (!item) {
@@ -108,6 +145,11 @@ exports.updateMenuItem = async (req, res) => {
       Description: Description !== undefined ? Description : item.Description,
       ImageUrl: ImageUrl !== undefined ? ImageUrl : item.ImageUrl,
       Status: Status || item.Status,
+      SKU: SKU !== undefined ? SKU : item.SKU,
+      Ingredients: Ingredients !== undefined ? Ingredients : item.Ingredients,
+      Allergens: Allergens !== undefined ? Allergens : item.Allergens,
+      ServingTime: ServingTime !== undefined ? ServingTime : item.ServingTime,
+      KitchenStation: KitchenStation !== undefined ? KitchenStation : item.KitchenStation,
       UpdatedAt: new Date()
     });
 
