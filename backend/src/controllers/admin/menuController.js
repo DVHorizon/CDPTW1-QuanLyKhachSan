@@ -199,13 +199,23 @@ exports.updateMenuItemStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    if (!status) {
-      return res.status(400).json({ code: 'ERROR_0005_VALIDATION', message: 'Trạng thái không được để trống' });
+    // Authorization mock logic could go here
+    // if (!req.headers.authorization) return res.status(401).json({ code: 'ERROR_0009_UNAUTHENTICATED', message: 'Bạn cần đăng nhập để thực hiện chức năng này' });
+    
+    const validStatuses = ['Available', 'OutOfStock', 'Inactive'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Trạng thái không hợp lệ' });
     }
     
     const item = await MenuItem.findByPk(id);
     if (!item) {
       return res.status(404).json({ code: 'ERROR_0004_NOT_FOUND', message: 'Không tìm thấy món ăn' });
+    }
+    
+    // Simulate POS sync
+    const posSyncSuccess = true; // In real life, call POS API here
+    if (!posSyncSuccess) {
+      return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể đồng bộ với hệ thống POS.' });
     }
     
     await item.update({ Status: status, UpdatedAt: new Date() });
@@ -216,6 +226,6 @@ exports.updateMenuItemStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating status:', error);
-    return res.status(500).json({ code: 'ERROR_0500_INTERNAL', message: 'Lỗi hệ thống' });
+    return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể cập nhật trạng thái món.' });
   }
 };
