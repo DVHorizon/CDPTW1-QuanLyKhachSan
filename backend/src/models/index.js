@@ -13,6 +13,10 @@ const defineReview = require('./Review');
 const defineMenuCategory = require('./MenuCategory');
 const defineMenuItem = require('./MenuItem');
 
+const defineStay = require('./Stay');
+const defineFoodOrder = require('./FoodOrder');
+const defineFoodOrderDetail = require('./FoodOrderDetail');
+
 // Initialize models
 const Branch = defineBranch(sequelize);
 const RoomType = defineRoomType(sequelize);
@@ -25,6 +29,9 @@ const Booking = defineBooking(sequelize);
 const Review = defineReview(sequelize);
 const MenuCategory = defineMenuCategory(sequelize);
 const MenuItem = defineMenuItem(sequelize);
+const Stay = defineStay(sequelize);
+const FoodOrder = defineFoodOrder(sequelize);
+const FoodOrderDetail = defineFoodOrderDetail(sequelize);
 
 // Setup Relationships / Associations
 // 1. Role & User
@@ -59,6 +66,30 @@ Review.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 MenuCategory.hasMany(MenuItem, { foreignKey: 'CategoryId' });
 MenuItem.belongsTo(MenuCategory, { foreignKey: 'CategoryId' });
 
+// 9. Booking & Stay
+Booking.hasMany(Stay, { foreignKey: 'BookingId' });
+Stay.belongsTo(Booking, { foreignKey: 'BookingId' });
+
+// 10. Room & Stay
+Room.hasMany(Stay, { foreignKey: 'RoomId' });
+Stay.belongsTo(Room, { foreignKey: 'RoomId' });
+
+// 11. Stay & FoodOrder
+Stay.hasMany(FoodOrder, { foreignKey: 'StayId' });
+FoodOrder.belongsTo(Stay, { foreignKey: 'StayId' });
+
+// 12. Room & FoodOrder
+Room.hasMany(FoodOrder, { foreignKey: 'RoomId' });
+FoodOrder.belongsTo(Room, { foreignKey: 'RoomId' });
+
+// 13. FoodOrder & FoodOrderDetail
+FoodOrder.hasMany(FoodOrderDetail, { foreignKey: 'FoodOrderId', as: 'details' });
+FoodOrderDetail.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
+
+// 14. MenuItem & FoodOrderDetail
+MenuItem.hasMany(FoodOrderDetail, { foreignKey: 'MenuItemId' });
+FoodOrderDetail.belongsTo(MenuItem, { foreignKey: 'MenuItemId' });
+
 module.exports = {
   sequelize,
   Branch,
@@ -71,5 +102,8 @@ module.exports = {
   Booking,
   Review,
   MenuCategory,
-  MenuItem
+  MenuItem,
+  Stay,
+  FoodOrder,
+  FoodOrderDetail
 };
