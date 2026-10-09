@@ -7,6 +7,8 @@ import Auth from './pages/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
+import RoomService from './pages/client/RoomService';
+import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 
 function App() {
@@ -18,6 +20,7 @@ function App() {
           <Route path="/rooms" element={<SearchRooms />} />
           <Route path="/rooms/search" element={<SearchRooms />} />
           <Route path="/tim-kiem" element={<SearchRooms />} />
+          <Route path="/room-service" element={<RoomService />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/register" element={<Auth />} />
@@ -25,6 +28,7 @@ function App() {
           <Route path="/admin/menu" element={<MenuManagement />} />
           <Route path="/admin/room-types" element={<RoomTypeManagement />} />
           <Route path="/admin/rooms" element={<RoomManagement />} />
+          <Route path="/admin/fnb/kitchen" element={<KitchenDisplay />} />
           <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
           {/* Redirect everything else to home for now */}
           <Route path="*" element={<Navigate to="/" />} />

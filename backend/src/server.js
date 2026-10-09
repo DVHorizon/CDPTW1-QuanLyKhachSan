@@ -36,6 +36,9 @@ app.use('/api/phong', require('./routes/rooms'));
 // Routes F&B Quản lý Menu
 app.use('/api/v1', require('./routes/admin/menuRoutes'));
 
+// Route F&B Orders (Room Service, KDS, History)
+app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
+
 app.listen(PORT, () => {
   console.log(`Backend server is running on port ${PORT}`);
 });
