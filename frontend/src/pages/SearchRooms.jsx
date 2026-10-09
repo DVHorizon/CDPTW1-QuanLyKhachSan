@@ -337,10 +337,10 @@ export default function SearchRooms() {
         ══════════════════════════════════════════════════════════════ */}
         <section className={`sticky z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-md py-space-md px-margin border-b border-[#dedad0]/50 transition-all duration-300 ${isHeaderVisible ? 'top-20' : 'top-0'}`}>
           <div className="max-w-[1440px] mx-auto flex flex-col gap-space-sm">
-            
+
             {/* Thanh tìm kiếm chính */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-md items-center">
-              
+
               {/* 1. Destination / Khu nghỉ dưỡng */}
               <div className="lg:col-span-3 flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-low rounded-xl border border-transparent hover:border-secondary/30 transition-colors">
                 <span className="material-symbols-outlined text-secondary text-[24px]">location_on</span>
@@ -386,7 +386,7 @@ export default function SearchRooms() {
                           value={checkInDate}
                           onChange={(e) => handleCheckInChange(e.target.value)}
                           onClick={(e) => {
-                            try { e.target.showPicker(); } catch (_) {}
+                            try { e.target.showPicker(); } catch (_) { }
                           }}
                           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                           title="Chọn ngày nhận phòng (dd/mm/yyyy)"
@@ -403,7 +403,7 @@ export default function SearchRooms() {
                           value={checkOutDate}
                           onChange={(e) => handleCheckOutChange(e.target.value)}
                           onClick={(e) => {
-                            try { e.target.showPicker(); } catch (_) {}
+                            try { e.target.showPicker(); } catch (_) { }
                           }}
                           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                           title="Chọn ngày trả phòng (dd/mm/yyyy)"
@@ -418,7 +418,7 @@ export default function SearchRooms() {
               </div>
 
               {/* 3. Guest & Room Selector */}
-              <div 
+              <div
                 onClick={() => setGuestPickerOpen(!guestPickerOpen)}
                 className="lg:col-span-3 relative flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-low rounded-xl cursor-pointer hover:bg-surface-container transition-colors border border-transparent hover:border-secondary/30"
               >
@@ -433,7 +433,7 @@ export default function SearchRooms() {
 
                 {/* Popover chọn số khách */}
                 {guestPickerOpen && (
-                  <div 
+                  <div
                     onClick={(e) => e.stopPropagation()}
                     className="absolute top-full left-0 right-0 mt-2 p-4 bg-white rounded-xl shadow-xl border border-[#dedad0] z-50 flex flex-col gap-3"
                   >
@@ -506,7 +506,7 @@ export default function SearchRooms() {
 
             {/* Keyword Input & Search Engine indicator strip */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-space-sm pt-1 border-t border-dashed border-[#dedad0]/60">
-              <div 
+              <div
                 ref={searchInputContainerRef}
                 className="relative w-full sm:w-auto flex-1"
               >
@@ -652,21 +652,7 @@ export default function SearchRooms() {
                 )}
               </div>
 
-              {/* Search Engine Badge */}
-              {searchEngineMeta && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 text-[11px] text-on-tertiary-container font-semibold bg-[#e8f7f0] px-3 py-1 rounded-full shrink-0 border border-[#b7eb8f]/40">
-                    <span className="material-symbols-outlined text-[15px]">neurology</span>
-                    <span>Search Engine: {searchEngineMeta.engine} ({searchEngineMeta.executionTimeMs}ms)</span>
-                  </div>
-                  {searchEngineMeta.isFullWidthInput && (
-                    <div className="flex items-center gap-1 text-[11px] text-[#d48806] font-semibold bg-[#fffbe6] border border-[#ffe58f] px-2.5 py-1 rounded-full shrink-0 animate-fade-in">
-                      <span className="material-symbols-outlined text-[14px]">translate</span>
-                      <span>Full-width (全角): "{searchEngineMeta.query}" ➔ Half-width: "{searchEngineMeta.normalizedQuery}"</span>
-                    </div>
-                  )}
-                </div>
-              )}
+
             </div>
 
             {/* Thông báo lỗi validation nguyên văn */}
@@ -683,7 +669,7 @@ export default function SearchRooms() {
             MAIN CONTENT LAYOUT (2-COLUMN RESPONSIVE)
         ══════════════════════════════════════════════════════════════ */}
         <div className="w-full px-margin py-space-xl max-w-[1440px] mx-auto">
-          
+
           {/* Breadcrumb & Editorial Sub-header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-space-lg gap-space-sm">
             <div>
@@ -707,7 +693,7 @@ export default function SearchRooms() {
 
           {/* 2-Column Responsive Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
-            
+
             {/* ─── LEFT SIDEBAR FILTERS (25% -> 3 of 12 cols) ─── */}
             <aside className="lg:col-span-3 flex flex-col gap-space-lg bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-[#dedad0]/40">
               <div className="flex items-center justify-between pb-space-sm border-b border-surface-container">
@@ -791,11 +777,10 @@ export default function SearchRooms() {
                       key={v.id}
                       type="button"
                       onClick={() => setSelectedView(v.id)}
-                      className={`px-space-md py-space-xs rounded-full font-label-md text-label-md transition-colors ${
-                        selectedView === v.id
+                      className={`px-space-md py-space-xs rounded-full font-label-md text-label-md transition-colors ${selectedView === v.id
                           ? 'bg-secondary text-on-secondary shadow-sm font-bold'
                           : 'bg-surface-container-low text-on-surface hover:bg-surface-container'
-                      }`}
+                        }`}
                     >
                       {v.label}
                     </button>
@@ -896,7 +881,7 @@ export default function SearchRooms() {
 
             {/* ─── RIGHT RESULTS CONTENT (75% -> 9 of 12 cols) ─── */}
             <main className="lg:col-span-9 flex flex-col gap-space-lg">
-              
+
               {/* Results Header & Sort Controls */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-space-md bg-surface-container-lowest rounded-xl shadow-sm gap-space-sm border border-[#dedad0]/40">
                 <div className="flex items-center gap-space-xs flex-wrap">
@@ -925,33 +910,30 @@ export default function SearchRooms() {
                     <button
                       type="button"
                       onClick={() => setSortBy('price_asc')}
-                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${
-                        sortBy === 'price_asc'
+                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${sortBy === 'price_asc'
                           ? 'bg-surface-container-lowest text-secondary shadow-sm font-bold'
                           : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
+                        }`}
                     >
                       Giá tốt nhất
                     </button>
                     <button
                       type="button"
                       onClick={() => setSortBy('rating_desc')}
-                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${
-                        sortBy === 'rating_desc'
+                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${sortBy === 'rating_desc'
                           ? 'bg-surface-container-lowest text-secondary shadow-sm font-bold'
                           : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
+                        }`}
                     >
                       Đánh giá cao
                     </button>
                     <button
                       type="button"
                       onClick={() => setSortBy('popular')}
-                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${
-                        sortBy === 'popular'
+                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${sortBy === 'popular'
                           ? 'bg-surface-container-lowest text-secondary shadow-sm font-bold'
                           : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
+                        }`}
                     >
                       Phổ biến nhất
                     </button>
@@ -1015,9 +997,8 @@ export default function SearchRooms() {
                         <button
                           type="button"
                           onClick={() => toggleWishlist(room.RoomTypeId)}
-                          className={`absolute bottom-4 right-4 w-9 h-9 rounded-full bg-surface-container-lowest/90 flex items-center justify-center transition-colors shadow-sm ${
-                            isSaved ? 'text-red-500' : 'text-on-surface hover:text-secondary'
-                          }`}
+                          className={`absolute bottom-4 right-4 w-9 h-9 rounded-full bg-surface-container-lowest/90 flex items-center justify-center transition-colors shadow-sm ${isSaved ? 'text-red-500' : 'text-on-surface hover:text-secondary'
+                            }`}
                         >
                           <span className="material-symbols-outlined text-[18px]">
                             {isSaved ? 'favorite' : 'favorite_border'}
@@ -1164,28 +1145,27 @@ export default function SearchRooms() {
                       <span className="material-symbols-outlined text-[20px]">chevron_left</span>
                       <span className="hidden sm:inline">Trang trước</span>
                     </button>
-                    
+
                     {[...Array(totalPages)].map((_, index) => {
                       const pageNum = index + 1;
                       if (totalPages > 5) {
                         if (pageNum !== 1 && pageNum !== totalPages && Math.abs(currentPage - pageNum) > 1) {
-                           if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                               return <span key={`ellipsis-${pageNum}`} className="px-space-xs text-outline">...</span>;
-                           }
-                           return null;
+                          if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                            return <span key={`ellipsis-${pageNum}`} className="px-space-xs text-outline">...</span>;
+                          }
+                          return null;
                         }
                       }
-                      
+
                       return (
                         <button
                           key={pageNum}
                           type="button"
                           onClick={() => handlePageChange(pageNum)}
-                          className={`w-10 h-10 rounded-xl font-label-lg text-label-lg shadow-sm transition-colors ${
-                            currentPage === pageNum
+                          className={`w-10 h-10 rounded-xl font-label-lg text-label-lg shadow-sm transition-colors ${currentPage === pageNum
                               ? 'bg-primary text-on-primary font-bold'
                               : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container'
-                          }`}
+                            }`}
                         >
                           {pageNum}
                         </button>
