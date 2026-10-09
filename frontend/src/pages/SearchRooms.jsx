@@ -73,6 +73,8 @@ export default function SearchRooms() {
   const [branches, setBranches] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const roomsPerPage = 5;
   const [errorMessage, setErrorMessage] = useState('');
   const [validationError, setValidationError] = useState('');
   const [searchEngineMeta, setSearchEngineMeta] = useState(null);
@@ -160,6 +162,7 @@ export default function SearchRooms() {
   const executeSearch = async (overrideParams = {}) => {
     setValidationError('');
     setErrorMessage('');
+    setCurrentPage(1);
 
     const targetCheckIn = overrideParams.checkInDate || checkInDate;
     const targetCheckOut = overrideParams.checkOutDate || checkOutDate;
@@ -282,6 +285,17 @@ export default function SearchRooms() {
   const currentBranchObj = branches.find(b => String(b.BranchId) === String(branchId));
   const currentBranchName = currentBranchObj ? currentBranchObj.BranchName : 'Grand Horizon Phú Quốc';
 
+  // Pagination logic
+  const indexOfLastRoom = currentPage * roomsPerPage;
+  const indexOfFirstRoom = indexOfLastRoom - roomsPerPage;
+  const currentRooms = rooms.slice(indexOfFirstRoom, indexOfLastRoom);
+  const totalPages = Math.ceil(rooms.length / roomsPerPage);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo({ top: 300, behavior: 'smooth' });
+  };
+
   return (
     <MainLayout
       wishlistCount={wishlist.length}
@@ -292,9 +306,9 @@ export default function SearchRooms() {
       <div className="flex flex-col w-full">
 
         {/* ══════════════════════════════════════════════════════════════
-            DYNAMIC SEARCH STRIP (STICKY TOP-20)
+            DYNAMIC SEARCH STRIP
         ══════════════════════════════════════════════════════════════ */}
-        <section className="sticky top-20 z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-md py-space-md px-margin border-b border-[#dedad0]/50">
+        <section className="relative z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-md py-space-md px-margin border-b border-[#dedad0]/50">
           <div className="max-w-[1440px] mx-auto flex flex-col gap-space-sm">
             
             {/* Thanh tìm kiếm chính */}
@@ -940,7 +954,7 @@ export default function SearchRooms() {
 
               {/* Danh sách phòng dạng thẻ ngang (Horizontal Cards) */}
               <div className="flex flex-col gap-space-lg">
-                {rooms.map((room) => {
+                {currentRooms.map((room) => {
                   const isSaved = wishlist.includes(room.RoomTypeId);
                   return (
                     <article
@@ -1112,40 +1126,56 @@ export default function SearchRooms() {
               {/* Pagination & Direct Assistance Strip */}
               <div className="flex flex-col md:flex-row items-center justify-between gap-space-md pt-space-md border-t border-[#dedad0]/40">
                 {/* Page Selectors */}
-                <div className="flex items-center gap-space-xs">
-                  <button
-                    type="button"
-                    disabled
-                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface-variant flex items-center justify-center shadow-sm disabled:opacity-40"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">chevron_left</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="w-10 h-10 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg shadow-sm font-bold"
-                  >
-                    1
-                  </button>
-                  <button
-                    type="button"
-                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors shadow-sm"
-                  >
-                    2
-                  </button>
-                  <button
-                    type="button"
-                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors shadow-sm"
-                  >
-                    3
-                  </button>
-                  <span className="px-space-xs text-outline">...</span>
-                  <button
-                    type="button"
-                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors shadow-sm"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-                  </button>
-                </div>
+                {totalPages > 1 ? (
+                  <div className="flex items-center gap-space-xs">
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface flex items-center justify-center shadow-sm disabled:opacity-40 disabled:hover:bg-surface-container-lowest transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                    </button>
+                    
+                    {[...Array(totalPages)].map((_, index) => {
+                      const pageNum = index + 1;
+                      if (totalPages > 5) {
+                        if (pageNum !== 1 && pageNum !== totalPages && Math.abs(currentPage - pageNum) > 1) {
+                           if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                               return <span key={`ellipsis-${pageNum}`} className="px-space-xs text-outline">...</span>;
+                           }
+                           return null;
+                        }
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`w-10 h-10 rounded-xl font-label-lg text-label-lg shadow-sm transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-primary text-on-primary font-bold'
+                              : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface flex items-center justify-center shadow-sm disabled:opacity-40 disabled:hover:bg-surface-container-lowest transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div></div>
+                )}
 
                 {/* Direct Concierge Help Desk Callout */}
                 <div className="flex items-center gap-space-md bg-surface-container-lowest px-space-lg py-space-sm rounded-xl shadow-sm border border-[#dedad0]/40">
