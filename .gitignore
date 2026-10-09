@@ -50,3 +50,6 @@ Thumbs.db
 # 9. Cơ sở dữ liệu cục bộ
 *.sqlite
 database.sqlite
+
+# 10. File backup Database
+*.sql
