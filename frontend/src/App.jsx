@@ -8,6 +8,7 @@ import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
 import RoomService from './pages/client/RoomService';
+import Profile from './pages/client/Profile';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 
@@ -21,6 +22,7 @@ function App() {
           <Route path="/rooms/search" element={<SearchRooms />} />
           <Route path="/tim-kiem" element={<SearchRooms />} />
           <Route path="/room-service" element={<RoomService />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/register" element={<Auth />} />

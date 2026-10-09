@@ -18,4 +18,7 @@ router.post('/facebook', authController.facebookLogin);
 // GET /api/v1/auth/me - Lấy thông tin tài khoản hiện tại từ JWT token
 router.get('/me', verifyToken, authController.getMe);
 
+// PUT /api/v1/auth/me - Cập nhật thông tin tài khoản
+router.put('/me', verifyToken, authController.updateMe);
+
 module.exports = router;

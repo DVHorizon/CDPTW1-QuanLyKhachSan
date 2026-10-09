@@ -89,6 +89,11 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('hotel_user');
   };
 
+  const updateUser = (updatedUser) => {
+    setUser(updatedUser);
+    localStorage.setItem('hotel_user', JSON.stringify(updatedUser));
+  };
+
   const value = {
     user,
     token,
@@ -98,7 +103,8 @@ export const AuthProvider = ({ children }) => {
     register: handleRegister,
     loginGoogle: handleGoogleLogin,
     loginFacebook: handleFacebookLogin,
-    logout: handleLogout
+    logout: handleLogout,
+    updateUser
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

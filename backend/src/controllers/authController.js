@@ -614,10 +614,68 @@ const facebookLogin = async (req, res) => {
   }
 };
 
+/**
+ * Cập nhật thông tin người dùng hiện tại đang đăng nhập
+ * PUT /api/v1/auth/me
+ */
+const updateMe = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { fullName, phone, idNumber, idType, dateOfBirth, gender } = req.body;
+
+    if (!fullName || !fullName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Họ và tên không được để trống.'
+      });
+    }
+
+    const cleanFullName = fullName.trim();
+    const cleanPhone = phone ? phone.trim() : null;
+    const cleanIdNumber = idNumber ? idNumber.trim() : null;
+    const cleanIdType = idType ? idType.trim() : null;
+    const cleanDateOfBirth = dateOfBirth ? dateOfBirth : null;
+    const cleanGender = gender ? gender.trim() : null;
+
+    // Check if phone already used by someone else
+    if (cleanPhone) {
+      const [existingPhone] = await pool.query(
+        'SELECT UserId FROM Users WHERE Phone = ? AND UserId != ? LIMIT 1',
+        [cleanPhone, userId]
+      );
+      if (existingPhone.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Số điện thoại này đã được liên kết với một tài khoản khác.'
+        });
+      }
+    }
+
+    await pool.query(
+      `UPDATE Users 
+       SET FullName = ?, Phone = ?, IdNumber = ?, IdType = ?, DateOfBirth = ?, Gender = ?, UpdatedAt = NOW()
+       WHERE UserId = ?`,
+      [cleanFullName, cleanPhone, cleanIdNumber, cleanIdType, cleanDateOfBirth, cleanGender, userId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật hồ sơ thành công.'
+    });
+  } catch (error) {
+    console.error('Lỗi API updateMe:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi máy chủ khi cập nhật hồ sơ: ' + error.message
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
   getMe,
+  updateMe,
   googleLogin,
   facebookLogin
 };
