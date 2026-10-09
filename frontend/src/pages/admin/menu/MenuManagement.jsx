@@ -5,6 +5,10 @@ import MenuForm from './MenuForm';
 const MenuManagement = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [keyword, setKeyword] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [servingTime, setServingTime] = useState('');
+  const [stockStatus, setStockStatus] = useState('');
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, itemId: null });
   const [messageModal, setMessageModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,15 +24,37 @@ const MenuManagement = () => {
 
   const fetchMenu = () => {
     setLoading(true);
-    fetch('http://localhost:5000/api/v1/menu-items')
+    let url = 'http://localhost:5000/api/v1/menu-items';
+    const params = new URLSearchParams();
+    if (keyword) params.append('keyword', keyword);
+    if (selectedCategory) params.append('category', selectedCategory);
+    if (servingTime) params.append('servingTime', servingTime);
+    if (stockStatus) params.append('stockStatus', stockStatus);
+    if (params.toString()) url += `?${params.toString()}`;
+
+    fetch(url)
       .then(res => res.json())
       .then(res => {
-        if (res.success) setMenuItems(res.data);
+        if (res.success) {
+          setMenuItems(res.data);
+        } else {
+          setMenuItems([]);
+        }
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Fetch error:", error);
+        setMenuItems([]);
         setLoading(false);
       });
   };
 
-  useEffect(() => { fetchMenu(); }, []);
+  useEffect(() => { 
+    const timer = setTimeout(() => {
+      fetchMenu();
+    }, 300); // Debounce search
+    return () => clearTimeout(timer);
+  }, [keyword, selectedCategory, servingTime, stockStatus]);
 
   const openAddModal = () => {
     setEditingItem(null);
@@ -71,6 +97,29 @@ const MenuManagement = () => {
   const handleArchiveClick = (id, e) => {
     e.stopPropagation();
     setConfirmModal({ isOpen: true, itemId: id });
+  };
+
+  const handleStatusToggle = async (item, e) => {
+    e.stopPropagation();
+    const newStatus = item.Status === 'Available' ? 'OutOfStock' : 'Available';
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/menu-items/${item.MenuItemId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const result = await response.json();
+      
+      if (response.ok) {
+        // Show success briefly if needed, or just refresh
+        fetchMenu();
+      } else {
+        setMessageModal({ isOpen: true, type: 'error', title: 'LỖI', message: result.message });
+      }
+    } catch (err) {
+      setMessageModal({ isOpen: true, type: 'error', title: 'LỖI HỆ THỐNG', message: 'Không thể cập nhật trạng thái món.' });
+    }
   };
 
   const executeArchive = async () => {
@@ -213,29 +262,61 @@ const MenuManagement = () => {
             {/*  Filter Segmented Tabs & Instant Keyword Search  */}
             <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-space-md">
               <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-space-sm">
-                {/*  Meal Period Badges  */}
+                {/*  Meal Period Badges / Categories  */}
                 <div className="inline-flex p-1 bg-surface-container rounded-lg gap-1 overflow-x-auto">
-                  <button className="px-space-sm py-1 rounded bg-surface-container-lowest shadow-sm text-admin-primary font-label-md text-label-md font-bold whitespace-nowrap" type="button">
-                    Tất Cả Menu (64)
+                  <button onClick={() => setSelectedCategory('')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                    Tất Cả Món
                   </button>
-                  <button className="px-space-sm py-1 rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md whitespace-nowrap" type="button">
-                    Ăn Sáng (06:00-11:00)
+                  <button onClick={() => setSelectedCategory('1')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '1' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                    Bếp Nóng
                   </button>
-                  <button className="px-space-sm py-1 rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md whitespace-nowrap" type="button">
-                    Cả Ngày A La Carte
+                  <button onClick={() => setSelectedCategory('2')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '2' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                    Bếp Lạnh
                   </button>
-                  <button className="px-space-sm py-1 rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md whitespace-nowrap" type="button">
-                    In-Room Đêm
+                  <button onClick={() => setSelectedCategory('3')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '3' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                    Tráng Miệng
                   </button>
-                  <button className="px-space-sm py-1 rounded hover:bg-surface-container-high text-on-surface-variant font-label-md text-label-md whitespace-nowrap" type="button">
-                    Pool Bar
+                  <button onClick={() => setSelectedCategory('4')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '4' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                    Đồ Uống / Bar
                   </button>
                 </div>
-                {/*  SKU Quick Lookup Field  */}
-                <div className="relative min-w-[200px]">
-                  <span className="material-symbols-outlined absolute left-2.5 top-2 text-[18px] text-on-surface-variant">search</span>
-                  <input className="w-full bg-surface pl-8 pr-12 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Tìm tên món, mã SKU..." type="text" value="Cá tuyết" />
-                  <span className="absolute right-2 top-2 font-mono text-[10px] text-outline-variant bg-surface-container px-1 rounded">⌘K</span>
+                
+                {/* Advanced Filters */}
+                <div className="flex gap-2 items-center w-full md:w-auto">
+                  <select 
+                    value={servingTime}
+                    onChange={(e) => setServingTime(e.target.value)}
+                    className="bg-surface pl-3 pr-8 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary border border-surface-container shadow-sm"
+                  >
+                    <option value="">Khung Giờ</option>
+                    <option value="Ăn Sáng">Ăn Sáng (06-10)</option>
+                    <option value="Cả Ngày">Cả Ngày</option>
+                    <option value="Tối">In-Room Đêm</option>
+                  </select>
+
+                  <select 
+                    value={stockStatus}
+                    onChange={(e) => setStockStatus(e.target.value)}
+                    className="bg-surface pl-3 pr-8 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary border border-surface-container shadow-sm"
+                  >
+                    <option value="">Tồn Kho</option>
+                    <option value="Available">Đang Bán</option>
+                    <option value="OutOfStock">Hết Hàng (86'd)</option>
+                    <option value="Inactive">Ngừng Bán</option>
+                  </select>
+
+                  {/*  SKU Quick Lookup Field  */}
+                  <div className="relative flex-1 min-w-[250px]">
+                    <span className="material-symbols-outlined absolute left-2.5 top-2 text-[18px] text-on-surface-variant">search</span>
+                    <input 
+                      className="w-full bg-surface pl-8 pr-12 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary shadow-sm border border-surface-container" 
+                      placeholder="Tìm mã SKU, tên, dị ứng, nguyên liệu..." 
+                      type="text" 
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)} 
+                    />
+                    <span className="absolute right-2 top-2 font-mono text-[10px] text-outline-variant bg-surface-container px-1 rounded">⌘K</span>
+                  </div>
                 </div>
               </div>
               {/*  Catalog Data Table  */}
@@ -260,16 +341,22 @@ const MenuManagement = () => {
                       <tr><td colSpan="7" className="text-center py-4">Chưa có món ăn nào trong CSDL</td></tr>
                     ) : (
                       currentItems.map(item => (
-                        <tr key={item.MenuItemId} onClick={() => { setActiveRow(item.MenuItemId); setEditingItem(item); setFormData({ ...item }); setIsModalOpen(true); }} className={`hover:bg-surface-container transition-colors cursor-pointer ${item.Status === 'Inactive' ? 'bg-error-container/20' : ''}`}>
+                        <tr key={item.MenuItemId} onClick={() => { setActiveRow(item.MenuItemId); setEditingItem(item); setFormData({ ...item }); setIsModalOpen(true); }} 
+                          className={`hover:bg-surface-container transition-all cursor-pointer ${
+                            activeRow === item.MenuItemId 
+                              ? (item.Status === 'Available' ? 'bg-[#10B981]/10' : 'bg-[#EF4444]/10') 
+                              : (item.Status === 'Available' ? 'bg-transparent' : 'bg-[#EF4444]/5')
+                          }`}
+                        >
                           <td className="py-3 px-3">
                             <div className="flex items-center gap-2">
-                              <div className={`w-1.5 h-8 rounded ${item.Status === 'Available' ? 'bg-admin-primary' : 'bg-transparent'}`}></div>
+                              <div className={`w-1.5 h-8 rounded ${activeRow === item.MenuItemId ? (item.Status === 'Available' ? 'bg-[#10B981]' : 'bg-[#EF4444]') : 'bg-transparent'}`}></div>
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-1.5">
-                                  <span className={`font-headline-sm text-body-md font-semibold text-on-surface ${item.Status === 'Inactive' ? 'line-through opacity-75' : ''}`}>
+                                  <span className={`font-headline-sm text-body-md font-semibold text-on-surface ${item.Status !== 'Available' ? 'line-through opacity-80' : ''}`}>
                                     {item.ItemName}
                                   </span>
-                                  {item.Status === 'Inactive' && <span className="bg-tertiary text-on-tertiary font-label-sm text-[9px] px-1 rounded font-bold uppercase">86'D</span>}
+                                  {item.Status !== 'Available' && <span className="bg-[#EF4444] text-white font-label-sm text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shadow-sm">86'D</span>}
                                 </div>
                                 <span className="font-mono text-label-sm text-on-surface-variant">{item.MenuItemId}</span>
                               </div>
@@ -277,7 +364,7 @@ const MenuManagement = () => {
                           </td>
                           <td className="py-3 px-3">
                             <span className="inline-flex items-center gap-1 font-label-sm text-label-sm bg-surface-container text-on-surface px-2 py-0.5 rounded">
-                              <span className="w-1.5 h-1.5 rounded-full bg-tertiary"></span> {item.MenuCategory ? item.MenuCategory.categoryName : 'Chưa phân loại'}
+                              <span className="w-1.5 h-1.5 rounded-full bg-tertiary"></span> {item.MenuCategory ? item.MenuCategory.CategoryName : 'Chưa phân loại'}
                             </span>
                           </td>
                           <td className="py-3 px-3 text-center font-mono font-semibold text-on-surface">15'</td>
@@ -287,11 +374,15 @@ const MenuManagement = () => {
                             <span className="font-mono font-bold text-admin-primary bg-admin-primary/10 px-2 py-0.5 rounded text-label-sm">70.0%</span>
                           </td>
                           <td className="py-3 px-3 text-center">
-                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${item.Status === 'Available' ? 'bg-admin-primary/15 text-admin-primary' : 'bg-tertiary/15 text-tertiary'}`}>
+                            <button 
+                              onClick={(e) => handleStatusToggle(item, e)}
+                              className={`inline-flex items-center justify-center w-6 h-6 rounded-full transition-colors ${item.Status === 'Available' ? 'bg-[#10B981]/15 text-[#10B981] hover:bg-[#10B981]/30' : 'bg-[#EF4444]/15 text-[#EF4444] hover:bg-[#EF4444]/30'}`}
+                              title={item.Status === 'Available' ? 'Đang Bán - Bấm để báo Hết Hàng' : 'Hết Hàng - Bấm để báo Đang Bán'}
+                            >
                               <span className="material-symbols-outlined text-[16px]">
                                 {item.Status === 'Available' ? 'check_circle' : 'cancel'}
                               </span>
-                            </span>
+                            </button>
                             <button onClick={(e) => handleArchiveClick(item.MenuItemId, e)} className="ml-2 w-6 h-6 rounded-full bg-error-container/50 text-error flex items-center justify-center hover:bg-error-container transition-colors" title="Xóa Món">
                               <span className="material-symbols-outlined text-[14px]">delete</span>
                             </button>
