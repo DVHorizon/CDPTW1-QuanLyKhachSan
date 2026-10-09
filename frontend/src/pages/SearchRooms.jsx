@@ -55,6 +55,15 @@ export default function SearchRooms() {
 
   // Filter states
   const [priceMax, setPriceMax] = useState(25000000);
+  const [debouncedPriceMax, setDebouncedPriceMax] = useState(priceMax);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPriceMax(priceMax);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [priceMax]);
+
   const [selectedRoomTypes, setSelectedRoomTypes] = useState([
     'Villa Riêng Tư',
     'Suite Cao Cấp',
@@ -82,6 +91,24 @@ export default function SearchRooms() {
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
+
+  // Trạng thái cuộn trang để xử lý sticky header/search bar
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        setIsHeaderVisible(false);
+      } else {
+        setIsHeaderVisible(true);
+      }
+      setLastScrollY(currentScrollY);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY]);
 
   // Suggester Autocomplete state (hỗ trợ hiển thị gợi ý từ 1-2 ký tự)
   const [suggestions, setSuggestions] = useState(null);
@@ -208,7 +235,7 @@ export default function SearchRooms() {
       checkOutDate: targetCheckOut,
       totalGuests: overrideParams.totalGuests || totalGuests,
       keyword: targetKeyword,
-      priceMax,
+      priceMax: debouncedPriceMax,
       roomTypes: selectedRoomTypes,
       view: selectedView,
       amenities: selectedAmenities,
@@ -250,7 +277,7 @@ export default function SearchRooms() {
   // Tự động tìm kiếm lần đầu khi mount
   useEffect(() => {
     executeSearch();
-  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, priceMax]);
+  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, debouncedPriceMax]);
 
   // Xử lý Wishlist
   const toggleWishlist = (roomId) => {
@@ -308,7 +335,7 @@ export default function SearchRooms() {
         {/* ══════════════════════════════════════════════════════════════
             DYNAMIC SEARCH STRIP
         ══════════════════════════════════════════════════════════════ */}
-        <section className="relative z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-md py-space-md px-margin border-b border-[#dedad0]/50">
+        <section className={`sticky z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-md py-space-md px-margin border-b border-[#dedad0]/50 transition-all duration-300 ${isHeaderVisible ? 'top-20' : 'top-0'}`}>
           <div className="max-w-[1440px] mx-auto flex flex-col gap-space-sm">
             
             {/* Thanh tìm kiếm chính */}
@@ -1132,9 +1159,10 @@ export default function SearchRooms() {
                       type="button"
                       disabled={currentPage === 1}
                       onClick={() => handlePageChange(currentPage - 1)}
-                      className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface flex items-center justify-center shadow-sm disabled:opacity-40 disabled:hover:bg-surface-container-lowest transition-colors"
+                      className="h-10 px-3 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface flex items-center justify-center gap-1 shadow-sm disabled:opacity-40 disabled:hover:bg-surface-container-lowest transition-colors font-label-md"
                     >
                       <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                      <span className="hidden sm:inline">Trang trước</span>
                     </button>
                     
                     {[...Array(totalPages)].map((_, index) => {
@@ -1168,8 +1196,9 @@ export default function SearchRooms() {
                       type="button"
                       disabled={currentPage === totalPages}
                       onClick={() => handlePageChange(currentPage + 1)}
-                      className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface flex items-center justify-center shadow-sm disabled:opacity-40 disabled:hover:bg-surface-container-lowest transition-colors"
+                      className="h-10 px-3 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface flex items-center justify-center gap-1 shadow-sm disabled:opacity-40 disabled:hover:bg-surface-container-lowest transition-colors font-label-md"
                     >
+                      <span className="hidden sm:inline">Trang sau</span>
                       <span className="material-symbols-outlined text-[20px]">chevron_right</span>
                     </button>
                   </div>
