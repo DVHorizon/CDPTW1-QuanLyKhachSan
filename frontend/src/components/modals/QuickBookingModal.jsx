@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
 
-const QuickBookingModal = ({ room, branch, checkIn, checkOut, isOpen, onClose }) => {
+const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, checkOut, checkOutDate, isOpen = true, onClose, onSuccess }) => {
   if (!isOpen || !room) return null;
 
   const todayStr = new Date().toISOString().split('T')[0];
-  const defaultCheckIn = checkIn || todayStr;
+  const initialCheckIn = checkIn || checkInDate || todayStr;
   
   // Tính ngày check-out mặc định nếu chưa có
   const calcDefaultCheckOut = (cin) => {
-    const d = new Date(cin);
+    const d = new Date(cin + 'T00:00:00');
     d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
-  const [bookingIn, setBookingIn] = useState(defaultCheckIn);
-  const [bookingOut, setBookingOut] = useState(checkOut || calcDefaultCheckOut(defaultCheckIn));
+  const [bookingIn, setBookingIn] = useState(initialCheckIn);
+  const [bookingOut, setBookingOut] = useState(checkOut || checkOutDate || calcDefaultCheckOut(initialCheckIn));
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
@@ -150,35 +153,55 @@ const QuickBookingModal = ({ room, branch, checkIn, checkOut, isOpen, onClose })
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] uppercase tracking-wider font-bold text-[#203044] block mb-1">
-                  Ngày nhận phòng (Check-in)
+                  Ngày nhận phòng (Check-in: dd/mm/yyyy)
                 </label>
-                <input
-                  type="date"
-                  min={todayStr}
-                  value={bookingIn}
-                  onChange={(e) => {
-                    setBookingIn(e.target.value);
-                    if (e.target.value >= bookingOut) {
-                      setBookingOut(calcDefaultCheckOut(e.target.value));
-                    }
-                  }}
-                  className="w-full h-11 px-3 bg-[#fbf8f2] border border-[#dedad0] rounded-xl text-[13px] font-semibold text-[#203044] focus:outline-none focus:border-[#b9a277]"
-                  required
-                />
+                <div className="relative group cursor-pointer">
+                  <div className="w-full h-11 px-3.5 bg-[#fbf8f2] border border-[#dedad0] rounded-xl flex items-center justify-between text-[13px] font-semibold text-[#203044] group-hover:border-[#b9a277] transition-colors">
+                    <span>{bookingIn ? bookingIn.split('-').reverse().join('/') : 'dd/mm/yyyy'}</span>
+                    <span className="material-symbols-outlined text-[18px] text-[#b9a277]">calendar_today</span>
+                  </div>
+                  <input
+                    type="date"
+                    min={todayStr}
+                    value={bookingIn}
+                    onChange={(e) => {
+                      setBookingIn(e.target.value);
+                      if (e.target.value >= bookingOut) {
+                        setBookingOut(calcDefaultCheckOut(e.target.value));
+                      }
+                    }}
+                    onClick={(e) => {
+                      try { e.target.showPicker(); } catch (_) {}
+                    }}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    title="Chọn ngày nhận phòng (dd/mm/yyyy)"
+                    required
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="text-[11px] uppercase tracking-wider font-bold text-[#203044] block mb-1">
-                  Ngày trả phòng (Check-out)
+                  Ngày trả phòng (Check-out: dd/mm/yyyy)
                 </label>
-                <input
-                  type="date"
-                  min={bookingIn}
-                  value={bookingOut}
-                  onChange={(e) => setBookingOut(e.target.value)}
-                  className="w-full h-11 px-3 bg-[#fbf8f2] border border-[#dedad0] rounded-xl text-[13px] font-semibold text-[#203044] focus:outline-none focus:border-[#b9a277]"
-                  required
-                />
+                <div className="relative group cursor-pointer">
+                  <div className="w-full h-11 px-3.5 bg-[#fbf8f2] border border-[#dedad0] rounded-xl flex items-center justify-between text-[13px] font-semibold text-[#203044] group-hover:border-[#b9a277] transition-colors">
+                    <span>{bookingOut ? bookingOut.split('-').reverse().join('/') : 'dd/mm/yyyy'}</span>
+                    <span className="material-symbols-outlined text-[18px] text-[#b9a277]">calendar_today</span>
+                  </div>
+                  <input
+                    type="date"
+                    min={bookingIn}
+                    value={bookingOut}
+                    onChange={(e) => setBookingOut(e.target.value)}
+                    onClick={(e) => {
+                      try { e.target.showPicker(); } catch (_) {}
+                    }}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    title="Chọn ngày trả phòng (dd/mm/yyyy)"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
