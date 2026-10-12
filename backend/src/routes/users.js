@@ -27,13 +27,25 @@ const DEFAULT_POLICY = {
   hanPhienGio: 8
 };
 
-// ─── GET danh sách người dùng / nhân viên (Tối đa 50) ─────────────────────────
-// GET /api/users?search=&dept=&role=&status=&limit=50
+// ─── GET danh sách người dùng / nhân viên ─────────────────────────────────────
+// GET /api/users?search=&dept=&role=&status=&limit=50&sort=desc
 router.get('/', async (req, res) => {
   try {
-    const { search, dept, role, status, limit } = req.query;
-    const maxLimit = 50;
-    const queryLimit = Math.min(parseInt(limit) || maxLimit, maxLimit);
+    const { search, dept, role, status, limit, sort } = req.query;
+    
+    // Hỗ trợ limit linh hoạt: mặc định 50, hoặc 100, 200, 500, hoặc 'all' (tối đa 2000 để bảo vệ memory)
+    let queryLimit = 50;
+    if (limit === 'all') {
+      queryLimit = 2000;
+    } else if (limit) {
+      const parsed = parseInt(limit, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        queryLimit = Math.min(parsed, 2000); // Cho phép lấy lên đến 2000 bản ghi
+      }
+    }
+
+    // Sắp xếp: Mặc định DESC để người dùng mới thêm hiển thị ngay lập tức
+    const sortOrder = (sort && String(sort).toLowerCase() === 'asc') ? 'ASC' : 'DESC';
 
     let sql = `
       SELECT u.UserId, u.FullName, u.Email, u.Phone, u.Status, u.Department,
@@ -66,9 +78,11 @@ router.get('/', async (req, res) => {
       params.push(status);
     }
 
-    sql += ` ORDER BY u.UserId ASC LIMIT ${queryLimit}`;
+    sql += ` ORDER BY u.UserId ${sortOrder} LIMIT ${queryLimit}`;
 
     const [rows] = await pool.query(sql, params);
+    const [[countRow]] = await pool.query('SELECT COUNT(*) as totalInDb FROM Users WHERE IsDeleted = 0');
+    const totalInDb = countRow ? countRow.totalInDb : rows.length;
 
     // Chuẩn hóa dữ liệu trả về cho frontend
     const users = rows.map(u => {
@@ -117,6 +131,7 @@ router.get('/', async (req, res) => {
       success: true,
       data: users,
       total: users.length,
+      totalInDb,
       limit: queryLimit
     });
   } catch (err) {

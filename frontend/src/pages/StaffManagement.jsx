@@ -203,12 +203,20 @@ const QuanLyTaiKhoan = () => {
   // Nhân bản vai trò
   const [tenVaiTroMoi, setTenVaiTroMoi] = useState('');
 
-  // ─── TẢI DỮ LIỆU TỪ BACKEND (50 bản ghi thật từ MySQL) ─────────────────────
-  const taiDuLieuTuBackend = useCallback(async () => {
+  // Tùy chọn hiển thị & CSDL thực
+  const [gioiHanHienThi, setGioiHanHienThi] = useState('50');
+  const [thuTuSapXep, setThuTuSapXep] = useState('desc');
+  const [tongSoTrongDb, setTongSoTrongDb] = useState(0);
+
+  // ─── TẢI DỮ LIỆU TỪ BACKEND (MySQL) ──────────────────────────────────────────
+  const taiDuLieuTuBackend = useCallback(async (customLimit = gioiHanHienThi, customSort = thuTuSapXep) => {
     setLoading(true);
-    const res = await callApi('GET', '?limit=50');
+    const res = await callApi('GET', `?limit=${customLimit}&sort=${customSort}`);
     if (res && res.ok && Array.isArray(res.data.data)) {
       setDanhSachNV(res.data.data);
+      if (res.data.totalInDb) {
+        setTongSoTrongDb(res.data.totalInDb);
+      }
       setBackendConnected(true);
       if (res.data.data.length > 0 && !idDangChon) {
         setIdDangChon(res.data.data[0].id);
@@ -218,11 +226,11 @@ const QuanLyTaiKhoan = () => {
       setThongBao({ noiDung: 'Không thể kết nối máy chủ MySQL. Vui lòng kiểm tra backend port 5000.', loai: 'loi', id: Date.now() });
     }
     setLoading(false);
-  }, [idDangChon]);
+  }, [idDangChon, gioiHanHienThi, thuTuSapXep]);
 
   useEffect(() => {
-    taiDuLieuTuBackend();
-  }, [taiDuLieuTuBackend]);
+    taiDuLieuTuBackend(gioiHanHienThi, thuTuSapXep);
+  }, [gioiHanHienThi, thuTuSapXep]);
 
   useEffect(() => {
     try {
@@ -388,6 +396,10 @@ const QuanLyTaiKhoan = () => {
     ghiNhatKy('CẤP PHÁT TÀI KHOẢN', res.data.data?.id || 'MỚI',
       `Cấp phát thành công: ${hoTen} (${email}) với vai trò ${vaiTro}`);
     setModalCapPhat(false);
+    setTrangHienTai(1);
+    if (res.data.data?.id) {
+      setIdDangChon(res.data.data.id);
+    }
     taiDuLieuTuBackend();
   };
 
@@ -864,6 +876,27 @@ const QuanLyTaiKhoan = () => {
               <option value="da_thu_hoi">Đã Thu Hồi</option>
             </select>
           </div>
+
+          <div className="flex items-center gap-2 px-space-sm py-2 bg-surface-container-lowest border border-outline-variant rounded-lg">
+            <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold whitespace-nowrap">Sắp Xếp:</span>
+            <select value={thuTuSapXep} onChange={e => setThuTuSapXep(e.target.value)}
+              className="bg-transparent font-label-md text-label-md text-on-surface font-semibold focus:outline-none cursor-pointer">
+              <option value="desc">Mới Nhất Trước</option>
+              <option value="asc">Mã NV Tăng Dần</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 px-space-sm py-2 bg-surface-container-lowest border border-outline-variant rounded-lg">
+            <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold whitespace-nowrap">Hiển Thị:</span>
+            <select value={gioiHanHienThi} onChange={e => setGioiHanHienThi(e.target.value)}
+              className="bg-transparent font-label-md text-label-md text-on-surface font-semibold focus:outline-none cursor-pointer">
+              <option value="50">50 Tài Khoản</option>
+              <option value="100">100 Tài Khoản</option>
+              <option value="200">200 Tài Khoản</option>
+              <option value="500">500 Tài Khoản</option>
+              <option value="all">Tất Cả</option>
+            </select>
+          </div>
         </div>
 
         {/* ── Nội Dung Chính (Bảng + RBAC Inspector) ─────────────────────────── */}
@@ -882,17 +915,19 @@ const QuanLyTaiKhoan = () => {
                     {danhSachDaLoc.length} / {danhSachNV.length}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <button
-                    onClick={taiDuLieuTuBackend}
-                    className="flex items-center gap-1 text-xs text-on-surface-variant hover:text-admin-primary px-2 py-1 rounded bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer"
+                    onClick={() => taiDuLieuTuBackend()}
+                    className="flex items-center gap-1 text-xs text-on-surface-variant hover:text-admin-primary px-2.5 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer"
                     title="Tải lại từ MySQL"
                   >
                     <span className="material-symbols-outlined text-[14px]">refresh</span>
                     <span>Làm mới</span>
                   </button>
-                  <span className="w-2 h-2 rounded-full bg-admin-primary animate-ping" />
-                  <span className="font-label-sm text-label-sm text-admin-primary font-semibold">CSDL THỰC (LIMIT 50)</span>
+                  <span className="font-label-sm text-label-sm text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>CSDL THỰC {tongSoTrongDb > 0 ? `(${tongSoTrongDb.toLocaleString('vi-VN')} người dùng)` : ''}</span>
+                  </span>
                 </div>
               </div>
 
@@ -1287,7 +1322,7 @@ const QuanLyTaiKhoan = () => {
                 <span className="material-symbols-outlined text-[22px] text-admin-primary">person_add</span>
                 <div>
                   <div className="font-title-md text-title-md text-on-surface font-semibold">Cấp Phát Tài Khoản Người Dùng Mới</div>
-                  <div className="font-label-sm text-label-sm text-on-surface-variant">Lưu trực tiếp vào CSDL MySQL (Bảng Users)</div>
+                  <div className="font-label-sm text-label-sm text-on-surface-variant">Lưu trực tiếp vào CSDL MySQL (Bảng Users) • Thêm không giới hạn số lượng</div>
                 </div>
               </div>
               <button onClick={() => setModalCapPhat(false)} className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-all cursor-pointer">
