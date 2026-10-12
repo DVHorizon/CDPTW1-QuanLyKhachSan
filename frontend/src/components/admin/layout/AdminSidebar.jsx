@@ -5,38 +5,17 @@ import { NavLink } from "react-router-dom";
 const NAV_ITEMS = [
   { icon: "grid_view", label: "Bàn Làm Việc", to: "/admin/ban-lam-viec" },
   { icon: "room_service", label: "Lễ Tân & Tiền Sảnh", to: "/admin/le-tan" },
-  {
-    icon: "bedroom_parent",
-    label: "Quản Lý Hạng Phòng",
-    to: "/admin/room-types",
-  },
+  { icon: "bedroom_parent", label: "Quản Lý Hạng Phòng", to: "/admin/room-types" },
   { icon: "meeting_room", label: "Quản Lý Phòng Vật Lý", to: "/admin/rooms" },
-  {
-    icon: "cleaning_services",
-    label: "Buồng Phòng & Kỹ Thuật",
-    to: "/admin/buong-phong",
-  },
+  { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong" },
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services" },
-  { icon: "restaurant", label: "Ẩm Thực F&B & Bếp", to: "/admin/menu" },
-  {
-    icon: "account_balance",
-    label: "Tài Chính & Sổ Cái",
-    to: "/admin/tai-chinh",
-  },
-{icon: "soup_kitchen",
-label: "Màn hình bếp (KDS)",
-to: "/admin/fnb/kitchen",},
-  {
-    icon: "neurology",
-    label: "AI Concierge & Chatbot",
-    to: "/admin/ai-concierge",
-  },
+  { icon: "restaurant", label: "Quản Lý Thực Đơn (F&B)", to: "/admin/menu" },
+  { icon: "soup_kitchen", label: "Màn Hình Bếp (KDS)", to: "/admin/fnb/kitchen" },
+  { icon: "point_of_sale", label: "POS & Room Service", to: "/room-service" },
+  { icon: "account_balance", label: "Tài Chính & Sổ Cái", to: "/admin/tai-chinh" },
+  { icon: "neurology", label: "AI Concierge & Chatbot", to: "/admin/ai-concierge" },
   { icon: "loyalty", label: "Khách Hàng & Hội Viên", to: "/admin/loyalty" },
-  {
-    icon: "admin_panel_settings",
-    label: "Quản Trị Hệ Thống",
-    to: "/admin/quan-tri",
-  },
+  { icon: "admin_panel_settings", label: "Quản Trị Hệ Thống", to: "/admin/quan-tri" },
 ];
 
 const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
@@ -80,6 +59,9 @@ const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
                     <span className="font-headline-sm text-label-md uppercase tracking-wider text-on-surface font-bold truncate">
                       Grand Horizon
                     </span>
+                    <span className="font-label-sm text-label-sm uppercase tracking-widest text-admin-primary font-semibold truncate">
+                      Resort &amp; Suites • PMS
+                    </span>
                   </div>
                 </div>
               </>
@@ -105,6 +87,7 @@ const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
                   key={item.to}
                   to={item.to}
                   title={item.label}
+                  end={item.to === '/admin'}
                   className={({ isActive }) =>
                     `flex items-center ${
                       isCollapsed
@@ -113,14 +96,14 @@ const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
                     } transition-all duration-200 group no-underline relative
                     ${
                       isActive
-                        ? "bg-admin-primary-container text-on-admin-primary font-semibold shadow-sm"
+                        ? "bg-admin-primary text-[#002114] font-bold shadow-sm"
                         : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      <span className="material-symbols-outlined text-[20px] transition-colors flex-shrink-0">
+                      <span className={`material-symbols-outlined text-[20px] transition-colors flex-shrink-0 ${isActive ? 'text-[#002114]' : ''}`}>
                         {item.icon}
                       </span>
                       {!isCollapsed && (
@@ -129,7 +112,7 @@ const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
                             {item.label}
                           </span>
                           {isActive && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-admin-primary flex-shrink-0" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#002114] flex-shrink-0" />
                           )}
                         </>
                       )}

@@ -9,11 +9,19 @@ module.exports = (sequelize) => {
     },
     StayId: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true
     },
-    RoomId: {
+    TableId: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    UserId: {
       type: DataTypes.INTEGER,
       allowNull: false
+    },
+    OrderTime: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW
     },
     OrderType: {
       type: DataTypes.ENUM('RoomService', 'Restaurant'),
@@ -31,11 +39,13 @@ module.exports = (sequelize) => {
     PaymentMode: {
       type: DataTypes.ENUM('RoomInvoice', 'PayNow'),
       allowNull: false
+    },
+    Note: {
+      type: DataTypes.STRING,
+      allowNull: true
     }
   }, {
     tableName: 'FoodOrders',
-    timestamps: true,
-    createdAt: 'CreatedAt',
-    updatedAt: 'UpdatedAt'
+    timestamps: false
   });
 };
