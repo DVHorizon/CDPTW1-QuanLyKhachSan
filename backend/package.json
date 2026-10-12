@@ -7,7 +7,11 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "migrate": "sequelize-cli db:migrate",
-    "seed": "node src/seeders/seedAll.js"
+    "seed": "node src/seeders/seedRunner.js",
+    "seed:fast": "node src/seeders/seedRunner.js --count=1000",
+    "seed:dev": "node src/seeders/seedRunner.js --count=10000",
+    "seed:full": "node src/seeders/seedRunner.js --count=100000",
+    "verify:db": "node src/seeders/verifyTables.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

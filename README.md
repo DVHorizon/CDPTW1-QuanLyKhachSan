@@ -73,21 +73,29 @@ volumes:
 
 👉 **Cơ chế:** Khi MySQL container khởi động lần đầu tiên, hệ thống sẽ tự động quét thư mục `/docker-entrypoint-initdb.d/` và thực thi toàn bộ câu lệnh trong tệp `init.sql` để tạo cơ sở dữ liệu `hotel_management` cùng toàn bộ 50 bảng mà bạn không cần phải import thủ công!
 
-### 3.2 Các bước khởi chạy:
+### 3.2 Khởi chạy nhanh 1-Click (Tự động hoàn toàn)
+
+- **Trên Windows:** Nhấp đúp chuột vào tệp `setup.bat` (hoặc chạy `.\setup.bat` trong PowerShell/CMD).
+- **Trên macOS / Linux:** Chạy `./setup.sh` trong Terminal.
+
+> Script sẽ tự động: Khởi chạy Docker -> Đợi MySQL sẵn sàng -> Chạy Migration tạo 57 bảng -> Nạp dữ liệu Seeder (~20 giây) -> Sẵn sàng trên phpMyAdmin!
+
+### 3.3 Khởi chạy thủ công bằng lệnh Docker
 
 1. Mở terminal tại thư mục gốc dự án:
    ```bash
-   docker compose up -d --build
+   docker compose up -d
    ```
-2. Kiểm tra trạng thái các container:
+2. Khởi tạo 57 bảng và nạp dữ liệu mẫu vào CSDL:
    ```bash
-   docker compose ps
+   docker exec hotel_backend npm run migrate
+   docker exec hotel_backend npm run seed:fast
    ```
 3. Truy cập các dịch vụ:
+   - **Giao diện quản lý CSDL phpMyAdmin:** [http://localhost:8080](http://localhost:8080)  
+     _(Tài khoản: `root` / Mật khẩu: để trống / Server: `mysql`)_
    - **Giao diện Khách hàng & Quản trị:** [http://localhost:3000](http://localhost:3000)
    - **Máy chủ Backend API:** [http://localhost:5000/api/health](http://localhost:5000/api/health)
-   - **Giao diện quản lý CSDL phpMyAdmin:** [http://localhost:8080](http://localhost:8080)  
-     _(Tài khoản: `root` / Mật khẩu:)_
 
 ---
 
