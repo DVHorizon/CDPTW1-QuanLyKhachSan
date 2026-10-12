@@ -29,7 +29,6 @@ app.use('/api/rooms', require('./routes/roomSearchRoutes'));
 
 // Route quản lý loại phòng
 app.use('/api/loai-phong', require('./routes/roomTypes'));
-
 // Route quản lý phòng vật lý
 app.use('/api/phong', require('./routes/rooms'));
 
@@ -38,6 +37,7 @@ app.use('/api/v1', require('./routes/admin/menuRoutes'));
 
 // Route F&B Orders (Room Service, KDS, History)
 app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
+
 
 app.listen(PORT, () => {
   console.log(`Backend server is running on port ${PORT}`);
