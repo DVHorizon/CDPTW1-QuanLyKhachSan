@@ -39,6 +39,12 @@ app.use('/api/v1', require('./routes/admin/menuRoutes'));
 // Route F&B Orders (Room Service, KDS, History)
 app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
 
-app.listen(PORT, () => {
-  console.log(`Backend server is running on port ${PORT}`);
+const http = require('http');
+const { initWebSocket } = require('./services/websocketService');
+
+const server = http.createServer(app);
+initWebSocket(server);
+
+server.listen(PORT, () => {
+  console.log(`Backend server with WebSocket is running on port ${PORT}`);
 });

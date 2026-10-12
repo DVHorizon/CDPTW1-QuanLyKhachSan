@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services" },
   { icon: "restaurant", label: "Quản Lý Thực Đơn (F&B)", to: "/admin/menu" },
   { icon: "soup_kitchen", label: "Màn Hình Bếp (KDS)", to: "/admin/fnb/kitchen" },
+  { icon: "local_shipping", label: "Theo Dõi & Giao Món", to: "/admin/fnb/dispatch" },
   { icon: "point_of_sale", label: "POS & Room Service", to: "/room-service" },
   { icon: "account_balance", label: "Tài Chính & Sổ Cái", to: "/admin/tai-chinh" },
   { icon: "neurology", label: "AI Concierge & Chatbot", to: "/admin/ai-concierge" },
@@ -21,20 +22,18 @@ const NAV_ITEMS = [
 const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen ${
-        isCollapsed ? "w-20" : "w-72"
-      } bg-surface-container-lowest z-50 shadow-[0_1px_8px_rgba(0,0,0,0.04)] transition-all duration-300 ease-in-out border-r border-outline-variant/20`}
+      className={`fixed left-0 top-0 h-screen ${isCollapsed ? "w-20" : "w-72"
+        } bg-surface-container-lowest z-50 shadow-[0_1px_8px_rgba(0,0,0,0.04)] transition-all duration-300 ease-in-out border-r border-outline-variant/20`}
     >
       {/* Khung nội dung scrollable bên trong */}
       <div className="h-full flex flex-col justify-between overflow-y-auto overflow-x-hidden">
         <div className="flex flex-col">
           {/* Logo / Brand */}
           <div
-            className={`h-16 ${
-              isCollapsed
-                ? "px-2 justify-center"
-                : "px-space-md justify-between"
-            } flex items-center bg-surface-container-low flex-shrink-0 border-b border-outline-variant/20`}
+            className={`h-16 ${isCollapsed
+              ? "px-2 justify-center"
+              : "px-space-md justify-between"
+              } flex items-center bg-surface-container-low flex-shrink-0 border-b border-outline-variant/20`}
           >
             {isCollapsed ? (
               <button
@@ -70,14 +69,12 @@ const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
 
           {/* Navigation */}
           <div
-            className={`${
-              isCollapsed ? "px-space-xs" : "px-space-md"
-            } py-space-sm transition-all duration-300`}
+            className={`${isCollapsed ? "px-space-xs" : "px-space-md"
+              } py-space-sm transition-all duration-300`}
           >
             <div
-              className={`px-space-sm py-space-xs mb-space-xs font-label-sm text-label-sm uppercase text-on-surface-variant font-bold tracking-wider ${
-                isCollapsed ? "text-center text-[10px]" : ""
-              }`}
+              className={`px-space-sm py-space-xs mb-space-xs font-label-sm text-label-sm uppercase text-on-surface-variant font-bold tracking-wider ${isCollapsed ? "text-center text-[10px]" : ""
+                }`}
             >
               {isCollapsed ? "•••" : "Phân Hệ Tác Nghiệp"}
             </div>
@@ -89,15 +86,13 @@ const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
                   title={item.label}
                   end={item.to === '/admin'}
                   className={({ isActive }) =>
-                    `flex items-center ${
-                      isCollapsed
-                        ? "justify-center w-11 h-11 mx-auto rounded-xl"
-                        : "gap-space-md px-space-md py-space-sm rounded-lg"
+                    `flex items-center ${isCollapsed
+                      ? "justify-center w-11 h-11 mx-auto rounded-xl"
+                      : "gap-space-md px-space-md py-space-sm rounded-lg"
                     } transition-all duration-200 group no-underline relative
-                    ${
-                      isActive
-                        ? "bg-admin-primary text-[#002114] font-bold shadow-sm"
-                        : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                    ${isActive
+                      ? "bg-admin-primary text-[#002114] font-bold shadow-sm"
+                      : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
                     }`
                   }
                 >
