@@ -47,4 +47,7 @@ initWebSocket(server);
 
 server.listen(PORT, () => {
   console.log(`Backend server with WebSocket is running on port ${PORT}`);
+
+app.listen(PORT, () => {
+  console.log(`Backend server is running on port ${PORT}`);
 });
