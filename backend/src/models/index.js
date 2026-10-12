@@ -12,6 +12,8 @@ const defineBooking = require('./Booking');
 const defineReview = require('./Review');
 const defineMenuCategory = require('./MenuCategory');
 const defineMenuItem = require('./MenuItem');
+const defineAuditLog = require('./AuditLog');
+const defineFraudAlert = require('./FraudAlert');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -25,6 +27,8 @@ const Booking = defineBooking(sequelize);
 const Review = defineReview(sequelize);
 const MenuCategory = defineMenuCategory(sequelize);
 const MenuItem = defineMenuItem(sequelize);
+const AuditLog = defineAuditLog(sequelize);
+const FraudAlert = defineFraudAlert(sequelize);
 
 // Setup Relationships / Associations
 // 1. Role & User
@@ -71,5 +75,7 @@ module.exports = {
   Booking,
   Review,
   MenuCategory,
-  MenuItem
+  MenuItem,
+  AuditLog,
+  FraudAlert
 };

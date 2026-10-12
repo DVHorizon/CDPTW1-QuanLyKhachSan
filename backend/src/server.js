@@ -36,6 +36,16 @@ app.use('/api/phong', require('./routes/rooms'));
 // Routes F&B Quản lý Menu
 app.use('/api/v1', require('./routes/admin/menuRoutes'));
 
-app.listen(PORT, () => {
+// Route Audit Logs & Fraud Prevention
+app.use('/api/audit', require('./routes/auditLogRoutes'));
+
+const { AuditLog } = require('./models');
+
+app.listen(PORT, async () => {
   console.log(`Backend server is running on port ${PORT}`);
+  if (AuditLog && AuditLog.initDatabaseTriggers) {
+    await AuditLog.initDatabaseTriggers();
+    console.log('[Security] Đã kích hoạt Triggers bảo vệ bất biến (WORM) cho Audit Log.');
+  }
 });
+

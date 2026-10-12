@@ -8,6 +8,7 @@ import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
 import LoyaltyManagement from './pages/LoyaltyManagement';
+import AuditLogs from './pages/AuditLogs';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="/admin/room-types" element={<RoomTypeManagement />} />
           <Route path="/admin/rooms" element={<RoomManagement />} />
           <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
+          <Route path="/admin/audit-logs" element={<AuditLogs />} />
           {/* Redirect everything else to home for now */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
