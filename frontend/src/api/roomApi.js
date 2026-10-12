@@ -1,6 +1,92 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ROOM AVAILABILITY & BOOKING LOCK API (FEAT-GUEST-04 / A4)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Kiểm tra phòng trống real-time theo khoảng ngày
+ * GET /api/v1/rooms/availability
+ * @param {Object} params { roomTypeId, checkInDate, checkOutDate, quantity, lockSessionId }
+ */
+export const checkRoomAvailabilityApi = async ({ roomTypeId, checkInDate, checkOutDate, quantity = 1, lockSessionId = null }) => {
+  try {
+    const query = new URLSearchParams({
+      roomTypeId,
+      checkInDate,
+      checkOutDate,
+      quantity
+    });
+    if (lockSessionId) query.append('lockSessionId', lockSessionId);
+
+    let res = await fetch(`${API_BASE_URL}/v1/rooms/availability?${query.toString()}`);
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/availability?${query.toString()}`);
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi checkRoomAvailabilityApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ kiểm tra phòng trống.'
+    };
+  }
+};
+
+/**
+ * Giữ phòng tạm thời 15 phút chống Overbooking
+ * POST /api/v1/rooms/lock
+ * @param {Object} payload { roomTypeId, checkInDate, checkOutDate, quantity }
+ */
+export const lockRoomSessionApi = async ({ roomTypeId, checkInDate, checkOutDate, quantity = 1 }) => {
+  try {
+    let res = await fetch(`${API_BASE_URL}/v1/rooms/lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomTypeId, checkInDate, checkOutDate, quantity })
+    });
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/lock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomTypeId, checkInDate, checkOutDate, quantity })
+      });
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi lockRoomSessionApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ giữ phòng.'
+    };
+  }
+};
+
+/**
+ * Nhả phiên giữ phòng
+ * DELETE /api/v1/rooms/lock/:sessionId
+ */
+export const releaseRoomLockApi = async (sessionId) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/rooms/lock/${sessionId}`, {
+      method: 'DELETE'
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi releaseRoomLockApi:', err);
+    return { success: false };
+  }
+};
+
+/**
  * Gọi API Tìm kiếm phòng (FEAT-GUEST-02 / A2)
  * GET /api/v1/rooms/search
  * @param {Object} params { branchId, checkInDate, checkOutDate, totalGuests, keyword, priceMin, priceMax, roomTypes, view, amenities, rating, sortBy }
@@ -68,7 +154,6 @@ export const getBranchesApi = async () => {
     return json.data || [];
   } catch (err) {
     console.error('Lỗi khi fetch chi nhánh:', err);
-    // Fallback chi nhánh chuẩn của Grand Horizon
     return [
       { BranchId: 1, BranchName: 'Grand Horizon Phú Quốc', Address: 'Bãi Khem, Phú Quốc' },
       { BranchId: 2, BranchName: 'Grand Horizon Cam Ranh', Address: 'Bãi Dài, Cam Ranh' },
@@ -98,15 +183,14 @@ export const getRoomDetailApi = async (id) => {
  * GET /api/v1/rooms/suggest?q=...
  */
 export const suggestRoomsApi = async (q) => {
-  if (!q || !q.trim()) return null;
   try {
+    if (!q || !q.trim()) return { data: null };
     const res = await fetch(`${API_BASE_URL}/v1/rooms/suggest?q=${encodeURIComponent(q.trim())}`);
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const json = await res.json();
-    return json.data;
+    return json;
   } catch (err) {
-    console.error('Lỗi khi fetch gợi ý:', err);
-    return null;
+    console.error('Lỗi khi fetch suggester:', err);
+    return { data: null };
   }
 };
-

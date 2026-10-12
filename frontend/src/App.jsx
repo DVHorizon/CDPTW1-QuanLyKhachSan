@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import Home from './pages/client/Home';
 import SearchRooms from './pages/SearchRooms';
+import RoomDetail from './pages/client/RoomDetail';
 import Auth from './pages/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomTypeManagement from './pages/RoomTypeManagement';
@@ -23,6 +24,8 @@ function App() {
           <Route path="/rooms" element={<SearchRooms />} />
           <Route path="/rooms/search" element={<SearchRooms />} />
           <Route path="/tim-kiem" element={<SearchRooms />} />
+          <Route path="/rooms/:id" element={<RoomDetail />} />
+          <Route path="/room/:id" element={<RoomDetail />} />
           <Route path="/room-service" element={<RoomService />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/auth" element={<Auth />} />
