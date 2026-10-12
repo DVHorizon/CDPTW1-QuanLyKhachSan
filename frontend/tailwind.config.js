@@ -111,6 +111,7 @@ export default {
         "admin-primary": PALETTE.admin.primary,
         "admin-primary-container": PALETTE.admin.container,
         "on-admin-primary": PALETTE.neutral.white,
+        "on-admin-primary-container": PALETTE.neutral.white,
 
         // --- 4. SYSTEM STATUS & TERTIARY ---
         "error": PALETTE.status.error,
