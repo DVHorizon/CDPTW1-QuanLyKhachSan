@@ -1100,30 +1100,128 @@ const QuanLyTaiKhoan = () => {
                 </table>
               </div>
 
-              {/* Phân Trang */}
-              <div className="px-space-lg py-space-sm border-t border-outline-variant bg-surface-container/30 flex flex-col sm:flex-row items-center justify-between gap-space-sm">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">
-                  Hiển thị {danhSachTrang.length} / {danhSachDaLoc.length} người dùng — Trang {trangHienTai} / {tongSoTrang}
-                </span>
-                <div className="flex items-center gap-space-xs">
-                  <button onClick={() => setTrangHienTai(p => Math.max(1, p - 1))} disabled={trangHienTai === 1}
-                    className="p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer">
-                    <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-                  </button>
-                  {Array.from({ length: tongSoTrang }, (_, i) => i + 1).map(trang => (
-                    <button key={trang} onClick={() => setTrangHienTai(trang)}
-                      className={`w-8 h-8 rounded-lg font-label-md text-label-md font-semibold transition-all cursor-pointer ${
-                        trangHienTai === trang ? 'bg-admin-primary text-white shadow-sm' : 'border border-outline-variant text-on-surface-variant hover:bg-surface-container-high'
-                      }`}>
-                      {trang}
-                    </button>
-                  ))}
-                  <button onClick={() => setTrangHienTai(p => Math.min(tongSoTrang, p + 1))} disabled={trangHienTai === tongSoTrang}
-                    className="p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer">
-                    <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                  </button>
+              {/* Phân Trang — Smart Pagination */}
+              {tongSoTrang > 1 && (
+                <div className="px-space-lg py-3 border-t border-outline-variant bg-surface-container/30">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    {/* Info bên trái */}
+                    <div className="flex items-center gap-3">
+                      <span className="font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap">
+                        Trang <span className="font-bold text-on-surface">{trangHienTai}</span> / {tongSoTrang}
+                        &nbsp;·&nbsp;
+                        <span className="font-bold text-on-surface">{danhSachTrang.length}</span> / {danhSachDaLoc.length} bản ghi
+                      </span>
+                      {/* Nhảy trang nhanh */}
+                      <div className="flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
+                        <span>Đến trang</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={tongSoTrang}
+                          defaultValue={trangHienTai}
+                          key={trangHienTai}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              const v = parseInt(e.target.value, 10);
+                              if (v >= 1 && v <= tongSoTrang) setTrangHienTai(v);
+                            }
+                          }}
+                          className="w-14 text-center px-2 py-1 border border-outline-variant rounded-lg bg-surface-container-lowest font-mono text-sm text-on-surface focus:outline-none focus:border-admin-primary transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Nút phân trang bên phải */}
+                    <div className="flex items-center gap-1">
+                      {/* Về đầu */}
+                      <button
+                        onClick={() => setTrangHienTai(1)}
+                        disabled={trangHienTai === 1}
+                        className="p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        title="Trang đầu"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">first_page</span>
+                      </button>
+
+                      {/* Trang trước */}
+                      <button
+                        onClick={() => setTrangHienTai(p => Math.max(1, p - 1))}
+                        disabled={trangHienTai === 1}
+                        className="p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        title="Trang trước"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                      </button>
+
+                      {/* Smart page numbers with ellipsis */}
+                      {(() => {
+                        const pages = [];
+                        const delta = 2; // số trang hiển thị mỗi bên trang hiện tại
+                        const rangeStart = Math.max(2, trangHienTai - delta);
+                        const rangeEnd = Math.min(tongSoTrang - 1, trangHienTai + delta);
+
+                        // Trang 1 luôn hiện
+                        pages.push(1);
+
+                        // Dấu "..." trước
+                        if (rangeStart > 2) pages.push('..._left');
+
+                        // Các trang xung quanh trang hiện tại
+                        for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
+
+                        // Dấu "..." sau
+                        if (rangeEnd < tongSoTrang - 1) pages.push('..._right');
+
+                        // Trang cuối luôn hiện (nếu > 1)
+                        if (tongSoTrang > 1) pages.push(tongSoTrang);
+
+                        return pages.map((p, idx) => {
+                          if (typeof p === 'string') {
+                            return (
+                              <span key={p} className="w-8 h-8 flex items-center justify-center text-on-surface-variant font-label-sm select-none">
+                                ···
+                              </span>
+                            );
+                          }
+                          return (
+                            <button
+                              key={`page-${p}`}
+                              onClick={() => setTrangHienTai(p)}
+                              className={`w-8 h-8 rounded-lg font-label-md text-label-md font-semibold transition-all cursor-pointer ${
+                                trangHienTai === p
+                                  ? 'bg-admin-primary text-white shadow-sm shadow-admin-primary/30'
+                                  : 'border border-outline-variant text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          );
+                        });
+                      })()}
+
+                      {/* Trang sau */}
+                      <button
+                        onClick={() => setTrangHienTai(p => Math.min(tongSoTrang, p + 1))}
+                        disabled={trangHienTai === tongSoTrang}
+                        className="p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        title="Trang sau"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                      </button>
+
+                      {/* Về cuối */}
+                      <button
+                        onClick={() => setTrangHienTai(tongSoTrang)}
+                        disabled={trangHienTai === tongSoTrang}
+                        className="p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                        title="Trang cuối"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">last_page</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
