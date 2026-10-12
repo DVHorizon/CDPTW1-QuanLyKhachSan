@@ -8,6 +8,10 @@ router.post('/', fnbOrderController.createRoomServiceOrder);
 // Lịch sử gọi món
 router.get('/', fnbOrderController.getOrderHistory);
 
+// FEAT-FNB-06 (A4.6): Theo dõi trạng thái đơn món real-time bằng WebSocket
+router.get('/track/hub', fnbOrderController.getAllOrdersForHub);
+router.get('/track/:orderId', fnbOrderController.getOrderStatus);
+
 // Kitchen Display System
 router.get('/kitchen', fnbOrderController.getKitchenOrders);
 router.get('/kitchen/ready', fnbOrderController.getReadyOrders);

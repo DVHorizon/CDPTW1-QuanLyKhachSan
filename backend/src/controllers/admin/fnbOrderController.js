@@ -1,4 +1,5 @@
 const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room } = require('../../models');
+const { broadcastOrderStatus } = require('../../services/websocketService');
 
 exports.createRoomServiceOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -155,10 +156,13 @@ exports.updateItemCompletion = async (req, res) => {
     await detail.save();
     
     // Update order status to Preparing if it was Pending
-    const order = await FoodOrder.findByPk(orderId);
+    const order = await FoodOrder.findByPk(orderId, {
+      include: [{ model: Stay, include: [{ model: Room }] }]
+    });
     if (order && order.Status === 'Pending') {
       order.Status = 'Preparing';
       await order.save();
+      broadcastOrderStatus(order);
     }
     
     res.json({ success: true, message: 'Cập nhật món thành công.' });
@@ -187,10 +191,105 @@ exports.markOrderReady = async (req, res) => {
     
     order.Status = 'Ready';
     await order.save();
+    broadcastOrderStatus(order);
     
     res.json({ success: true, message: 'Đơn đã sẵn sàng.' });
   } catch (error) {
     res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể chuyển trạng thái đơn.' });
+  }
+};
+
+exports.getOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await FoodOrder.findByPk(orderId, {
+      include: [
+        {
+          model: FoodOrderDetail,
+          as: 'details',
+          include: [{ model: MenuItem }]
+        },
+        { model: Stay, include: [{ model: Room }] }
+      ]
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Đơn hàng không tồn tại.'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        foodOrderId: order.FoodOrderId,
+        status: order.Status,
+        orderTime: order.OrderTime,
+        totalAmount: order.TotalAmount,
+        paymentMode: order.PaymentMode,
+        note: order.Note,
+        roomNumber: order.Stay?.Room?.RoomNumber || 'N/A',
+        roomType: order.Stay?.Room?.RoomType?.Name || 'Deluxe Suite',
+        items: (order.details || []).map(d => ({
+          orderDetailId: d.FoodOrderDetailId,
+          itemName: d.MenuItem?.ItemName || 'Món ăn',
+          price: d.UnitPrice,
+          quantity: d.Quantity,
+          totalPrice: d.TotalPrice,
+          isCompleted: d.IsCompleted,
+          note: d.Note
+        }))
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: 'Không thể cập nhật trạng thái đơn.'
+    });
+  }
+};
+
+exports.getAllOrdersForHub = async (req, res) => {
+  try {
+    const orders = await FoodOrder.findAll({
+      order: [['OrderTime', 'DESC']],
+      limit: 50,
+      include: [
+        {
+          model: FoodOrderDetail,
+          as: 'details',
+          include: [{ model: MenuItem }]
+        },
+        { model: Stay, include: [{ model: Room }] }
+      ]
+    });
+
+    const transformed = orders.map(order => ({
+      foodOrderId: order.FoodOrderId,
+      status: order.Status,
+      orderTime: order.OrderTime,
+      totalAmount: order.TotalAmount,
+      roomNumber: order.Stay?.Room?.RoomNumber || (order.TableId ? `Bàn ${order.TableId}` : 'Khách Vãng Lai'),
+      note: order.Note,
+      items: (order.details || []).map(d => ({
+        orderDetailId: d.FoodOrderDetailId,
+        itemName: d.MenuItem?.ItemName || 'Món ăn',
+        quantity: d.Quantity,
+        isCompleted: d.IsCompleted,
+        kitchenStation: d.MenuItem?.KitchenStation || 'Hot'
+      }))
+    }));
+
+    res.json({
+      success: true,
+      data: transformed
+    });
+  } catch (error) {
+    res.status(500).json({
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: 'Không thể cập nhật trạng thái đơn.'
+    });
   }
 };
 
@@ -216,10 +315,13 @@ exports.getReadyOrders = async (req, res) => {
 exports.restoreOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const order = await FoodOrder.findByPk(orderId);
+    const order = await FoodOrder.findByPk(orderId, {
+      include: [{ model: Stay, include: [{ model: Room }] }]
+    });
     if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy.' });
     order.Status = 'Preparing';
     await order.save();
+    broadcastOrderStatus(order);
     res.json({ success: true, message: 'Đã khôi phục thành công.' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Lỗi khôi phục.' });
@@ -387,6 +489,13 @@ exports.updateOrder = async (req, res) => {
 
     await order.save({ transaction });
     await transaction.commit();
+
+    const fullOrder = await FoodOrder.findByPk(orderId, {
+      include: [{ model: Stay, include: [{ model: Room }] }]
+    });
+    if (fullOrder) {
+      broadcastOrderStatus(fullOrder);
+    }
 
     res.json({ success: true, message: 'Cập nhật thành công', data: order });
   } catch (error) {
