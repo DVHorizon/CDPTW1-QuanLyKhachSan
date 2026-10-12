@@ -15,11 +15,11 @@ const STATUS_CONFIG = {
     topBorder: 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.7)]',
     cardRing: 'ring-emerald-500/50',
     icon: 'verified',
-    description: 'Phòng đã dọn dẹp và kiểm định QC, sẵn sàng đón khách mới check-in.',
+    description: 'Phòng đã được dọn sạch và kiểm định chất lượng, sẵn sàng đón khách mới nhận phòng.',
     nextActions: [
-      { action: 'inhouse', label: 'Check-in (Nhận Phòng)', icon: 'login', cls: 'bg-secondary text-white hover:brightness-110' },
+      { action: 'inhouse', label: 'Nhận Phòng (Check-in)', icon: 'login', cls: 'bg-secondary text-white hover:brightness-110' },
       { action: 'dirty', label: 'Báo Bẩn (Chờ Dọn)', icon: 'mop', cls: 'bg-amber-600 text-white hover:brightness-110' },
-      { action: 'ooo', label: 'Khóa Bảo Trì (OOO)', icon: 'build', cls: 'bg-slate-600 text-white hover:brightness-110' },
+      { action: 'ooo', label: 'Khóa Bảo Trì (Kỹ Thuật)', icon: 'build', cls: 'bg-slate-600 text-white hover:brightness-110' },
     ]
   },
   inhouse: {
@@ -31,9 +31,9 @@ const STATUS_CONFIG = {
     topBorder: 'bg-sky-500 shadow-[0_0_12px_rgba(2,132,199,0.7)]',
     cardRing: 'ring-sky-500/50',
     icon: 'person_pin_circle',
-    description: 'Khách đang lưu trú tại phòng. Khóa thẻ RFID đang được kích hoạt.',
+    description: 'Khách đang lưu trú tại phòng. Khóa thẻ thông minh đang được kích hoạt.',
     nextActions: [
-      { action: 'dirty', label: 'Check-out (Trả Phòng)', icon: 'logout', cls: 'bg-amber-600 text-white hover:brightness-110' },
+      { action: 'dirty', label: 'Trả Phòng (Check-out)', icon: 'logout', cls: 'bg-amber-600 text-white hover:brightness-110' },
       { action: 'clean', label: 'Chuyển Trống Sạch', icon: 'check_circle', cls: 'bg-emerald-600 text-white hover:brightness-110' },
     ]
   },
@@ -46,11 +46,11 @@ const STATUS_CONFIG = {
     topBorder: 'bg-amber-500 shadow-[0_0_12px_rgba(217,119,6,0.7)]',
     cardRing: 'ring-amber-500/50',
     icon: 'cleaning_services',
-    description: 'Phòng khách vừa trả hoặc đang cần Housekeeping dọn dẹp, thay drap.',
+    description: 'Phòng khách vừa trả hoặc đang chờ bộ phận buồng phòng vệ sinh, thay ga gối.',
     nextActions: [
       { action: 'clean', label: 'Đã Dọn Xong (Sạch)', icon: 'task_alt', cls: 'bg-emerald-600 text-white hover:brightness-110' },
       { action: 'inhouse', label: 'Nhận Phòng Ngay', icon: 'login', cls: 'bg-secondary text-white hover:brightness-110' },
-      { action: 'ooo', label: 'Khóa Bảo Trì', icon: 'build', cls: 'bg-slate-600 text-white hover:brightness-110' },
+      { action: 'ooo', label: 'Khóa Kỹ Thuật Bảo Trì', icon: 'build', cls: 'bg-slate-600 text-white hover:brightness-110' },
     ]
   },
   ooo: {
@@ -62,9 +62,9 @@ const STATUS_CONFIG = {
     topBorder: 'bg-rose-500 shadow-[0_0_12px_rgba(225,29,72,0.7)]',
     cardRing: 'ring-rose-500/50',
     icon: 'build_circle',
-    description: 'Phòng bị khóa kỹ thuật do hỏng hóc hoặc bảo trì định kỳ. Cấm gán phòng.',
+    description: 'Phòng bị khóa kỹ thuật do hỏng hóc hoặc sửa chữa định kỳ. Cấm gán phòng.',
     nextActions: [
-      { action: 'dirty', label: 'Bảo Trì Xong (Chờ Dọn)', icon: 'mop', cls: 'bg-amber-600 text-white hover:brightness-110' },
+      { action: 'dirty', label: 'Sửa Xong (Chờ Dọn)', icon: 'mop', cls: 'bg-amber-600 text-white hover:brightness-110' },
       { action: 'clean', label: 'Khôi Phục Trống Sạch', icon: 'check_circle', cls: 'bg-emerald-600 text-white hover:brightness-110' },
     ]
   }
@@ -81,9 +81,9 @@ const getRoomStatusKey = (r) => {
 const DEFAULT_TYPES = [
   { code: 'RT-1', name: 'Deluxe King Hướng Biển', price: '2.500.000 đ' },
   { code: 'RT-2', name: 'Premier Suite Ban Công Riêng', price: '3.800.000 đ' },
-  { code: 'RT-3', name: 'Executive Corner Suite', price: '4.500.000 đ' },
-  { code: 'RT-4', name: 'Presidential Sky Villa', price: '12.000.000 đ' },
-  { code: 'RT-5', name: 'Family Connecting Suite', price: '5.200.000 đ' },
+  { code: 'RT-3', name: 'Executive Suite Góc Hai Mặt Thoáng', price: '4.500.000 đ' },
+  { code: 'RT-4', name: 'Biệt Thự Tổng Thống Sky Villa', price: '12.000.000 đ' },
+  { code: 'RT-5', name: 'Phòng Gia Đình Liên Thông', price: '5.200.000 đ' },
 ];
 
 const RoomStatusManagement = () => {
@@ -449,7 +449,7 @@ const RoomStatusManagement = () => {
             <div className="flex items-center gap-space-sm flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-space-sm py-0.5 rounded-full bg-admin-primary/15 text-admin-primary font-label-sm text-label-sm font-bold tracking-wider uppercase">
                 <span className="w-2 h-2 rounded-full bg-admin-primary animate-ping" />
-                Live Real-Time Feed
+                Dữ Liệu Trực Tiếp Thời Gian Thực
               </span>
               <span className="font-headline-sm text-headline-sm font-bold text-on-surface tracking-tight">
                 SƠ ĐỒ PHÒNG &amp; QUẢN LÝ TRẠNG THÁI PHÒNG TỰ ĐỘNG
@@ -734,9 +734,9 @@ const RoomStatusManagement = () => {
               className="bg-surface-container-lowest border border-outline-variant/40 rounded-xl px-3 py-1.5 text-body-sm font-semibold text-on-surface outline-none focus:ring-1 focus:ring-admin-primary"
             >
               <option value="all">Tất cả khu</option>
-              <option value="A">Khu A (Villas)</option>
-              <option value="B">Khu B (Suites)</option>
-              <option value="C">Khu C (Ocean)</option>
+              <option value="A">Khu A (Biệt Thự)</option>
+              <option value="B">Khu B (Căn Hộ Nghỉ Dưỡng)</option>
+              <option value="C">Khu C (Hướng Biển)</option>
             </select>
 
             <select
@@ -877,7 +877,7 @@ const RoomStatusManagement = () => {
                                   title={na.label}
                                   className={`text-[10px] px-2 py-0.5 rounded font-bold cursor-pointer transition-transform active:scale-95 ${na.cls}`}
                                 >
-                                  {na.action === 'inhouse' ? 'In' : na.action === 'dirty' ? 'Out' : 'Clean'}
+                                  {na.action === 'inhouse' ? 'Nhận' : na.action === 'dirty' ? 'Trả' : 'Dọn'}
                                 </button>
                               ))}
                             </div>
@@ -1059,13 +1059,13 @@ const RoomStatusManagement = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent" />
                   <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between">
                     <div>
-                      <span className="text-[10px] text-amber-500 uppercase tracking-widest font-bold">Resort Suites</span>
+                      <span className="text-[10px] text-amber-500 uppercase tracking-widest font-bold">Hạng Nghỉ Dưỡng</span>
                       <p className="text-body-sm font-bold text-white drop-shadow-md">
                         {getPrice(selectedRoom.ma_loai)} / đêm
                       </p>
                     </div>
                     <span className="text-[11px] px-2 py-0.5 rounded bg-surface-container-lowest/90 font-mono text-admin-primary font-bold shadow-xs">
-                      {selectedRoom.ma_khoa || 'RFID Active'}
+                      {selectedRoom.ma_khoa || 'Thẻ Kích Hoạt'}
                     </span>
                   </div>
                 </div>
@@ -1140,11 +1140,11 @@ const RoomStatusManagement = () => {
                   <div className="p-2.5 rounded-xl bg-surface-container text-center flex flex-col items-center">
                     <span className="material-symbols-outlined text-sky-500 text-[20px]">vpn_key</span>
                     <span className="text-[10px] text-on-surface-variant mt-0.5">Đầu Khóa</span>
-                    <span className="font-mono text-label-md font-bold text-sky-500">Online</span>
+                    <span className="font-mono text-label-md font-bold text-sky-500">Trực Tuyến</span>
                   </div>
                   <div className="p-2.5 rounded-xl bg-surface-container text-center flex flex-col items-center">
                     <span className="material-symbols-outlined text-amber-500 text-[20px]">wifi</span>
-                    <span className="text-[10px] text-on-surface-variant mt-0.5">IoT Mesh</span>
+                    <span className="text-[10px] text-on-surface-variant mt-0.5">Mạng Cảm Biến</span>
                     <span className="font-mono text-label-md font-bold text-admin-primary">98%</span>
                   </div>
                 </div>
@@ -1287,7 +1287,7 @@ const RoomStatusManagement = () => {
 
                 <div className="grid grid-cols-2 gap-3">
                   <label className="flex flex-col gap-1">
-                    <span className="font-label-sm text-label-sm font-bold text-on-surface-variant">Khu (Wing)</span>
+                    <span className="font-label-sm text-label-sm font-bold text-on-surface-variant">Phân Khu (Dãy)</span>
                     <select
                       value={editModal.room.khu || 'A'}
                       onChange={(e) =>
@@ -1295,9 +1295,9 @@ const RoomStatusManagement = () => {
                       }
                       className="bg-surface border border-outline-variant rounded-xl px-3 py-2 text-body-sm font-semibold text-on-surface outline-none focus:ring-1 focus:ring-admin-primary"
                     >
-                      <option value="A">Khu A (Villas)</option>
-                      <option value="B">Khu B (Suites)</option>
-                      <option value="C">Khu C (Ocean)</option>
+                      <option value="A">Khu A (Biệt Thự)</option>
+                      <option value="B">Khu B (Căn Hộ Nghỉ Dưỡng)</option>
+                      <option value="C">Khu C (Hướng Biển)</option>
                     </select>
                   </label>
 
