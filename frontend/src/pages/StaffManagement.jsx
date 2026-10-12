@@ -726,10 +726,16 @@ const QuanLyTaiKhoan = () => {
     setTuKhoa(''); setLocPhongBan('TAT_CA'); setLocVaiTro('TAT_CA'); setLocTrangThai('TAT_CA');
   };
 
-  // KPI tổng quan
+  // KPI tổng quan — dùng tongSoTrongDb từ backend để hiển thị đúng tổng DB
   const soHoatDong = danhSachNV.filter(nv => nv.trangThai === 'hoat_dong').length;
   const soThuHoi = danhSachNV.filter(nv => nv.trangThai === 'da_thu_hoi').length;
   const soPhongBan = new Set(danhSachNV.map(nv => nv.phongBan)).size;
+  // Tổng thực trong DB (lấy từ API response field totalInDb)
+  const tongNguoiDungThucTe = tongSoTrongDb > 0 ? tongSoTrongDb : danhSachNV.length;
+  // Tỉ lệ hoạt động ước tính: nếu có dữ liệu tổng DB thì ước tính, nếu không thì dùng local
+  const tiLeHoatDong = danhSachNV.length > 0
+    ? Math.round((soHoatDong / danhSachNV.length) * tongNguoiDungThucTe)
+    : soHoatDong;
 
   return (
     <AdminLayout>
@@ -763,7 +769,7 @@ const QuanLyTaiKhoan = () => {
               Quản Lý Người Dùng & Phân Quyền Nội Bộ
             </h1>
             <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
-              Dữ liệu thật kết nối từ cơ sở dữ liệu MySQL (giới hạn 50 bản ghi) — Hỗ trợ thêm, sửa, xóa với kiểm tra xung đột thời gian thực.
+              Dữ liệu thật kết nối từ cơ sở dữ liệu MySQL — Hỗ trợ thêm không giới hạn, sửa, xóa với kiểm tra xung đột thời gian thực.
             </p>
           </div>
 
@@ -829,10 +835,36 @@ const QuanLyTaiKhoan = () => {
         {/* ── Thẻ KPI Tổng Quan ───────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-space-md mb-space-lg">
           {[
-            { nhan: 'Tổng Người Dùng', gia_tri: `${danhSachNV.length} / 50`, phu: `${soHoatDong} đang hoạt động`, bieu_tuong: 'group', mau: 'text-admin-primary' },
-            { nhan: 'Đã Thu Hồi Quyền', gia_tri: soThuHoi, phu: 'Tài khoản bị đình chỉ', bieu_tuong: 'block', mau: 'text-error' },
-            { nhan: 'Số Phòng Ban', gia_tri: soPhongBan, phu: 'Nhóm chức năng PMS', bieu_tuong: 'domain', mau: 'text-secondary' },
-            { nhan: 'Nguồn CSDL MySQL', gia_tri: backendConnected ? 'Đã Kết Nối' : 'Mất Kết Nối', phu: backendConnected ? 'hotel_management (50 users)' : 'Vui lòng kiểm tra server', bieu_tuong: 'database', mau: backendConnected ? 'text-admin-primary' : 'text-error' },
+            {
+              nhan: 'Tổng Người Dùng',
+              gia_tri: tongNguoiDungThucTe.toLocaleString('vi-VN'),
+              phu: `${tiLeHoatDong.toLocaleString('vi-VN')} đang hoạt động`,
+              bieu_tuong: 'group',
+              mau: 'text-admin-primary'
+            },
+            {
+              nhan: 'Đã Thu Hồi Quyền',
+              gia_tri: soThuHoi,
+              phu: 'Tài khoản bị đình chỉ',
+              bieu_tuong: 'block',
+              mau: 'text-error'
+            },
+            {
+              nhan: 'Số Phòng Ban',
+              gia_tri: soPhongBan,
+              phu: 'Nhóm chức năng PMS',
+              bieu_tuong: 'domain',
+              mau: 'text-secondary'
+            },
+            {
+              nhan: 'Nguồn CSDL MySQL',
+              gia_tri: backendConnected ? 'Đã Kết Nối' : 'Mất Kết Nối',
+              phu: backendConnected
+                ? `quanlykhachsan.Users (${tongNguoiDungThucTe.toLocaleString('vi-VN')} tài khoản)`
+                : 'Vui lòng kiểm tra server',
+              bieu_tuong: 'database',
+              mau: backendConnected ? 'text-admin-primary' : 'text-error'
+            },
           ].map((the, i) => (
             <div key={i} className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between border border-outline-variant/30">
               <div className="flex items-center justify-between mb-space-xs">
