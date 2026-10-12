@@ -395,12 +395,29 @@ const QuanLyTaiKhoan = () => {
     hienThongBao(`Đã cấp phát thành công tài khoản cho ${hoTen}!`, 'thanh_cong');
     ghiNhatKy('CẤP PHÁT TÀI KHOẢN', res.data.data?.id || 'MỚI',
       `Cấp phát thành công: ${hoTen} (${email}) với vai trò ${vaiTro}`);
-    setModalCapPhat(false);
-    setTrangHienTai(1);
-    if (res.data.data?.id) {
-      setIdDangChon(res.data.data.id);
+
+    // Cập nhật ngay lập tức giao diện người dùng (Optimistic update)
+    const newUser = res.data.data;
+    if (newUser) {
+      setDanhSachNV(prev => [newUser, ...prev.filter(u => u.id !== newUser.id)]);
+      setTongSoTrongDb(prev => (prev || 0) + 1);
+      setIdDangChon(newUser.id);
+      setTrangHienTai(1);
     }
-    taiDuLieuTuBackend();
+
+    // Reset sạch form thêm mới
+    setFormNVMoi({
+      hoTen: '',
+      email: '',
+      phone: '',
+      phongBan: DANH_SACH_PHONG_BAN[0],
+      vaiTro: ''
+    });
+    setLoiFormNVMoi('');
+    setModalCapPhat(false);
+
+    // Đồng bộ lại trực tiếp từ CSDL MySQL
+    await taiDuLieuTuBackend();
   };
 
   // ─── MỞ MODAL SỬA THÔNG TIN ────────────────────────────────────────────────

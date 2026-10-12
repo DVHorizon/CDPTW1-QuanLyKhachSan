@@ -266,6 +266,10 @@ router.post('/', async (req, res) => {
     ]);
 
     const newId = result.insertId;
+    const phanTen = cleanName.split(' ').filter(Boolean);
+    const vienTat = phanTen.length >= 2
+      ? (phanTen[0][0] + phanTen[phanTen.length - 1][0]).toUpperCase()
+      : cleanName.substring(0, 2).toUpperCase();
 
     res.status(201).json({
       success: true,
@@ -275,9 +279,16 @@ router.post('/', async (req, res) => {
         rawId: newId,
         hoTen: cleanName,
         email: cleanEmail,
+        phone: phone ? String(phone).trim() : '0900000000',
         phongBan: dept,
         vaiTro,
-        trangThai: 'hoat_dong'
+        maVaiTro: `VAI_TRO #${String(roleId).padStart(2, '0')}`,
+        trangThai: 'hoat_dong',
+        rawStatus: 'Active',
+        vienTat,
+        ngayVaoLam: now.toLocaleDateString('vi-VN'),
+        quyenHan: quyenHan || DEFAULT_PERMS,
+        chinhSachBaoMat: chinhSachBaoMat || DEFAULT_POLICY
       }
     });
   } catch (err) {
