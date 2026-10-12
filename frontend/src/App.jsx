@@ -10,6 +10,7 @@ import RoomManagement from './pages/RoomManagement';
 import RoomService from './pages/client/RoomService';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import LoyaltyManagement from './pages/LoyaltyManagement';
+import ServiceManagement from './pages/ServiceManagement';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
           <Route path="/admin/room-types" element={<RoomTypeManagement />} />
           <Route path="/admin/rooms" element={<RoomManagement />} />
           <Route path="/admin/fnb/kitchen" element={<KitchenDisplay />} />
+		   <Route path="/admin/services" element={<ServiceManagement />} />
           <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
           {/* Redirect everything else to home for now */}
           <Route path="*" element={<Navigate to="/" />} />
