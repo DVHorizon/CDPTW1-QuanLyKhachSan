@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -9,8 +10,10 @@ const Auth = () => {
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '899765659367-t8al691bc6mhhmu52r6mh58fq1i5fma7.apps.googleusercontent.com';
   const FACEBOOK_APP_ID = import.meta.env.VITE_FACEBOOK_APP_ID || '';
 
-  // Khởi tạo Google One Tap khi component mount
+  const googleInitialized = useRef(false);
+  // Khởi tạo Google One Tap khi component mount (chỉ chạy 1 lần)
   useEffect(() => {
+    if (googleInitialized.current) return; // đã init rồi thì bỏ qua
     if (window.google?.accounts?.id && GOOGLE_CLIENT_ID && !isAuthenticated) {
       try {
         window.google.accounts.id.initialize({
@@ -41,11 +44,12 @@ const Auth = () => {
             }
           }
         });
+        googleInitialized.current = true; // đánh dấu đã init
       } catch (e) {
         console.warn('Google One Tap init warning:', e);
       }
     }
-  }, [GOOGLE_CLIENT_ID, isAuthenticated, loginGoogle, navigate]);
+  }, []); // chỉ chạy 1 lần khi mount
 
   // Khởi tạo Facebook SDK (nếu có cấu hình FACEBOOK_APP_ID)
   useEffect(() => {
