@@ -30,8 +30,10 @@ app.use('/api/rooms', require('./routes/roomSearchRoutes'));
 // Route quản lý loại phòng
 app.use('/api/loai-phong', require('./routes/roomTypes'));
 
-// Route quản lý phòng vật lý
+// Route quản lý phòng vật lý & Sơ đồ phòng tự động
 app.use('/api/phong', require('./routes/rooms'));
+app.use('/api/so-do-phong', require('./routes/rooms'));
+app.use('/api/room-status', require('./routes/rooms'));
 
 // Routes F&B Quản lý Menu
 app.use('/api/v1', require('./routes/admin/menuRoutes'));

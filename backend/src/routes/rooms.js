@@ -113,21 +113,21 @@ function applyAction(room, action) {
   }
 }
 
-// ─── Kiểm tra dữ liệu đầu vào ──────────────────────────────────────────────
+// ─── Kiểm tra dữ liệu đầu vào (Hỗ trợ Unicode tiếng Việt & ký tự hợp lệ) ───
 async function validateRoomInput(body) {
   const { so_phong, tang, khu, ma_loai, ma_khoa, phong_lien_thong, ghi_chu, buong_phong, luu_tru } = body;
 
   if (!so_phong || !String(so_phong).trim()) return "Số phòng không được để trống";
   const trimmedNumber = String(so_phong).trim();
-  // Cho phép chữ cái, chữ số, gạch ngang, gạch dưới, chấm, gạch chéo
-  if (!/^[A-Za-z0-9._\-\/]{1,20}$/.test(trimmedNumber)) {
-    return "Số phòng chỉ gồm chữ cái, chữ số, dấu gạch ngang (-), gạch dưới (_), chấm (.), gạch chéo (/) (tối đa 20 ký tự)";
+  // Hỗ trợ chữ cái Unicode (tiếng Việt có dấu), chữ số, dấu gạch ngang, gạch dưới, chấm, khoảng trắng, gạch chéo
+  if (!/^[\p{L}0-9._\-\/\s]{1,30}$/u.test(trimmedNumber)) {
+    return "Số phòng chỉ gồm chữ cái, chữ số, dấu gạch ngang (-), gạch dưới (_), chấm (.), gạch chéo (/), khoảng trắng (tối đa 30 ký tự)";
   }
 
   const floor = Number(tang);
   if (!Number.isInteger(floor) || floor < 1 || floor > 99) return "Tầng phải là số nguyên từ 1 đến 99";
 
-  if (khu !== undefined && String(khu).trim().length > 20) return "Tên khu tối đa 20 ký tự";
+  if (khu !== undefined && String(khu).trim().length > 30) return "Tên khu tối đa 30 ký tự";
 
   if (!ma_loai || !String(ma_loai).trim()) return "Vui lòng chọn loại phòng";
   const trimmedType = String(ma_loai).trim();
@@ -146,7 +146,7 @@ async function validateRoomInput(body) {
       if (byName.length > 0) typeFound = true;
     }
     if (!typeFound) {
-      // Cho phép mã nếu bảng RoomTypes rỗng hoặc mã trùng với bất kỳ loại phòng nào
+      // Cho phép mã nếu bảng RoomTypes rỗng hoặc mã hợp lệ
       const [allTypes] = await pool.query("SELECT RoomTypeId FROM RoomTypes WHERE IsDeleted = 0 LIMIT 1");
       if (allTypes.length === 0) {
         typeFound = true;
@@ -157,7 +157,7 @@ async function validateRoomInput(body) {
     }
   } catch (err) {
     if (err.code === "ER_NO_SUCH_TABLE") {
-      // Nếu chưa có bảng RoomTypes thì vẫn cho phép lưu
+      // Bỏ qua nếu bảng RoomTypes chưa có
     } else {
       console.error("Lỗi kiểm tra loại phòng:", err.message);
     }
@@ -167,7 +167,7 @@ async function validateRoomInput(body) {
   const trimmedKey = String(ma_khoa).trim();
   if (trimmedKey.length > 50) return "Mã đầu đọc khóa tối đa 50 ký tự";
 
-  if (phong_lien_thong && String(phong_lien_thong).trim().length > 20) return "Phòng liên thông tối đa 20 ký tự";
+  if (phong_lien_thong && String(phong_lien_thong).trim().length > 30) return "Phòng liên thông tối đa 30 ký tự";
   if (ghi_chu && String(ghi_chu).length > 500) return "Ghi chú tối đa 500 ký tự";
   if (buong_phong !== undefined && !BUONG_PHONG.includes(buong_phong)) return "Trạng thái buồng phòng không hợp lệ";
   if (luu_tru !== undefined && !LUU_TRU.includes(luu_tru)) return "Trạng thái lưu trú không hợp lệ";
@@ -184,33 +184,191 @@ function handleDup(err, res) {
   return null;
 }
 
-// ─── GET danh sách phòng ───────────────────────────────────────────────────
+// ─── GET danh sách phòng & Sơ đồ phòng trực quan ───────────────────────────
 // GET /api/phong?tang=4&khu=A&ma_loai=DLX-OCN&tim=101&limit=50
 router.get("/", async (req, res) => {
   try {
-    const { tang, khu, ma_loai, tim, limit } = req.query;
-    // Giới hạn tối đa 50 bản ghi theo yêu cầu hệ thống
+    const { tang, khu, ma_loai, tim, limit, cat_bot_du_thua } = req.query;
+
+    // Nếu người dùng yêu cầu cắt bớt dư thừa hoặc DB vượt quá 50, kiểm tra và chỉ lấy đúng 50 phòng
+    const [[{ countAll }]] = await pool.query("SELECT COUNT(*) as countAll FROM physical_rooms");
+    if ((cat_bot_du_thua === "true" || cat_bot_du_thua === "1") && countAll > 50) {
+      await pool.query(
+        "DELETE FROM physical_rooms WHERE id NOT IN (SELECT id FROM (SELECT id FROM physical_rooms ORDER BY tang ASC, so_phong ASC LIMIT 50) as sub)"
+      );
+    }
+
+    // Giới hạn tối đa 50 bản ghi thật theo yêu cầu của hệ thống
     const maxLimit = 50;
     const queryLimit = Math.min(parseInt(limit) || maxLimit, maxLimit);
 
     let sql = "SELECT * FROM physical_rooms WHERE 1=1";
     const params = [];
-    if (tang) { sql += " AND tang = ?"; params.push(Number(tang)); }
-    if (khu) { sql += " AND khu = ?"; params.push(khu); }
-    if (ma_loai) { sql += " AND ma_loai = ?"; params.push(ma_loai); }
+    if (tang && tang !== "all") { sql += " AND tang = ?"; params.push(Number(tang)); }
+    if (khu && khu !== "all") { sql += " AND khu = ?"; params.push(khu); }
+    if (ma_loai && ma_loai !== "all") { sql += " AND ma_loai = ?"; params.push(ma_loai); }
     if (tim) {
-      sql += " AND (so_phong LIKE ? OR ma_khoa LIKE ?)";
-      params.push(`%${tim}%`, `%${tim}%`);
+      sql += " AND (so_phong LIKE ? OR ma_khoa LIKE ? OR ghi_chu LIKE ?)";
+      params.push(`%${tim}%`, `%${tim}%`, `%${tim}%`);
     }
     sql += " ORDER BY tang ASC, so_phong ASC";
     sql += ` LIMIT ${queryLimit}`;
     const [rows] = await pool.query(sql, params);
-    res.json({ success: true, data: rows, total: rows.length });
+
+    // Tính toán KPI 4 trạng thái trực tiếp từ 50 phòng
+    let kpi = {
+      total: rows.length,
+      clean: 0,      // Trống sạch (vacant + clean)
+      inhouse: 0,    // Đang ở (inhouse)
+      dirty: 0,      // Chờ dọn dẹp (vacant + dirty)
+      ooo: 0,        // Đang bảo trì (ooo)
+      occupancyRate: 0
+    };
+
+    rows.forEach(r => {
+      if (r.buong_phong === "ooo") {
+        kpi.ooo++;
+      } else if (r.luu_tru === "inhouse") {
+        kpi.inhouse++;
+      } else if (r.buong_phong === "dirty") {
+        kpi.dirty++;
+      } else {
+        kpi.clean++;
+      }
+    });
+
+    if (kpi.total > 0) {
+      kpi.occupancyRate = Number(((kpi.inhouse / kpi.total) * 100).toFixed(1));
+    }
+
+    res.json({
+      success: true,
+      data: rows,
+      total: rows.length,
+      totalInDb: countAll,
+      kpi,
+      databaseSource: "MySQL (physical_rooms)"
+    });
   } catch (err) {
     if (err.code === "ER_NO_SUCH_TABLE") {
       return res.status(500).json({ success: false, isTableMissing: true, message: "Bảng dữ liệu physical_rooms không tồn tại trong cơ sở dữ liệu!" });
     }
     console.error("GET /phong error:", err.message);
+    res.status(500).json({ success: false, message: "Lỗi máy chủ: " + err.message });
+  }
+});
+
+// ─── POST Đồng bộ & Cắt bớt giữ đúng 50 phòng chuẩn ─────────────────────────
+router.post("/dong-bo-50", async (req, res) => {
+  try {
+    const [[{ total }]] = await pool.query("SELECT COUNT(*) as total FROM physical_rooms");
+    if (total > 50) {
+      await pool.query(
+        "DELETE FROM physical_rooms WHERE id NOT IN (SELECT id FROM (SELECT id FROM physical_rooms ORDER BY tang ASC, so_phong ASC LIMIT 50) as sub)"
+      );
+    }
+    const [rows] = await pool.query("SELECT * FROM physical_rooms ORDER BY tang ASC, so_phong ASC LIMIT 50");
+    res.json({
+      success: true,
+      message: `Đã đồng bộ cơ sở dữ liệu: hiện có ${rows.length} phòng hoạt động.`,
+      count: rows.length,
+      data: rows
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Lỗi đồng bộ: " + err.message });
+  }
+});
+
+// ─── PATCH Chuyển Đổi Trạng Thái Phòng Tự Động (Trống sạch, Đang ở, Chờ dọn, Bảo trì) ───
+// PATCH /api/phong/:id/chuyen-trang-thai { targetStatus: "clean"|"inhouse"|"dirty"|"ooo", prevUpdatedAt?: string }
+router.patch("/:id/chuyen-trang-thai", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { targetStatus, prevUpdatedAt, note } = req.body;
+
+    // Kiểm tra phòng có tồn tại không (phòng người khác đã xóa)
+    const [rooms] = await pool.query("SELECT * FROM physical_rooms WHERE id = ?", [id]);
+    if (!rooms.length) {
+      return res.status(404).json({
+        success: false,
+        isRecordDeleted: true,
+        message: "Lỗi đồng bộ: Phòng này không còn tồn tại trong cơ sở dữ liệu (có thể đã bị xóa bởi nhân viên khác hoặc quản trị viên)!"
+      });
+    }
+
+    const room = rooms[0];
+
+    // Kiểm tra xung đột sửa đồng thời (Optimistic Lock)
+    if (prevUpdatedAt && room.updated_at) {
+      const prevTime = new Date(prevUpdatedAt).getTime();
+      const currTime = new Date(room.updated_at).getTime();
+      if (Math.abs(currTime - prevTime) > 1000) {
+        return res.status(409).json({
+          success: false,
+          isConflict: true,
+          message: `Lỗi xung đột: Phòng ${room.so_phong} vừa được chỉnh sửa bởi một người khác! Vui lòng làm mới dữ liệu để xem trạng thái mới nhất.`,
+          currentRoom: room
+        });
+      }
+    }
+
+    // Quy tắc chuyển trạng thái tự động 4 nhóm chuẩn PMS
+    let buong_phong = room.buong_phong;
+    let luu_tru = room.luu_tru;
+
+    switch (targetStatus) {
+      case "clean": // Trống sạch (Ready to check-in)
+        buong_phong = "clean";
+        luu_tru = "vacant";
+        break;
+      case "inhouse": // Nhận phòng (Check-in -> Đang ở)
+        if (room.buong_phong === "ooo") {
+          return res.status(400).json({
+            success: false,
+            message: `Phòng ${room.so_phong} đang khóa bảo trì (OOO), không thể nhận khách lưu trú!`
+          });
+        }
+        luu_tru = "inhouse";
+        break;
+      case "dirty": // Trả phòng (Check-out -> Chờ dọn dẹp)
+        buong_phong = "dirty";
+        luu_tru = "vacant";
+        break;
+      case "ooo": // Đưa vào bảo trì (Out of Order)
+        if (room.luu_tru === "inhouse") {
+          return res.status(400).json({
+            success: false,
+            message: `Phòng ${room.so_phong} đang có khách lưu trú! Vui lòng chuyển phòng hoặc trả phòng cho khách trước khi khóa bảo trì.`
+          });
+        }
+        buong_phong = "ooo";
+        luu_tru = "vacant";
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          message: "Trạng thái đích không hợp lệ! Chỉ chấp nhận: clean (Trống sạch), inhouse (Đang ở), dirty (Chờ dọn dẹp), ooo (Đang bảo trì)."
+        });
+    }
+
+    const newNote = note !== undefined ? String(note).trim() : room.ghi_chu;
+
+    await pool.query(
+      "UPDATE physical_rooms SET buong_phong = ?, luu_tru = ?, ghi_chu = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [buong_phong, luu_tru, newNote, id]
+    );
+
+    const [updated] = await pool.query("SELECT * FROM physical_rooms WHERE id = ?", [id]);
+    res.json({
+      success: true,
+      message: `Đã tự động cập nhật trạng thái phòng ${room.so_phong} thành công!`,
+      data: updated[0]
+    });
+  } catch (err) {
+    if (err.code === "ER_NO_SUCH_TABLE") {
+      return res.status(500).json({ success: false, isTableMissing: true, message: "Bảng dữ liệu physical_rooms không tồn tại!" });
+    }
+    console.error("PATCH /chuyen-trang-thai error:", err.message);
     res.status(500).json({ success: false, message: "Lỗi máy chủ: " + err.message });
   }
 });

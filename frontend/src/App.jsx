@@ -13,6 +13,7 @@ import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 import ServiceManagement from './pages/ServiceManagement';
+import RoomStatusManagement from './pages/RoomStatusManagement';
 
 function App() {
   return (
@@ -31,6 +32,10 @@ function App() {
           <Route path="/admin/menu" element={<MenuManagement />} />
           <Route path="/admin/room-types" element={<RoomTypeManagement />} />
           <Route path="/admin/rooms" element={<RoomManagement />} />
+          <Route path="/admin/so-do-phong" element={<RoomStatusManagement />} />
+          <Route path="/admin/room-status" element={<RoomStatusManagement />} />
+          <Route path="/admin/le-tan" element={<RoomStatusManagement />} />
+          <Route path="/admin/buong-phong" element={<RoomStatusManagement />} />
           <Route path="/admin/staff" element={<StaffManagement />} />
           <Route path="/admin/staff-accounts" element={<StaffManagement />} />
           <Route path="/admin/quan-tri" element={<StaffManagement />} />
