@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { icon: "account_balance", label: "Tài Chính & Sổ Cái", to: "/admin/tai-chinh" },
   { icon: "neurology", label: "AI Concierge & Chatbot", to: "/admin/ai-concierge" },
   { icon: "loyalty", label: "Khách Hàng & Hội Viên", to: "/admin/loyalty" },
+  { icon: "badge", label: "Quản Lý Tài Khoản (RBAC)", to: "/admin/staff" },
   { icon: "admin_panel_settings", label: "Quản Trị Hệ Thống", to: "/admin/quan-tri" },
 ];
 

@@ -1,256 +1,33 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import AdminLayout from '../components/layout/AdminLayout';
+import AdminLayout from '../components/admin/layout/AdminLayout';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HẰNG SỐ & CẤU HÌNH
+// HẰNG SỐ & CẤU HÌNH API
 // ═══════════════════════════════════════════════════════════════════════════════
-const STORAGE_KEY_STAFF  = 'qlks_nhan_vien_v5';
-const STORAGE_KEY_LOGS   = 'qlks_nhat_ky_v5';
-const SO_DONG_TRANG      = 5;
+const API_USERS = 'http://localhost:5000/api/users';
+const STORAGE_KEY_LOGS = 'qlks_nhat_ky_v5';
+const SO_DONG_TRANG = 5;
 
-// GM key hợp lệ (thực tế sẽ gọi API backend)
+// GM key hợp lệ
 const GM_KEYS_HOP_LE = ['GM-KEY-2026', 'SUPERADMIN', 'GM8888', 'GRANDHORIZON'];
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DỮ LIỆU MẪU — 100% TIẾNG VIỆT
-// ═══════════════════════════════════════════════════════════════════════════════
-const DU_LIEU_NHAN_VIEN_MAU = [
-  {
-    id: 'NV-4092',
-    hoTen: 'Nguyễn Thị Minh Châu',
-    email: 'chau.nguyen@grandhorizon.vn',
-    phongBan: 'Lễ Tân & Tiền Sảnh',
-    vaiTro: 'Trưởng Ca Lễ Tân',
-    maVaiTro: 'VAI_TRO #TC-04',
-    trangThai: 'hoat_dong',
-    vienTat: 'CH',
-    ngayVaoLam: '15/03/2022',
-    quyenHan: {
-      quyen_checkin:     true,
-      quyen_chuyen_phong: true,
-      quyen_the_tu:      true,
-      quyen_buong_phong: true,
-      quyen_night_audit: false,
-      quyen_he_thong:    false,
-    },
-    chinhSachBaoMat: {
-      hanMatKhauNgay:    60,
-      thoiGianIdlePhut:  15,
-      baoMatMFA:         true,
-      hanPhienGio:       8,
-    },
-  },
-  {
-    id: 'NV-3180',
-    hoTen: 'Trần Văn Tuấn Anh',
-    email: 'tuananh.tran@grandhorizon.vn',
-    phongBan: 'Lễ Tân & Tiền Sảnh',
-    vaiTro: 'Nhân Viên Lễ Tân',
-    maVaiTro: 'VAI_TRO #LT-02',
-    trangThai: 'hoat_dong',
-    vienTat: 'TA',
-    ngayVaoLam: '10/01/2023',
-    quyenHan: {
-      quyen_checkin:     true,
-      quyen_chuyen_phong: false,
-      quyen_the_tu:      true,
-      quyen_buong_phong: false,
-      quyen_night_audit: false,
-      quyen_he_thong:    false,
-    },
-    chinhSachBaoMat: {
-      hanMatKhauNgay:    60,
-      thoiGianIdlePhut:  15,
-      baoMatMFA:         true,
-      hanPhienGio:       8,
-    },
-  },
-  {
-    id: 'NV-1044',
-    hoTen: 'Lê Thị Bích Ngọc',
-    email: 'bicngoc.le@grandhorizon.vn',
-    phongBan: 'Buồng Phòng & Kỹ Thuật',
-    vaiTro: 'Trưởng Bộ Phận Buồng Phòng',
-    maVaiTro: 'VAI_TRO #BP-01',
-    trangThai: 'hoat_dong',
-    vienTat: 'BN',
-    ngayVaoLam: '22/08/2021',
-    quyenHan: {
-      quyen_checkin:     false,
-      quyen_chuyen_phong: false,
-      quyen_the_tu:      true,
-      quyen_buong_phong: true,
-      quyen_night_audit: false,
-      quyen_he_thong:    false,
-    },
-    chinhSachBaoMat: {
-      hanMatKhauNgay:    90,
-      thoiGianIdlePhut:  20,
-      baoMatMFA:         true,
-      hanPhienGio:       10,
-    },
-  },
-  {
-    id: 'NV-2089',
-    hoTen: 'Phạm Quốc Dũng',
-    email: 'quocdung.pham@grandhorizon.vn',
-    phongBan: 'Ẩm Thực F&B & Bếp',
-    vaiTro: 'Quản Lý Nhà Hàng',
-    maVaiTro: 'VAI_TRO #FB-03',
-    trangThai: 'hoat_dong',
-    vienTat: 'QD',
-    ngayVaoLam: '05/11/2022',
-    quyenHan: {
-      quyen_checkin:     false,
-      quyen_chuyen_phong: false,
-      quyen_the_tu:      false,
-      quyen_buong_phong: false,
-      quyen_night_audit: false,
-      quyen_he_thong:    false,
-    },
-    chinhSachBaoMat: {
-      hanMatKhauNgay:    60,
-      thoiGianIdlePhut:  30,
-      baoMatMFA:         true,
-      hanPhienGio:       8,
-    },
-  },
-  {
-    id: 'NV-0012',
-    hoTen: 'Võ Minh Khoa',
-    email: 'minhkhoa.vo@grandhorizon.vn',
-    phongBan: 'Quản Trị & Công Nghệ',
-    vaiTro: 'Quản Trị Viên Hệ Thống',
-    maVaiTro: 'VAI_TRO #QT-01',
-    trangThai: 'hoat_dong',
-    vienTat: 'MK',
-    ngayVaoLam: '01/06/2020',
-    quyenHan: {
-      quyen_checkin:     true,
-      quyen_chuyen_phong: true,
-      quyen_the_tu:      true,
-      quyen_buong_phong: true,
-      quyen_night_audit: true,
-      quyen_he_thong:    true,
-    },
-    chinhSachBaoMat: {
-      hanMatKhauNgay:    30,
-      thoiGianIdlePhut:  10,
-      baoMatMFA:         true,
-      hanPhienGio:       4,
-    },
-  },
-  {
-    id: 'NV-2150',
-    hoTen: 'Hoàng Thị Thu Hà',
-    email: 'thuha.hoang@grandhorizon.vn',
-    phongBan: 'Ẩm Thực F&B & Bếp',
-    vaiTro: 'Bếp Trưởng Điều Hành',
-    maVaiTro: 'VAI_TRO #FB-02',
-    trangThai: 'hoat_dong',
-    vienTat: 'TH',
-    ngayVaoLam: '18/04/2022',
-    quyenHan: {
-      quyen_checkin:     false,
-      quyen_chuyen_phong: false,
-      quyen_the_tu:      false,
-      quyen_buong_phong: false,
-      quyen_night_audit: false,
-      quyen_he_thong:    false,
-    },
-    chinhSachBaoMat: {
-      hanMatKhauNgay:    60,
-      thoiGianIdlePhut:  30,
-      baoMatMFA:         true,
-      hanPhienGio:       8,
-    },
-  },
-  {
-    id: 'NV-1192',
-    hoTen: 'Nguyễn Văn Hoàng',
-    email: 'vanhoang.nguyen@grandhorizon.vn',
-    phongBan: 'Buồng Phòng & Kỹ Thuật',
-    vaiTro: 'Nhân Viên Dọn Phòng',
-    maVaiTro: 'VAI_TRO #BP-04',
-    trangThai: 'hoat_dong',
-    vienTat: 'VH',
-    ngayVaoLam: '20/07/2023',
-    quyenHan: {
-      quyen_checkin:     false,
-      quyen_chuyen_phong: false,
-      quyen_the_tu:      true,
-      quyen_buong_phong: true,
-      quyen_night_audit: false,
-      quyen_he_thong:    false,
-    },
-    chinhSachBaoMat: {
-      hanMatKhauNgay:    90,
-      thoiGianIdlePhut:  30,
-      baoMatMFA:         true,
-      hanPhienGio:       8,
-    },
-  },
-  {
-    id: 'NV-3204',
-    hoTen: 'Bùi Thị Thanh Thảo',
-    email: 'thanhthao.bui@grandhorizon.vn',
-    phongBan: 'Lễ Tân & Tiền Sảnh',
-    vaiTro: 'Kiểm Toán Viên Ca Đêm',
-    maVaiTro: 'VAI_TRO #KT-01',
-    trangThai: 'tam_dung',
-    vienTat: 'TT',
-    ngayVaoLam: '14/12/2021',
-    quyenHan: {
-      quyen_checkin:     true,
-      quyen_chuyen_phong: true,
-      quyen_the_tu:      true,
-      quyen_buong_phong: false,
-      quyen_night_audit: true,
-      quyen_he_thong:    false,
-    },
-    chinhSachBaoMat: {
-      hanMatKhauNgay:    45,
-      thoiGianIdlePhut:  15,
-      baoMatMFA:         true,
-      hanPhienGio:       8,
-    },
-  },
-];
+// Gọi API
+const callApi = async (method, path = '', body) => {
+  try {
+    const res = await fetch(`${API_USERS}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok && data.success !== false, status: res.status, data };
+  } catch (_) {
+    return null;
+  }
+};
 
-const NHAT_KY_MAU = [
-  {
-    id: 'NK-8891', thoiGian: '05/10/2026 14:28:10',
-    nguoiThucHien: 'Võ Minh Khoa (NV-0012)',
-    hanhDong: 'CẬP NHẬT CHÍNH SÁCH', mucTieu: 'NV-4092',
-    chiTiet: 'Cập nhật quyền Lập Trình Thẻ Từ cho Nguyễn Thị Minh Châu → ĐÃ CẤP',
-    ketQua: 'THÀNH CÔNG',
-  },
-  {
-    id: 'NK-8889', thoiGian: '05/10/2026 13:45:00',
-    nguoiThucHien: 'Võ Minh Khoa (NV-0012)',
-    hanhDong: 'ĐỊNH NGHĨA VAI TRÒ', mucTieu: 'VAI_TRO #FB-03',
-    chiTiet: 'Khởi tạo hồ sơ Quản Lý Nhà Hàng với 0 quyền ban đầu',
-    ketQua: 'THÀNH CÔNG',
-  },
-  {
-    id: 'NK-8882', thoiGian: '05/10/2026 11:15:22',
-    nguoiThucHien: 'Nguyễn Thị Minh Châu (NV-4092)',
-    hanhDong: 'XÁC THỰC PHIÊN', mucTieu: 'TRẠM SỐ 04',
-    chiTiet: 'Đăng nhập thành công qua SmartCard kết hợp token MFA',
-    ketQua: 'THÀNH CÔNG',
-  },
-  {
-    id: 'NK-8875', thoiGian: '05/10/2026 09:10:04',
-    nguoiThucHien: 'Trần Văn Tuấn Anh (NV-3180)',
-    hanhDong: 'TỪ CHỐI THAY ĐỔI QUYỀN', mucTieu: 'NV-4092',
-    chiTiet: 'Cố thay đổi phân quyền mà không có xác nhận của Quản Trị Viên',
-    ketQua: 'BỊ CHẶN',
-  },
-];
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // CẤU HÌNH 6 QUYỀN HẠN RBAC
-// ═══════════════════════════════════════════════════════════════════════════════
 const CAU_HINH_QUYEN = [
   {
     key: 'quyen_checkin',
@@ -296,9 +73,7 @@ const CAU_HINH_QUYEN = [
   },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════════
 // DANH MỤC LỰA CHỌN
-// ═══════════════════════════════════════════════════════════════════════════════
 const DANH_SACH_PHONG_BAN = [
   'Lễ Tân & Tiền Sảnh',
   'Buồng Phòng & Kỹ Thuật',
@@ -309,16 +84,14 @@ const DANH_SACH_PHONG_BAN = [
 ];
 
 const DANH_SACH_VAI_TRO = [
+  'Quản Trị Viên Hệ Thống',
   'Trưởng Ca Lễ Tân',
   'Nhân Viên Lễ Tân',
   'Trưởng Bộ Phận Buồng Phòng',
   'Nhân Viên Dọn Phòng',
   'Quản Lý Nhà Hàng',
   'Bếp Trưởng Điều Hành',
-  'Nhân Viên Phục Vụ Bàn',
   'Kiểm Toán Viên Ca Đêm',
-  'Quản Trị Viên Hệ Thống',
-  'Giám Đốc Vận Hành',
 ];
 
 const MAU_AVATAR = [
@@ -332,95 +105,92 @@ const MAU_AVATAR = [
   'from-cyan-500 to-cyan-700',
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// HÀM TIỆN ÍCH
-// ═══════════════════════════════════════════════════════════════════════════════
-const layMauAvatar = (id) => {
-  // Tính toán màu avatar dựa trên mã ID → nhất quán, không thay đổi khi render
+const layMauAvatar = (id = '') => {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) & 0xffffffff;
   return MAU_AVATAR[Math.abs(hash) % MAU_AVATAR.length];
 };
 
 const nhanDangTrangThai = (trangThai) => {
-  if (trangThai === 'hoat_dong') return { nhan: 'Hoạt Động', cls: 'bg-admin-primary/10 text-admin-primary border border-admin-primary/20', dot: 'bg-admin-primary' };
-  if (trangThai === 'da_thu_hoi') return { nhan: 'Đã Thu Hồi', cls: 'bg-error/10 text-error border border-error/20', dot: 'bg-error' };
+  if (trangThai === 'hoat_dong' || trangThai === 'Active')
+    return { nhan: 'Hoạt Động', cls: 'bg-admin-primary/10 text-admin-primary border border-admin-primary/20', dot: 'bg-admin-primary' };
+  if (trangThai === 'da_thu_hoi' || trangThai === 'Revoked')
+    return { nhan: 'Đã Thu Hồi', cls: 'bg-error/10 text-error border border-error/20', dot: 'bg-error' };
   return { nhan: 'Tạm Dừng', cls: 'bg-surface-container text-on-surface-variant border border-outline-variant', dot: 'bg-on-surface-variant' };
 };
-
-const taoMaNV = () => `NV-${Math.floor(1000 + Math.random() * 9000)}`;
 
 const layThoiGian = () => {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
-  return `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  return `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPONENT CHÍNH
 // ═══════════════════════════════════════════════════════════════════════════════
 const QuanLyTaiKhoan = () => {
-
-  // ─── STATE DANH SÁCH & NHẬT KÝ ──────────────────────────────────────────────
-  const [danhSachNV, setDanhSachNV] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_STAFF);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (_) {}
-    return DU_LIEU_NHAN_VIEN_MAU;
-  });
+  // ─── STATE DANH SÁCH & KẾT NỐI ──────────────────────────────────────────────
+  const [danhSachNV, setDanhSachNV] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [backendConnected, setBackendConnected] = useState(true);
 
   const [nhatKy, setNhatKy] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_LOGS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
+      if (saved) return JSON.parse(saved);
     } catch (_) {}
-    return NHAT_KY_MAU;
+    return [];
   });
 
-  // ─── PHIÊN LÀM VIỆC GIẢ LẬP (Vai trò đang đăng nhập) ───────────────────────
-  // Nhân viên đang đăng nhập là Nguyễn Thị Minh Châu (NV-4092), vai trò: Quản Trị Viên
+  // Phiên làm việc giả lập
   const [vaiTroHienTai, setVaiTroHienTai] = useState(() => localStorage.getItem('qlks_vai_tro_phien') || 'Quản Trị Viên');
-  const maNVDangDangNhap = 'NV-4092';
+  const maNVDangDangNhap = 'NV-0001';
   const laQuanTriVien = vaiTroHienTai === 'Quản Trị Viên';
 
-  // ─── CHỌN NHÂN VIÊN ─────────────────────────────────────────────────────────
-  const [idDangChon, setIdDangChon] = useState('NV-4092');
+  // Chọn nhân viên
+  const [idDangChon, setIdDangChon] = useState(null);
 
-  // ─── TÌM KIẾM & LỌC ─────────────────────────────────────────────────────────
+  // Tìm kiếm & lọc
   const [tuKhoa, setTuKhoa] = useState('');
   const [locPhongBan, setLocPhongBan] = useState('TAT_CA');
   const [locVaiTro, setLocVaiTro] = useState('TAT_CA');
   const [locTrangThai, setLocTrangThai] = useState('TAT_CA');
   const [trangHienTai, setTrangHienTai] = useState(1);
 
-  // ─── RBAC INSPECTOR (Bản sao làm việc — chưa lưu) ───────────────────────────
+  // RBAC Inspector (bản sao làm việc)
   const [quyenLamViec, setQuyenLamViec] = useState({});
   const [chinhSachLamViec, setChinhSachLamViec] = useState({
     hanMatKhauNgay: 60, thoiGianIdlePhut: 15, baoMatMFA: true, hanPhienGio: 8,
   });
-  const [daCoBanLuu, setDaCoBanLuu] = useState(false); // Cờ phát hiện thay đổi chưa lưu
+  const [daCoBanLuu, setDaCoBanLuu] = useState(false);
 
-  // ─── THÔNG BÁO TOAST ─────────────────────────────────────────────────────────
+  // Thông báo toast
   const [thongBao, setThongBao] = useState(null);
 
-  // ─── MODAL STATES ─────────────────────────────────────────────────────────────
-  const [modalCapPhat, setModalCapPhat]     = useState(false);
-  const [modalVaiTro, setModalVaiTro]       = useState(false);
-  const [modalNhatKy, setModalNhatKy]       = useState(false);
-  const [modalXacThuc, setModalXacThuc]     = useState(false);
-  const [modalThuHoi, setModalThuHoi]       = useState(false);
-  const [modalNhanBan, setModalNhanBan]     = useState(false);
+  // Modal lỗi đồng bộ / Concurrency Check
+  const [syncErrorModal, setSyncErrorModal] = useState(null);
 
-  // Trạng thái form cấp phát nhân viên mới
-  const [formNVMoi, setFormNVMoi] = useState({ id: taoMaNV(), hoTen: '', email: '', phongBan: DANH_SACH_PHONG_BAN[0], vaiTro: '' });
+  // Modal states
+  const [modalCapPhat, setModalCapPhat] = useState(false);
+  const [modalSuaThongTin, setModalSuaThongTin] = useState(false);
+  const [modalXoa, setModalXoa] = useState(null);
+  const [modalVaiTro, setModalVaiTro] = useState(false);
+  const [modalNhatKy, setModalNhatKy] = useState(false);
+  const [modalXacThuc, setModalXacThuc] = useState(false);
+  const [modalThuHoi, setModalThuHoi] = useState(false);
+  const [modalNhanBan, setModalNhanBan] = useState(false);
+
+  // Form nhân viên mới
+  const [formNVMoi, setFormNVMoi] = useState({
+    hoTen: '', email: '', phone: '', phongBan: DANH_SACH_PHONG_BAN[0], vaiTro: ''
+  });
   const [loiFormNVMoi, setLoiFormNVMoi] = useState('');
+
+  // Form sửa thông tin
+  const [formSua, setFormSua] = useState({
+    hoTen: '', email: '', phone: '', phongBan: '', vaiTro: ''
+  });
+  const [loiFormSua, setLoiFormSua] = useState('');
 
   // Trạng thái form định nghĩa vai trò
   const [formVaiTro, setFormVaiTro] = useState({ tenVaiTro: '', phongBan: DANH_SACH_PHONG_BAN[0] });
@@ -430,96 +200,111 @@ const QuanLyTaiKhoan = () => {
   const [gmKey, setGmKey] = useState('');
   const [loiGmKey, setLoiGmKey] = useState('');
 
-  // Trạng thái nhân bản vai trò
+  // Nhân bản vai trò
   const [tenVaiTroMoi, setTenVaiTroMoi] = useState('');
 
-  // ─── ĐỒNG BỘ LƯU TRỮ ────────────────────────────────────────────────────────
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(danhSachNV));
-  }, [danhSachNV]);
+  // ─── TẢI DỮ LIỆU TỪ BACKEND (50 bản ghi thật từ MySQL) ─────────────────────
+  const taiDuLieuTuBackend = useCallback(async () => {
+    setLoading(true);
+    const res = await callApi('GET', '?limit=50');
+    if (res && res.ok && Array.isArray(res.data.data)) {
+      setDanhSachNV(res.data.data);
+      setBackendConnected(true);
+      if (res.data.data.length > 0 && !idDangChon) {
+        setIdDangChon(res.data.data[0].id);
+      }
+    } else {
+      setBackendConnected(false);
+      setThongBao({ noiDung: 'Không thể kết nối máy chủ MySQL. Vui lòng kiểm tra backend port 5000.', loai: 'loi', id: Date.now() });
+    }
+    setLoading(false);
+  }, [idDangChon]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(nhatKy));
+    taiDuLieuTuBackend();
+  }, [taiDuLieuTuBackend]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(nhatKy));
+    } catch (_) {}
   }, [nhatKy]);
 
   useEffect(() => {
-    localStorage.setItem('qlks_vai_tro_phien', vaiTroHienTai);
+    try {
+      localStorage.setItem('qlks_vai_tro_phien', vaiTroHienTai);
+    } catch (_) {}
   }, [vaiTroHienTai]);
 
-  // ─── NHÂN VIÊN ĐANG CHỌN ─────────────────────────────────────────────────────
+  // Nhân viên đang chọn
   const nvDangChon = useMemo(() =>
-    danhSachNV.find(nv => nv.id === idDangChon) || null,
+    danhSachNV.find(nv => nv.id === idDangChon) || danhSachNV[0] || null,
     [danhSachNV, idDangChon]
   );
 
-  // ─── ĐỒNG BỘ RBAC INSPECTOR KHI CHỌN NHÂN VIÊN MỚI ─────────────────────────
+  // Đồng bộ RBAC Inspector khi chọn nhân viên khác
   useEffect(() => {
     if (nvDangChon) {
       setQuyenLamViec({ ...nvDangChon.quyenHan });
       setChinhSachLamViec({ ...nvDangChon.chinhSachBaoMat, baoMatMFA: true });
       setDaCoBanLuu(false);
     }
-  }, [idDangChon]); // Chỉ chạy khi idDangChon thay đổi, không phụ thuộc danhSachNV
+  }, [idDangChon, nvDangChon]);
 
-  // ─── HÀM GHI NHẬT KÝ ────────────────────────────────────────────────────────
+  // Ghi nhật ký
   const ghiNhatKy = useCallback((hanhDong, mucTieu, chiTiet, ketQua = 'THÀNH CÔNG') => {
     const banGhi = {
       id: `NK-${Math.floor(1000 + Math.random() * 9000)}`,
       thoiGian: layThoiGian(),
       nguoiThucHien: nvDangChon?.id === maNVDangDangNhap
-        ? `Nguyễn Thị Minh Châu (${maNVDangDangNhap})` 
+        ? `Quản Trị Viên (${maNVDangDangNhap})`
         : `Người dùng [${vaiTroHienTai}]`,
       hanhDong, mucTieu, chiTiet, ketQua,
     };
-    setNhatKy(prev => [banGhi, ...prev]);
+    setNhatKy(prev => [banGhi, ...prev].slice(0, 50));
   }, [vaiTroHienTai, nvDangChon, maNVDangDangNhap]);
 
-  // ─── HÀM HIỂN THỊ TOAST ─────────────────────────────────────────────────────
+  // Thông báo Toast
   const hienThongBao = useCallback((noiDung, loai = 'thanh_cong') => {
     setThongBao({ noiDung, loai, id: Date.now() });
-    setTimeout(() => setThongBao(null), 4500);
+    setTimeout(() => setThongBao(null), 4000);
   }, []);
 
-  // ─── KIỂM TRA QUYỀN QUẢN TRỊ ────────────────────────────────────────────────
+  // Kiểm tra quyền Admin
   const kiemTraQuyenAdmin = useCallback(() => {
     if (!laQuanTriVien) {
-      hienThongBao('Bạn không có quyền quản lý tài khoản nhân viên.', 'loi');
-      ghiNhatKy('TRUY CẬP BỊ TỪ CHỐI', 'QUẢN LÝ NHÂN VIÊN',
+      hienThongBao('Bạn không có quyền quản trị viên để thao tác.', 'loi');
+      ghiNhatKy('TRUY CẬP BỊ TỪ CHỐI', 'QUẢN LÝ NHÂN SỰ',
         `Vai trò [${vaiTroHienTai}] không được phép thực hiện thao tác quản trị`, 'BỊ CHẶN');
       return false;
     }
     return true;
   }, [laQuanTriVien, hienThongBao, ghiNhatKy, vaiTroHienTai]);
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // TEST CASE 1: TÌM KIẾM & LỌC
-  // Kết hợp nhiều bộ lọc đồng thời, bảng cập nhật ngay lập tức
-  // ═══════════════════════════════════════════════════════════════════════════════
+  // ─── TÌM KIẾM & LỌC ─────────────────────────────────────────────────────────
   const danhSachDaLoc = useMemo(() => {
     const kw = tuKhoa.toLowerCase().trim();
     return danhSachNV.filter(nv => {
       const khopTimKiem = !kw ||
-        nv.hoTen.toLowerCase().includes(kw) ||
-        nv.id.toLowerCase().includes(kw) ||
-        nv.email.toLowerCase().includes(kw) ||
-        nv.phongBan.toLowerCase().includes(kw) ||
-        nv.vaiTro.toLowerCase().includes(kw);
+        (nv.hoTen || '').toLowerCase().includes(kw) ||
+        (nv.id || '').toLowerCase().includes(kw) ||
+        (nv.email || '').toLowerCase().includes(kw) ||
+        (nv.phone || '').toLowerCase().includes(kw) ||
+        (nv.phongBan || '').toLowerCase().includes(kw) ||
+        (nv.vaiTro || '').toLowerCase().includes(kw);
 
-      const khopPhongBan  = locPhongBan  === 'TAT_CA' || nv.phongBan  === locPhongBan;
-      const khopVaiTro    = locVaiTro    === 'TAT_CA' || nv.vaiTro    === locVaiTro;
+      const khopPhongBan = locPhongBan === 'TAT_CA' || nv.phongBan === locPhongBan;
+      const khopVaiTro = locVaiTro === 'TAT_CA' || nv.vaiTro === locVaiTro;
       const khopTrangThai = locTrangThai === 'TAT_CA' || nv.trangThai === locTrangThai;
 
       return khopTimKiem && khopPhongBan && khopVaiTro && khopTrangThai;
     });
   }, [danhSachNV, tuKhoa, locPhongBan, locVaiTro, locTrangThai]);
 
-  // Tổng số trang
   const tongSoTrang = Math.max(1, Math.ceil(danhSachDaLoc.length / SO_DONG_TRANG));
 
-  // Reset về trang 1 khi bộ lọc thay đổi
   useEffect(() => { setTrangHienTai(1); }, [tuKhoa, locPhongBan, locVaiTro, locTrangThai]);
 
-  // Đảm bảo trang không vượt quá tổng số trang
   useEffect(() => {
     if (trangHienTai > tongSoTrang) setTrangHienTai(tongSoTrang);
   }, [tongSoTrang, trangHienTai]);
@@ -529,99 +314,166 @@ const QuanLyTaiKhoan = () => {
     return danhSachDaLoc.slice(batDau, batDau + SO_DONG_TRANG);
   }, [danhSachDaLoc, trangHienTai]);
 
-  // Số quyền đã cấp trong inspector
   const soQuyenDaCap = useMemo(() =>
     Object.values(quyenLamViec).filter(Boolean).length, [quyenLamViec]);
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // TEST CASE 2: CẤP PHÁT NHÂN VIÊN MỚI
-  // - Mã NV & email không được trùng
-  // - Phải gán ít nhất 1 vai trò
-  // ═══════════════════════════════════════════════════════════════════════════════
-  const xuLyCapPhat = (e) => {
+  // ─── THÊM / CẤP PHÁT NHÂN VIÊN MỚI (GỌI API MYSQL THẬT) ───────────────────
+  const xuLyCapPhat = async (e) => {
     e.preventDefault();
     setLoiFormNVMoi('');
 
-    const id      = formNVMoi.id.trim().toUpperCase();
-    const hoTen   = formNVMoi.hoTen.trim();
-    const email   = formNVMoi.email.trim().toLowerCase();
-    const vaiTro  = formNVMoi.vaiTro.trim();
+    const hoTen = formNVMoi.hoTen.trim();
+    const email = formNVMoi.email.trim().toLowerCase();
+    const phone = formNVMoi.phone.trim();
+    const vaiTro = formNVMoi.vaiTro.trim();
+    const phongBan = formNVMoi.phongBan;
 
-    // Kiểm tra trường rỗng
-    if (!id)     { setLoiFormNVMoi('Mã nhân viên không được để trống.'); return; }
-    if (!hoTen)  { setLoiFormNVMoi('Họ và tên không được để trống.'); return; }
-    if (!email)  { setLoiFormNVMoi('Địa chỉ email không được để trống.'); return; }
+    // Validate họ tên
+    if (!hoTen) { setLoiFormNVMoi('Họ và tên không được để trống.'); return; }
+    if (hoTen.length < 2 || hoTen.length > 100) { setLoiFormNVMoi('Họ và tên phải từ 2 đến 100 ký tự.'); return; }
+    if (!/^[a-zA-Z0-9\sÀ-ỹ._\-\/]+$/.test(hoTen)) {
+      setLoiFormNVMoi('Họ và tên chỉ được chứa chữ cái tiếng Việt, số, dấu cách và ký tự . _ - /');
+      return;
+    }
 
-    // TEST CASE: Nhân viên mới phải gán ít nhất một vai trò
+    // Validate email
+    if (!email) { setLoiFormNVMoi('Địa chỉ email không được để trống.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setLoiFormNVMoi('Địa chỉ email không đúng định dạng hợp lệ.');
+      return;
+    }
+
+    // Validate số điện thoại nếu có
+    if (phone && !/^[0-9+\s._\-]{8,20}$/.test(phone)) {
+      setLoiFormNVMoi('Số điện thoại chỉ gồm chữ số và ký tự + - . _');
+      return;
+    }
+
     if (!vaiTro) {
       setLoiFormNVMoi('Nhân viên mới phải được gán ít nhất một vai trò trước khi cấp phát.');
       return;
     }
 
-    // Định dạng email cơ bản
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setLoiFormNVMoi('Địa chỉ email không đúng định dạng.');
-      return;
-    }
-
-    // TEST CASE: Mã nhân viên không trùng
-    if (danhSachNV.some(nv => nv.id.toUpperCase() === id)) {
-      setLoiFormNVMoi(`Mã nhân viên "${id}" đã tồn tại trong hệ thống. Vui lòng chọn mã khác.`);
-      return;
-    }
-
-    // TEST CASE: Email không trùng
+    // Kiểm tra trùng lặp email ở phía client trước
     if (danhSachNV.some(nv => nv.email.toLowerCase() === email)) {
       setLoiFormNVMoi(`Địa chỉ email "${email}" đã được sử dụng bởi một nhân viên khác.`);
       return;
     }
 
-    // Tạo chữ viết tắt avatar từ tên
-    const phanTen = hoTen.split(' ').filter(Boolean);
-    const vienTat = phanTen.length >= 2
-      ? (phanTen[0][0] + phanTen[phanTen.length - 1][0]).toUpperCase()
-      : hoTen.substring(0, 2).toUpperCase();
-
-    const nvMoi = {
-      id, hoTen, email,
-      phongBan: formNVMoi.phongBan,
-      vaiTro,
-      maVaiTro: `VAI_TRO #${id.replace('NV-', '')}`,
-      trangThai: 'hoat_dong',
-      vienTat,
-      ngayVaoLam: layThoiGian().split(' ')[0],
+    // Gửi lên Backend API
+    const res = await callApi('POST', '', {
+      hoTen, email, phone, phongBan, vaiTro,
       quyenHan: {
-        quyen_checkin:      vaiTro.includes('Lễ Tân') || vaiTro.includes('Trưởng Ca'),
+        quyen_checkin: vaiTro.includes('Lễ Tân') || vaiTro.includes('Trưởng Ca'),
         quyen_chuyen_phong: false,
-        quyen_the_tu:       true,
-        quyen_buong_phong:  vaiTro.includes('Buồng') || vaiTro.includes('Dọn'),
-        quyen_night_audit:  false,
-        quyen_he_thong:     false,
+        quyen_the_tu: true,
+        quyen_buong_phong: vaiTro.includes('Buồng') || vaiTro.includes('Dọn'),
+        quyen_night_audit: false,
+        quyen_he_thong: vaiTro.includes('Quản Trị') || vaiTro.includes('Admin'),
       },
-      chinhSachBaoMat: { hanMatKhauNgay: 60, thoiGianIdlePhut: 15, baoMatMFA: true, hanPhienGio: 8 },
-    };
+      chinhSachBaoMat: { hanMatKhauNgay: 60, thoiGianIdlePhut: 15, baoMatMFA: true, hanPhienGio: 8 }
+    });
 
-    setDanhSachNV(prev => [nvMoi, ...prev]);
-    setIdDangChon(id); // Tự động chọn nhân viên vừa tạo → RBAC Inspector cập nhật
+    if (!res) {
+      setLoiFormNVMoi('Mất kết nối máy chủ backend. Vui lòng thử lại sau.');
+      return;
+    }
 
-    ghiNhatKy('CẤP PHÁT TÀI KHOẢN', id,
+    if (!res.ok) {
+      setLoiFormNVMoi(res.data.message || 'Không thể cấp phát tài khoản');
+      return;
+    }
+
+    hienThongBao(`Đã cấp phát thành công tài khoản cho ${hoTen}!`, 'thanh_cong');
+    ghiNhatKy('CẤP PHÁT TÀI KHOẢN', res.data.data?.id || 'MỚI',
       `Cấp phát thành công: ${hoTen} (${email}) với vai trò ${vaiTro}`);
-    hienThongBao(`Đã cấp phát tài khoản ${hoTen} [${id}] thành công!`, 'thanh_cong');
-
     setModalCapPhat(false);
+    taiDuLieuTuBackend();
   };
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // TEST CASE 3: TOGGLE QUYỀN HẠN
-  // - Quyền cấp cao cần xác thực GM Key
-  // - Các thay đổi chưa lưu được đánh dấu (cờ daCoBanLuu)
-  // ═══════════════════════════════════════════════════════════════════════════════
+  // ─── MỞ MODAL SỬA THÔNG TIN ────────────────────────────────────────────────
+  const moModalSua = (nv) => {
+    if (!kiemTraQuyenAdmin()) return;
+    setFormSua({
+      hoTen: nv.hoTen,
+      email: nv.email,
+      phone: nv.phone || '',
+      phongBan: nv.phongBan,
+      vaiTro: nv.vaiTro
+    });
+    setLoiFormSua('');
+    setModalSuaThongTin(true);
+  };
+
+  // ─── LƯU SỬA THÔNG TIN (GỌI API MYSQL VỚI CONCURRENCY CHECK) ────────────────
+  const xuLySuaThongTin = async (e) => {
+    e.preventDefault();
+    if (!nvDangChon) return;
+    setLoiFormSua('');
+
+    const hoTen = formSua.hoTen.trim();
+    const email = formSua.email.trim().toLowerCase();
+    const phone = formSua.phone.trim();
+
+    if (!hoTen) { setLoiFormSua('Họ và tên không được để trống.'); return; }
+    if (hoTen.length < 2 || hoTen.length > 100) { setLoiFormSua('Họ và tên phải từ 2 đến 100 ký tự.'); return; }
+    if (!/^[a-zA-Z0-9\sÀ-ỹ._\-\/]+$/.test(hoTen)) {
+      setLoiFormSua('Họ và tên chỉ được chứa chữ cái tiếng Việt, số, dấu cách và ký tự . _ - /');
+      return;
+    }
+
+    if (!email) { setLoiFormSua('Địa chỉ email không được để trống.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setLoiFormSua('Địa chỉ email không đúng định dạng hợp lệ.');
+      return;
+    }
+
+    const rawId = nvDangChon.rawId || parseInt(String(nvDangChon.id).replace(/\D/g, ''), 10);
+    const res = await callApi('PUT', `/${rawId}`, {
+      hoTen,
+      email,
+      phone,
+      phongBan: formSua.phongBan,
+      vaiTro: formSua.vaiTro
+    });
+
+    if (!res) {
+      setLoiFormSua('Mất kết nối máy chủ. Vui lòng kiểm tra lại backend.');
+      return;
+    }
+
+    // Concurrency Check: Nếu bản ghi bị xóa bởi người khác trong lúc sửa
+    if (res.status === 404 || res.data?.isRecordDeleted) {
+      setModalSuaThongTin(false);
+      setSyncErrorModal({
+        title: 'CẢNH BÁO: TÀI KHOẢN ĐÃ BỊ XÓA KHỎI HỆ THỐNG!',
+        message: `Trong lúc bạn đang thao tác chỉnh sửa, tài khoản [${nvDangChon.hoTen}] (${nvDangChon.id}) đã bị người khác hoặc tiến trình khác xóa khỏi cơ sở dữ liệu! Thao tác sửa không thể thực hiện.`,
+        actionText: 'Tải Lại Danh Sách Mới Nhất',
+        onAction: () => {
+          setSyncErrorModal(null);
+          taiDuLieuTuBackend();
+        }
+      });
+      return;
+    }
+
+    if (!res.ok) {
+      setLoiFormSua(res.data.message || 'Không thể cập nhật thông tin');
+      return;
+    }
+
+    hienThongBao(`Đã cập nhật thông tin thành công cho ${hoTen}!`, 'thanh_cong');
+    ghiNhatKy('CẬP NHẬT HỒ SƠ', nvDangChon.id, `Cập nhật thông tin cho ${hoTen} (${email})`);
+    setModalSuaThongTin(false);
+    taiDuLieuTuBackend();
+  };
+
+  // ─── TOGGLE QUYỀN HẠN RBAC ─────────────────────────────────────────────────
   const xuLyToggleQuyen = (key, laCaoCapBac) => {
     if (!kiemTraQuyenAdmin()) return;
 
     const giaTriMoi = !quyenLamViec[key];
 
-    // TEST CASE: Kích hoạt quyền cấp cao → yêu cầu xác thực GM Key
     if (giaTriMoi && laCaoCapBac) {
       setQuyenDangXacThuc(key);
       setGmKey('');
@@ -631,10 +483,10 @@ const QuanLyTaiKhoan = () => {
     }
 
     setQuyenLamViec(prev => ({ ...prev, [key]: giaTriMoi }));
-    setDaCoBanLuu(true); // Đánh dấu có thay đổi chưa lưu
+    setDaCoBanLuu(true);
   };
 
-  // TEST CASE: Xác thực GM Key
+  // Xác thực GM Key
   const xuLyXacThucGMKey = (e) => {
     e.preventDefault();
     const keyNhap = gmKey.trim().toUpperCase();
@@ -644,20 +496,16 @@ const QuanLyTaiKhoan = () => {
       setDaCoBanLuu(true);
       ghiNhatKy('XÁC THỰC QUYỀN ĐẶC BIỆT', nvDangChon?.id || 'UNKNOWN',
         `Cấp quyền cao cấp [${quyenDangXacThuc}] qua khóa GM`);
-      hienThongBao('Xác thực thành công! Đã cấp quyền đặc biệt.', 'thanh_cong');
+      hienThongBao('Xác thực thành công! Đã mở quyền đặc biệt.', 'thanh_cong');
       setModalXacThuc(false);
     } else {
-      setLoiGmKey('Quyền này yêu cầu xác thực từ cấp quản lý cao hơn.');
+      setLoiGmKey('Quyền này yêu cầu xác thực từ cấp quản lý cao hơn (Gợi ý: GM-KEY-2026).');
       ghiNhatKy('XÁC THỰC THẤT BẠI', nvDangChon?.id || 'UNKNOWN',
         `Nhập sai khóa GM khi cố cấp quyền [${quyenDangXacThuc}]`, 'BỊ CHẶN');
     }
   };
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // TEST CASE 4: CHÍNH SÁCH BẢO MẬT — Giá trị trong khoảng cho phép
-  // hanMatKhauNgay: 15–365, thoiGianIdlePhut: 1–120, hanPhienGio: 1–24
-  // MFA bắt buộc không thể tắt
-  // ═══════════════════════════════════════════════════════════════════════════════
+  // Cập nhật chính sách bảo mật
   const capNhatChinhSach = (truong, giaTriRaw) => {
     if (!kiemTraQuyenAdmin()) return;
     const giaTri = Number(giaTriRaw);
@@ -670,16 +518,14 @@ const QuanLyTaiKhoan = () => {
     const exp = Number(hanMatKhauNgay);
     const idle = Number(thoiGianIdlePhut);
     const sess = Number(hanPhienGio);
-    if (isNaN(exp)  || exp  < 15  || exp  > 365) return 'Hạn mật khẩu phải từ 15 đến 365 ngày.';
-    if (isNaN(idle) || idle < 1   || idle > 120) return 'Thời gian tự khóa phải từ 1 đến 120 phút.';
-    if (isNaN(sess) || sess < 1   || sess > 24)  return 'Thời hạn phiên token phải từ 1 đến 24 giờ.';
+    if (isNaN(exp) || exp < 15 || exp > 365) return 'Hạn mật khẩu phải từ 15 đến 365 ngày.';
+    if (isNaN(idle) || idle < 1 || idle > 120) return 'Thời gian tự khóa phải từ 1 đến 120 phút.';
+    if (isNaN(sess) || sess < 1 || sess > 24) return 'Thời hạn phiên token phải từ 1 đến 24 giờ.';
     return null;
   };
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // TEST CASE 5: LƯU THAY ĐỔI — Cập nhật danhSachNV, reset cờ thay đổi
-  // ═══════════════════════════════════════════════════════════════════════════════
-  const xuLyLuuThayDoi = () => {
+  // ─── LƯU PHÂN QUYỀN RBAC & CHÍNH SÁCH BẢO MẬT (GỌI API MYSQL VỚI CONCURRENCY) ─
+  const xuLyLuuThayDoi = async () => {
     if (!kiemTraQuyenAdmin() || !nvDangChon) return;
 
     const loiChinhSach = kiemTraChinhSachHopLe();
@@ -688,30 +534,144 @@ const QuanLyTaiKhoan = () => {
       return;
     }
 
-    setDanhSachNV(prev => prev.map(nv =>
-      nv.id === nvDangChon.id
-        ? {
-            ...nv,
-            quyenHan: { ...quyenLamViec },
-            chinhSachBaoMat: {
-              hanMatKhauNgay:   Number(chinhSachLamViec.hanMatKhauNgay),
-              thoiGianIdlePhut: Number(chinhSachLamViec.thoiGianIdlePhut),
-              baoMatMFA:        true, // MFA bắt buộc không thể thay đổi
-              hanPhienGio:      Number(chinhSachLamViec.hanPhienGio),
-            },
-          }
-        : nv
-    ));
+    const rawId = nvDangChon.rawId || parseInt(String(nvDangChon.id).replace(/\D/g, ''), 10);
+    const res = await callApi('PUT', `/${rawId}`, {
+      quyenHan: quyenLamViec,
+      chinhSachBaoMat: {
+        hanMatKhauNgay: Number(chinhSachLamViec.hanMatKhauNgay),
+        thoiGianIdlePhut: Number(chinhSachLamViec.thoiGianIdlePhut),
+        baoMatMFA: true,
+        hanPhienGio: Number(chinhSachLamViec.hanPhienGio)
+      }
+    });
 
-    setDaCoBanLuu(false); // Xóa cờ thay đổi sau khi lưu
+    if (!res) {
+      hienThongBao('Mất kết nối máy chủ MySQL backend.', 'loi');
+      return;
+    }
+
+    // Concurrency check
+    if (res.status === 404 || res.data?.isRecordDeleted) {
+      setSyncErrorModal({
+        title: 'CẢNH BÁO: DỮ LIỆU ĐÃ BỊ XÓA KHỎI DATABASE!',
+        message: `Trong lúc bạn đang thao tác phân quyền, tài khoản [${nvDangChon.hoTen}] (${nvDangChon.id}) đã bị người khác xóa khỏi cơ sở dữ liệu! Thao tác lưu không thể thực hiện.`,
+        actionText: 'Tải Lại Danh Sách',
+        onAction: () => {
+          setSyncErrorModal(null);
+          taiDuLieuTuBackend();
+        }
+      });
+      return;
+    }
+
+    if (!res.ok) {
+      hienThongBao(res.data.message || 'Không thể lưu phân quyền', 'loi');
+      return;
+    }
+
+    setDaCoBanLuu(false);
     ghiNhatKy('LƯU THAY ĐỔI PHÂN QUYỀN', nvDangChon.id,
       `Đã lưu cấu hình RBAC và chính sách bảo mật cho ${nvDangChon.hoTen}`);
     hienThongBao(`Đã lưu thay đổi phân quyền cho ${nvDangChon.hoTen} thành công.`, 'thanh_cong');
+    taiDuLieuTuBackend();
   };
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // TEST CASE 6: NHÂN BẢN VAI TRÒ
-  // ═══════════════════════════════════════════════════════════════════════════════
+  // ─── THU HỒI QUYỀN TRUY CẬP (ĐÌNH CHỈ) ─────────────────────────────────────
+  const khoiDongThuHoi = () => {
+    if (!kiemTraQuyenAdmin() || !nvDangChon) return;
+
+    if (nvDangChon.id === maNVDangDangNhap) {
+      hienThongBao('Không thể thu hồi quyền của tài khoản Root Admin đang đăng nhập.', 'loi');
+      return;
+    }
+
+    if (nvDangChon.trangThai === 'da_thu_hoi') {
+      hienThongBao('Tài khoản này đã bị thu hồi quyền trước đó.', 'loi');
+      return;
+    }
+
+    setModalThuHoi(true);
+  };
+
+  const xacNhanThuHoi = async () => {
+    if (!nvDangChon) return;
+    const rawId = nvDangChon.rawId || parseInt(String(nvDangChon.id).replace(/\D/g, ''), 10);
+
+    const res = await callApi('PUT', `/${rawId}`, {
+      trangThai: 'da_thu_hoi',
+      quyenHan: {
+        quyen_checkin: false, quyen_chuyen_phong: false,
+        quyen_the_tu: false, quyen_buong_phong: false,
+        quyen_night_audit: false, quyen_he_thong: false,
+      }
+    });
+
+    if (!res) {
+      hienThongBao('Mất kết nối máy chủ MySQL.', 'loi');
+      setModalThuHoi(false);
+      return;
+    }
+
+    if (res.status === 404 || res.data?.isRecordDeleted) {
+      setModalThuHoi(false);
+      setSyncErrorModal({
+        title: 'CẢNH BÁO: TÀI KHOẢN ĐÃ BỊ XÓA!',
+        message: `Tài khoản [${nvDangChon.hoTen}] đã bị người khác xóa trước đó!`,
+        actionText: 'Tải Lại Danh Sách',
+        onAction: () => {
+          setSyncErrorModal(null);
+          taiDuLieuTuBackend();
+        }
+      });
+      return;
+    }
+
+    ghiNhatKy('THU HỒI QUYỀN TRUY CẬP', nvDangChon.id,
+      `Thu hồi toàn bộ quyền & đình chỉ tài khoản ${nvDangChon.hoTen}`);
+    hienThongBao(`Đã thu hồi quyền truy cập của ${nvDangChon.hoTen} [${nvDangChon.id}].`, 'thong_tin');
+    setModalThuHoi(false);
+    taiDuLieuTuBackend();
+  };
+
+  // ─── XÓA NHÂN VIÊN VĨNH VIỄN (DELETE MYSQL VỚI CONCURRENCY CHECK) ──────────
+  const xacNhanXoaNhanVien = async () => {
+    if (!modalXoa) return;
+    const target = modalXoa;
+    const rawId = target.rawId || parseInt(String(target.id).replace(/\D/g, ''), 10);
+
+    const res = await callApi('DELETE', `/${rawId}`);
+    setModalXoa(null);
+
+    if (!res) {
+      hienThongBao('Mất kết nối máy chủ backend.', 'loi');
+      return;
+    }
+
+    // Concurrency Check: Nếu bản ghi đã bị người khác xóa trước đó
+    if (res.status === 404 || res.data?.isRecordDeleted) {
+      setSyncErrorModal({
+        title: 'CẢNH BÁO: TÀI KHOẢN ĐÃ BỊ XÓA TRƯỚC ĐÓ!',
+        message: `Tài khoản "${target.hoTen}" (${target.id}) đã bị xóa khỏi cơ sở dữ liệu bởi quản trị viên hoặc tiến trình khác! Vui lòng tải lại danh sách.`,
+        actionText: 'Tải Lại Danh Sách',
+        onAction: () => {
+          setSyncErrorModal(null);
+          taiDuLieuTuBackend();
+        }
+      });
+      return;
+    }
+
+    if (!res.ok) {
+      hienThongBao(res.data.message || 'Không thể xóa tài khoản', 'loi');
+      return;
+    }
+
+    hienThongBao(`Đã xóa tài khoản nhân viên ${target.hoTen} thành công khỏi database!`, 'thanh_cong');
+    ghiNhatKy('XÓA TÀI KHOẢN', target.id, `Đã xóa nhân viên ${target.hoTen} khỏi hệ thống`);
+    taiDuLieuTuBackend();
+  };
+
+  // Nhân bản vai trò
   const xuLyNhanBan = (e) => {
     e.preventDefault();
     if (!kiemTraQuyenAdmin() || !nvDangChon) return;
@@ -722,67 +682,7 @@ const QuanLyTaiKhoan = () => {
     setModalNhanBan(false);
   };
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // TEST CASE 7: THU HỒI QUYỀN TRUY CẬP
-  // - Không thể thu hồi tài khoản đang đăng nhập
-  // - Có hiệu lực ngay, cần xác nhận
-  // ═══════════════════════════════════════════════════════════════════════════════
-  const khoiDongThuHoi = () => {
-    if (!kiemTraQuyenAdmin() || !nvDangChon) return;
-
-    // TEST CASE: Không thể thu hồi chính tài khoản đang đăng nhập
-    if (nvDangChon.id === maNVDangDangNhap) {
-      hienThongBao('Không thể thu hồi quyền của tài khoản đang đăng nhập.', 'loi');
-      ghiNhatKy('TỪ CHỐI THU HỒI', nvDangChon.id,
-        'Không thể đình chỉ chính tài khoản đang hoạt động trong phiên này', 'BỊ CHẶN');
-      return;
-    }
-
-    // TEST CASE: Không thể thu hồi tài khoản đã bị thu hồi trước đó
-    if (nvDangChon.trangThai === 'da_thu_hoi') {
-      hienThongBao('Tài khoản này đã bị thu hồi quyền trước đó.', 'loi');
-      return;
-    }
-
-    setModalThuHoi(true);
-  };
-
-  const xacNhanThuHoi = () => {
-    if (!nvDangChon) return;
-
-    // Xóa tất cả quyền và chuyển trạng thái → da_thu_hoi (có hiệu lực ngay)
-    setDanhSachNV(prev => prev.map(nv =>
-      nv.id === nvDangChon.id
-        ? {
-            ...nv,
-            trangThai: 'da_thu_hoi',
-            quyenHan: {
-              quyen_checkin:      false,
-              quyen_chuyen_phong: false,
-              quyen_the_tu:       false,
-              quyen_buong_phong:  false,
-              quyen_night_audit:  false,
-              quyen_he_thong:     false,
-            },
-          }
-        : nv
-    ));
-
-    // Cập nhật RBAC Inspector ngay lập tức để phản ánh trạng thái mới
-    setQuyenLamViec({
-      quyen_checkin: false, quyen_chuyen_phong: false,
-      quyen_the_tu: false,  quyen_buong_phong:  false,
-      quyen_night_audit: false, quyen_he_thong: false,
-    });
-    setDaCoBanLuu(false);
-
-    ghiNhatKy('THU HỒI QUYỀN TRUY CẬP', nvDangChon.id,
-      `Thu hồi toàn bộ quyền & đình chỉ tài khoản ${nvDangChon.hoTen} — có hiệu lực ngay`);
-    hienThongBao(`Đã thu hồi quyền truy cập của ${nvDangChon.hoTen} [${nvDangChon.id}].`, 'thong_tin');
-    setModalThuHoi(false);
-  };
-
-  // ─── ĐỊNH NGHĨA VAI TRÒ MỚI ──────────────────────────────────────────────────
+  // Định nghĩa vai trò mới
   const xuLyDinhNghiaVaiTro = (e) => {
     e.preventDefault();
     if (!formVaiTro.tenVaiTro.trim()) { hienThongBao('Tên vai trò không được để trống.', 'loi'); return; }
@@ -792,19 +692,16 @@ const QuanLyTaiKhoan = () => {
     setModalVaiTro(false);
   };
 
-  // ─── XÓA BỘ LỌC ─────────────────────────────────────────────────────────────
+  // Xóa bộ lọc
   const xoaBoDam = () => {
     setTuKhoa(''); setLocPhongBan('TAT_CA'); setLocVaiTro('TAT_CA'); setLocTrangThai('TAT_CA');
   };
 
-  // ─── KPI TỔNG QUAN ───────────────────────────────────────────────────────────
-  const soHoatDong  = danhSachNV.filter(nv => nv.trangThai === 'hoat_dong').length;
-  const soThuHoi    = danhSachNV.filter(nv => nv.trangThai === 'da_thu_hoi').length;
-  const soPhongBan  = new Set(danhSachNV.map(nv => nv.phongBan)).size;
+  // KPI tổng quan
+  const soHoatDong = danhSachNV.filter(nv => nv.trangThai === 'hoat_dong').length;
+  const soThuHoi = danhSachNV.filter(nv => nv.trangThai === 'da_thu_hoi').length;
+  const soPhongBan = new Set(danhSachNV.map(nv => nv.phongBan)).size;
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ═══════════════════════════════════════════════════════════════════════════════
   return (
     <AdminLayout>
       <div className="flex flex-col w-full">
@@ -812,7 +709,7 @@ const QuanLyTaiKhoan = () => {
         {/* ── Toast Thông Báo ─────────────────────────────────────────────────── */}
         {thongBao && (
           <div className={`fixed top-20 right-6 z-[200] max-w-sm flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-2xl font-label-md text-label-md font-semibold transition-all duration-300 ${
-            thongBao.loai === 'loi'       ? 'bg-error text-white shadow-error/30'
+            thongBao.loai === 'loi' ? 'bg-error text-white shadow-error/30'
             : thongBao.loai === 'thong_tin' ? 'bg-surface-container-highest text-on-surface border border-outline-variant'
             : 'bg-admin-primary text-white shadow-admin-primary/30'
           }`}>
@@ -831,13 +728,13 @@ const QuanLyTaiKhoan = () => {
               <span className="text-outline-variant">//</span>
               <span className="text-on-surface-variant">Bảo Mật & Nhân Sự</span>
               <span className="text-outline-variant">//</span>
-              <span>Quản Lý Tài Khoản & Phân Quyền RBAC</span>
+              <span>Quản Lý Người Dùng & Phân Quyền RBAC</span>
             </div>
             <h1 className="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">
-              Quản Lý Tài Khoản & Phân Quyền Nội Bộ
+              Quản Lý Người Dùng & Phân Quyền Nội Bộ
             </h1>
             <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
-              Cấp phát, phân quyền RBAC và giám sát bảo mật cho toàn bộ nhân viên — Quản Trị Viên, Lễ Tân, Bếp, Buồng Phòng.
+              Dữ liệu thật kết nối từ cơ sở dữ liệu MySQL (giới hạn 50 bản ghi) — Hỗ trợ thêm, sửa, xóa với kiểm tra xung đột thời gian thực.
             </p>
           </div>
 
@@ -845,10 +742,10 @@ const QuanLyTaiKhoan = () => {
             {/* Giả lập vai trò phiên */}
             <div className="flex items-center gap-2 px-space-sm py-space-xs bg-surface-container-low rounded-lg border border-outline-variant">
               <span className="material-symbols-outlined text-[16px] text-on-surface-variant">manage_accounts</span>
-              <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold">Vai trò thử nghiệm:</span>
+              <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold">Vai trò đăng nhập:</span>
               <select
                 value={vaiTroHienTai}
-                onChange={e => { setVaiTroHienTai(e.target.value); hienThongBao(`Đã chuyển sang vai trò giả lập: ${e.target.value}`, 'thong_tin'); }}
+                onChange={e => { setVaiTroHienTai(e.target.value); hienThongBao(`Đã chuyển sang vai trò: ${e.target.value}`, 'thong_tin'); }}
                 className="bg-transparent font-label-md text-label-md text-admin-primary font-bold focus:outline-none cursor-pointer"
               >
                 <option value="Quản Trị Viên">Quản Trị Viên (Admin)</option>
@@ -861,16 +758,17 @@ const QuanLyTaiKhoan = () => {
             {/* Thanh công cụ nhân sự */}
             <div className="flex flex-wrap items-center gap-space-sm">
               <button
+                id="btn-add-staff"
                 onClick={() => {
                   if (!kiemTraQuyenAdmin()) return;
-                  setFormNVMoi({ id: taoMaNV(), hoTen: '', email: '', phongBan: DANH_SACH_PHONG_BAN[0], vaiTro: '' });
+                  setFormNVMoi({ hoTen: '', email: '', phone: '', phongBan: DANH_SACH_PHONG_BAN[0], vaiTro: '' });
                   setLoiFormNVMoi('');
                   setModalCapPhat(true);
                 }}
-                className="flex items-center gap-space-xs px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-bold rounded-lg hover:brightness-105 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all"
+                className="flex items-center gap-space-xs px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-bold rounded-lg hover:brightness-105 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">person_add</span>
-                <span>+ Cấp Phát Nhân Viên Mới</span>
+                <span>+ Thêm Người Dùng Mới</span>
               </button>
 
               <button
@@ -879,7 +777,7 @@ const QuanLyTaiKhoan = () => {
                   setFormVaiTro({ tenVaiTro: '', phongBan: DANH_SACH_PHONG_BAN[0] });
                   setModalVaiTro(true);
                 }}
-                className="flex items-center gap-space-xs px-space-md py-space-sm bg-surface-container text-on-surface font-label-md text-label-md font-semibold rounded-lg border border-outline-variant hover:bg-surface-container-high transition-all"
+                className="flex items-center gap-space-xs px-space-md py-space-sm bg-surface-container text-on-surface font-label-md text-label-md font-semibold rounded-lg border border-outline-variant hover:bg-surface-container-high transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">tune</span>
                 <span>Định Nghĩa Vai Trò</span>
@@ -890,7 +788,7 @@ const QuanLyTaiKhoan = () => {
                   if (!kiemTraQuyenAdmin()) return;
                   setModalNhatKy(true);
                 }}
-                className="flex items-center gap-space-xs px-space-md py-space-sm bg-surface-container text-on-surface font-label-md text-label-md font-semibold rounded-lg border border-outline-variant hover:bg-surface-container-high transition-all"
+                className="flex items-center gap-space-xs px-space-md py-space-sm bg-surface-container text-on-surface font-label-md text-label-md font-semibold rounded-lg border border-outline-variant hover:bg-surface-container-high transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">history</span>
                 <span>Nhật Ký Kiểm Toán</span>
@@ -902,12 +800,12 @@ const QuanLyTaiKhoan = () => {
         {/* ── Thẻ KPI Tổng Quan ───────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-space-md mb-space-lg">
           {[
-            { nhan: 'Tổng Nhân Viên',       gia_tri: danhSachNV.length, phu: `${soHoatDong} đang hoạt động`,       bieu_tuong: 'group',          mau: 'text-admin-primary' },
-            { nhan: 'Đã Thu Hồi Quyền',     gia_tri: soThuHoi,          phu: 'Tài khoản bị đình chỉ',             bieu_tuong: 'block',          mau: 'text-error'         },
-            { nhan: 'Số Phòng Ban',          gia_tri: soPhongBan,        phu: 'Nhóm chức năng',                    bieu_tuong: 'domain',         mau: 'text-secondary'     },
-            { nhan: 'Bảo Mật MFA',           gia_tri: '100%',            phu: 'Bắt buộc toàn hệ thống',           bieu_tuong: 'verified_user',  mau: 'text-admin-primary' },
+            { nhan: 'Tổng Người Dùng', gia_tri: `${danhSachNV.length} / 50`, phu: `${soHoatDong} đang hoạt động`, bieu_tuong: 'group', mau: 'text-admin-primary' },
+            { nhan: 'Đã Thu Hồi Quyền', gia_tri: soThuHoi, phu: 'Tài khoản bị đình chỉ', bieu_tuong: 'block', mau: 'text-error' },
+            { nhan: 'Số Phòng Ban', gia_tri: soPhongBan, phu: 'Nhóm chức năng PMS', bieu_tuong: 'domain', mau: 'text-secondary' },
+            { nhan: 'Nguồn CSDL MySQL', gia_tri: backendConnected ? 'Đã Kết Nối' : 'Mất Kết Nối', phu: backendConnected ? 'hotel_management (50 users)' : 'Vui lòng kiểm tra server', bieu_tuong: 'database', mau: backendConnected ? 'text-admin-primary' : 'text-error' },
           ].map((the, i) => (
-            <div key={i} className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+            <div key={i} className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between border border-outline-variant/30">
               <div className="flex items-center justify-between mb-space-xs">
                 <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">{the.nhan}</span>
                 <span className={`material-symbols-outlined text-[20px] ${the.mau}`}>{the.bieu_tuong}</span>
@@ -922,24 +820,22 @@ const QuanLyTaiKhoan = () => {
 
         {/* ── Bộ Lọc & Tìm Kiếm ─────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center gap-space-sm mb-space-md">
-          {/* Ô tìm kiếm */}
           <div className="flex-1 min-w-[260px] relative">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">search</span>
             <input
               type="text"
               value={tuKhoa}
               onChange={e => setTuKhoa(e.target.value)}
-              placeholder="Tìm theo tên, mã NV, email, phòng ban, vai trò..."
+              placeholder="Tìm theo tên, mã NV, email, SĐT, phòng ban, vai trò..."
               className="w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-admin-primary focus:ring-1 focus:ring-admin-primary/30 transition-all"
             />
             {tuKhoa && (
-              <button onClick={() => setTuKhoa('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface">
+              <button onClick={() => setTuKhoa('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer">
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             )}
           </div>
 
-          {/* Lọc Phòng Ban */}
           <div className="flex items-center gap-2 px-space-sm py-2 bg-surface-container-lowest border border-outline-variant rounded-lg">
             <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold whitespace-nowrap">Phòng Ban:</span>
             <select value={locPhongBan} onChange={e => setLocPhongBan(e.target.value)}
@@ -949,7 +845,6 @@ const QuanLyTaiKhoan = () => {
             </select>
           </div>
 
-          {/* Lọc Vai Trò */}
           <div className="flex items-center gap-2 px-space-sm py-2 bg-surface-container-lowest border border-outline-variant rounded-lg">
             <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold whitespace-nowrap">Vai Trò:</span>
             <select value={locVaiTro} onChange={e => setLocVaiTro(e.target.value)}
@@ -959,7 +854,6 @@ const QuanLyTaiKhoan = () => {
             </select>
           </div>
 
-          {/* Lọc Trạng Thái */}
           <div className="flex items-center gap-2 px-space-sm py-2 bg-surface-container-lowest border border-outline-variant rounded-lg">
             <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold whitespace-nowrap">Trạng Thái:</span>
             <select value={locTrangThai} onChange={e => setLocTrangThai(e.target.value)}
@@ -983,17 +877,22 @@ const QuanLyTaiKhoan = () => {
               <div className="px-space-lg py-space-sm border-b border-outline-variant flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-space-sm">
                   <span className="material-symbols-outlined text-[20px] text-admin-primary">badge</span>
-                  <span className="font-title-md text-title-md text-on-surface font-semibold">Danh Sách Nhân Viên</span>
+                  <span className="font-title-md text-title-md text-on-surface font-semibold">Danh Sách Người Dùng (MySQL)</span>
                   <span className="bg-admin-primary/10 text-admin-primary font-label-sm text-label-sm font-bold px-2 py-0.5 rounded-full">
                     {danhSachDaLoc.length} / {danhSachNV.length}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-admin-primary opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-admin-primary" />
-                  </span>
-                  <span className="font-label-sm text-label-sm text-admin-primary font-semibold">ĐỒNG BỘ THỜI GIAN THỰC</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={taiDuLieuTuBackend}
+                    className="flex items-center gap-1 text-xs text-on-surface-variant hover:text-admin-primary px-2 py-1 rounded bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer"
+                    title="Tải lại từ MySQL"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">refresh</span>
+                    <span>Làm mới</span>
+                  </button>
+                  <span className="w-2 h-2 rounded-full bg-admin-primary animate-ping" />
+                  <span className="font-label-sm text-label-sm text-admin-primary font-semibold">CSDL THỰC (LIMIT 50)</span>
                 </div>
               </div>
 
@@ -1002,7 +901,7 @@ const QuanLyTaiKhoan = () => {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-surface-container/60 border-b border-outline-variant">
-                      {['Mã NV', 'Nhân Viên', 'Phòng Ban', 'Vai Trò', 'Trạng Thái'].map(h => (
+                      {['Mã NV', 'Họ Tên / Email', 'Phòng Ban', 'Vai Trò', 'Trạng Thái', 'Thao Tác'].map(h => (
                         <th key={h} className="py-space-sm px-space-md font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-bold whitespace-nowrap">
                           {h}
                         </th>
@@ -1010,13 +909,20 @@ const QuanLyTaiKhoan = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/30">
-                    {danhSachTrang.length === 0 ? (
+                    {loading ? (
                       <tr>
-                        <td colSpan={5} className="py-16 text-center">
+                        <td colSpan={6} className="py-16 text-center">
+                          <span className="material-symbols-outlined text-[36px] text-admin-primary animate-spin block mb-2">progress_activity</span>
+                          <p className="font-body-md text-on-surface-variant">Đang tải dữ liệu từ CSDL MySQL...</p>
+                        </td>
+                      </tr>
+                    ) : danhSachTrang.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-16 text-center">
                           <span className="material-symbols-outlined text-[48px] text-on-surface-variant/30 block mb-2">manage_search</span>
-                          <p className="font-body-md text-body-md text-on-surface-variant mb-3">Không tìm thấy nhân viên phù hợp.</p>
+                          <p className="font-body-md text-body-md text-on-surface-variant mb-3">Không tìm thấy người dùng phù hợp.</p>
                           <button onClick={xoaBoDam}
-                            className="px-space-md py-space-xs bg-admin-primary text-white rounded-lg font-label-md text-label-md hover:brightness-110 transition-all">
+                            className="px-space-md py-space-xs bg-admin-primary text-white rounded-lg font-label-md text-label-md hover:brightness-110 transition-all cursor-pointer">
                             Xóa Bộ Lọc
                           </button>
                         </td>
@@ -1048,7 +954,7 @@ const QuanLyTaiKhoan = () => {
                                 <div className={`font-body-md text-body-md font-semibold ${dangChon ? 'text-admin-primary' : 'text-on-surface'}`}>
                                   {nv.hoTen}
                                   {nv.id === maNVDangDangNhap && (
-                                    <span className="ml-1.5 text-[10px] bg-admin-primary/10 text-admin-primary px-1.5 py-0.5 rounded-full font-bold uppercase">Tôi</span>
+                                    <span className="ml-1.5 text-[10px] bg-admin-primary/10 text-admin-primary px-1.5 py-0.5 rounded-full font-bold uppercase">Root</span>
                                   )}
                                 </div>
                                 <div className="font-label-sm text-label-sm text-on-surface-variant">{nv.email}</div>
@@ -1073,6 +979,36 @@ const QuanLyTaiKhoan = () => {
                               {trangThai.nhan}
                             </span>
                           </td>
+
+                          {/* Thao Tác (Sửa / Xóa) */}
+                          <td className="py-3 px-space-md whitespace-nowrap">
+                            <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                              <button
+                                onClick={() => {
+                                  setIdDangChon(nv.id);
+                                  moModalSua(nv);
+                                }}
+                                className="p-1.5 rounded-lg hover:bg-admin-primary/10 text-admin-primary transition-colors cursor-pointer"
+                                title="Chỉnh sửa thông tin người dùng"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (nv.id === maNVDangDangNhap) {
+                                    hienThongBao('Không thể xóa tài khoản Quản Trị Viên Gốc!', 'loi');
+                                    return;
+                                  }
+                                  setModalXoa(nv);
+                                }}
+                                disabled={nv.id === maNVDangDangNhap}
+                                className="p-1.5 rounded-lg hover:bg-error/10 text-error disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                title="Xóa người dùng khỏi database"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })}
@@ -1083,23 +1019,23 @@ const QuanLyTaiKhoan = () => {
               {/* Phân Trang */}
               <div className="px-space-lg py-space-sm border-t border-outline-variant bg-surface-container/30 flex flex-col sm:flex-row items-center justify-between gap-space-sm">
                 <span className="font-label-sm text-label-sm text-on-surface-variant">
-                  Hiển thị {danhSachTrang.length} / {danhSachDaLoc.length} nhân viên — Trang {trangHienTai} / {tongSoTrang}
+                  Hiển thị {danhSachTrang.length} / {danhSachDaLoc.length} người dùng — Trang {trangHienTai} / {tongSoTrang}
                 </span>
                 <div className="flex items-center gap-space-xs">
                   <button onClick={() => setTrangHienTai(p => Math.max(1, p - 1))} disabled={trangHienTai === 1}
-                    className="p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                    className="p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-[18px]">chevron_left</span>
                   </button>
                   {Array.from({ length: tongSoTrang }, (_, i) => i + 1).map(trang => (
                     <button key={trang} onClick={() => setTrangHienTai(trang)}
-                      className={`w-8 h-8 rounded-lg font-label-md text-label-md font-semibold transition-all ${
+                      className={`w-8 h-8 rounded-lg font-label-md text-label-md font-semibold transition-all cursor-pointer ${
                         trangHienTai === trang ? 'bg-admin-primary text-white shadow-sm' : 'border border-outline-variant text-on-surface-variant hover:bg-surface-container-high'
                       }`}>
                       {trang}
                     </button>
                   ))}
                   <button onClick={() => setTrangHienTai(p => Math.min(tongSoTrang, p + 1))} disabled={trangHienTai === tongSoTrang}
-                    className="p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                    className="p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer">
                     <span className="material-symbols-outlined text-[18px]">chevron_right</span>
                   </button>
                 </div>
@@ -1120,19 +1056,28 @@ const QuanLyTaiKhoan = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
-                          <h2 className="font-title-lg text-title-lg text-on-surface font-semibold">
+                          <h2 className="font-title-lg text-title-lg text-on-surface font-semibold flex items-center gap-2">
                             {nvDangChon.hoTen}
                             {nvDangChon.id === maNVDangDangNhap && (
-                              <span className="ml-2 text-xs bg-admin-primary/10 text-admin-primary px-2 py-0.5 rounded-full font-bold uppercase">Đang Đăng Nhập</span>
+                              <span className="text-xs bg-admin-primary/10 text-admin-primary px-2 py-0.5 rounded-full font-bold uppercase">Root</span>
                             )}
                           </h2>
                           <p className="font-label-sm text-label-sm text-on-surface-variant">{nvDangChon.email}</p>
                         </div>
-                        {(() => { const ts = nhanDangTrangThai(nvDangChon.trangThai); return (
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm font-semibold ${ts.cls}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${ts.dot}`} />{ts.nhan}
-                          </span>
-                        ); })()}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => moModalSua(nvDangChon)}
+                            className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-admin-primary/30 bg-admin-primary/5 text-admin-primary hover:bg-admin-primary/10 font-bold transition-all cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">edit</span>
+                            Sửa Hồ Sơ
+                          </button>
+                          {(() => { const ts = nhanDangTrangThai(nvDangChon.trangThai); return (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm font-semibold ${ts.cls}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${ts.dot}`} />{ts.nhan}
+                            </span>
+                          ); })()}
+                        </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-space-sm mt-space-sm">
                         <span className="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
@@ -1250,7 +1195,7 @@ const QuanLyTaiKhoan = () => {
                     <div className="p-space-md bg-surface-container rounded-xl border border-outline-variant/50">
                       <div className="flex items-center gap-1 mb-space-xs">
                         <span className="material-symbols-outlined text-[15px] text-on-surface-variant">timer</span>
-                        <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold">Tự Khóa Idle</span>
+                        <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold">Tự Khóa Khi Rảnh</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <input
@@ -1264,35 +1209,11 @@ const QuanLyTaiKhoan = () => {
                     </div>
                   </div>
 
-                  {/* MFA Bắt Buộc */}
-                  <div className="flex items-center justify-between p-space-md bg-admin-primary/5 border border-admin-primary/20 rounded-xl mb-space-sm">
-                    <div className="flex items-center gap-space-sm">
-                      <span className="material-symbols-outlined text-[18px] text-admin-primary">verified_user</span>
-                      <div>
-                        <div className="font-label-md text-label-md text-on-surface font-semibold">Xác Thực Đa Yếu Tố (MFA)</div>
-                        <div className="font-label-sm text-label-sm text-on-surface-variant">Chính sách toàn hệ thống — không thể tắt</div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => hienThongBao('MFA bắt buộc toàn hệ thống. Không thể tắt theo chính sách bảo mật PMS.', 'loi')}
-                      className="flex items-center gap-1 bg-admin-primary text-white px-space-sm py-space-xs rounded-lg font-label-sm text-label-sm font-bold cursor-not-allowed"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">lock</span>
-                      BẮT BUỘC
-                    </button>
-                  </div>
-
-                  {/* Thời Hạn Phiên Token */}
+                  {/* Slider Phiên Đăng Nhập */}
                   <div className="p-space-md bg-surface-container rounded-xl border border-outline-variant/50">
-                    <div className="flex items-center justify-between mb-space-sm">
-                      <div className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[15px] text-on-surface-variant">token</span>
-                        <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold">Thời Hạn Phiên Token</span>
-                      </div>
-                      <span className="font-label-md text-label-md text-admin-primary font-bold">
-                        {String(chinhSachLamViec.hanPhienGio).padStart(2, '0')}:00:00
-                      </span>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-bold">Thời Hạn Phiên Token</span>
+                      <span className="font-label-md text-label-md font-bold text-admin-primary font-mono">{chinhSachLamViec.hanPhienGio} Giờ</span>
                     </div>
                     <input
                       type="range" min="1" max="24"
@@ -1309,15 +1230,16 @@ const QuanLyTaiKhoan = () => {
                 {/* Nút Hành Động */}
                 <div className="flex flex-col gap-space-sm">
                   <button
+                    id="btn-save-staff-policy"
                     onClick={xuLyLuuThayDoi}
-                    className={`w-full flex items-center justify-center gap-space-sm px-space-lg py-space-md font-title-md text-title-md font-bold rounded-xl transition-all shadow-sm ${
+                    className={`w-full flex items-center justify-center gap-space-sm px-space-lg py-space-md font-title-md text-title-md font-bold rounded-xl transition-all shadow-sm cursor-pointer ${
                       daCoBanLuu
                         ? 'bg-admin-primary-container text-on-admin-primary hover:brightness-105 shadow-[0_0_16px_rgba(16,185,129,0.3)] animate-pulse-slow'
                         : 'bg-surface-container text-on-surface-variant border border-outline-variant hover:bg-surface-container-high'
                     }`}
                   >
                     <span className="material-symbols-outlined text-[20px]">save</span>
-                    {daCoBanLuu ? 'Lưu Thay Đổi Phân Quyền *' : 'Lưu Thay Đổi Phân Quyền'}
+                    {daCoBanLuu ? 'Lưu Thay Đổi Phân Quyền *' : 'Lưu Thay Đổi Phân Quyền (Lên MySQL)'}
                   </button>
 
                   <div className="grid grid-cols-2 gap-space-sm">
@@ -1327,14 +1249,14 @@ const QuanLyTaiKhoan = () => {
                         setTenVaiTroMoi(`${nvDangChon.vaiTro} (Bản Sao)`);
                         setModalNhanBan(true);
                       }}
-                      className="flex items-center justify-center gap-space-xs px-space-md py-space-sm bg-surface-container text-on-surface font-label-lg text-label-lg font-semibold rounded-xl border border-outline-variant hover:bg-surface-container-high transition-all"
+                      className="flex items-center justify-center gap-space-xs px-space-md py-space-sm bg-surface-container text-on-surface font-label-lg text-label-lg font-semibold rounded-xl border border-outline-variant hover:bg-surface-container-high transition-all cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[18px]">content_copy</span>
                       Nhân Bản Vai Trò
                     </button>
                     <button
                       onClick={khoiDongThuHoi}
-                      className="flex items-center justify-center gap-space-xs px-space-md py-space-sm bg-error/5 text-error font-label-lg text-label-lg font-semibold rounded-xl border border-error/25 hover:bg-error/10 transition-all"
+                      className="flex items-center justify-center gap-space-xs px-space-md py-space-sm bg-error/5 text-error font-label-lg text-label-lg font-semibold rounded-xl border border-error/25 hover:bg-error/10 transition-all cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[18px]">block</span>
                       Thu Hồi Quyền
@@ -1345,7 +1267,7 @@ const QuanLyTaiKhoan = () => {
             ) : (
               <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/50 p-16 flex flex-col items-center justify-center text-center gap-space-sm">
                 <span className="material-symbols-outlined text-[56px] text-on-surface-variant/30">manage_accounts</span>
-                <p className="font-body-md text-body-md text-on-surface-variant">Chọn một nhân viên để xem và chỉnh sửa phân quyền RBAC</p>
+                <p className="font-body-md text-body-md text-on-surface-variant">Chọn một người dùng để xem và chỉnh sửa phân quyền RBAC</p>
               </div>
             )}
           </div>
@@ -1356,7 +1278,7 @@ const QuanLyTaiKhoan = () => {
           CÁC MODAL / HỘP THOẠI
       ═══════════════════════════════════════════════════════════════════════════ */}
 
-      {/* ── Modal 1: Cấp Phát Nhân Viên Mới ─────────────────────────────────── */}
+      {/* ── Modal 1: Cấp Phát Người Dùng Mới ─────────────────────────────────── */}
       {modalCapPhat && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface w-full max-w-lg rounded-2xl shadow-3 border border-outline-variant overflow-hidden">
@@ -1364,11 +1286,11 @@ const QuanLyTaiKhoan = () => {
               <div className="flex items-center gap-space-sm">
                 <span className="material-symbols-outlined text-[22px] text-admin-primary">person_add</span>
                 <div>
-                  <div className="font-title-md text-title-md text-on-surface font-semibold">Cấp Phát Tài Khoản Nhân Viên Mới</div>
-                  <div className="font-label-sm text-label-sm text-on-surface-variant">Mã NV và email phải là duy nhất trong hệ thống</div>
+                  <div className="font-title-md text-title-md text-on-surface font-semibold">Cấp Phát Tài Khoản Người Dùng Mới</div>
+                  <div className="font-label-sm text-label-sm text-on-surface-variant">Lưu trực tiếp vào CSDL MySQL (Bảng Users)</div>
                 </div>
               </div>
-              <button onClick={() => setModalCapPhat(false)} className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-all">
+              <button onClick={() => setModalCapPhat(false)} className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-all cursor-pointer">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
@@ -1380,21 +1302,6 @@ const QuanLyTaiKhoan = () => {
                   {loiFormNVMoi}
                 </div>
               )}
-
-              {/* Mã Nhân Viên */}
-              <div>
-                <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5 uppercase font-bold">
-                  Mã Nhân Viên <span className="text-error">*</span>
-                </label>
-                <input
-                  type="text" required
-                  value={formNVMoi.id}
-                  onChange={e => setFormNVMoi(p => ({ ...p, id: e.target.value.toUpperCase() }))}
-                  placeholder="VD: NV-5099"
-                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-admin-primary focus:ring-1 focus:ring-admin-primary/30 transition-all font-mono"
-                />
-                <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">Mã định danh duy nhất trên PMS — không được trùng</p>
-              </div>
 
               {/* Họ Và Tên */}
               <div>
@@ -1422,7 +1329,21 @@ const QuanLyTaiKhoan = () => {
                   placeholder="VD: nguyen.a@grandhorizon.vn"
                   className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-admin-primary focus:ring-1 focus:ring-admin-primary/30 transition-all"
                 />
-                <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">Email không được trùng với bất kỳ nhân viên nào khác</p>
+                <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">Email là duy nhất, không được trùng với tài khoản khác</p>
+              </div>
+
+              {/* Số điện thoại */}
+              <div>
+                <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5 uppercase font-bold">
+                  Số Điện Thoại Liên Hệ
+                </label>
+                <input
+                  type="text"
+                  value={formNVMoi.phone}
+                  onChange={e => setFormNVMoi(p => ({ ...p, phone: e.target.value }))}
+                  placeholder="VD: 0912345678"
+                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-admin-primary focus:ring-1 focus:ring-admin-primary/30 transition-all font-mono"
+                />
               </div>
 
               {/* Phòng Ban */}
@@ -1431,7 +1352,7 @@ const QuanLyTaiKhoan = () => {
                 <select
                   value={formNVMoi.phongBan}
                   onChange={e => setFormNVMoi(p => ({ ...p, phongBan: e.target.value }))}
-                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all"
+                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all cursor-pointer"
                 >
                   {DANH_SACH_PHONG_BAN.map(pb => <option key={pb} value={pb}>{pb}</option>)}
                 </select>
@@ -1447,7 +1368,7 @@ const QuanLyTaiKhoan = () => {
                   required
                   value={formNVMoi.vaiTro}
                   onChange={e => setFormNVMoi(p => ({ ...p, vaiTro: e.target.value }))}
-                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all"
+                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all cursor-pointer"
                 >
                   <option value="">-- Chọn vai trò cho nhân viên --</option>
                   {DANH_SACH_VAI_TRO.map(vt => <option key={vt} value={vt}>{vt}</option>)}
@@ -1456,15 +1377,198 @@ const QuanLyTaiKhoan = () => {
 
               <div className="flex items-center justify-end gap-space-sm pt-space-sm border-t border-outline-variant">
                 <button type="button" onClick={() => setModalCapPhat(false)}
-                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all">
+                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all cursor-pointer">
                   Hủy Bỏ
                 </button>
                 <button type="submit"
-                  className="px-space-lg py-2.5 rounded-xl bg-admin-primary text-white font-label-lg text-label-lg font-bold hover:brightness-110 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all">
+                  className="px-space-lg py-2.5 rounded-xl bg-admin-primary text-white font-label-lg text-label-lg font-bold hover:brightness-110 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all cursor-pointer">
                   Cấp Phát Tài Khoản
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Sửa Thông Tin Người Dùng ───────────────────────────────────── */}
+      {modalSuaThongTin && nvDangChon && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface w-full max-w-lg rounded-2xl shadow-3 border border-outline-variant overflow-hidden">
+            <div className="flex items-center justify-between px-space-lg py-space-md border-b border-outline-variant bg-surface-container-lowest">
+              <div className="flex items-center gap-space-sm">
+                <span className="material-symbols-outlined text-[22px] text-admin-primary">manage_accounts</span>
+                <div>
+                  <div className="font-title-md text-title-md text-on-surface font-semibold">Chỉnh Sửa Thông Tin Người Dùng</div>
+                  <div className="font-label-sm text-label-sm text-on-surface-variant">{nvDangChon.id} — Cập nhật trực tiếp lên MySQL</div>
+                </div>
+              </div>
+              <button onClick={() => setModalSuaThongTin(false)} className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-all cursor-pointer">
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={xuLySuaThongTin} className="p-space-lg space-y-space-md">
+              {loiFormSua && (
+                <div className="flex items-start gap-space-sm p-space-md bg-error/5 border border-error/25 rounded-xl text-error font-label-md text-label-md">
+                  <span className="material-symbols-outlined text-[18px] flex-shrink-0 mt-0.5">error</span>
+                  {loiFormSua}
+                </div>
+              )}
+
+              {/* Họ Và Tên */}
+              <div>
+                <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5 uppercase font-bold">
+                  Họ Và Tên Đầy Đủ <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text" required
+                  value={formSua.hoTen}
+                  onChange={e => setFormSua(p => ({ ...p, hoTen: e.target.value }))}
+                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5 uppercase font-bold">
+                  Địa Chỉ Email <span className="text-error">*</span>
+                </label>
+                <input
+                  type="email" required
+                  value={formSua.email}
+                  onChange={e => setFormSua(p => ({ ...p, email: e.target.value }))}
+                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all"
+                />
+              </div>
+
+              {/* Số điện thoại */}
+              <div>
+                <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5 uppercase font-bold">
+                  Số Điện Thoại
+                </label>
+                <input
+                  type="text"
+                  value={formSua.phone}
+                  onChange={e => setFormSua(p => ({ ...p, phone: e.target.value }))}
+                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all font-mono"
+                />
+              </div>
+
+              {/* Phòng Ban */}
+              <div>
+                <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5 uppercase font-bold">Phòng Ban</label>
+                <select
+                  value={formSua.phongBan}
+                  onChange={e => setFormSua(p => ({ ...p, phongBan: e.target.value }))}
+                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all cursor-pointer"
+                >
+                  {DANH_SACH_PHONG_BAN.map(pb => <option key={pb} value={pb}>{pb}</option>)}
+                </select>
+              </div>
+
+              {/* Vai Trò */}
+              <div>
+                <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5 uppercase font-bold">Vai Trò</label>
+                <select
+                  value={formSua.vaiTro}
+                  onChange={e => setFormSua(p => ({ ...p, vaiTro: e.target.value }))}
+                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all cursor-pointer"
+                >
+                  {DANH_SACH_VAI_TRO.map(vt => <option key={vt} value={vt}>{vt}</option>)}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-space-sm pt-space-sm border-t border-outline-variant">
+                <button type="button" onClick={() => setModalSuaThongTin(false)}
+                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all cursor-pointer">
+                  Hủy Bỏ
+                </button>
+                <button type="submit"
+                  className="px-space-lg py-2.5 rounded-xl bg-admin-primary text-white font-label-lg text-label-lg font-bold hover:brightness-110 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all cursor-pointer">
+                  Lưu Thay Đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Xác Nhận Xóa Người Dùng ───────────────────────────────────── */}
+      {modalXoa && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface w-full max-w-md rounded-2xl shadow-3 border border-error/30 overflow-hidden">
+            <div className="flex items-center gap-space-sm px-space-lg py-space-md bg-error/5 border-b border-error/20">
+              <span className="material-symbols-outlined text-[24px] text-error">delete_forever</span>
+              <div>
+                <div className="font-title-md text-title-md text-error font-semibold">Xóa Người Dùng Khỏi Hệ Thống</div>
+                <div className="font-label-sm text-label-sm text-error/70">Thao tác soft-delete trên CSDL MySQL</div>
+              </div>
+            </div>
+            <div className="p-space-lg space-y-space-md">
+              <p className="font-body-md text-body-md text-on-surface leading-relaxed">
+                Bạn có chắc chắn muốn xóa tài khoản của người dùng{' '}
+                <strong>{modalXoa.hoTen}</strong> <span className="font-mono text-on-surface-variant font-semibold">({modalXoa.id})</span> khỏi cơ sở dữ liệu?
+              </p>
+              <div className="p-3.5 bg-error/5 border border-error/20 rounded-xl text-xs text-error/80 flex items-start gap-2">
+                <span className="material-symbols-outlined text-[16px] text-error flex-shrink-0 mt-0.5">info</span>
+                <span>Tài khoản sẽ được chuyển trạng thái đã xóa, ngắt toàn bộ phiên làm việc và không còn xuất hiện trong danh sách tác nghiệp.</span>
+              </div>
+              <div className="flex justify-end gap-space-sm pt-space-sm border-t border-outline-variant">
+                <button type="button" onClick={() => setModalXoa(null)}
+                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all cursor-pointer">
+                  Hủy Bỏ
+                </button>
+                <button type="button" onClick={xacNhanXoaNhanVien}
+                  className="px-space-lg py-2.5 rounded-xl bg-error text-white font-label-lg text-label-lg font-bold hover:bg-error/90 transition-all cursor-pointer">
+                  Xác Nhận Xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Lỗi Đồng Bộ / Concurrency Check (Khi người khác xóa bản ghi) ── */}
+      {syncErrorModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-surface-container-lowest max-w-lg w-full rounded-2xl border-2 border-error shadow-2xl overflow-hidden">
+            <div className="bg-error/10 px-6 py-4 flex items-center gap-3 border-b border-error/20">
+              <div className="w-10 h-10 rounded-xl bg-error flex items-center justify-center text-white flex-shrink-0">
+                <span className="material-symbols-outlined text-[24px]">sync_problem</span>
+              </div>
+              <div>
+                <h3 className="font-title-lg text-title-lg text-error font-bold tracking-tight">
+                  {syncErrorModal.title}
+                </h3>
+                <span className="font-label-sm text-label-sm text-error/80">Xung đột dữ liệu thời gian thực (Concurrency Conflict)</span>
+              </div>
+            </div>
+            <div className="p-6 flex flex-col gap-4">
+              <p className="text-body-md text-on-surface leading-relaxed">
+                {syncErrorModal.message}
+              </p>
+              <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/50 text-[13px] text-on-surface-variant flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-[18px] text-error flex-shrink-0 mt-0.5">info</span>
+                <span>Để đảm bảo tính toàn vẹn dữ liệu của hệ thống, thao tác đã được hủy. Bấm nút bên dưới để cập nhật lại danh sách nhân sự mới nhất từ CSDL.</span>
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSyncErrorModal(null)}
+                  className="px-4 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors cursor-pointer"
+                >
+                  Bỏ Qua
+                </button>
+                <button
+                  type="button"
+                  onClick={syncErrorModal.onAction}
+                  className="px-5 py-2.5 rounded-xl bg-error hover:bg-error/90 text-white font-label-md text-label-md font-bold shadow-lg shadow-error/30 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] animate-spin">refresh</span>
+                  <span>{syncErrorModal.actionText}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1478,7 +1582,7 @@ const QuanLyTaiKhoan = () => {
                 <span className="material-symbols-outlined text-[22px] text-admin-primary">tune</span>
                 <span className="font-title-md text-title-md text-on-surface font-semibold">Định Nghĩa Vai Trò Tùy Chỉnh</span>
               </div>
-              <button onClick={() => setModalVaiTro(false)} className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-all">
+              <button onClick={() => setModalVaiTro(false)} className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-all cursor-pointer">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
@@ -1494,15 +1598,15 @@ const QuanLyTaiKhoan = () => {
               <div>
                 <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5 uppercase font-bold">Phòng Ban Quản Lý</label>
                 <select value={formVaiTro.phongBan} onChange={e => setFormVaiTro(p => ({ ...p, phongBan: e.target.value }))}
-                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all">
+                  className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all cursor-pointer">
                   {DANH_SACH_PHONG_BAN.map(pb => <option key={pb} value={pb}>{pb}</option>)}
                 </select>
               </div>
               <div className="flex justify-end gap-space-sm pt-space-sm border-t border-outline-variant">
                 <button type="button" onClick={() => setModalVaiTro(false)}
-                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all">Hủy</button>
+                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all cursor-pointer">Hủy</button>
                 <button type="submit"
-                  className="px-space-lg py-2.5 rounded-xl bg-admin-primary text-white font-label-lg text-label-lg font-bold hover:brightness-110 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all">Tạo Vai Trò</button>
+                  className="px-space-lg py-2.5 rounded-xl bg-admin-primary text-white font-label-lg text-label-lg font-bold hover:brightness-110 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all cursor-pointer">Tạo Vai Trò</button>
               </div>
             </form>
           </div>
@@ -1521,14 +1625,16 @@ const QuanLyTaiKhoan = () => {
                   {nhatKy.length} sự kiện
                 </span>
               </div>
-              <button onClick={() => setModalNhatKy(false)} className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-all">
+              <button onClick={() => setModalNhatKy(false)} className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-all cursor-pointer">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-space-lg">
               <div className="space-y-space-sm">
-                {nhatKy.map(bk => (
+                {nhatKy.length === 0 ? (
+                  <p className="text-center py-10 text-on-surface-variant">Chưa có bản ghi nhật ký kiểm toán nào.</p>
+                ) : nhatKy.map(bk => (
                   <div key={bk.id} className="flex items-start gap-space-md p-space-md bg-surface-container-lowest border border-outline-variant/50 rounded-xl">
                     <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${bk.ketQua === 'THÀNH CÔNG' ? 'bg-admin-primary' : 'bg-error'}`} />
                     <div className="flex-1 min-w-0">
@@ -1553,7 +1659,7 @@ const QuanLyTaiKhoan = () => {
             <div className="px-space-lg py-space-sm border-t border-outline-variant bg-surface-container/30 flex-shrink-0 flex justify-between items-center">
               <span className="font-label-sm text-label-sm text-on-surface-variant">Ghi nhận tự động bởi Bộ Điều Phối Bảo Mật PMS v4.2</span>
               <button onClick={() => setModalNhatKy(false)}
-                className="px-space-lg py-2.5 rounded-xl bg-admin-primary text-white font-label-lg text-label-lg font-bold hover:brightness-110 transition-all">
+                className="px-space-lg py-2.5 rounded-xl bg-admin-primary text-white font-label-lg text-label-lg font-bold hover:brightness-110 transition-all cursor-pointer">
                 Đóng
               </button>
             </div>
@@ -1603,9 +1709,9 @@ const QuanLyTaiKhoan = () => {
 
               <div className="flex justify-end gap-space-sm pt-space-sm border-t border-outline-variant">
                 <button type="button" onClick={() => setModalXacThuc(false)}
-                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all">Hủy</button>
+                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all cursor-pointer">Hủy</button>
                 <button type="submit"
-                  className="px-space-lg py-2.5 rounded-xl bg-secondary text-white font-label-lg text-label-lg font-bold hover:brightness-110 transition-all">
+                  className="px-space-lg py-2.5 rounded-xl bg-secondary text-white font-label-lg text-label-lg font-bold hover:brightness-110 transition-all cursor-pointer">
                   Xác Nhận Cấp Quyền
                 </button>
               </div>
@@ -1640,11 +1746,11 @@ const QuanLyTaiKhoan = () => {
               </div>
               <div className="flex justify-end gap-space-sm pt-space-sm border-t border-outline-variant">
                 <button type="button" onClick={() => setModalThuHoi(false)}
-                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all">
+                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all cursor-pointer">
                   Hủy Bỏ
                 </button>
                 <button type="button" onClick={xacNhanThuHoi}
-                  className="px-space-lg py-2.5 rounded-xl bg-error text-white font-label-lg text-label-lg font-bold hover:bg-error/90 transition-all">
+                  className="px-space-lg py-2.5 rounded-xl bg-error text-white font-label-lg text-label-lg font-bold hover:bg-error/90 transition-all cursor-pointer">
                   Xác Nhận Thu Hồi Ngay
                 </button>
               </div>
@@ -1662,7 +1768,7 @@ const QuanLyTaiKhoan = () => {
                 <span className="material-symbols-outlined text-[22px] text-admin-primary">content_copy</span>
                 <span className="font-title-md text-title-md text-on-surface font-semibold">Nhân Bản Hồ Sơ Vai Trò</span>
               </div>
-              <button onClick={() => setModalNhanBan(false)} className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-all">
+              <button onClick={() => setModalNhanBan(false)} className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-all cursor-pointer">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
@@ -1686,9 +1792,9 @@ const QuanLyTaiKhoan = () => {
               </div>
               <div className="flex justify-end gap-space-sm pt-space-sm border-t border-outline-variant">
                 <button type="button" onClick={() => setModalNhanBan(false)}
-                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all">Hủy</button>
+                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all cursor-pointer">Hủy</button>
                 <button type="submit"
-                  className="px-space-lg py-2.5 rounded-xl bg-admin-primary text-white font-label-lg text-label-lg font-bold hover:brightness-110 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all">
+                  className="px-space-lg py-2.5 rounded-xl bg-admin-primary text-white font-label-lg text-label-lg font-bold hover:brightness-110 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all cursor-pointer">
                   Xác Nhận Nhân Bản
                 </button>
               </div>

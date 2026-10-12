@@ -39,6 +39,10 @@ app.use('/api/v1', require('./routes/admin/menuRoutes'));
 // Route F&B Orders (Room Service, KDS, History)
 app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
 
+// Route Quản lý người dùng & nhân viên
+app.use('/api/users', require('./routes/users'));
+app.use('/api/v1/users', require('./routes/users'));
+
 const http = require('http');
 const { initWebSocket } = require('./services/websocketService');
 
