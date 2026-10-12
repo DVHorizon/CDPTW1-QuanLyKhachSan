@@ -59,6 +59,11 @@ const menuItems = [
     icon: 'security',
     to: '/admin/audit-logs',
   },
+  {
+    label: 'Điều Độ Lịch Trực Ca (Roster)',
+    icon: 'event_available',
+    to: '/admin/roster',
+  },
 ];
 
 const AdminSidebar = () => {

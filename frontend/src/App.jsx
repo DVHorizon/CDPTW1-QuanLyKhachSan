@@ -9,6 +9,7 @@ import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 import AuditLogs from './pages/AuditLogs';
+import RosterShifts from './pages/RosterShifts';
 
 function App() {
   return (
@@ -28,6 +29,9 @@ function App() {
           <Route path="/admin/rooms" element={<RoomManagement />} />
           <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
           <Route path="/admin/audit-logs" element={<AuditLogs />} />
+          <Route path="/admin/roster" element={<RosterShifts />} />
+          <Route path="/admin/shifts" element={<RosterShifts />} />
+          <Route path="/admin/dieu-do-ca" element={<RosterShifts />} />
           {/* Redirect everything else to home for now */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
