@@ -297,37 +297,51 @@ export default function RoomDetail() {
               </div>
 
               {/* Key Highlights Metrics */}
-              <div className="flex flex-wrap items-center gap-4 bg-white p-3 px-5 rounded-2xl shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2.5 text-gray-700">
-                  <span className="text-xl text-[#725b38]">📐</span>
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 bg-white/95 backdrop-blur-sm p-3 px-4 sm:px-6 rounded-2xl shadow-sm border border-[#dedad0]/80">
+                <div className="flex items-center gap-3 text-gray-700">
+                  <div className="w-10 h-10 rounded-xl bg-[#fbf8f2] border border-[#dedad0] flex items-center justify-center text-[#725b38] shrink-0 shadow-2xs">
+                    <span className="material-symbols-outlined text-[20px] text-[#725b38]">square_foot</span>
+                  </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wider text-gray-400 font-bold">Diện tích</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[#8a8782] font-bold">Diện tích</p>
                     <p className="text-sm font-bold text-[#0b1c30]">{roomType?.AreaSqm || 180} m²</p>
                   </div>
                 </div>
-                <span className="h-8 w-px bg-gray-200 hidden sm:block"></span>
-                <div className="flex items-center gap-2.5 text-gray-700">
-                  <span className="text-xl text-[#725b38]">🛏️</span>
+                <span className="h-8 w-px bg-[#dedad0]/60 hidden sm:block"></span>
+                <div className="flex items-center gap-3 text-gray-700">
+                  <div className="w-10 h-10 rounded-xl bg-[#fbf8f2] border border-[#dedad0] flex items-center justify-center text-[#725b38] shrink-0 shadow-2xs">
+                    <span className="material-symbols-outlined text-[20px] text-[#725b38]">king_bed</span>
+                  </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wider text-gray-400 font-bold">Giường ngủ</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[#8a8782] font-bold">Giường ngủ</p>
                     <p className="text-sm font-bold text-[#0b1c30]">{roomType?.BedType || '1 King Siêu Lớn'}</p>
                   </div>
                 </div>
-                <span className="h-8 w-px bg-gray-200 hidden sm:block"></span>
-                <div className="flex items-center gap-2.5 text-gray-700">
-                  <span className="text-xl text-[#725b38]">👥</span>
+                <span className="h-8 w-px bg-[#dedad0]/60 hidden sm:block"></span>
+                <div className="flex items-center gap-3 text-gray-700">
+                  <div className="w-10 h-10 rounded-xl bg-[#fbf8f2] border border-[#dedad0] flex items-center justify-center text-[#725b38] shrink-0 shadow-2xs">
+                    <span className="material-symbols-outlined text-[20px] text-[#725b38]">group</span>
+                  </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wider text-gray-400 font-bold">Sức chứa</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[#8a8782] font-bold">Sức chứa</p>
                     <p className="text-sm font-bold text-[#0b1c30]">
                       {roomType?.AdultCapacity || 2} Lớn + {roomType?.ChildCapacity || 2} Trẻ
                     </p>
                   </div>
                 </div>
-                <span className="h-8 w-px bg-gray-200 hidden sm:block"></span>
-                <div className="flex items-center gap-2.5 text-gray-700">
-                  <span className="text-xl text-[#725b38]">🌅</span>
+                <span className="h-8 w-px bg-[#dedad0]/60 hidden sm:block"></span>
+                <div className="flex items-center gap-3 text-gray-700">
+                  <div className="w-10 h-10 rounded-xl bg-[#fbf8f2] border border-[#dedad0] flex items-center justify-center text-[#725b38] shrink-0 shadow-2xs">
+                    <span className="material-symbols-outlined text-[20px] text-[#725b38]">
+                      {(roomType?.ViewType || '').toLowerCase().includes('hoàng hôn') || (roomType?.ViewType || '').toLowerCase().includes('sunset')
+                        ? 'wb_twilight'
+                        : (roomType?.ViewType || '').toLowerCase().includes('biển')
+                        ? 'water'
+                        : 'panorama'}
+                    </span>
+                  </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wider text-gray-400 font-bold">Tầm nhìn</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[#8a8782] font-bold">Tầm nhìn</p>
                     <p className="text-sm font-bold text-[#0b1c30]">{roomType?.ViewType || 'Trực diện biển Hoàng hôn'}</p>
                   </div>
                 </div>
@@ -404,8 +418,9 @@ export default function RoomDetail() {
               </div>
 
               {/* Floating Button */}
-              <button className="absolute bottom-4 right-4 bg-white/95 hover:bg-white text-gray-900 backdrop-blur-md px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all hover:scale-105">
-                📸 Xem tất cả 24 ảnh
+              <button className="absolute bottom-4 right-4 bg-white/95 hover:bg-white text-gray-900 backdrop-blur-md px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-md transition-all hover:scale-105">
+                <span className="material-symbols-outlined text-[18px] text-[#725b38]">photo_library</span>
+                Xem tất cả 24 ảnh
               </button>
             </div>
           </div>
@@ -416,7 +431,7 @@ export default function RoomDetail() {
           <section className="w-full px-6 lg:px-12 py-2">
             <div className="max-w-7xl mx-auto bg-amber-500/10 border-2 border-amber-500/30 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <span className="text-2xl animate-pulse">⏳</span>
+                <span className="material-symbols-outlined text-2xl text-amber-700 animate-spin">hourglass_top</span>
                 <div>
                   <h4 className="font-bold text-amber-900 text-sm">
                     ĐANG GIỮ CHỖ TẠM THỜI CHỐNG OVERBOOKING TRONG: <span className="font-mono text-base font-extrabold text-amber-700">{formatTimer(lockTimeRemaining)}</span>
@@ -466,23 +481,23 @@ export default function RoomDetail() {
 
                 {/* 4 Badges */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
-                  <div className="p-3 bg-[#eff4ff] rounded-2xl text-center">
-                    <span className="text-2xl">🏊</span>
+                  <div className="p-3 bg-[#fbf8f2] border border-[#dedad0]/80 rounded-2xl text-center">
+                    <span className="material-symbols-outlined text-[26px] text-[#725b38]">pool</span>
                     <p className="font-bold text-sm text-[#0b1c30] mt-1">Hồ Bơi 35m²</p>
                     <p className="text-xs text-gray-500">Nước ấm vô cực</p>
                   </div>
-                  <div className="p-3 bg-[#eff4ff] rounded-2xl text-center">
-                    <span className="text-2xl">🌅</span>
+                  <div className="p-3 bg-[#fbf8f2] border border-[#dedad0]/80 rounded-2xl text-center">
+                    <span className="material-symbols-outlined text-[26px] text-[#725b38]">wb_twilight</span>
                     <p className="font-bold text-sm text-[#0b1c30] mt-1">View 100% Biển</p>
                     <p className="text-xs text-gray-500">Ngắm hoàng hôn</p>
                   </div>
-                  <div className="p-3 bg-[#eff4ff] rounded-2xl text-center">
-                    <span className="text-2xl">🛎️</span>
+                  <div className="p-3 bg-[#fbf8f2] border border-[#dedad0]/80 rounded-2xl text-center">
+                    <span className="material-symbols-outlined text-[26px] text-[#725b38]">concierge</span>
                     <p className="font-bold text-sm text-[#0b1c30] mt-1">Butler 24/7</p>
                     <p className="text-xs text-gray-500">Quản gia chuyên biệt</p>
                   </div>
-                  <div className="p-3 bg-[#eff4ff] rounded-2xl text-center">
-                    <span className="text-2xl">🎵</span>
+                  <div className="p-3 bg-[#fbf8f2] border border-[#dedad0]/80 rounded-2xl text-center">
+                    <span className="material-symbols-outlined text-[26px] text-[#725b38]">speaker</span>
                     <p className="font-bold text-sm text-[#0b1c30] mt-1">Bang & Olufsen</p>
                     <p className="text-xs text-gray-500">Âm thanh chuẩn rạp</p>
                   </div>
@@ -502,8 +517,8 @@ export default function RoomDetail() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#fedeb2]/40 flex items-center justify-center shrink-0 text-xl">
-                        🌊
+                      <div className="w-10 h-10 rounded-xl bg-[#fbf8f2] border border-[#dedad0] flex items-center justify-center shrink-0 text-[#725b38]">
+                        <span className="material-symbols-outlined text-[22px]">pool</span>
                       </div>
                       <div>
                         <h4 className="font-bold text-[#0b1c30] text-sm">Hồ Bơi Riêng Ngoài Trời 35m²</h4>
@@ -511,8 +526,8 @@ export default function RoomDetail() {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#fedeb2]/40 flex items-center justify-center shrink-0 text-xl">
-                        🛁
+                      <div className="w-10 h-10 rounded-xl bg-[#fbf8f2] border border-[#dedad0] flex items-center justify-center shrink-0 text-[#725b38]">
+                        <span className="material-symbols-outlined text-[22px]">bathtub</span>
                       </div>
                       <div>
                         <h4 className="font-bold text-[#0b1c30] text-sm">Bồn Tắm Nằm Nguyên Khối Nhìn Ra Biển</h4>
@@ -520,8 +535,8 @@ export default function RoomDetail() {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#fedeb2]/40 flex items-center justify-center shrink-0 text-xl">
-                        ☕
+                      <div className="w-10 h-10 rounded-xl bg-[#fbf8f2] border border-[#dedad0] flex items-center justify-center shrink-0 text-[#725b38]">
+                        <span className="material-symbols-outlined text-[22px]">coffee</span>
                       </div>
                       <div>
                         <h4 className="font-bold text-[#0b1c30] text-sm">Máy Pha Cà Phê Nespresso Cao Cấp</h4>
@@ -532,8 +547,8 @@ export default function RoomDetail() {
 
                   <div className="space-y-4">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#fedeb2]/40 flex items-center justify-center shrink-0 text-xl">
-                        🔊
+                      <div className="w-10 h-10 rounded-xl bg-[#fbf8f2] border border-[#dedad0] flex items-center justify-center shrink-0 text-[#725b38]">
+                        <span className="material-symbols-outlined text-[22px]">speaker</span>
                       </div>
                       <div>
                         <h4 className="font-bold text-[#0b1c30] text-sm">Hệ Thống Âm Thanh Bang & Olufsen</h4>
@@ -541,8 +556,8 @@ export default function RoomDetail() {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#fedeb2]/40 flex items-center justify-center shrink-0 text-xl">
-                        🍷
+                      <div className="w-10 h-10 rounded-xl bg-[#fbf8f2] border border-[#dedad0] flex items-center justify-center shrink-0 text-[#725b38]">
+                        <span className="material-symbols-outlined text-[22px]">wine_bar</span>
                       </div>
                       <div>
                         <h4 className="font-bold text-[#0b1c30] text-sm">Rượu Vang & Giỏ Hoa Quả Tươi Chào Đón</h4>
@@ -550,8 +565,8 @@ export default function RoomDetail() {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#fedeb2]/40 flex items-center justify-center shrink-0 text-xl">
-                        🛎️
+                      <div className="w-10 h-10 rounded-xl bg-[#fbf8f2] border border-[#dedad0] flex items-center justify-center shrink-0 text-[#725b38]">
+                        <span className="material-symbols-outlined text-[22px]">concierge</span>
                       </div>
                       <div>
                         <h4 className="font-bold text-[#0b1c30] text-sm">Dịch Vụ Ẩm Thực & Concierge 24/7</h4>

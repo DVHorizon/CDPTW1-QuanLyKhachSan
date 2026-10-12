@@ -1,10 +1,21 @@
-const WebSocket = require('ws');
+let WebSocket = null;
+try {
+  WebSocket = require('ws');
+} catch (e) {
+  console.warn('⚠️ ws module not found, WebSocket functionality disabled.');
+}
 
 let wss = null;
 
 // Initialize WebSocket Server attached to HTTP Server
 function initWebSocket(server) {
-  wss = new WebSocket.Server({ server, path: '/ws/fnb-orders' });
+  if (!WebSocket) return null;
+  try {
+    wss = new WebSocket.Server({ server, path: '/ws/fnb-orders' });
+  } catch (err) {
+    console.warn('⚠️ Could not init WebSocket server:', err.message);
+    return null;
+  }
 
   wss.on('connection', (ws, req) => {
     ws.isAlive = true;
