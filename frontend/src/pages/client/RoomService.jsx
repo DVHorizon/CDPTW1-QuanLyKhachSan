@@ -1,19 +1,20 @@
-import React from 'react';
+﻿import React from 'react';
+import AdminLayout from '../../components/admin/layout/AdminLayout';
 
 const RoomService = () => {
   return (
-    <>
-<aside className="fixed left-0 top-0 h-full w-72 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between select-none"><div className="flex flex-col"><div className="h-16 px-space-xl flex items-center gap-space-md"><div className="w-9 h-9 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container shadow-[0_0_12px_rgba(16,185,129,0.25)]"><span className="material-symbols-outlined text-[20px]">domain</span></div><div className="flex flex-col min-w-0"><span className="font-headline-lg text-headline-sm text-primary font-bold tracking-tight truncate leading-tight">GRAND HORIZON</span><span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Resort &amp; Suites PMS</span></div></div><div className="px-space-md py-space-sm"><div className="px-space-sm py-space-xs mb-space-xs"><span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Phân hệ điều hành</span></div><nav className="space-y-1" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_0_10px_rgba(16,185,129,0.25)]"><a className="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ban-lam-viec" href="#"><span className="material-symbols-outlined text-[20px]">dashboard</span><span className="font-label-lg text-label-lg">Bàn Làm Việc</span></a><a className="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="le-tan-tien-sanh" href="#"><span className="material-symbols-outlined text-[20px]">concierge</span><span className="font-label-lg text-label-lg">Lễ Tân &amp; Tiền Sảnh</span></a><a className="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="quan-ly-phong" href="#"><span className="material-symbols-outlined text-[20px]">meeting_room</span><span className="font-label-lg text-label-lg">Quản Lý Phòng</span></a><a className="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="buong-phong-ky-thuat" href="#"><span className="material-symbols-outlined text-[20px]">cleaning_services</span><span className="font-label-lg text-label-lg">Buồng Phòng &amp; Kỹ Thuật</span></a><a className="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dich-vu-spa" href="#"><span className="material-symbols-outlined text-[20px]">spa</span><span className="font-label-lg text-label-lg">Dịch Vụ &amp; Spa</span></a><a aria-current="page" className="flex items-center gap-space-md px-space-md py-space-sm rounded-lg transition-colors bg-primary-container text-on-primary-container font-semibold shadow-[0_0_10px_rgba(16,185,129,0.25)]" data-path="fb-pos-goi-mon" href="#"><span className="material-symbols-outlined text-[20px]">restaurant</span><span className="font-label-lg text-label-lg">Ẩm Thực F&amp;B &amp; Bếp</span></a><a className="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="tai-chinh-so-cai" href="#"><span className="material-symbols-outlined text-[20px]">account_balance_wallet</span><span className="font-label-lg text-label-lg">Tài Chính &amp; Sổ Cái</span></a><a className="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ai-concierge-chatbot" href="#"><span className="material-symbols-outlined text-[20px]">smart_toy</span><span className="font-label-lg text-label-lg">AI Concierge &amp; Chatbot</span></a><a className="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="quan-tri-he-thong" href="#"><span className="material-symbols-outlined text-[20px]">admin_panel_settings</span><span className="font-label-lg text-label-lg">Quản Trị Hệ Thống</span></a></nav></div></div><div className="p-space-md"><div className="bg-surface-container-low rounded-xl p-space-md flex flex-col gap-space-xs"><div className="flex items-center justify-between"><span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Khu Vực Vận Hành</span><span className="flex h-2 w-2 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span></span></div><div className="font-label-md text-label-md text-on-surface font-semibold truncate">Phú Quốc Sanctuary</div><div className="flex items-center justify-between text-on-surface-variant pt-space-xs font-body-sm text-body-sm"><span>Công suất phòng</span><span className="font-label-md text-label-md text-primary font-bold">84%</span></div></div></div></aside><div className="pl-72"><header className="fixed top-0 left-72 right-0 h-16 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-space-xl"><div className="flex items-center gap-space-lg"><div className="flex items-center gap-space-sm bg-surface-container-low px-space-md py-space-xs rounded-lg"><span className="material-symbols-outlined text-primary text-[18px]">pin_drop</span><span className="font-label-md text-label-md text-on-surface">Phú Quốc Sanctuary • Ca Chiều (14:00 - 22:00)</span></div><div className="hidden xl:flex items-center gap-space-xs bg-surface-container px-space-md py-space-xs rounded-full"><span className="w-2 h-2 rounded-full bg-primary-container shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span><span className="font-label-sm text-label-sm text-on-surface-variant font-semibold tracking-wide uppercase">Terminal Live • 84% OCC</span></div></div><div className="flex items-center gap-space-md"><div className="hidden md:flex items-center bg-surface-container-low px-space-md py-space-xs rounded-lg text-outline gap-space-sm"><span className="material-symbols-outlined text-[18px]">search</span><span className="font-body-sm text-body-sm text-outline">Tìm bàn, hóa đơn, món (⌘K)</span></div><button className="relative p-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button"><span className="material-symbols-outlined text-[22px]">notifications</span><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-tertiary-container ring-2 ring-surface-container-lowest"></span></button><div className="h-6 w-px bg-outline-variant"></div><div className="flex items-center gap-space-md pl-space-xs"><div className="flex flex-col text-right hidden sm:flex"><span className="font-label-md text-label-md text-on-surface font-semibold">Lê Minh Anh</span><span className="font-label-sm text-label-sm text-on-surface-variant">Tổng Quản Lý Tiền Sảnh</span></div><div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-sm"><span className="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main className="w-full pt-16 bg-surface"><div className="flex flex-col w-full">
-{/* Top Command & Header Ribbon */}
-<div className="w-full bg-surface-container-lowest px-gutter-lg py-space-md shadow-sm">
-<div className="flex flex-wrap items-center justify-between gap-space-md">
-<div className="flex items-center gap-space-md min-w-0">
-<div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+    <AdminLayout>
+      <div className="flex flex-col w-full -mx-space-lg -mt-16">
+        {/* Top Command & Header Ribbon */}
+        <div className="w-full bg-surface-container-lowest px-space-lg py-space-md shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-space-md px-space-lg">
+            <div className="flex items-center gap-space-md min-w-0">
+<div className="w-10 h-10 rounded-lg bg-admin-primary/10 flex items-center justify-center text-admin-primary">
 <span className="material-symbols-outlined text-[24px]">room_service</span>
 </div>
 <div className="flex flex-col min-w-0">
 <div className="flex items-center gap-space-xs">
-<span className="font-label-sm text-label-sm text-primary uppercase tracking-widest">MODULE 31 // KHU ẨM THỰC PHÒNG</span>
+<span className="font-label-sm text-label-sm text-admin-primary uppercase tracking-widest">MODULE 31 // KHU ẨM THỰC PHÒNG</span>
 <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
 <span className="font-label-sm text-label-sm text-on-surface-variant font-semibold">TỰ ĐỘNG GHI NỢ PHÒNG (IRD)</span>
 </div>
@@ -25,7 +26,7 @@ const RoomService = () => {
 {/* Live Terminal Status Strip */}
 <div className="flex items-center gap-space-sm bg-surface-container-low px-space-md py-space-xs rounded-xl">
 <div className="flex items-center gap-space-xs">
-<span className="w-2.5 h-2.5 rounded-full bg-primary-container shadow-sm animate-pulse"></span>
+<span className="w-2.5 h-2.5 rounded-full bg-admin-primary-container shadow-sm animate-pulse"></span>
 <span className="font-label-sm text-label-sm text-on-surface font-bold">KẾT NỐI BẾP TRUNG TÂM</span>
 </div>
 <span className="h-4 w-px bg-outline-variant mx-space-xs"></span>
@@ -33,7 +34,7 @@ const RoomService = () => {
           Cổng <span className="font-semibold text-on-surface">Micros Simphony v4.2</span>
 </div>
 <span className="h-4 w-px bg-outline-variant mx-space-xs"></span>
-<div className="flex items-center gap-space-xs text-primary font-label-sm text-label-sm">
+<div className="flex items-center gap-space-xs text-admin-primary font-label-sm text-label-sm">
 <span className="material-symbols-outlined text-[16px]">bolt</span>
 <span>100ms</span>
 </div>
@@ -41,8 +42,8 @@ const RoomService = () => {
 </div>
 </div>
 {/* Primary 3-Column Console Canvas */}
-<div className="w-full px-gutter-lg py-space-lg">
-<div className="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">
+<div className="w-full px-space-lg py-space-lg">
+<div className="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start px-space-lg">
 {/* ========================================================================= */}
 {/* CỘT 1: HỒ SƠ KHÁCH IN-HOUSE & THÔNG SỐ GIAO MÓN (28% -> Col span 3 or 4) */}
 {/* ========================================================================= */}
@@ -54,7 +55,7 @@ const RoomService = () => {
 <span className="px-space-xs py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">Tháp B • Tầng 8</span>
 </div>
 <div className="flex items-start gap-space-md pt-space-xs">
-<div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-primary flex-shrink-0 shadow-inner">
+<div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-admin-primary flex-shrink-0 shadow-inner">
 <span className="font-headline-lg text-headline-sm font-bold">804</span>
 </div>
 <div className="flex flex-col min-w-0">
@@ -78,10 +79,10 @@ const RoomService = () => {
 </div>
 <div className="flex items-center justify-between text-body-sm font-body-sm">
 <span className="text-on-surface-variant">Hạn mức khả dụng</span>
-<span className="font-bold text-primary">30.000.000 đ</span>
+<span className="font-bold text-admin-primary">30.000.000 đ</span>
 </div>
 <div className="w-full bg-surface-variant h-1.5 rounded-full overflow-hidden mt-1">
-<div className="bg-primary h-full rounded-full" style={{ width: '22%' }}></div>
+<div className="bg-admin-primary h-full rounded-full" style={{ width: '22%' }}></div>
 </div>
 <div className="flex justify-between items-center pt-0.5">
 <span className="font-label-sm text-label-sm text-outline">Đã tiêu: 6.600.000 đ</span>
@@ -111,13 +112,13 @@ const RoomService = () => {
 <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm space-y-space-md">
 <div className="flex items-center justify-between">
 <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Thông Số Giao Hàng</span>
-<span className="material-symbols-outlined text-primary text-[18px]">nest_clock_farsight_analog</span>
+<span className="material-symbols-outlined text-admin-primary text-[18px]">nest_clock_farsight_analog</span>
 </div>
 {/* Khung giờ giao */}
 <div className="space-y-space-xs">
 <label className="font-label-sm text-label-sm text-on-surface-variant block">Thời gian giao món</label>
 <div className="grid grid-cols-2 gap-space-xs">
-<button className="py-space-xs px-space-sm rounded-lg bg-primary-container text-on-primary-container font-label-sm text-label-sm text-center font-bold shadow-sm" type="button">
+<button className="py-space-xs px-space-sm rounded-lg bg-admin-primary-container text-on-admin-primary-container font-label-sm text-label-sm text-center font-bold shadow-sm" type="button">
                 Ngay tức thì (25-35p)
               </button>
 <button className="py-space-xs px-space-sm rounded-lg bg-surface-container text-on-surface-variant hover:bg-surface-container-high font-label-sm text-label-sm text-center transition-colors" type="button">
@@ -129,7 +130,7 @@ const RoomService = () => {
 <div className="space-y-space-xs">
 <label className="font-label-sm text-label-sm text-on-surface-variant block">Hình thức phục vụ</label>
 <div className="grid grid-cols-2 gap-space-xs">
-<div className="p-space-xs bg-primary/10 rounded-lg text-primary flex items-center gap-space-xs">
+<div className="p-space-xs bg-admin-primary/10 rounded-lg text-admin-primary flex items-center gap-space-xs">
 <span className="material-symbols-outlined text-[18px]">table_restaurant</span>
 <div className="flex flex-col text-left">
 <span className="font-label-sm text-label-sm font-bold">Bàn xe đẩy</span>
@@ -150,9 +151,9 @@ const RoomService = () => {
 <div className="flex items-center justify-between">
 <span className="font-label-sm text-label-sm text-on-surface-variant">Số lượng khách dùng</span>
 <div className="flex items-center gap-space-sm bg-surface-container-low px-space-sm py-1 rounded-lg">
-<button className="text-on-surface-variant hover:text-primary font-bold">-</button>
+<button className="text-on-surface-variant hover:text-admin-primary font-bold">-</button>
 <span className="font-label-md text-label-md text-on-surface font-bold px-1">02</span>
-<button className="text-on-surface-variant hover:text-primary font-bold">+</button>
+<button className="text-on-surface-variant hover:text-admin-primary font-bold">+</button>
 </div>
 </div>
 </div>
@@ -183,7 +184,7 @@ const RoomService = () => {
 <button className="px-space-md py-1.5 rounded-lg bg-surface-container text-on-surface-variant hover:bg-surface-container-high font-label-sm text-label-sm whitespace-nowrap">
               Khai Vị
             </button>
-<button className="px-space-md py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm whitespace-nowrap shadow-sm">
+<button className="px-space-md py-1.5 rounded-lg bg-admin-primary text-on-admin-primary font-label-sm text-label-sm whitespace-nowrap shadow-sm">
               Món Chính &amp; Nướng
             </button>
 <button className="px-space-md py-1.5 rounded-lg bg-surface-container text-on-surface-variant hover:bg-surface-container-high font-label-sm text-label-sm whitespace-nowrap">
@@ -196,7 +197,7 @@ const RoomService = () => {
 {/* Bộ lọc chuyên sâu */}
 <div className="flex items-center justify-between pt-space-xs">
 <div className="flex items-center gap-space-xs">
-<span className="px-space-xs py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm flex items-center gap-1">
+<span className="px-space-xs py-0.5 rounded-full bg-admin-primary/10 text-admin-primary font-label-sm text-label-sm flex items-center gap-1">
 <span className="material-symbols-outlined text-[14px]">eco</span>
                 Ăn chay (Vegetarian)
               </span>
@@ -213,11 +214,11 @@ const RoomService = () => {
 <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm flex flex-col justify-between relative group cursor-pointer">
 <div className="relative h-32 w-full overflow-hidden">
 <img className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Gourmet Chilean sea bass pan-seared to golden perfection with lemon butter sauce and seasonal microgreens on luxury ceramic plate, five-star hotel cuisine style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1j5cHLdLdJb3iNQ8D5ECQu13rOW5IBKfFlx2NoPJEBLV-dKj7r3eVcX5U9Gh0QgqxgbFkJrpXY2ZkpsadODwjbJd1isKG_ksD8DBLOnAT9qgCrOaKLAeEGwatz-OCuyvU66AghTDJc9PKLu8QwVy3PosmLj1BSS6uWrks3Iq7O9FFXbQbCsmpc546CkLaf52W0GAEa6tJj2Fb0Yn2ZaSxDtOjv3CWBlxS92ohhbqpdJdQEARa2n08" />
-<div className="absolute top-2 right-2 bg-surface-container-lowest/90 backdrop-blur-sm px-space-xs py-0.5 rounded font-label-sm text-label-sm font-bold text-primary">
+<div className="absolute top-2 right-2 bg-surface-container-lowest/90 backdrop-blur-sm px-space-xs py-0.5 rounded font-label-sm text-label-sm font-bold text-admin-primary">
                 910.000 đ
               </div>
 <div className="absolute top-2 left-2 flex gap-1">
-<span className="bg-primary text-on-primary px-1.5 py-0.5 rounded-full text-[10px] font-bold">Đang chọn</span>
+<span className="bg-admin-primary text-on-admin-primary px-1.5 py-0.5 rounded-full text-[10px] font-bold">Đang chọn</span>
 </div>
 </div>
 <div className="p-space-md space-y-space-xs flex-1 flex flex-col justify-between">
@@ -230,7 +231,7 @@ const RoomService = () => {
 <span className="px-1 rounded bg-surface-container text-[10px] text-on-surface-variant font-medium">Cá biển</span>
 <span className="px-1 rounded bg-surface-container text-[10px] text-on-surface-variant font-medium">Bơ sữa</span>
 </div>
-<span className="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span className="material-symbols-outlined text-admin-primary text-[20px]">check_circle</span>
 </div>
 </div>
 </div>
@@ -252,7 +253,7 @@ const RoomService = () => {
 <span className="px-1 rounded bg-surface-container text-[10px] text-on-surface-variant font-medium">Gluten</span>
 <span className="px-1 rounded bg-surface-container text-[10px] text-on-surface-variant font-medium">Bò cao cấp</span>
 </div>
-<button className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface hover:bg-primary hover:text-on-primary transition-colors">
+<button className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface hover:bg-admin-primary hover:text-on-admin-primary transition-colors">
 <span className="material-symbols-outlined text-[18px]">add</span>
 </button>
 </div>
@@ -266,7 +267,7 @@ const RoomService = () => {
                 520.000 đ
               </div>
 <div className="absolute top-2 left-2">
-<span className="px-1.5 py-0.5 rounded bg-primary/20 backdrop-blur-sm text-primary font-label-sm text-label-sm font-bold">Ăn chay</span>
+<span className="px-1.5 py-0.5 rounded bg-admin-primary/20 backdrop-blur-sm text-admin-primary font-label-sm text-label-sm font-bold">Ăn chay</span>
 </div>
 </div>
 <div className="p-space-md space-y-space-xs flex-1 flex flex-col justify-between">
@@ -279,7 +280,7 @@ const RoomService = () => {
 <span className="px-1 rounded bg-surface-container text-[10px] text-on-surface-variant font-medium">Nấm dại</span>
 <span className="px-1 rounded bg-surface-container text-[10px] text-on-surface-variant font-medium">Bơ sữa</span>
 </div>
-<button className="w-7 h-7 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
+<button className="w-7 h-7 rounded-full bg-admin-primary-container text-on-admin-primary-container flex items-center justify-center font-bold">
 <span className="material-symbols-outlined text-[18px]">check</span>
 </button>
 </div>
@@ -302,7 +303,7 @@ const RoomService = () => {
 <div className="flex gap-1">
 <span className="px-1 rounded bg-surface-container text-[10px] text-on-surface-variant font-medium">Thịt nguội</span>
 </div>
-<button className="w-7 h-7 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
+<button className="w-7 h-7 rounded-full bg-admin-primary-container text-on-admin-primary-container flex items-center justify-center font-bold">
 <span className="material-symbols-outlined text-[18px]">check</span>
 </button>
 </div>
@@ -325,7 +326,7 @@ const RoomService = () => {
 <div className="flex gap-1">
 <span className="px-1 rounded bg-surface-container text-[10px] text-on-surface-variant font-medium">Tráng miệng</span>
 </div>
-<button className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface hover:bg-primary hover:text-on-primary transition-colors">
+<button className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface hover:bg-admin-primary hover:text-on-admin-primary transition-colors">
 <span className="material-symbols-outlined text-[18px]">add</span>
 </button>
 </div>
@@ -354,7 +355,7 @@ const RoomService = () => {
 <div className="flex gap-1">
 <span className="px-1 rounded bg-surface-container text-[10px] text-on-surface-variant font-medium">Bordeaux</span>
 </div>
-<button className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface hover:bg-primary hover:text-on-primary transition-colors">
+<button className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface hover:bg-admin-primary hover:text-on-admin-primary transition-colors">
 <span className="material-symbols-outlined text-[18px]">add</span>
 </button>
 </div>
@@ -365,12 +366,12 @@ const RoomService = () => {
 <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm space-y-space-md">
 <div className="flex items-center justify-between">
 <div className="flex items-center gap-space-sm">
-<span className="w-2 h-5 bg-primary rounded-full"></span>
+<span className="w-2 h-5 bg-admin-primary rounded-full"></span>
 <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">
                 Tùy Chỉnh Món: Cá Tuyết Áp Chảo Bơ Chanh (910.000 đ)
               </h3>
 </div>
-<span className="font-label-sm text-label-sm text-primary font-bold">Bắt buộc chọn 1 ăn kèm</span>
+<span className="font-label-sm text-label-sm text-admin-primary font-bold">Bắt buộc chọn 1 ăn kèm</span>
 </div>
 {/* Options Grid */}
 <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-space-xs">
@@ -380,21 +381,21 @@ const RoomService = () => {
 <div className="space-y-1.5">
 <label className="flex items-center justify-between p-space-xs bg-surface-container-low rounded-lg cursor-pointer">
 <div className="flex items-center gap-space-xs">
-<input defaultChecked className="text-primary focus:ring-0" name="side_choice" type="radio" />
+<input defaultChecked className="text-admin-primary focus:ring-0" name="side_choice" type="radio" />
 <span className="font-body-sm text-body-sm text-on-surface font-medium">Khoai tây nghiền Truffle</span>
 </div>
 <span className="font-label-sm text-label-sm text-on-surface-variant">+0 đ</span>
 </label>
 <label className="flex items-center justify-between p-space-xs bg-surface-container-lowest rounded-lg hover:bg-surface-container-low cursor-pointer">
 <div className="flex items-center gap-space-xs">
-<input className="text-primary" name="side_choice" type="radio" />
+<input className="text-admin-primary" name="side_choice" type="radio" />
 <span className="font-body-sm text-body-sm text-on-surface">Măng tây áp chảo tỏi</span>
 </div>
 <span className="font-label-sm text-label-sm text-on-surface-variant">+0 đ</span>
 </label>
 <label className="flex items-center justify-between p-space-xs bg-surface-container-lowest rounded-lg hover:bg-surface-container-low cursor-pointer">
 <div className="flex items-center gap-space-xs">
-<input className="text-primary" name="side_choice" type="radio" />
+<input className="text-admin-primary" name="side_choice" type="radio" />
 <span className="font-body-sm text-body-sm text-on-surface">Bánh mì men chua ủ thủ công</span>
 </div>
 <span className="font-label-sm text-label-sm text-on-surface-variant">+0 đ</span>
@@ -405,23 +406,23 @@ const RoomService = () => {
 <div className="space-y-space-xs">
 <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider block">Nâng Cấp Cao Cấp (Tùy chọn)</span>
 <div className="space-y-1.5">
-<label className="flex items-center justify-between p-space-xs bg-primary/5 rounded-lg cursor-pointer">
+<label className="flex items-center justify-between p-space-xs bg-admin-primary/5 rounded-lg cursor-pointer">
 <div className="flex items-center gap-space-xs">
-<input defaultChecked className="rounded text-primary focus:ring-0" type="checkbox" />
+<input defaultChecked className="rounded text-admin-primary focus:ring-0" type="checkbox" />
 <span className="font-body-sm text-body-sm text-on-surface font-medium">Nấm truffle đen cạo tươi (3g)</span>
 </div>
-<span className="font-label-sm text-label-sm text-primary font-bold">+250.000 đ</span>
+<span className="font-label-sm text-label-sm text-admin-primary font-bold">+250.000 đ</span>
 </label>
 <label className="flex items-center justify-between p-space-xs bg-surface-container-lowest rounded-lg hover:bg-surface-container-low cursor-pointer">
 <div className="flex items-center gap-space-xs">
-<input className="rounded text-primary" type="checkbox" />
+<input className="rounded text-admin-primary" type="checkbox" />
 <span className="font-body-sm text-body-sm text-on-surface">Thêm sốt bơ nụ bạch hoa riêng</span>
 </div>
 <span className="font-label-sm text-label-sm text-on-surface-variant">+45.000 đ</span>
 </label>
 <label className="flex items-center justify-between p-space-xs bg-surface-container-lowest rounded-lg hover:bg-surface-container-low cursor-pointer">
 <div className="flex items-center gap-space-xs">
-<input className="rounded text-primary" type="checkbox" />
+<input className="rounded text-admin-primary" type="checkbox" />
 <span className="font-body-sm text-body-sm text-on-surface">Bọc màng bạc giữ nhiệt cực đại</span>
 </div>
 <span className="font-label-sm text-label-sm text-on-surface-variant">+0 đ</span>
@@ -434,7 +435,7 @@ const RoomService = () => {
 <button className="px-space-md py-space-xs rounded-lg bg-surface-container text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-high transition-colors">
               Hủy thay đổi
             </button>
-<button className="px-space-lg py-space-xs rounded-lg bg-primary text-on-primary font-label-md text-label-md flex items-center gap-space-xs shadow-sm hover:brightness-105 transition-all">
+<button className="px-space-lg py-space-xs rounded-lg bg-admin-primary text-on-admin-primary font-label-md text-label-md flex items-center gap-space-xs shadow-sm hover:brightness-105 transition-all">
 <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
               Lưu &amp; Cập Nhật Vào Phiếu IRD
             </button>
@@ -451,7 +452,7 @@ const RoomService = () => {
 <div className="flex flex-col">
 <div className="flex items-center gap-space-xs">
 <span className="font-headline-sm text-headline-sm font-bold text-on-surface">Phiếu Gọi Món</span>
-<span className="font-label-sm text-label-sm text-primary font-semibold">#IRD-4092</span>
+<span className="font-label-sm text-label-sm text-admin-primary font-semibold">#IRD-4092</span>
 </div>
 <span className="font-body-sm text-body-sm text-on-surface-variant">Phòng 804 • NV: T. Marco • Lúc: 19:12</span>
 </div>
@@ -465,7 +466,7 @@ const RoomService = () => {
 <div className="bg-surface-container-low rounded-lg p-space-sm space-y-1">
 <div className="flex items-start justify-between">
 <div className="flex items-start gap-space-xs">
-<span className="font-label-md text-label-md text-primary font-bold">1x</span>
+<span className="font-label-md text-label-md text-admin-primary font-bold">1x</span>
 <div>
 <span className="font-label-md text-label-md text-on-surface font-semibold">Cá Tuyết Áp Chảo Bơ Chanh</span>
 <div className="font-body-sm text-body-sm text-on-surface-variant">
@@ -487,7 +488,7 @@ const RoomService = () => {
 <div className="bg-surface-container-low rounded-lg p-space-sm space-y-1">
 <div className="flex items-start justify-between">
 <div className="flex items-start gap-space-xs">
-<span className="font-label-md text-label-md text-primary font-bold">1x</span>
+<span className="font-label-md text-label-md text-admin-primary font-bold">1x</span>
 <div>
 <span className="font-label-md text-label-md text-on-surface font-semibold">Cơm Ý Nấm Rừng Truffle Tươi</span>
 <div className="font-body-sm text-body-sm text-on-surface-variant">
@@ -507,7 +508,7 @@ const RoomService = () => {
 <div className="bg-surface-container-low rounded-lg p-space-sm space-y-1">
 <div className="flex items-start justify-between">
 <div className="flex items-start gap-space-xs">
-<span className="font-label-md text-label-md text-primary font-bold">1x</span>
+<span className="font-label-md text-label-md text-admin-primary font-bold">1x</span>
 <div>
 <span className="font-label-md text-label-md text-on-surface font-semibold">Tháp Thịt Nguội &amp; Phô Mai</span>
 <div className="font-body-sm text-body-sm text-on-surface-variant">
@@ -527,7 +528,7 @@ const RoomService = () => {
 <div className="bg-surface-container-low rounded-lg p-space-sm space-y-1">
 <div className="flex items-start justify-between">
 <div className="flex items-start gap-space-xs">
-<span className="font-label-md text-label-md text-primary font-bold">2x</span>
+<span className="font-label-md text-label-md text-admin-primary font-bold">2x</span>
 <div>
 <span className="font-label-md text-label-md text-on-surface font-semibold">Nước Khoáng Có Ga San Pellegrino 750ml</span>
 <div className="font-body-sm text-body-sm text-on-surface-variant">
@@ -559,7 +560,7 @@ const RoomService = () => {
 <span className="font-semibold text-on-surface">354.900 đ</span>
 </div>
 {/* Giảm trừ hội viên Silver */}
-<div className="flex justify-between items-center text-body-sm font-body-sm text-primary">
+<div className="flex justify-between items-center text-body-sm font-body-sm text-admin-primary">
 <span className="font-medium">Ưu đãi Silver Resident (-10% món ăn):</span>
 <span className="font-bold">-320.000 đ</span>
 </div>
@@ -569,7 +570,7 @@ const RoomService = () => {
 <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider block">Tổng Thanh Toán Cuối</span>
 <span className="font-label-sm text-label-sm text-outline">Quy đổi: ~$128.00 USD</span>
 </div>
-<span className="font-headline-lg text-headline-sm text-primary font-bold tracking-tight">
+<span className="font-headline-lg text-headline-sm text-admin-primary font-bold tracking-tight">
                 3.174.400 đ
               </span>
 </div>
@@ -577,22 +578,22 @@ const RoomService = () => {
 {/* Phương thức quyết toán */}
 <div className="space-y-space-xs pt-space-xs">
 <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider block">Hình thức quyết toán hóa đơn</span>
-<label className="flex items-center gap-space-sm p-space-sm rounded-xl bg-primary/10 cursor-pointer shadow-sm">
-<input defaultChecked className="text-primary focus:ring-0" name="billing_opt" type="radio" />
+<label className="flex items-center gap-space-sm p-space-sm rounded-xl bg-admin-primary/10 cursor-pointer shadow-sm">
+<input defaultChecked className="text-admin-primary focus:ring-0" name="billing_opt" type="radio" />
 <div className="flex flex-col">
 <span className="font-label-md text-label-md text-on-surface font-bold">Ký nợ vào Hóa đơn phòng (Room Charge)</span>
 <span className="font-body-sm text-body-sm text-on-surface-variant">Ghi nợ Folio tự động: #FL-88031-C</span>
 </div>
 </label>
 <label className="flex items-center gap-space-sm p-space-sm rounded-xl bg-surface-container hover:bg-surface-container-high cursor-pointer transition-colors">
-<input className="text-primary" name="billing_opt" type="radio" />
+<input className="text-admin-primary" name="billing_opt" type="radio" />
 <div className="flex flex-col">
 <span className="font-label-md text-label-md text-on-surface font-medium">Quẹt thẻ ngân hàng tại phòng (Mobile POS)</span>
 <span className="font-body-sm text-body-sm text-on-surface-variant">Nhân viên mang máy quẹt thẻ kèm hóa đơn</span>
 </div>
 </label>
 <label className="flex items-center gap-space-sm p-space-sm rounded-xl bg-surface-container hover:bg-surface-container-high cursor-pointer transition-colors">
-<input className="text-primary" name="billing_opt" type="radio" />
+<input className="text-admin-primary" name="billing_opt" type="radio" />
 <div className="flex flex-col">
 <span className="font-label-md text-label-md text-on-surface font-medium">Chiêu đãi miễn phí (GM Special Privilege)</span>
 <span className="font-body-sm text-body-sm text-on-surface-variant">Cần phê duyệt từ Tổng Quản Lý</span>
@@ -601,7 +602,7 @@ const RoomService = () => {
 </div>
 {/* Nút Thực Thi Nghiệp Vụ Chính */}
 <div className="space-y-space-xs pt-space-sm">
-<button className="w-full py-3 px-space-md rounded-xl bg-primary-container text-on-primary-container font-label-lg text-label-lg font-bold flex items-center justify-center gap-space-sm shadow-md hover:brightness-105 active:scale-[0.99] transition-all" type="button">
+<button className="w-full py-3 px-space-md rounded-xl bg-admin-primary-container text-on-admin-primary-container font-label-lg text-label-lg font-bold flex items-center justify-center gap-space-sm shadow-md hover:brightness-105 active:scale-[0.99] transition-all" type="button">
 <span className="material-symbols-outlined text-[20px]">send_and_archive</span>
               XÁC NHẬN GỬI BẾP &amp; GHI NỢ PHÒNG
             </button>
@@ -626,8 +627,8 @@ const RoomService = () => {
 </div>
 </div>
 </div>
-</div></main></div>
-    </>
+</div>
+    </AdminLayout>
   );
 };
 

@@ -78,9 +78,7 @@ Stay.belongsTo(Room, { foreignKey: 'RoomId' });
 Stay.hasMany(FoodOrder, { foreignKey: 'StayId' });
 FoodOrder.belongsTo(Stay, { foreignKey: 'StayId' });
 
-// 12. Room & FoodOrder
-Room.hasMany(FoodOrder, { foreignKey: 'RoomId' });
-FoodOrder.belongsTo(Room, { foreignKey: 'RoomId' });
+
 
 // 13. FoodOrder & FoodOrderDetail
 FoodOrder.hasMany(FoodOrderDetail, { foreignKey: 'FoodOrderId', as: 'details' });
