@@ -1,8 +1,80 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 
+// Ảnh fallback theo index nếu loại phòng không có hình
+const FALLBACK_IMAGES = [
+  'https://images.unsplash.com/photo-1582719478250-c89404bb2a15?q=80&w=2070&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=2070&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?q=80&w=2070&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?q=80&w=2070&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?q=80&w=2070&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=2070&auto=format&fit=crop',
+];
+
+function formatPrice(price) {
+  if (!price && price !== 0) return 'Liên hệ';
+  return new Intl.NumberFormat('vi-VN').format(price) + '₫';
+}
+
 function Home() {
+  const [roomTypes, setRoomTypes] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loadingRooms, setLoadingRooms] = useState(true);
+  const [roomError, setRoomError] = useState(null);
+
+  // State cho Modal Khách Xem Chi Tiết Phòng
+  const [selectedRoomDetail, setSelectedRoomDetail] = useState(null);
+
+  // State cho Modal Khách Xem Toàn Bộ Danh Sách Phòng (Read-Only)
+  const [showAllRoomsModal, setShowAllRoomsModal] = useState(false);
+  const [allRooms, setAllRooms] = useState([]);
+  const [loadingAllRooms, setLoadingAllRooms] = useState(false);
+  const [searchModalKeyword, setSearchModalKeyword] = useState('');
+
+  // Fetch danh sách loại phòng từ backend
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoadingRooms(true);
+    fetch('http://localhost:5000/api/loai-phong?trang_thai=active&limit=12', { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error('Không thể tải dữ liệu loại phòng.');
+        return res.json();
+      })
+      .then((json) => {
+        if (json.success) {
+          setRoomTypes(json.data || []);
+          setTotalCount(json.total || (json.data ? json.data.length : 0));
+        } else {
+          setRoomError(json.message || 'Lỗi tải dữ liệu.');
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          setRoomError('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
+        }
+      })
+      .finally(() => setLoadingRooms(false));
+    return () => controller.abort();
+  }, []);
+
+  // Mở modal toàn bộ phòng dành cho khách
+  const handleOpenAllRooms = () => {
+    setShowAllRoomsModal(true);
+    if (allRooms.length === 0) {
+      setLoadingAllRooms(true);
+      fetch('http://localhost:5000/api/loai-phong?trang_thai=active&limit=200')
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success) {
+            setAllRooms(json.data || []);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingAllRooms(false));
+    }
+  };
+
   useEffect(() => {
     // Set min date to today for check-in
     const today = new Date().toISOString().split('T')[0];
@@ -150,166 +222,149 @@ function Home() {
                   Mỗi không gian là một tác phẩm kiến trúc hòa quyện cùng thiên nhiên nhiệt đới, kiến tạo sự riêng tư vô hạn và thư thái an nhiên.
                 </p>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
-                <div className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
-                  <div className="relative w-full aspect-[16/10] overflow-hidden">
-                    <img className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="Villa 1" src="https://images.unsplash.com/photo-1582719478250-c89404bb2a15?q=80&w=2070&auto=format&fit=crop" />
-                    <div className="absolute top-space-sm left-space-sm px-space-sm py-space-xs bg-primary-container/90 backdrop-blur-md rounded text-secondary-fixed font-label-sm text-label-sm font-semibold uppercase tracking-wider">
-                      Signature Villa
-                    </div>
-                    <div className="absolute bottom-space-sm right-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded-lg font-label-sm text-label-sm text-on-surface flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-[16px]">pool</span> Hồ bơi vô cực riêng
-                    </div>
-                  </div>
-                  <div className="p-space-lg flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-space-sm text-on-surface-variant font-body-sm text-body-sm mb-space-xs">
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">straighten</span> 180 m²</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">king_bed</span> 1 King Bed</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">visibility</span> Trực diện biển</span>
-                      </div>
-                      <h3 className="font-headline-sm text-headline-sm text-on-surface group-hover:text-secondary transition-colors mb-space-xs">
-                        Oceanfront Pool Villa
-                      </h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mb-space-md line-clamp-2">
-                        Biệt thự trực diện biển với hồ bơi tràn bờ riêng tư, sân tắm nắng bằng gỗ teak và lối đi thẳng ra bờ cát trắng mịn.
-                      </p>
-                      <div className="flex flex-wrap gap-space-xs mb-space-lg">
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Bữa sáng thượng hạng</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Đưa đón sân bay VIP</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Trà chiều bãi biển</span>
+              {/* === LOADING STATE === */}
+              {loadingRooms && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm animate-pulse">
+                      <div className="w-full aspect-[16/10] bg-surface-container-high" />
+                      <div className="p-space-lg flex flex-col gap-space-sm">
+                        <div className="h-4 bg-surface-container-high rounded w-3/4" />
+                        <div className="h-3 bg-surface-container-high rounded w-full" />
+                        <div className="h-3 bg-surface-container-high rounded w-2/3" />
+                        <div className="h-10 bg-surface-container-high rounded w-full mt-4" />
                       </div>
                     </div>
-                    <div className="pt-space-md border-t border-surface-container-high flex items-center justify-between mt-auto">
-                      <div>
-                        <span className="font-label-sm text-label-sm text-outline block">Giá chỉ từ</span>
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-title-lg text-title-lg text-on-surface font-bold">8.500.000₫</span>
-                          <span className="font-body-sm text-body-sm text-outline">/đêm</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-space-xs">
-                        <button className="px-space-md py-space-sm rounded-lg bg-surface-container-high hover:bg-secondary-container text-on-surface font-label-md text-label-md transition-colors" type="button">
-                          Chi Tiết
-                        </button>
-                        <button className="px-space-md py-space-sm rounded-lg bg-secondary text-on-secondary hover:bg-on-secondary-container font-label-md text-label-md transition-colors shadow-sm" type="button">
-                          Đặt Ngay
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
+              )}
 
-                <div className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
-                  <div className="relative w-full aspect-[16/10] overflow-hidden">
-                    <img className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="Suite 2" src="https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=2070&auto=format&fit=crop" />
-                    <div className="absolute top-space-sm left-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded text-secondary font-label-sm text-label-sm font-semibold uppercase tracking-wider">
-                      Khuyên Chọn
-                    </div>
-                    <div className="absolute bottom-space-sm right-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded-lg font-label-sm text-label-sm text-on-surface flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-[16px]">hot_tub</span> Bồn tắm Jacuzzi
-                    </div>
-                  </div>
-                  <div className="p-space-lg flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-space-sm text-on-surface-variant font-body-sm text-body-sm mb-space-xs">
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">straighten</span> 95 m²</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">king_bed</span> 1 King Bed</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">wb_twilight</span> Hướng Hoàng Hôn</span>
-                      </div>
-                      <h3 className="font-headline-sm text-headline-sm text-on-surface group-hover:text-secondary transition-colors mb-space-xs">
-                        Horizon Grand Suite
-                      </h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mb-space-md line-clamp-2">
-                        Tầm nhìn 180 độ ôm trọn khoảnh khắc hoàng hôn rực rỡ, trang bị bồn tắm sục đôi ngắm vịnh biển thơ mộng.
-                      </p>
-                      <div className="flex flex-wrap gap-space-xs mb-space-lg">
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Bữa sáng Buffet</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Cocktail Sunset Bar</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Dịch vụ giặt là nhẹ</span>
-                      </div>
-                    </div>
-                    <div className="pt-space-md border-t border-surface-container-high flex items-center justify-between mt-auto">
-                      <div>
-                        <span className="font-label-sm text-label-sm text-outline block">Giá chỉ từ</span>
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-title-lg text-title-lg text-on-surface font-bold">4.200.000₫</span>
-                          <span className="font-body-sm text-body-sm text-outline">/đêm</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-space-xs">
-                        <button className="px-space-md py-space-sm rounded-lg bg-surface-container-high hover:bg-secondary-container text-on-surface font-label-md text-label-md transition-colors" type="button">
-                          Chi Tiết
-                        </button>
-                        <button className="px-space-md py-space-sm rounded-lg bg-secondary text-on-secondary hover:bg-on-secondary-container font-label-md text-label-md transition-colors shadow-sm" type="button">
-                          Đặt Ngay
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+              {/* === ERROR STATE === */}
+              {!loadingRooms && roomError && (
+                <div className="flex flex-col items-center justify-center py-16 gap-space-md text-center">
+                  <span className="material-symbols-outlined text-error text-[48px]">wifi_off</span>
+                  <p className="font-title-md text-title-md text-on-surface-variant">{roomError}</p>
+                  <button
+                    onClick={() => { setRoomError(null); setLoadingRooms(true); fetch('http://localhost:5000/api/loai-phong?trang_thai=active').then(r=>r.json()).then(j=>{ if(j.success) setRoomTypes(j.data||[]); }).catch(()=>setRoomError('Không thể kết nối.')).finally(()=>setLoadingRooms(false)); }}
+                    className="px-space-lg py-space-sm rounded-lg bg-secondary text-on-secondary font-label-md text-label-md"
+                  >
+                    Thử lại
+                  </button>
                 </div>
+              )}
 
-                <div className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
-                  <div className="relative w-full aspect-[16/10] overflow-hidden">
-                    <img className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="Bungalow" src="https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?q=80&w=2070&auto=format&fit=crop" />
-                    <div className="absolute top-space-sm left-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded text-secondary font-label-sm text-label-sm font-semibold uppercase tracking-wider">
-                      An Nhiên & Tĩnh Tại
-                    </div>
-                    <div className="absolute bottom-space-sm right-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded-lg font-label-sm text-label-sm text-on-surface flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-[16px]">nature_people</span> Vườn Nhiệt Đới
-                    </div>
-                  </div>
-                  <div className="p-space-lg flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-space-sm text-on-surface-variant font-body-sm text-body-sm mb-space-xs">
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">straighten</span> 75 m²</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">king_bed</span> 1 King / 2 Twin</span>
-                        <span className="">•</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-secondary">yard</span> Hoa cỏ nội khu</span>
-                      </div>
-                      <h3 className="font-headline-sm text-headline-sm text-on-surface group-hover:text-secondary transition-colors mb-space-xs">
-                        Garden Sanctuary Bungalow
-                      </h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mb-space-md line-clamp-2">
-                        Ẩn mình giữa rừng dương và rặng hoa sứ ngát hương, mang lại không gian thiền định, tách biệt hoàn toàn ồn ào đô thị.
-                      </p>
-                      <div className="flex flex-wrap gap-space-xs mb-space-lg">
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Bữa sáng lành mạnh</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Lớp Yoga sáng sớm</span>
-                        <span className="px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant">Xe đạp dạo khu nghỉ</span>
-                      </div>
-                    </div>
-                    <div className="pt-space-md border-t border-surface-container-high flex items-center justify-between mt-auto">
-                      <div>
-                        <span className="font-label-sm text-label-sm text-outline block">Giá chỉ từ</span>
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-title-lg text-title-lg text-on-surface font-bold">2.900.000₫</span>
-                          <span className="font-body-sm text-body-sm text-outline">/đêm</span>
+              {/* === EMPTY STATE === */}
+              {!loadingRooms && !roomError && roomTypes.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 gap-space-md text-center">
+                  <span className="material-symbols-outlined text-outline text-[48px]">hotel</span>
+                  <p className="font-title-md text-title-md text-on-surface-variant">Chưa có loại phòng nào được thêm vào hệ thống.</p>
+                </div>
+              )}
+
+              {/* === ROOM CARDS TỪ DATABASE === */}
+              {!loadingRooms && !roomError && roomTypes.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+                  {roomTypes.slice(0, 6).map((room, index) => {
+                    const imgSrc = room.hinh_anh || FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
+                    const isFirst = index === 0;
+                    return (
+                      <div key={room.id} className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
+                        <div className="relative w-full aspect-[16/10] overflow-hidden">
+                          <img
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                            alt={room.ten_loai}
+                            src={imgSrc}
+                            onError={(e) => { e.currentTarget.src = FALLBACK_IMAGES[index % FALLBACK_IMAGES.length]; }}
+                          />
+                          {/* Badge loại phòng */}
+                          <div className={`absolute top-space-sm left-space-sm px-space-sm py-space-xs backdrop-blur-md rounded font-label-sm text-label-sm font-semibold uppercase tracking-wider ${
+                            isFirst
+                              ? 'bg-primary-container/90 text-secondary-fixed'
+                              : 'bg-surface-container-lowest/90 text-secondary'
+                          }`}>
+                            {room.ma_loai}
+                          </div>
+                          {/* Badge sức chứa */}
+                          <div className="absolute bottom-space-sm right-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded-lg font-label-sm text-label-sm text-on-surface flex items-center gap-1">
+                            <span className="material-symbols-outlined text-secondary text-[16px]">group</span>
+                            Tối đa {room.toi_da_tong || (room.toi_da_nguoi_lon + room.toi_da_tre_em)} khách
+                          </div>
+                        </div>
+                        <div className="p-space-lg flex-1 flex flex-col justify-between">
+                          <div>
+                            {/* Thông tin sức chứa */}
+                            <div className="flex items-center gap-space-sm text-on-surface-variant font-body-sm text-body-sm mb-space-xs flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[16px] text-secondary">king_bed</span>
+                                {room.toi_da_nguoi_lon} người lớn
+                              </span>
+                              {room.toi_da_tre_em > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[16px] text-secondary">child_care</span>
+                                    {room.toi_da_tre_em} trẻ em
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                            {/* Tên loại phòng */}
+                            <h3 className="font-headline-sm text-headline-sm text-on-surface group-hover:text-secondary transition-colors mb-space-xs">
+                              {room.ten_loai}
+                            </h3>
+                            {/* Mô tả */}
+                            <p className="font-body-sm text-body-sm text-on-surface-variant mb-space-md line-clamp-2">
+                              {room.mo_ta || 'Không gian nghỉ dưỡng tiện nghi và thoải mái, mang đến trải nghiệm lưu trú đẳng cấp.'}
+                            </p>
+                          </div>
+                          {/* Giá và nút */}
+                          <div className="pt-space-md border-t border-surface-container-high flex items-center justify-between mt-auto">
+                            <div>
+                              <span className="font-label-sm text-label-sm text-outline block">Giá chỉ từ</span>
+                              <div className="flex items-baseline gap-1">
+                                <span className="font-title-lg text-title-lg text-on-surface font-bold">
+                                  {formatPrice(room.gia_co_ban)}
+                                </span>
+                                <span className="font-body-sm text-body-sm text-outline">/đêm</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-space-xs">
+                              <button
+                                onClick={() => setSelectedRoomDetail(room)}
+                                className="px-space-md py-space-sm rounded-lg bg-surface-container-high hover:bg-secondary-container text-on-surface font-label-md text-label-md transition-colors"
+                                type="button"
+                              >
+                                Chi Tiết
+                              </button>
+                              <button
+                                className="px-space-md py-space-sm rounded-lg bg-secondary text-on-secondary hover:bg-on-secondary-container font-label-md text-label-md transition-colors shadow-sm"
+                                type="button"
+                              >
+                                Đặt Ngay
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-space-xs">
-                        <button className="px-space-md py-space-sm rounded-lg bg-surface-container-high hover:bg-secondary-container text-on-surface font-label-md text-label-md transition-colors" type="button">
-                          Chi Tiết
-                        </button>
-                        <button className="px-space-md py-space-sm rounded-lg bg-secondary text-on-secondary hover:bg-on-secondary-container font-label-md text-label-md transition-colors shadow-sm" type="button">
-                          Đặt Ngay
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-              </div>
-              <div className="mt-space-xl text-center">
-                <a className="inline-flex items-center gap-space-sm px-space-xl py-space-md rounded-lg bg-surface-container-lowest text-secondary font-label-lg text-label-lg shadow-sm hover:shadow-md transition-all" href="#">
-                  <span className="">Xem Toàn Bộ 12 Hạng Phòng & Biệt Thự</span>
-                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </a>
-              </div>
+              )}
+
+              {/* Nút xem tất cả dành cho khách (Chỉ xem - Modal) */}
+              {!loadingRooms && !roomError && (
+                <div className="mt-space-xl text-center">
+                  <button
+                    type="button"
+                    onClick={handleOpenAllRooms}
+                    className="inline-flex items-center gap-space-sm px-space-xl py-space-md rounded-lg bg-surface-container-lowest text-secondary font-label-lg text-label-lg shadow-sm hover:shadow-md hover:bg-secondary hover:text-on-secondary transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">explore</span>
+                    <span>Xem Toàn Bộ {totalCount || roomTypes.length} Hạng Phòng & Biệt Thự</span>
+                    <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  </button>
+                </div>
+              )}
             </div>
           </section>
 
@@ -506,6 +561,255 @@ function Home() {
           </section>
         </div>
       </main>
+
+      {/* ============================================================== */}
+      {/* 🌟 MODAL 1: KHÁCH XEM TOÀN BỘ PHÒNG (READ-ONLY - KHÔNG VÀO ADMIN) */}
+      {/* ============================================================== */}
+      {showAllRoomsModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-surface-container-lowest w-full max-w-5xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-outline-variant/30">
+            {/* Header Modal */}
+            <div className="p-space-lg border-b border-surface-container-high flex items-center justify-between bg-surface-container-low">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-secondary-container/40 flex items-center justify-center text-secondary">
+                  <span className="material-symbols-outlined text-[24px]">hotel</span>
+                </div>
+                <div>
+                  <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
+                    Danh Sách Toàn Bộ Hạng Phòng &amp; Biệt Thự
+                  </h3>
+                  <span className="font-body-sm text-body-sm text-on-surface-variant">
+                    Hiển thị {allRooms.length > 0 ? allRooms.length : totalCount} hạng phòng sẵn sàng đón tiếp quý khách
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAllRoomsModal(false)}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[24px]">close</span>
+              </button>
+            </div>
+
+            {/* Thanh Tìm Kiếm Nhanh trong Modal */}
+            <div className="px-space-lg py-space-sm bg-surface-container-lowest border-b border-surface-container-high/60 flex items-center gap-space-sm">
+              <div className="relative flex-1">
+                <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={searchModalKeyword}
+                  onChange={(e) => setSearchModalKeyword(e.target.value)}
+                  placeholder="Tìm theo tên hạng phòng hoặc mô tả..."
+                  className="w-full bg-surface-container-low pl-10 pr-4 py-2 rounded-xl text-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary border border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Nội dung danh sách phòng */}
+            <div className="p-space-lg overflow-y-auto flex-1">
+              {loadingAllRooms && (
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-secondary">
+                  <span className="material-symbols-outlined text-[36px] animate-spin">progress_activity</span>
+                  <span className="font-label-md text-label-md">Đang tải toàn bộ dữ liệu phòng nghỉ...</span>
+                </div>
+              )}
+
+              {!loadingAllRooms && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-space-md">
+                  {(allRooms.length > 0 ? allRooms : roomTypes)
+                    .filter((r) =>
+                      !searchModalKeyword.trim() ||
+                      r.ten_loai?.toLowerCase().includes(searchModalKeyword.toLowerCase()) ||
+                      r.mo_ta?.toLowerCase().includes(searchModalKeyword.toLowerCase()) ||
+                      r.ma_loai?.toLowerCase().includes(searchModalKeyword.toLowerCase())
+                    )
+                    .map((room, idx) => {
+                      const imgSrc = room.hinh_anh || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];
+                      return (
+                        <div
+                          key={room.id}
+                          className="bg-surface-container-low rounded-xl overflow-hidden border border-outline-variant/30 flex flex-col justify-between hover:shadow-lg transition-all"
+                        >
+                          <div className="relative aspect-[16/10] overflow-hidden">
+                            <img
+                              src={imgSrc}
+                              alt={room.ten_loai}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.src = FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length]; }}
+                            />
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm text-white font-mono text-[11px] font-bold">
+                              {room.ma_loai}
+                            </span>
+                          </div>
+                          <div className="p-space-md flex-1 flex flex-col justify-between">
+                            <div>
+                              <h4 className="font-title-md text-title-md text-on-surface font-semibold mb-1 line-clamp-1">
+                                {room.ten_loai}
+                              </h4>
+                              <p className="font-body-sm text-body-sm text-on-surface-variant line-clamp-2 mb-space-sm">
+                                {room.mo_ta || 'Không gian nghỉ dưỡng sang trọng, tiện nghi cao cấp tiêu chuẩn 5 sao.'}
+                              </p>
+                              <div className="flex items-center gap-2 text-[12px] text-on-surface-variant font-medium mb-space-sm">
+                                <span className="flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[15px] text-secondary">group</span>
+                                  {room.toi_da_nguoi_lon} người lớn
+                                </span>
+                                <span>•</span>
+                                <span>{room.dien_tich ? `${room.dien_tich} m²` : 'Tiêu chuẩn'}</span>
+                              </div>
+                            </div>
+                            <div className="pt-space-sm border-t border-surface-container-high flex items-center justify-between">
+                              <span className="font-title-md text-title-md text-secondary font-bold">
+                                {formatPrice(room.gia_co_ban)}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setSelectedRoomDetail(room);
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-secondary text-on-secondary font-label-sm text-label-sm hover:opacity-95 transition-opacity"
+                                type="button"
+                              >
+                                Xem Chi Tiết
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-space-md bg-surface-container-low border-t border-surface-container-high flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setShowAllRoomsModal(false)}
+                className="px-space-lg py-space-sm rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 🌟 MODAL 2: KHÁCH XEM CHI TIẾT MỘT PHÒNG (READ-ONLY)            */}
+      {/* ============================================================== */}
+      {selectedRoomDetail && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-surface-container-lowest w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-outline-variant/30">
+            {/* Ảnh phòng */}
+            <div className="relative aspect-[16/9] w-full overflow-hidden bg-surface-container-high">
+              <img
+                src={selectedRoomDetail.hinh_anh || FALLBACK_IMAGES[0]}
+                alt={selectedRoomDetail.ten_loai}
+                className="w-full h-full object-cover"
+                onError={(e) => { e.currentTarget.src = FALLBACK_IMAGES[0]; }}
+              />
+              <button
+                onClick={() => setSelectedRoomDetail(null)}
+                className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+              <span className="absolute bottom-3 left-3 px-3 py-1 rounded bg-black/70 backdrop-blur-sm text-white font-mono text-label-sm font-bold">
+                {selectedRoomDetail.ma_loai}
+              </span>
+            </div>
+
+            {/* Thông tin chi tiết */}
+            <div className="p-space-lg overflow-y-auto flex-1 flex flex-col gap-space-md">
+              <div>
+                <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold mb-1">
+                  {selectedRoomDetail.ten_loai}
+                </h3>
+                <div className="flex items-center gap-3 text-on-surface-variant font-body-sm">
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px] text-secondary">king_bed</span>
+                    {selectedRoomDetail.loai_giuong || '1 Giường King'}
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px] text-secondary">group</span>
+                    Tối đa {selectedRoomDetail.toi_da_tong || (selectedRoomDetail.toi_da_nguoi_lon + selectedRoomDetail.toi_da_tre_em)} khách
+                  </span>
+                  {selectedRoomDetail.dien_tich && (
+                    <>
+                      <span>•</span>
+                      <span>{selectedRoomDetail.dien_tich} m²</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-title-sm text-title-sm font-semibold text-on-surface mb-1">Mô Tả Không Gian</h4>
+                <p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                  {selectedRoomDetail.mo_ta || 'Phòng nghỉ thượng đỉnh kết hợp phong cách hiện đại và sự riêng tư tuyệt đối, mang lại trải nghiệm nghỉ dưỡng hoàn mỹ.'}
+                </p>
+              </div>
+
+              {/* Tiện nghi phòng */}
+              <div>
+                <h4 className="font-title-sm text-title-sm font-semibold text-on-surface mb-2">Đặc Quyền &amp; Tiện Nghi</h4>
+                <div className="grid grid-cols-2 gap-2 text-body-sm text-on-surface-variant">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-secondary">wifi</span>
+                    Wi-Fi Tốc Độ Cao
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-secondary">ac_unit</span>
+                    Điều Hòa Trung Tâm
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-secondary">deck</span>
+                    Ban Công Hướng Biển
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-secondary">room_service</span>
+                    Phục Vụ Phòng 24/7
+                  </div>
+                </div>
+              </div>
+
+              {/* Giá và nút đặt */}
+              <div className="pt-space-md border-t border-surface-container-high flex items-center justify-between mt-auto">
+                <div>
+                  <span className="font-label-sm text-label-sm text-outline block">Giá tiêu chuẩn</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-headline-sm text-headline-sm text-secondary font-bold">
+                      {formatPrice(selectedRoomDetail.gia_co_ban)}
+                    </span>
+                    <span className="font-body-sm text-body-sm text-outline">/đêm</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-space-xs">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRoomDetail(null)}
+                    className="px-space-md py-space-sm rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md transition-colors"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="button"
+                    className="px-space-lg py-space-sm rounded-lg bg-secondary text-on-secondary font-label-md text-label-md hover:bg-on-secondary-container transition-all shadow-sm"
+                  >
+                    Đặt Phòng Ngay
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>
