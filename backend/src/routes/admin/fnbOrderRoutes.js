@@ -10,8 +10,21 @@ router.get('/', fnbOrderController.getOrderHistory);
 
 // Kitchen Display System
 router.get('/kitchen', fnbOrderController.getKitchenOrders);
+router.get('/kitchen/ready', fnbOrderController.getReadyOrders);
+router.get('/kitchen/expediter-metrics', fnbOrderController.getExpediterAndStationMetrics);
+router.post('/kitchen/call-runners', fnbOrderController.callRunners);
+router.post('/kitchen/clear-pass', fnbOrderController.clearExpediterPass);
+router.patch('/kitchen/:orderId/items/:detailId', fnbOrderController.updateItemCompletion);
+router.patch('/kitchen/:orderId/ready', fnbOrderController.markOrderReady);
+router.patch('/kitchen/:orderId/restore', fnbOrderController.restoreOrder);
 
 // Xử lý thanh toán F&B
 router.patch('/:orderId/payment', fnbOrderController.processPayment);
+
+// Cập nhật đơn hàng (Update)
+router.put('/:orderId', fnbOrderController.updateOrder);
+
+// Xóa đơn hàng (Soft Delete)
+router.delete('/:orderId', fnbOrderController.deleteOrder);
 
 module.exports = router;

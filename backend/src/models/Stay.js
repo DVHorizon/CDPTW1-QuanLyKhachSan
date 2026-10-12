@@ -15,11 +15,15 @@ module.exports = (sequelize) => {
       type: DataTypes.INTEGER,
       allowNull: false
     },
-    CheckInTime: {
+    ActualCheckIn: {
       type: DataTypes.DATE,
       allowNull: true
     },
-    CheckOutTime: {
+    ExpectedCheckOut: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    ActualCheckOut: {
       type: DataTypes.DATE,
       allowNull: true
     },
