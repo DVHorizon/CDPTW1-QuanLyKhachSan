@@ -1,9 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const fnbOrderController = require('../../controllers/admin/fnbOrderController');
+const { verifyToken } = require('../../middlewares/authMiddleware');
 
-// Đặt món Room Service online
-router.post('/', fnbOrderController.createRoomServiceOrder);
+// Lấy danh sách phòng đang lưu trú phục vụ Room Service
+router.get('/active-stays', fnbOrderController.getActiveStays);
+
+// Đặt món Room Service online (FEAT-FNB-04: A4.4)
+router.post('/', verifyToken, fnbOrderController.createRoomServiceOrder);
+
+
 
 // Lịch sử gọi món
 router.get('/', fnbOrderController.getOrderHistory);
@@ -22,8 +28,10 @@ router.patch('/kitchen/:orderId/items/:detailId', fnbOrderController.updateItemC
 router.patch('/kitchen/:orderId/ready', fnbOrderController.markOrderReady);
 router.patch('/kitchen/:orderId/restore', fnbOrderController.restoreOrder);
 
-// Xử lý thanh toán F&B
-router.patch('/:orderId/payment', fnbOrderController.processPayment);
+// Xử lý thanh toán F&B (FEAT-FNB-07: A4.7)
+router.patch('/:orderId/payment', verifyToken, fnbOrderController.processPayment);
+
+
 
 // Cập nhật đơn hàng (Update)
 router.put('/:orderId', fnbOrderController.updateOrder);

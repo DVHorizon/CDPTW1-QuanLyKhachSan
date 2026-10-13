@@ -10,7 +10,8 @@ const verifyToken = (req, res, next) => {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({
       success: false,
-      message: 'Không tìm thấy mã xác thực (Token). Vui lòng đăng nhập.'
+      code: 'ERROR_0009_UNAUTHENTICATED',
+      message: 'Bạn cần đăng nhập để thực hiện chức năng này'
     });
   }
 
@@ -23,15 +24,18 @@ const verifyToken = (req, res, next) => {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
-        message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+        code: 'ERROR_0009_UNAUTHENTICATED',
+        message: 'Bạn cần đăng nhập để thực hiện chức năng này'
       });
     }
     return res.status(401).json({
       success: false,
-      message: 'Mã xác thực không hợp lệ.'
+      code: 'ERROR_0009_UNAUTHENTICATED',
+      message: 'Bạn cần đăng nhập để thực hiện chức năng này'
     });
   }
 };
+
 
 module.exports = {
   verifyToken,
