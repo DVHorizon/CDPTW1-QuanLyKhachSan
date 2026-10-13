@@ -1,9 +1,18 @@
-const WebSocket = require('ws');
+let WebSocket;
+try {
+  WebSocket = require('ws');
+} catch (_) {
+  WebSocket = null;
+}
 
 let wss = null;
 
 // Initialize WebSocket Server attached to HTTP Server
 function initWebSocket(server) {
+  if (!WebSocket) {
+    console.warn('ws package is not installed. WebSocket support disabled.');
+    return;
+  }
   wss = new WebSocket.Server({ server, path: '/ws/fnb-orders' });
 
   wss.on('connection', (ws, req) => {

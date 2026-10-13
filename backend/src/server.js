@@ -30,14 +30,20 @@ app.use('/api/rooms', require('./routes/roomSearchRoutes'));
 // Route quản lý loại phòng
 app.use('/api/loai-phong', require('./routes/roomTypes'));
 
-// Route quản lý phòng vật lý
+// Route quản lý phòng vật lý & Sơ đồ phòng tự động
 app.use('/api/phong', require('./routes/rooms'));
+app.use('/api/so-do-phong', require('./routes/rooms'));
+app.use('/api/room-status', require('./routes/rooms'));
 
 // Routes F&B Quản lý Menu
 app.use('/api/v1', require('./routes/admin/menuRoutes'));
 
 // Route F&B Orders (Room Service, KDS, History)
 app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
+
+// Route Quản lý người dùng & nhân viên
+app.use('/api/users', require('./routes/users'));
+app.use('/api/v1/users', require('./routes/users'));
 
 const http = require('http');
 const { initWebSocket } = require('./services/websocketService');

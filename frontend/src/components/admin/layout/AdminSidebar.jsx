@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { icon: "room_service", label: "Lễ Tân & Tiền Sảnh", to: "/admin/le-tan" },
   { icon: "bedroom_parent", label: "Quản Lý Hạng Phòng", to: "/admin/room-types" },
   { icon: "meeting_room", label: "Quản Lý Phòng Vật Lý", to: "/admin/rooms" },
+  { icon: "grid_on", label: "Sơ Đồ Phòng & Trạng Thái", to: "/admin/so-do-phong" },
   { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong" },
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services" },
   { icon: "restaurant", label: "Quản Lý Thực Đơn (F&B)", to: "/admin/menu" },
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { icon: "account_balance", label: "Tài Chính & Sổ Cái", to: "/admin/tai-chinh" },
   { icon: "neurology", label: "AI Concierge & Chatbot", to: "/admin/ai-concierge" },
   { icon: "loyalty", label: "Khách Hàng & Hội Viên", to: "/admin/loyalty" },
+  { icon: "badge", label: "Quản Lý Tài Khoản (RBAC)", to: "/admin/staff" },
   { icon: "admin_panel_settings", label: "Quản Trị Hệ Thống", to: "/admin/quan-tri" },
 ];
 
