@@ -270,12 +270,12 @@ Tất cả các tài khoản mẫu đều được mã hóa bằng **Bcrypt** v�
      - `ThiB/2_man_hinh_bep`
      - `MinhC/3_dat_phong_online`
 3. **Quy tắc Commit Message:**
-   - Nhóm cho phép **commit tự do**, chỉ cần ghi ngắn gọn, rõ ràng đúng nội dung công việc vừa hoàn thành để các thành viên khác dễ theo dõi lịch sử.
-   - Ví dụ:
-     - `hoàn thành giao diện sơ đồ phòng`
-     - `sửa lỗi tính tiền minibar khi checkout`
-     - `thêm api lấy danh sách món ăn theo danh mục`
-     - `cập nhật tài liệu hướng dẫn setup`
+   - Nhóm cho phép **commit tự do**, chỉ cần ghi ngắn gọn, rõ ràng đúng nội dung công việc vừa hoàn thành.
+   - Khuyến khích gắn thêm các tiền tố chuẩn để các thành viên dễ theo dõi và phân loại lịch sử commit:
+     - `feat:` thêm tính năng hoặc giao diện mới (ví dụ: `feat: hoàn thành giao diện sơ đồ phòng`)
+     - `fix:` sửa lỗi chức năng hoặc giao diện (ví dụ: `fix: sửa lỗi tính tiền minibar khi checkout`)
+     - `docs:` cập nhật tài liệu hoặc hướng dẫn (ví dụ: `docs: cập nhật tài liệu hướng dẫn setup`)
+     - `refactor:` tái cấu trúc, tối ưu code (ví dụ: `refactor: tối ưu hóa api lấy danh sách món ăn`)
 4. **Quy trình tích hợp:**
    - Sau khi hoàn thành tính năng trên nhánh cá nhân, kiểm tra kỹ lưỡng và push lên remote.
    - Tạo **Pull Request (PR)** trên GitHub hướng vào nhánh `master` để các thành viên trong nhóm review code trước khi merge.
