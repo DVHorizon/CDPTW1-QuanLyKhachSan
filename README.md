@@ -61,13 +61,10 @@ CDPTW1-QuanLyKhachSan/
 
 ## 3. Hướng Dẫn Khởi Chạy Dự Án Bằng Docker (Khuyên Dùng)
 
-> [!IMPORTANT]
-> **Dành cho các thành viên trong nhóm:**
-> Để đảm bảo có đầy đủ các bản vá cấu hình Docker, script tự động và toàn bộ 57 bảng CSDL mới nhất, hãy đảm bảo bạn đang ở nhánh `NhanBao/Database` (hoặc nhánh đã được gộp từ nhánh này):
+> [!TIP]
+> Trước khi khởi chạy hoặc sau khi cập nhật dự án, hãy đảm bảo bạn đã kéo mã nguồn mới nhất:
 > ```bash
-> git fetch origin
-> git checkout NhanBao/Database
-> git pull origin NhanBao/Database
+> git pull origin master
 > ```
 
 ---
@@ -246,12 +243,10 @@ Tất cả các tài khoản mẫu đều được mã hóa bằng **Bcrypt** v�
 ---
 
 ### ❓ 3. Lỗi: `Additional property volumes is not allowed` khi chạy `docker compose`
-- **Nguyên nhân:** Tệp `docker-compose.yml` trên máy bạn bị phiên bản cũ có 2 khối `volumes:` ở cấp root.
-- **Cách xử lý:** Cập nhật lại nhánh mới nhất:
+- **Nguyên nhân:** Tệp `docker-compose.yml` trên máy bạn là phiên bản cũ bị khai báo trùng khối `volumes:`.
+- **Cách xử lý:** Kéo mã nguồn mới nhất từ nhánh chính:
   ```bash
-  git fetch origin
-  git checkout NhanBao/Database
-  git pull origin NhanBao/Database
+  git pull origin master
   ```
 
 ---
