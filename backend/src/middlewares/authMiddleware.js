@@ -37,7 +37,24 @@ const verifyToken = (req, res, next) => {
 };
 
 
+const optionalVerifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+  } catch (error) {
+    // Token không hợp lệ thì bỏ qua, xem như khách vãng lai
+  }
+  next();
+};
+
 module.exports = {
   verifyToken,
+  optionalVerifyToken,
   JWT_SECRET
 };

@@ -11,6 +11,7 @@
     "seed:fast": "node src/seeders/seedRunner.js --count=1000",
     "seed:dev": "node src/seeders/seedRunner.js --count=10000",
     "seed:full": "node src/seeders/seedRunner.js --count=100000",
+    "seed:legacy": "node src/seeders/seedAll.js",
     "verify:db": "node src/seeders/verifyTables.js"
   },
   "dependencies": {

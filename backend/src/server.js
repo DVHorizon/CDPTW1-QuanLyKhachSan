@@ -43,6 +43,8 @@ app.use('/api/v1/services',   require('./modules/services'));
 
 // 👤 Trang — F&B
 app.use('/api/v1/fnb',        require('./modules/fnb'));
+app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/fnb-orders',    require('./routes/admin/fnbOrderRoutes'));
 
 // 👤 Tuyền — Back-office Operations
 app.use('/api/v1/operations', require('./modules/operations'));
