@@ -11,8 +11,9 @@ router.post('/', verifyToken, fnbOrderController.createRoomServiceOrder);
 
 
 
-// Lịch sử gọi món
+// FEAT-FNB-08: Lịch sử gọi món (DEV: không cần token để test)
 router.get('/', fnbOrderController.getOrderHistory);
+router.get('/history', fnbOrderController.getOrderHistory);
 
 // FEAT-FNB-06 (A4.6): Theo dõi trạng thái đơn món real-time bằng WebSocket
 router.get('/track/hub', fnbOrderController.getAllOrdersForHub);

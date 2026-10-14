@@ -161,8 +161,143 @@ exports.createRoomServiceOrder = async (req, res) => {
 };
 
 
+// FEAT-FNB-08 (A4.8): LỊCH SỬ GỌI MÓN & DANH SÁCH TỔNG HỢP ĐƠN F&B TRONG NGÀY
 exports.getOrderHistory = async (req, res) => {
-  res.json({ success: true, data: [] });
+  try {
+    const { Op } = require('sequelize');
+    const currentUser = req.user;
+    const roleId   = currentUser?.roleId   || currentUser?.RoleId;
+    const roleName = (currentUser?.roleName || currentUser?.role || '').toLowerCase();
+    let userId     = currentUser?.id || currentUser?.UserId;
+
+    // ── Phân loại actor (hỗ trợ view/role override khi test không cần token) ────────
+    let isStaff = !currentUser || roleId === 1 || roleId === 2 || roleId === 3 ||
+      ['admin', 'manager', 'staff', 'reception', 'fnb'].some(r => roleName.includes(r));
+
+    // Giả lập chế độ xem (Staff / Guest) khi test
+    if (req.query.view === 'guest' || req.query.role === 'guest') {
+      isStaff = false;
+      if (!userId) userId = req.query.userId || 1;
+    } else if (req.query.view === 'staff' || req.query.role === 'staff') {
+      isStaff = true;
+    }
+
+    // ── Bộ lọc ngày (nhân viên) ──────────────────────────────────────────────
+    let { fromDate, toDate, status, paymentMode, roomId, tableId } = req.query;
+
+    // Validate ngày
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (fromDate && !dateRegex.test(fromDate)) {
+      return res.status(400).json({ code: 'ERROR_0004_INVALID_FORMAT', message: 'fromDate không đúng định dạng' });
+    }
+    if (toDate && !dateRegex.test(toDate)) {
+      return res.status(400).json({ code: 'ERROR_0004_INVALID_FORMAT', message: 'toDate không đúng định dạng' });
+    }
+
+    // Mặc định khoảng ngày: 7 ngày trước -> hôm nay
+    const today = new Date().toISOString().slice(0, 10);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    if (isStaff) {
+      if (!fromDate) fromDate = sevenDaysAgo;
+      if (!toDate)   toDate   = today;
+      if (new Date(toDate) < new Date(fromDate)) {
+        return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Khoảng ngày không hợp lệ.' });
+      }
+    }
+
+    // ── Xây where clause ────────────────────────────────────────────────────
+    const where = {};
+
+    if (isStaff) {
+      // Khoảng thời gian
+      const start = new Date(fromDate + 'T00:00:00.000Z');
+      const end   = new Date(toDate   + 'T23:59:59.999Z');
+      where.OrderTime = { [Op.between]: [start, end] };
+      if (status)      where.Status      = status;
+      if (paymentMode) where.PaymentMode = paymentMode;
+      if (roomId)      where.StayId      = { [Op.ne]: null }; // join filter below
+      if (tableId)     where.TableId     = tableId;
+    } else {
+      // Khách: chỉ xem đơn của mình
+      if (!userId) {
+        return res.status(401).json({ code: 'ERROR_0009_UNAUTHENTICATED', message: 'Bạn cần đăng nhập để thực hiện chức năng này' });
+      }
+      where.UserId = userId;
+    }
+
+    // ── Truy vấn ────────────────────────────────────────────────────────────
+    const orders = await FoodOrder.findAll({
+      where,
+      order: [['OrderTime', 'DESC']],
+      include: [
+        {
+          model: FoodOrderDetail,
+          as: 'details',
+          required: false,
+          include: [{ model: MenuItem, attributes: ['MenuItemId', 'ItemName', 'Price', 'ImageUrl'] }]
+        },
+        {
+          model: Stay,
+          required: roomId ? true : false,
+          include: [{ model: Room, attributes: ['RoomId', 'RoomNumber', 'Floor'] }],
+          ...(roomId ? { where: { RoomId: roomId } } : {})
+        }
+      ]
+    });
+
+    // ── Không có dữ liệu ────────────────────────────────────────────────────
+    if (orders.length === 0) {
+      const emptyMsg = isStaff
+        ? 'Không có đơn món ăn nào trong khoảng thời gian đã chọn.'
+        : 'Bạn chưa có đơn món ăn nào.';
+      return res.status(200).json({ success: true, data: [], summary: null, message: emptyMsg });
+    }
+
+    // ── Tổng hợp doanh thu (loại trừ Cancelled) ─────────────────────────────
+    let totalRevenue = 0;
+    let totalOrders  = 0;
+    const transformed = orders.map(order => {
+      const amount = parseFloat(order.TotalAmount || 0);
+      if (order.Status !== 'Cancelled') {
+        totalRevenue += amount;
+        totalOrders++;
+      }
+      return {
+        foodOrderId : order.FoodOrderId,
+        status      : order.Status,
+        orderTime   : order.OrderTime,
+        orderType   : order.OrderType,
+        totalAmount : amount,
+        paymentMode : order.PaymentMode,
+        note        : order.Note,
+        roomNumber  : order.Stay?.Room?.RoomNumber || (order.TableId ? `Bàn ${order.TableId}` : null),
+        items       : (order.details || []).map(d => ({
+          orderDetailId : d.FoodOrderDetailId,
+          menuItemId    : d.MenuItemId,
+          itemName      : d.MenuItem?.ItemName || 'Món ăn',
+          quantity      : d.Quantity,
+          unitPrice     : parseFloat(d.UnitPrice || 0),
+          totalPrice    : parseFloat(d.TotalPrice || 0),
+          isCompleted   : d.IsCompleted,
+          note          : d.Note,
+          imageUrl      : d.MenuItem?.ImageUrl || null
+        }))
+      };
+    });
+
+    const summary = isStaff ? {
+      totalOrders,
+      totalRevenue,
+      fromDate,
+      toDate,
+      cancelledCount: orders.length - totalOrders
+    } : null;
+
+    return res.status(200).json({ success: true, data: transformed, summary });
+  } catch (error) {
+    console.error('Error fetching order history (FEAT-FNB-08):', error);
+    return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: error.message || 'Không thể tải lịch sử gọi món.', stack: error.stack });
+  }
 };
 
 exports.getKitchenOrders = async (req, res) => {
