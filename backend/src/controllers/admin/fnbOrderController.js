@@ -170,14 +170,24 @@ exports.getOrderHistory = async (req, res) => {
     const roleName = (currentUser?.roleName || currentUser?.role || '').toLowerCase();
     let userId     = currentUser?.id || currentUser?.UserId;
 
-    // ── Phân loại actor (hỗ trợ view/role override khi test không cần token) ────────
-    let isStaff = !currentUser || roleId === 1 || roleId === 2 || roleId === 3 ||
-      ['admin', 'manager', 'staff', 'reception', 'fnb'].some(r => roleName.includes(r));
+    // ── Phân loại actor ────────────────────────────────────────────────────────
+    let isStaff = false;
+    if (currentUser) {
+      isStaff = roleId === 1 || roleId === 2 || roleId === 3 ||
+        ['admin', 'manager', 'staff', 'reception', 'fnb'].some(r => roleName.includes(r));
+    } else {
+      // Khi không có token: nếu không chỉ định view=guest và không có userId thì mặc định là staff (dành cho PMS test)
+      if (req.query.view !== 'guest' && !req.query.userId) {
+        isStaff = true;
+      }
+    }
 
-    // Giả lập chế độ xem (Staff / Guest) khi test
+    // Role override theo query khi dev/test
     if (req.query.view === 'guest' || req.query.role === 'guest') {
       isStaff = false;
-      if (!userId) userId = req.query.userId || 1;
+      if (!userId && req.query.userId) {
+        userId = parseInt(req.query.userId, 10);
+      }
     } else if (req.query.view === 'staff' || req.query.role === 'staff') {
       isStaff = true;
     }
