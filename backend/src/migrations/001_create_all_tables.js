@@ -10,6 +10,15 @@ module.exports = {
     // Tắt kiểm tra khóa ngoại để tạo bảng an toàn
     await queryInterface.sequelize.query('SET FOREIGN_KEY_CHECKS = 0;');
 
+    // Dọn dẹp sạch sẽ các bảng cũ bị lệch schema từ các nhánh khác (nếu có)
+    const [existingTables] = await queryInterface.sequelize.query('SHOW TABLES;');
+    for (const row of existingTables) {
+      const tableName = Object.values(row)[0];
+      if (tableName !== 'SequelizeMeta') {
+        await queryInterface.sequelize.query(`DROP TABLE IF EXISTS \`${tableName}\`;`);
+      }
+    }
+
     // 1. Roles
     await queryInterface.createTable('Roles', {
       RoleId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },

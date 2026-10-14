@@ -9,6 +9,7 @@ import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
 import StaffManagement from './pages/StaffManagement';
 import RoomService from './pages/client/RoomService';
+import Profile from './pages/client/Profile';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
 import FnbOrderHistory from './pages/admin/fnb/FnbOrderHistory';
@@ -29,6 +30,7 @@ function App() {
           <Route path="/room-service" element={<RoomService />} />
           <Route path="/fnb/history" element={<GuestOrderHistory />} />
           <Route path="/lich-su-dat-mon" element={<GuestOrderHistory />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/register" element={<Auth />} />
