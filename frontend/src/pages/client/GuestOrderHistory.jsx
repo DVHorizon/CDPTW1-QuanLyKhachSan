@@ -37,7 +37,22 @@ export default function GuestOrderHistory() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(API);
+      const token = localStorage.getItem("hotel_token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      // Lấy user id từ localStorage nếu có
+      let url = API;
+      try {
+        const savedUser = JSON.parse(localStorage.getItem("hotel_user") || "{}");
+        if (savedUser?.id || savedUser?.UserId) {
+          url += `&userId=${savedUser.id || savedUser.UserId}`;
+        }
+      } catch {}
+
+      const res = await fetch(url, { headers });
       const json = await res.json();
       if (!res.ok) {
         setError(json.message || "Không thể tải lịch sử gọi món.");
