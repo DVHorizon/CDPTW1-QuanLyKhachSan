@@ -14,6 +14,7 @@ import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 import ServiceManagement from './pages/ServiceManagement';
 import RoomStatusManagement from './pages/RoomStatusManagement';
+import BookingManagement from './pages/BookingManagement';
 
 function App() {
   return (
@@ -32,6 +33,9 @@ function App() {
           <Route path="/admin/menu" element={<MenuManagement />} />
           <Route path="/admin/room-types" element={<RoomTypeManagement />} />
           <Route path="/admin/rooms" element={<RoomManagement />} />
+          <Route path="/admin/bookings" element={<BookingManagement />} />
+          <Route path="/admin/dat-phong" element={<BookingManagement />} />
+          <Route path="/admin/danh-sach-dat-phong" element={<BookingManagement />} />
           <Route path="/admin/so-do-phong" element={<RoomStatusManagement />} />
           <Route path="/admin/room-status" element={<RoomStatusManagement />} />
           <Route path="/admin/le-tan" element={<RoomStatusManagement />} />

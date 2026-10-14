@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { icon: "bedroom_parent", label: "Quản Lý Hạng Phòng", to: "/admin/room-types" },
   { icon: "meeting_room", label: "Quản Lý Phòng Vật Lý", to: "/admin/rooms" },
   { icon: "grid_on", label: "Sơ Đồ Phòng & Trạng Thái", to: "/admin/so-do-phong" },
+  { icon: "receipt_long", label: "Quản Lý Đặt Phòng", to: "/admin/dat-phong" },
   { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong" },
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services" },
   { icon: "restaurant", label: "Quản Lý Thực Đơn (F&B)", to: "/admin/menu" },

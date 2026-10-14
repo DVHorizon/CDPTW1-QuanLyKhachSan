@@ -35,6 +35,10 @@ app.use('/api/phong', require('./routes/rooms'));
 app.use('/api/so-do-phong', require('./routes/rooms'));
 app.use('/api/room-status', require('./routes/rooms'));
 
+// Route Quản lý danh sách booking toàn hệ thống (Master Bookings)
+app.use('/api/bookings', require('./routes/bookings'));
+app.use('/api/v1/bookings', require('./routes/bookings'));
+
 // Routes F&B Quản lý Menu
 app.use('/api/v1', require('./routes/admin/menuRoutes'));
 
