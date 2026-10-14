@@ -261,15 +261,21 @@ Tất cả các tài khoản mẫu đều được mã hóa bằng **Bcrypt** v�
 
 ## 8. Quy Định Làm Việc Nhóm Với Git & SmartGit
 
-1. **Nhánh chính (`master`):** Tuyệt đối không commit hoặc push code trực tiếp lên nhánh `master`.
+1. **Nhánh chính (`master`):** Được bảo vệ nghiêm ngặt, tuyệt đối không commit hoặc push code trực tiếp lên nhánh `master`.
 2. **Quy tắc đặt tên nhánh tính năng:**
-   - Cú pháp: `<Tên_Thành_Viên>/<Tên_Tính_Năng>`
-   - Ví dụ: `NhanBao/Database`, `VanA/QuanLyPhong`, `ThiB/ManHinhBepKDS`.
-3. **Quy tắc Commit message chuẩn Conventional Commits:**
-   - `feat: thêm chức năng đặt phòng online`
-   - `fix: sửa lỗi tính tổng tiền minibar`
-   - `refactor: tối ưu hóa truy vấn sequelize seeder`
-   - `docs: cập nhật tài liệu hướng dẫn readme`
+   - Cú pháp: `<Tên_Thành_Viên>/<STT>_<Tên_Chức_Năng>`
+   - Ví dụ: 
+     - `NhanBao/0_khoi_tao_database`
+     - `VanA/1_quan_ly_phong`
+     - `ThiB/2_man_hinh_bep`
+     - `MinhC/3_dat_phong_online`
+3. **Quy tắc Commit Message:**
+   - Nhóm cho phép **commit tự do**, chỉ cần ghi ngắn gọn, rõ ràng đúng nội dung công việc vừa hoàn thành để các thành viên khác dễ theo dõi lịch sử.
+   - Ví dụ:
+     - `hoàn thành giao diện sơ đồ phòng`
+     - `sửa lỗi tính tiền minibar khi checkout`
+     - `thêm api lấy danh sách món ăn theo danh mục`
+     - `cập nhật tài liệu hướng dẫn setup`
 4. **Quy trình tích hợp:**
    - Sau khi hoàn thành tính năng trên nhánh cá nhân, kiểm tra kỹ lưỡng và push lên remote.
-   - Tạo **Pull Request (PR)** trên GitHub hướng vào nhánh `master` để các thành viên khác review trước khi merge.
+   - Tạo **Pull Request (PR)** trên GitHub hướng vào nhánh `master` để các thành viên trong nhóm review code trước khi merge.
