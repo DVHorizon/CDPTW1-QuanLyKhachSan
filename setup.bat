@@ -23,11 +23,15 @@ if errorlevel 1 (
 echo    ✅ MySQL đã sẵn sàng!
 
 echo.
-echo [3/4] 📦 Đang khởi tạo cấu trúc 57 bảng (Sequelize Migration)...
+echo [3/5] 📥 Đang đồng bộ thư viện Backend (npm install)...
+docker exec hotel_backend npm install
+
+echo.
+echo [4/5] 📦 Đang khởi tạo cấu trúc 57 bảng (Sequelize Migration)...
 docker exec hotel_backend npm run migrate
 
 echo.
-echo [4/4] 🌱 Đang nạp dữ liệu vào cơ sở dữ liệu (Chế độ Fast Seed ~20 giây)...
+echo [5/5] 🌱 Đang nạp dữ liệu vào cơ sở dữ liệu (Chế độ Fast Seed ~20 giây)...
 docker exec hotel_backend npm run seed:fast
 
 echo.
