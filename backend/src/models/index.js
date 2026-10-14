@@ -106,6 +106,18 @@ FoodOrderDetail.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
 MenuItem.hasMany(FoodOrderDetail, { foreignKey: 'MenuItemId' });
 FoodOrderDetail.belongsTo(MenuItem, { foreignKey: 'MenuItemId' });
 
+// 15. RestaurantTable & TableReservation
+const defineRestaurantTable = require('./RestaurantTable');
+const defineTableReservation = require('./TableReservation');
+const RestaurantTable = defineRestaurantTable(sequelize);
+const TableReservation = defineTableReservation(sequelize);
+
+RestaurantTable.hasMany(TableReservation, { foreignKey: 'TableId', as: 'reservations' });
+TableReservation.belongsTo(RestaurantTable, { foreignKey: 'TableId', as: 'table' });
+
+User.hasMany(TableReservation, { foreignKey: 'UserId', as: 'tableReservations' });
+TableReservation.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+
 module.exports = {
   sequelize,
   Branch,
@@ -124,6 +136,8 @@ module.exports = {
   FoodOrderDetail,
   Invoice,
   InvoiceDetail,
-  Payment
+  Payment,
+  RestaurantTable,
+  TableReservation
 };
 
