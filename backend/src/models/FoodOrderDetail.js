@@ -2,7 +2,7 @@ const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
   return sequelize.define('FoodOrderDetail', {
-    OrderDetailId: {
+    FoodOrderDetailId: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true
@@ -31,11 +31,13 @@ module.exports = (sequelize) => {
     Note: {
       type: DataTypes.STRING,
       allowNull: true
+    },
+    IsCompleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
     }
   }, {
     tableName: 'FoodOrderDetails',
-    timestamps: true,
-    createdAt: 'CreatedAt',
-    updatedAt: 'UpdatedAt'
+    timestamps: false
   });
 };

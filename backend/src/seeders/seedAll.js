@@ -15,7 +15,7 @@ async function seed() {
     console.log(`Starting Database Sync...`);
     // Turn off constraints for MySQL during mass sync/seed
     await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 0;');
-    await db.sequelize.sync({ force: true });
+    // await db.sequelize.sync({ force: true });
     console.log('Database synced and reset successfully.');
 
     // 1. Seed Categories

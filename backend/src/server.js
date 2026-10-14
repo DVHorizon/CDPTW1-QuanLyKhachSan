@@ -24,6 +24,12 @@ app.use('/api/auth',     require('./routes/authRoutes'));   // backward compat
 // Nhưng giờ chúng đã được rewrite để dùng Sequelize model (bảng Rooms/RoomTypes)
 app.use('/api/loai-phong', require('./routes/roomTypes'));
 app.use('/api/phong',      require('./routes/rooms'));
+app.use('/api/so-do-phong', require('./routes/rooms'));
+app.use('/api/room-status', require('./routes/rooms'));
+
+// Route Quản lý người dùng & nhân viên
+app.use('/api/users', require('./routes/users'));
+app.use('/api/v1/users', require('./routes/users'));
 
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
@@ -48,9 +54,15 @@ app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 app.use(require('./shared/middlewares/errorHandler'));
 
-// ─── Start server ──────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`✅ Backend server running on port ${PORT}`);
+// ─── Start server with WebSocket ───────────────────────────────────────────
+const http = require('http');
+const { initWebSocket } = require('./services/websocketService');
+
+const server = http.createServer(app);
+initWebSocket(server);
+
+server.listen(PORT, () => {
+  console.log(`✅ Backend server with WebSocket running on port ${PORT}`);
   console.log(`   Modules: /api/v1/{guest|pms|services|fnb|operations}`);
-  console.log(`   Legacy:  /api/{loai-phong|phong|v1/auth|rooms}`);
+  console.log(`   Legacy:  /api/{loai-phong|phong|v1/auth|rooms|users}`);
 });

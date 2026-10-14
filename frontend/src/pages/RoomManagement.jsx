@@ -126,7 +126,7 @@ const EMPTY_FORM = {
 
 // ─── Component chính ────────────────────────────────────────────────────────
 const RoomManagement = () => {
-    const roomTypes = useMemo(loadRoomTypes, []);
+    const [roomTypes, setRoomTypes] = useState(loadRoomTypes);
 
     const [rooms, setRooms] = useState(() => {
         try {
@@ -158,6 +158,7 @@ const RoomManagement = () => {
     const [form, setForm] = useState({ ...EMPTY_FORM });
     const [formErrors, setFormErrors] = useState({});
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [syncErrorModal, setSyncErrorModal] = useState(null);
 
     useEffect(() => {
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms)); } catch (_) { }
@@ -165,16 +166,39 @@ const RoomManagement = () => {
     useEffect(() => {
         try { localStorage.setItem(LOG_KEY, JSON.stringify(logs)); } catch (_) { }
     }, [logs]);
-    // Thử tải danh sách phòng từ MySQL khi mở trang
-    useEffect(() => {
-        (async () => {
-            const r = await callApi('GET');
-            if (r && r.ok && Array.isArray(r.data.data)) {
-                setRooms(r.data.data.map(toUI));
-                setBackendConnected(true);
+
+    // Tải danh sách loại phòng thật từ MySQL Database
+    const fetchRoomTypes = async () => {
+        try {
+            const res = await fetch('http://localhost:5000/api/loai-phong?limit=200');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+                    const mapped = data.data.map((r) => ({
+                        code: r.ma_loai || `RT-${r.id}`,
+                        name: r.ten_loai || r.name || `Loại phòng #${r.id}`,
+                    }));
+                    setRoomTypes(mapped);
+                    try { localStorage.setItem('qlks_room_types', JSON.stringify(mapped)); } catch (_) { }
+                }
             }
-        })();
+        } catch (_) { }
+    };
+
+    // Tải danh sách phòng từ MySQL khi mở trang
+    const reloadDataFromBackend = async () => {
+        const r = await callApi('GET');
+        if (r && r.ok && Array.isArray(r.data.data)) {
+            setRooms(r.data.data.map(toUI));
+            setBackendConnected(true);
+        }
+        await fetchRoomTypes();
+    };
+
+    useEffect(() => {
+        reloadDataFromBackend();
     }, []);
+
     // Làm mới nhãn thời gian của nhật ký mỗi 30 giây
     useEffect(() => {
         const t = setInterval(() => setNow(Date.now()), 30000);
@@ -198,7 +222,17 @@ const RoomManagement = () => {
     const addLog = (text) =>
         setLogs((p) => [{ id: Date.now() + Math.random(), text, at: Date.now() }, ...p].slice(0, 30));
 
-    const typeName = (code) => roomTypes.find((t) => t.code === code)?.name || code || '---';
+    const typeName = (code) => {
+        if (!code) return '---';
+        const found = roomTypes.find((t) => t.code === code || t.code?.toUpperCase() === code?.toUpperCase());
+        if (found) return found.name;
+        const match = String(code).match(/^RT-(\d+)$/i);
+        if (match) {
+            const byId = roomTypes.find((t) => t.code === `RT-${match[1]}` || String(t.code) === match[1]);
+            if (byId) return byId.name;
+        }
+        return code;
+    };
 
     // ─── Thống kê (tổng các nhóm = tổng tồn kho) ──────────────────────────────
     const stats = useMemo(() => {
@@ -291,6 +325,19 @@ const RoomManagement = () => {
         if (backendConnected) {
             const r = await callApi('PATCH', `/${room.id}/thao-tac`, { action });
             if (!r) return lostConnection();
+            if (r.status === 404 || r.data?.isRecordDeleted) {
+                setSyncErrorModal({
+                    title: 'CẢNH BÁO: PHÒNG ĐÃ BỊ XÓA KHỎI CƠ SỞ DỮ LIỆU!',
+                    message: `Phòng ${room.number} (ID #${room.id}) đã bị người khác hoặc tiến trình khác xóa khỏi cơ sở dữ liệu! Không thể cập nhật trạng thái.`,
+                    actionText: 'Tải Lại Danh Sách',
+                    onAction: () => {
+                        setSyncErrorModal(null);
+                        reloadDataFromBackend();
+                    },
+                });
+                setRooms((p) => p.filter((x) => x.id !== room.id));
+                return;
+            }
             if (!r.ok) {
                 showToast(r.data.message || 'Thao tác không hợp lệ với trạng thái hiện tại.', 'error');
                 return;
@@ -425,7 +472,7 @@ const RoomManagement = () => {
         const number = form.number.trim();
         const keyId = form.keyId.trim();
         if (!number) e.number = 'Vui lòng nhập số phòng (ví dụ: 101)';
-        else if (!/^[A-Za-z0-9-]{1,10}$/.test(number)) e.number = 'Số phòng chỉ gồm chữ, số, gạch ngang (tối đa 10 ký tự)';
+        else if (!/^[A-Za-z0-9._\-\/]{1,20}$/.test(number)) e.number = 'Số phòng chỉ gồm chữ cái, chữ số, gạch ngang (-), gạch dưới (_), chấm (.), gạch chéo (/)';
         else if (rooms.some((r) => r.number.toLowerCase() === number.toLowerCase() && r.id !== modal?.id))
             e.number = `Số phòng "${number}" đã tồn tại`;
         if (!form.typeCode) e.typeCode = 'Vui lòng chọn loại phòng';
@@ -455,6 +502,34 @@ const RoomManagement = () => {
                 ? await callApi('POST', '', body)
                 : await callApi('PUT', `/${modal.id}`, body);
             if (!r) return lostConnection();
+
+            // Phát hiện phòng đã bị xóa trong CSDL bởi người khác
+            if (r.status === 404 || r.data?.isRecordDeleted) {
+                setSyncErrorModal({
+                    title: 'CẢNH BÁO: DỮ LIỆU ĐÃ BỊ XÓA KHỎI DATABASE!',
+                    message: `Trong lúc bạn đang thao tác chỉnh sửa, phòng [${form.number}] (ID #${modal.id}) đã bị người khác hoặc tiến trình khác xóa khỏi cơ sở dữ liệu! Thao tác lưu không thể thực hiện.`,
+                    actionText: 'Tải Lại Dữ Liệu & Danh Sách',
+                    onAction: () => {
+                        setSyncErrorModal(null);
+                        reloadDataFromBackend();
+                    },
+                });
+                setRooms((p) => p.filter((x) => x.id !== modal.id));
+                setModal(null);
+                return;
+            }
+
+            // Phát hiện bảng dữ liệu bị mất
+            if (r.data?.isTableMissing) {
+                setSyncErrorModal({
+                    title: 'LỖI CƠ SỞ DỮ LIỆU: BẢNG DỮ LIỆU ĐÃ BỊ XÓA!',
+                    message: 'Bảng dữ liệu physical_rooms không còn tồn tại trong cơ sở dữ liệu MySQL. Vui lòng kiểm tra lại cấu trúc CSDL hoặc tải lại trang.',
+                    actionText: 'Tải Lại Toàn Bộ Trang',
+                    onAction: () => window.location.reload(),
+                });
+                return;
+            }
+
             if (!r.ok) {
                 showToast(r.data.message || 'Không thể lưu phòng', 'error');
                 return;
@@ -482,14 +557,32 @@ const RoomManagement = () => {
         const r = deleteTarget;
         if (!r) return;
         if (r.occ === 'inhouse') {
-            showToast('Thao tác không hợp lệ với trạng thái hiện tại.', 'error');
+            showToast('Không thể xóa phòng đang có khách lưu trú!', 'error');
             setDeleteTarget(null);
             return;
         }
         if (backendConnected) {
             const res = await callApi('DELETE', `/${r.id}`);
             if (!res) { setDeleteTarget(null); return lostConnection(); }
-            if (!res.ok && res.status !== 404) {
+
+            // Phát hiện phòng đã bị xóa trước đó bởi người khác
+            if (res.status === 404 || res.data?.isRecordDeleted) {
+                setSyncErrorModal({
+                    title: 'CẢNH BÁO: PHÒNG ĐÃ BỊ XÓA TRƯỚC ĐÓ!',
+                    message: `Phòng "${r.number}" (ID #${r.id}) đã bị xóa khỏi cơ sở dữ liệu bởi quản trị viên hoặc tiến trình khác! Vui lòng tải lại danh sách.`,
+                    actionText: 'Tải Lại Danh Sách',
+                    onAction: () => {
+                        setSyncErrorModal(null);
+                        reloadDataFromBackend();
+                    },
+                });
+                setRooms((p) => p.filter((x) => x.id !== r.id));
+                setSelected((p) => p.filter((id) => id !== r.id));
+                setDeleteTarget(null);
+                return;
+            }
+
+            if (!res.ok) {
                 showToast(res.data.message || 'Không thể xóa phòng', 'error');
                 setDeleteTarget(null);
                 return;
@@ -562,9 +655,10 @@ const RoomManagement = () => {
 
                     <div className="flex flex-wrap items-center gap-space-xs">
                         <button
+                            id="btn-add-room"
                             type="button"
                             onClick={openNew}
-                            className="flex items-center gap-space-xs px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-bold rounded-lg hover:brightness-105 shadow-sm transition-all"
+                            className="flex items-center gap-space-xs px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-bold rounded-lg hover:brightness-105 shadow-sm transition-all cursor-pointer"
                         >
                             <span className="material-symbols-outlined text-[18px]">add_circle</span>
                             <span>Thêm Phòng Vật Lý</span>
@@ -930,9 +1024,10 @@ const RoomManagement = () => {
                             <div>
                                 <label className="font-label-sm text-label-sm font-bold text-on-surface-variant block mb-1">Số phòng *</label>
                                 <input
+                                    id="form-room-number"
                                     className={`w-full bg-surface border rounded-lg px-3 py-1.5 font-mono text-body-sm focus:outline-none focus:ring-1 ${formErrors.number ? 'border-error focus:ring-error' : 'border-outline-variant focus:ring-admin-primary'}`}
                                     placeholder="VD: 101"
-                                    maxLength={10}
+                                    maxLength={20}
                                     value={form.number}
                                     onChange={(e) => setF('number', e.target.value)}
                                 />
@@ -953,6 +1048,7 @@ const RoomManagement = () => {
                             <div>
                                 <label className="font-label-sm text-label-sm font-bold text-on-surface-variant block mb-1">Loại phòng *</label>
                                 <select
+                                    id="form-room-type"
                                     className={`w-full ${selectCls} ${formErrors.typeCode ? 'border-error' : ''}`}
                                     value={form.typeCode}
                                     onChange={(e) => setF('typeCode', e.target.value)}
@@ -965,6 +1061,7 @@ const RoomManagement = () => {
                             <div className="col-span-2">
                                 <label className="font-label-sm text-label-sm font-bold text-on-surface-variant block mb-1">Mã đầu đọc khóa (RFID) *</label>
                                 <input
+                                    id="form-room-key"
                                     className={`w-full bg-surface border rounded-lg px-3 py-1.5 font-mono text-body-sm focus:outline-none focus:ring-1 ${formErrors.keyId ? 'border-error focus:ring-error' : 'border-outline-variant focus:ring-admin-primary'}`}
                                     placeholder="VD: RFID-101"
                                     value={form.keyId}
@@ -1004,16 +1101,18 @@ const RoomManagement = () => {
 
                         <div className="flex gap-space-xs pt-space-sm border-t border-surface-container-high">
                             <button
+                                id="btn-save-room"
                                 type="button"
                                 onClick={handleSave}
-                                className="flex-1 px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-bold rounded-lg hover:brightness-105"
+                                className="flex-1 px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-bold rounded-lg hover:brightness-105 cursor-pointer"
                             >
                                 {modal.mode === 'new' ? 'Thêm phòng' : 'Lưu thay đổi'}
                             </button>
                             <button
+                                id="btn-cancel-room"
                                 type="button"
                                 onClick={() => setModal(null)}
-                                className="px-space-md py-space-sm bg-surface-container text-on-surface font-label-md text-label-md font-semibold rounded-lg hover:bg-surface-container-high"
+                                className="px-space-md py-space-sm bg-surface-container text-on-surface font-label-md text-label-md font-semibold rounded-lg hover:bg-surface-container-high cursor-pointer"
                             >
                                 Hủy
                             </button>
@@ -1048,6 +1147,63 @@ const RoomManagement = () => {
                             >
                                 Hủy
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 🚨 MODAL CẢNH BÁO: DỮ LIỆU ĐÃ BỊ XÓA KHỎI CƠ SỞ DỮ LIỆU */}
+            {syncErrorModal && (
+                <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+                    <div className="bg-surface-container-lowest w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border-2 border-error">
+                        {/* Header cảnh báo đỏ */}
+                        <div className="bg-error px-6 py-4 flex items-center gap-3 text-white">
+                            <span className="material-symbols-outlined text-[28px] animate-pulse">
+                                warning
+                            </span>
+                            <div className="flex flex-col">
+                                <h3 className="font-title-lg text-title-lg font-bold leading-tight">
+                                    {syncErrorModal.title}
+                                </h3>
+                                <span className="text-[12px] opacity-90 font-mono">PHÁT HIỆN THAY ĐỔI CSDL TRỰC TIẾP</span>
+                            </div>
+                        </div>
+
+                        {/* Nội dung chi tiết */}
+                        <div className="p-6 flex flex-col gap-4">
+                            <p className="text-body-md text-on-surface leading-relaxed">
+                                {syncErrorModal.message}
+                            </p>
+
+                            <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/50 text-[13px] text-on-surface-variant flex items-start gap-2.5">
+                                <span className="material-symbols-outlined text-[18px] text-error flex-shrink-0 mt-0.5">
+                                    info
+                                </span>
+                                <span>
+                                    Để đảm bảo tính nhất quán dữ liệu của khách sạn, hệ thống đã tạm dừng thao tác này. Vui lòng bấm nút bên dưới để tải lại dữ liệu mới nhất.
+                                </span>
+                            </div>
+
+                            {/* Các nút hành động */}
+                            <div className="flex items-center justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setSyncErrorModal(null)}
+                                    className="px-4 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors"
+                                >
+                                    Bỏ Qua
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={syncErrorModal.onAction}
+                                    className="px-5 py-2.5 rounded-xl bg-error hover:bg-error/90 text-white font-label-md text-label-md font-bold shadow-lg shadow-error/30 transition-all flex items-center gap-2 cursor-pointer"
+                                >
+                                    <span className="material-symbols-outlined text-[18px] animate-spin">
+                                        refresh
+                                    </span>
+                                    <span>{syncErrorModal.actionText}</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
