@@ -6,7 +6,7 @@ echo "🏨 GRAND HORIZON HOTEL - KHỞI TẠO HỆ THỐNG & CƠ SỞ DỮ LIỆ
 echo "=============================================================================="
 echo ""
 
-echo "[1/4] 🚀 Đang khởi động Docker (MySQL, phpMyAdmin, Backend, Frontend)..."
+echo "[1/5] 🚀 Đang khởi động Docker (MySQL, phpMyAdmin, Backend, Frontend)..."
 if command -v docker compose &> /dev/null; then
     docker compose up -d
 else
@@ -14,7 +14,7 @@ else
 fi
 
 echo ""
-echo "[2/4] ⏳ Đang đợi MySQL sẵn sàng kết nối..."
+echo "[2/5] ⏳ Đang đợi MySQL sẵn sàng kết nối..."
 until docker exec hotel_mysql mysqladmin ping -h localhost --silent &> /dev/null; do
     echo "   Đang chờ MySQL khởi động..."
     sleep 2

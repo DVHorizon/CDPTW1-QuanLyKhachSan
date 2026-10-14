@@ -5,7 +5,7 @@ echo 🏨 GRAND HORIZON HOTEL - KHỞI TẠO HỆ THỐNG ^& CƠ SỞ DỮ LIỆ
 echo ==============================================================================
 echo.
 
-echo [1/4] 🚀 Đang khởi động Docker (MySQL, phpMyAdmin, Backend, Frontend)...
+echo [1/5] 🚀 Đang khởi động Docker (MySQL, phpMyAdmin, Backend, Frontend)...
 docker compose up -d
 if errorlevel 1 (
     echo [Fallback] Thử với lệnh docker-compose...
@@ -13,7 +13,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/4] ⏳ Đang đợi MySQL sẵn sàng kết nối...
+echo [2/5] ⏳ Đang đợi MySQL sẵn sàng kết nối...
 :wait_mysql
 docker exec hotel_mysql mysqladmin ping -h localhost --silent >nul 2>&1
 if errorlevel 1 (
