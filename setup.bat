@@ -5,7 +5,7 @@ echo 🏨 GRAND HORIZON HOTEL - KHỞI TẠO HỆ THỐNG ^& CƠ SỞ DỮ LIỆ
 echo ==============================================================================
 echo.
 
-echo [1/4] 🚀 Đang khởi động Docker (MySQL, phpMyAdmin, Backend, Frontend)...
+echo [1/5] 🚀 Đang khởi động Docker (MySQL, phpMyAdmin, Backend, Frontend)...
 docker compose up -d
 if errorlevel 1 (
     echo [Fallback] Thử với lệnh docker-compose...
@@ -13,7 +13,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/4] ⏳ Đang đợi MySQL sẵn sàng kết nối...
+echo [2/5] ⏳ Đang đợi MySQL sẵn sàng kết nối...
 :wait_mysql
 docker exec hotel_mysql mysqladmin ping -h localhost --silent >nul 2>&1
 if errorlevel 1 (
@@ -23,11 +23,19 @@ if errorlevel 1 (
 echo    ✅ MySQL đã sẵn sàng!
 
 echo.
-echo [3/4] 📦 Đang khởi tạo cấu trúc 57 bảng (Sequelize Migration)...
+echo [3/6] 🧹 Dọn dẹp CSDL cũ để tránh xung đột cấu trúc...
+docker exec hotel_mysql mysql -uroot -e "DROP DATABASE IF EXISTS hotel_management; CREATE DATABASE hotel_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+echo.
+echo [4/6] 📥 Đang đồng bộ thư viện Backend (npm install)...
+docker exec hotel_backend npm install
+
+echo.
+echo [5/6] 📦 Đang khởi tạo cấu trúc 57 bảng (Sequelize Migration)...
 docker exec hotel_backend npm run migrate
 
 echo.
-echo [4/4] 🌱 Đang nạp dữ liệu vào cơ sở dữ liệu (Chế độ Fast Seed ~20 giây)...
+echo [6/6] 🌱 Đang nạp dữ liệu vào cơ sở dữ liệu (Chế độ Fast Seed ~20 giây)...
 docker exec hotel_backend npm run seed:fast
 
 echo.
