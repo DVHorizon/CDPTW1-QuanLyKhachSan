@@ -8,12 +8,14 @@ import Auth from './pages/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
+import StaffManagement from './pages/StaffManagement';
 import RoomService from './pages/client/RoomService';
 import Profile from './pages/client/Profile';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 import ServiceManagement from './pages/ServiceManagement';
+import RoomStatusManagement from './pages/RoomStatusManagement';
 
 function App() {
   return (
@@ -35,8 +37,16 @@ function App() {
           <Route path="/admin/menu" element={<MenuManagement />} />
           <Route path="/admin/room-types" element={<RoomTypeManagement />} />
           <Route path="/admin/rooms" element={<RoomManagement />} />
+          <Route path="/admin/so-do-phong" element={<RoomStatusManagement />} />
+          <Route path="/admin/room-status" element={<RoomStatusManagement />} />
+          <Route path="/admin/le-tan" element={<RoomStatusManagement />} />
+          <Route path="/admin/buong-phong" element={<RoomStatusManagement />} />
+          <Route path="/admin/staff" element={<StaffManagement />} />
+          <Route path="/admin/staff-accounts" element={<StaffManagement />} />
+          <Route path="/admin/quan-tri" element={<StaffManagement />} />
           <Route path="/admin/fnb/kitchen" element={<KitchenDisplay />} />
           <Route path="/admin/fnb/dispatch" element={<OrderDispatchHub />} />
+          <Route path="/admin/fnb/room-service" element={<RoomService />} />
           <Route path="/admin/services" element={<ServiceManagement />} />
           <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
           {/* Redirect everything else to home for now */}

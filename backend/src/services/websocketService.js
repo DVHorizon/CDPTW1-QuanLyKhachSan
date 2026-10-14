@@ -1,15 +1,18 @@
 let WebSocket = null;
 try {
   WebSocket = require('ws');
-} catch (e) {
-  console.warn('⚠️ ws module not found, WebSocket functionality disabled.');
+} catch (_) {
+  WebSocket = null;
 }
 
 let wss = null;
 
 // Initialize WebSocket Server attached to HTTP Server
 function initWebSocket(server) {
-  if (!WebSocket) return null;
+  if (!WebSocket) {
+    console.warn('⚠️ ws package is not installed. WebSocket support disabled.');
+    return null;
+  }
   try {
     wss = new WebSocket.Server({ server, path: '/ws/fnb-orders' });
   } catch (err) {

@@ -27,6 +27,12 @@ app.use('/api/auth',     require('./routes/authRoutes'));   // backward compat
 // Nhưng giờ chúng đã được rewrite để dùng Sequelize model (bảng Rooms/RoomTypes)
 app.use('/api/loai-phong', require('./routes/roomTypes'));
 app.use('/api/phong',      require('./routes/rooms'));
+app.use('/api/so-do-phong', require('./routes/rooms'));
+app.use('/api/room-status', require('./routes/rooms'));
+
+// Route Quản lý người dùng & nhân viên
+app.use('/api/users', require('./routes/users'));
+app.use('/api/v1/users', require('./routes/users'));
 
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
@@ -63,5 +69,5 @@ try {
 server.listen(PORT, () => {
   console.log(`✅ Backend server with WebSocket running on port ${PORT}`);
   console.log(`   Modules: /api/v1/{guest|pms|services|fnb|operations}`);
-  console.log(`   Legacy:  /api/{loai-phong|phong|v1/auth|rooms}`);
+  console.log(`   Legacy:  /api/{loai-phong|phong|v1/auth|rooms|users}`);
 });
