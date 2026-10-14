@@ -14,6 +14,7 @@ import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
 import FnbOrderHistory from './pages/admin/fnb/FnbOrderHistory';
 import GuestOrderHistory from './pages/client/GuestOrderHistory';
+import TableReservation from './pages/client/TableReservation';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 import ServiceManagement from './pages/ServiceManagement';
 import RoomStatusManagement from './pages/RoomStatusManagement';
@@ -30,6 +31,8 @@ function App() {
           <Route path="/room-service" element={<RoomService />} />
           <Route path="/fnb/history" element={<GuestOrderHistory />} />
           <Route path="/lich-su-dat-mon" element={<GuestOrderHistory />} />
+          <Route path="/fnb/dat-ban" element={<TableReservation />} />
+          <Route path="/dat-ban" element={<TableReservation />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/login" element={<Auth />} />
