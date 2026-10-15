@@ -7,6 +7,7 @@ import Auth from './pages/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
+import RoomAvailability from './pages/admin/menu/RoomAvailability';
 import StaffManagement from './pages/StaffManagement';
 import RoomService from './pages/client/RoomService';
 import Profile from './pages/client/Profile';
@@ -17,6 +18,7 @@ import GuestOrderHistory from './pages/client/GuestOrderHistory';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 import ServiceManagement from './pages/ServiceManagement';
 import RoomStatusManagement from './pages/RoomStatusManagement';
+
 
 function App() {
   return (
@@ -38,6 +40,7 @@ function App() {
           <Route path="/admin/menu" element={<MenuManagement />} />
           <Route path="/admin/room-types" element={<RoomTypeManagement />} />
           <Route path="/admin/rooms" element={<RoomManagement />} />
+          <Route path="/admin/room-availability" element={<RoomAvailability />} />
           <Route path="/admin/so-do-phong" element={<RoomStatusManagement />} />
           <Route path="/admin/room-status" element={<RoomStatusManagement />} />
           <Route path="/admin/le-tan" element={<RoomStatusManagement />} />
