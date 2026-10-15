@@ -222,9 +222,13 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Địa chỉ email không đúng định dạng hợp lệ' });
     }
 
-    // Validate số điện thoại nếu có (phải gồm đúng 10 chữ số)
-    if (phone && String(phone).trim() && !/^[0-9]{10}$/.test(String(phone).trim())) {
-      return res.status(400).json({ success: false, message: 'Số điện thoại chỉ được chứa chữ số và phải có đúng 10 số' });
+    // Validate số điện thoại bắt buộc (không được để trống, phải gồm đúng 10 chữ số)
+    if (!phone || !String(phone).trim()) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại không được để trống' });
+    }
+    const cleanPhone = String(phone).trim();
+    if (!/^[0-9]{10}$/.test(cleanPhone)) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại phải gồm đúng 10 chữ số (ví dụ: 0912345678)' });
     }
 
     if (!vaiTro || !String(vaiTro).trim()) {
@@ -349,9 +353,15 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    // Validate số điện thoại nếu có cập nhật (phải gồm đúng 10 chữ số)
-    if (phone !== undefined && String(phone).trim() && !/^[0-9]{10}$/.test(String(phone).trim())) {
-      return res.status(400).json({ success: false, message: 'Số điện thoại chỉ được chứa chữ số và phải có đúng 10 số' });
+    // Validate số điện thoại nếu có cập nhật (không được để trống, phải gồm đúng 10 chữ số)
+    if (phone !== undefined) {
+      const cleanPhone = String(phone).trim();
+      if (!cleanPhone) {
+        return res.status(400).json({ success: false, message: 'Số điện thoại không được để trống' });
+      }
+      if (!/^[0-9]{10}$/.test(cleanPhone)) {
+        return res.status(400).json({ success: false, message: 'Số điện thoại phải gồm đúng 10 chữ số (ví dụ: 0912345678)' });
+      }
     }
 
     // Chuẩn bị câu lệnh UPDATE
