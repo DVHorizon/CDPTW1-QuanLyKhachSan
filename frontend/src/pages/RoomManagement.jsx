@@ -14,7 +14,7 @@ const callApi = async (method, path = '', body) => {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: body ? JSON.stringify(body) : undefined,
-            signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined,
+            signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined,
         });
         const data = await res.json().catch(() => ({}));
         return { ok: res.ok && data.success !== false, status: res.status, data };
@@ -170,7 +170,7 @@ const RoomManagement = () => {
     // Tải danh sách loại phòng thật từ MySQL Database
     const fetchRoomTypes = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/loai-phong?limit=200');
+            const res = await fetch('http://localhost:5000/api/loai-phong');
             if (res.ok) {
                 const data = await res.json();
                 if (data.success && Array.isArray(data.data) && data.data.length > 0) {
@@ -344,7 +344,8 @@ const RoomManagement = () => {
             }
             mergeRooms([r.data.data]);
             addLog(`Phòng ${room.number}: ${ACTION_LABEL[action]}`);
-            showToast(`Phòng ${room.number}: ${ACTION_LABEL[action]}.`);
+            showToast(`Phòng ${room.number}: ${ACTION_LABEL[action]} - Đã đồng bộ CSDL!`, 'success');
+            await reloadDataFromBackend();
             return;
         }
         const next = applyAction(room, action);
@@ -380,8 +381,9 @@ const RoomManagement = () => {
             const { updated, ok, skipped } = r.data.data;
             mergeRooms(updated);
             addLog(`Hàng loạt "${ACTION_LABEL[action]}": ${ok} phòng`);
-            showToast(`Đã áp dụng cho ${ok} phòng${skipped ? `, bỏ qua ${skipped} phòng không hợp lệ` : ''}.`);
+            showToast(`Đã áp dụng cho ${ok} phòng${skipped ? `, bỏ qua ${skipped} phòng không hợp lệ` : ''} - Đã đồng bộ CSDL!`, 'success');
             setSelected([]);
+            await reloadDataFromBackend();
             return;
         }
         let ok = 0;
@@ -419,8 +421,9 @@ const RoomManagement = () => {
             const { updated, ok, skipped, floors } = r.data.data;
             mergeRooms(updated);
             addLog(`Khóa tầng ${floors.join(', ')}: ${ok} phòng`);
-            showToast(`Đã khóa tầng ${floors.join(', ')}: ${ok} phòng${skipped ? `, ${skipped} phòng đang có khách được giữ nguyên` : ''}.`);
+            showToast(`Đã khóa tầng ${floors.join(', ')}: ${ok} phòng${skipped ? `, ${skipped} phòng đang có khách được giữ nguyên` : ''} - Đã đồng bộ CSDL!`, 'success');
             setSelected([]);
+            await reloadDataFromBackend();
             return;
         }
         const floors = new Set(rooms.filter((r) => selected.includes(r.id)).map((r) => r.floor));
@@ -496,59 +499,64 @@ const RoomManagement = () => {
             connecting: form.connecting.trim(),
             note: form.note.trim(),
         };
-        if (backendConnected) {
-            const body = toAPI(payload);
-            const r = modal.mode === 'new'
-                ? await callApi('POST', '', body)
-                : await callApi('PUT', `/${modal.id}`, body);
-            if (!r) return lostConnection();
 
-            // Phát hiện phòng đã bị xóa trong CSDL bởi người khác
-            if (r.status === 404 || r.data?.isRecordDeleted) {
-                setSyncErrorModal({
-                    title: 'CẢNH BÁO: DỮ LIỆU ĐÃ BỊ XÓA KHỎI DATABASE!',
-                    message: `Trong lúc bạn đang thao tác chỉnh sửa, phòng [${form.number}] (ID #${modal.id}) đã bị người khác hoặc tiến trình khác xóa khỏi cơ sở dữ liệu! Thao tác lưu không thể thực hiện.`,
-                    actionText: 'Tải Lại Dữ Liệu & Danh Sách',
-                    onAction: () => {
-                        setSyncErrorModal(null);
-                        reloadDataFromBackend();
-                    },
-                });
-                setRooms((p) => p.filter((x) => x.id !== modal.id));
-                setModal(null);
-                return;
-            }
+        const isNew = modal?.mode === 'new';
+        const body = toAPI(payload);
 
-            // Phát hiện bảng dữ liệu bị mất
-            if (r.data?.isTableMissing) {
-                setSyncErrorModal({
-                    title: 'LỖI CƠ SỞ DỮ LIỆU: BẢNG DỮ LIỆU ĐÃ BỊ XÓA!',
-                    message: 'Bảng dữ liệu physical_rooms không còn tồn tại trong cơ sở dữ liệu MySQL. Vui lòng kiểm tra lại cấu trúc CSDL hoặc tải lại trang.',
-                    actionText: 'Tải Lại Toàn Bộ Trang',
-                    onAction: () => window.location.reload(),
-                });
-                return;
-            }
+        // Luôn luôn gọi API Backend để lưu vào cơ sở dữ liệu MySQL
+        const r = isNew
+            ? await callApi('POST', '', body)
+            : await callApi('PUT', `/${modal?.id}`, body);
 
-            if (!r.ok) {
-                showToast(r.data.message || 'Không thể lưu phòng', 'error');
-                return;
-            }
+        if (r && r.ok) {
             const saved = toUI(r.data.data);
-            setRooms((p) => (modal.mode === 'new' ? [...p, saved] : p.map((x) => (x.id === saved.id ? saved : x))));
-            addLog(modal.mode === 'new' ? `Thêm phòng ${saved.number} (tầng ${saved.floor})` : `Cập nhật phòng ${saved.number}`);
-            showToast(modal.mode === 'new' ? `Đã thêm phòng ${saved.number}.` : `Đã cập nhật phòng ${saved.number}.`);
+            setRooms((p) => (isNew ? [...p, saved] : p.map((x) => (x.id === saved.id ? saved : x))));
+            addLog(isNew ? `Thêm mới phòng ${saved.number} (tầng ${saved.floor})` : `Cập nhật phòng ${saved.number}`);
+            showToast(
+                isNew
+                    ? `Đã thêm mới phòng ${saved.number} thành công và đồng bộ dữ liệu vào CSDL!`
+                    : `Đã cập nhật thông tin phòng ${saved.number} thành công và đồng bộ CSDL!`,
+                'success'
+            );
+            setModal(null);
+            setBackendConnected(true);
+            // Đồng bộ lại toàn bộ danh sách phòng và số liệu thống kê từ MySQL
+            await reloadDataFromBackend();
+            return;
+        }
+
+        // Phát hiện phòng đã bị xóa trong CSDL bởi người khác
+        if (r && (r.status === 404 || r.data?.isRecordDeleted)) {
+            setSyncErrorModal({
+                title: 'CẢNH BÁO: DỮ LIỆU ĐÃ BỊ XÓA KHỎI DATABASE!',
+                message: `Trong lúc bạn đang thao tác chỉnh sửa, phòng [${form.number}] (ID #${modal?.id}) đã bị người khác xóa khỏi cơ sở dữ liệu! Thao tác lưu không thể thực hiện.`,
+                actionText: 'Tải Lại Dữ Liệu & Danh Sách',
+                onAction: () => {
+                    setSyncErrorModal(null);
+                    reloadDataFromBackend();
+                },
+            });
+            setRooms((p) => p.filter((x) => x.id !== modal?.id));
             setModal(null);
             return;
         }
-        if (modal.mode === 'new') {
+
+        // Báo lỗi chi tiết từ backend nếu có
+        if (r && !r.ok) {
+            showToast(r.data?.message || 'Không thể lưu phòng vào CSDL!', 'error');
+            return;
+        }
+
+        // Trường hợp mất kết nối backend hoàn toàn (mạng rớt)
+        lostConnection();
+        if (isNew) {
             setRooms((p) => [...p, { ...payload, id: Date.now() }]);
-            addLog(`Thêm phòng ${payload.number} (tầng ${payload.floor})`);
-            showToast(`Đã thêm phòng ${payload.number}.`);
+            addLog(`Thêm phòng ${payload.number} (cục bộ)`);
+            showToast(`Đã lưu tạm phòng ${payload.number} ở chế độ cục bộ (chưa kết nối được CSDL).`, 'error');
         } else {
-            setRooms((p) => p.map((r) => (r.id === modal.id ? { ...payload, id: modal.id } : r)));
-            addLog(`Cập nhật phòng ${payload.number}`);
-            showToast(`Đã cập nhật phòng ${payload.number}.`);
+            setRooms((p) => p.map((r) => (r.id === modal?.id ? { ...payload, id: modal?.id } : r)));
+            addLog(`Cập nhật phòng ${payload.number} (cục bộ)`);
+            showToast(`Đã cập nhật tạm phòng ${payload.number} ở chế độ cục bộ.`, 'error');
         }
         setModal(null);
     };
@@ -561,37 +569,49 @@ const RoomManagement = () => {
             setDeleteTarget(null);
             return;
         }
-        if (backendConnected) {
-            const res = await callApi('DELETE', `/${r.id}`);
-            if (!res) { setDeleteTarget(null); return lostConnection(); }
 
-            // Phát hiện phòng đã bị xóa trước đó bởi người khác
-            if (res.status === 404 || res.data?.isRecordDeleted) {
-                setSyncErrorModal({
-                    title: 'CẢNH BÁO: PHÒNG ĐÃ BỊ XÓA TRƯỚC ĐÓ!',
-                    message: `Phòng "${r.number}" (ID #${r.id}) đã bị xóa khỏi cơ sở dữ liệu bởi quản trị viên hoặc tiến trình khác! Vui lòng tải lại danh sách.`,
-                    actionText: 'Tải Lại Danh Sách',
-                    onAction: () => {
-                        setSyncErrorModal(null);
-                        reloadDataFromBackend();
-                    },
-                });
-                setRooms((p) => p.filter((x) => x.id !== r.id));
-                setSelected((p) => p.filter((id) => id !== r.id));
-                setDeleteTarget(null);
-                return;
-            }
+        const res = await callApi('DELETE', `/${r.id}`);
 
-            if (!res.ok) {
-                showToast(res.data.message || 'Không thể xóa phòng', 'error');
-                setDeleteTarget(null);
-                return;
-            }
+        if (res && res.ok) {
+            setRooms((p) => p.filter((x) => x.id !== r.id));
+            setSelected((p) => p.filter((id) => id !== r.id));
+            addLog(`Xóa phòng ${r.number}`);
+            showToast(`Đã xóa phòng ${r.number} thành công và đồng bộ dữ liệu khỏi CSDL!`, 'success');
+            setDeleteTarget(null);
+            setBackendConnected(true);
+            await reloadDataFromBackend();
+            return;
         }
+
+        // Phát hiện phòng đã bị xóa trước đó bởi người khác
+        if (res && (res.status === 404 || res.data?.isRecordDeleted)) {
+            setSyncErrorModal({
+                title: 'CẢNH BÁO: PHÒNG ĐÃ BỊ XÓA TRƯỚC ĐÓ!',
+                message: `Phòng "${r.number}" (ID #${r.id}) đã bị xóa khỏi cơ sở dữ liệu bởi quản trị viên hoặc tiến trình khác! Vui lòng tải lại danh sách.`,
+                actionText: 'Tải Lại Danh Sách',
+                onAction: () => {
+                    setSyncErrorModal(null);
+                    reloadDataFromBackend();
+                },
+            });
+            setRooms((p) => p.filter((x) => x.id !== r.id));
+            setSelected((p) => p.filter((id) => id !== r.id));
+            setDeleteTarget(null);
+            return;
+        }
+
+        if (res && !res.ok) {
+            showToast(res.data?.message || 'Không thể xóa phòng khỏi CSDL!', 'error');
+            setDeleteTarget(null);
+            return;
+        }
+
+        // Mất kết nối backend
+        lostConnection();
         setRooms((p) => p.filter((x) => x.id !== r.id));
         setSelected((p) => p.filter((id) => id !== r.id));
-        addLog(`Xóa phòng ${r.number}`);
-        showToast(`Đã xóa phòng ${r.number}.`);
+        addLog(`Xóa phòng ${r.number} (cục bộ)`);
+        showToast(`Đã xóa phòng ${r.number} ở chế độ cục bộ.`, 'error');
         setDeleteTarget(null);
     };
 
@@ -620,13 +640,21 @@ const RoomManagement = () => {
                 {/* Toast */}
                 {toast && (
                     <div
-                        className={`fixed top-20 right-6 z-[200] max-w-md flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-2xl font-label-md text-label-md font-semibold ${toast.type === 'error' ? 'bg-error text-white' : 'bg-admin-primary text-white'
-                            }`}
+                        className={`fixed top-20 right-6 z-[9999] max-w-md flex items-start gap-3 px-5 py-4 rounded-xl shadow-2xl font-label-md text-label-md font-semibold transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${
+                            toast.type === 'error'
+                                ? 'bg-error text-white shadow-error/30'
+                                : 'bg-emerald-600 text-white shadow-emerald-900/30'
+                        }`}
                     >
-                        <span className="material-symbols-outlined text-[20px] flex-shrink-0 mt-0.5">
+                        <span className="material-symbols-outlined text-[24px] flex-shrink-0 mt-0.5">
                             {toast.type === 'error' ? 'error' : 'check_circle'}
                         </span>
-                        <span className="text-body-sm leading-snug">{toast.msg}</span>
+                        <div className="flex flex-col">
+                            <span className="font-bold text-xs uppercase tracking-wider opacity-90">
+                                {toast.type === 'error' ? 'Thông Báo Lỗi' : 'Hệ Thống Đã Đồng Bộ CSDL'}
+                            </span>
+                            <span className="text-body-sm leading-snug mt-0.5">{toast.msg}</span>
+                        </div>
                     </div>
                 )}
 

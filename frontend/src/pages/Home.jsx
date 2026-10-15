@@ -63,7 +63,7 @@ function Home() {
     setShowAllRoomsModal(true);
     if (allRooms.length === 0) {
       setLoadingAllRooms(true);
-      fetch('http://localhost:5000/api/loai-phong?trang_thai=active&limit=200')
+      fetch('http://localhost:5000/api/loai-phong?trang_thai=active')
         .then((res) => res.json())
         .then((json) => {
           if (json.success) {
@@ -287,7 +287,7 @@ function Home() {
                           {/* Badge sức chứa */}
                           <div className="absolute bottom-space-sm right-space-sm px-space-sm py-space-xs bg-surface-container-lowest/90 backdrop-blur-md rounded-lg font-label-sm text-label-sm text-on-surface flex items-center gap-1">
                             <span className="material-symbols-outlined text-secondary text-[16px]">group</span>
-                            Tối đa {room.toi_da_tong || (room.toi_da_nguoi_lon + room.toi_da_tre_em)} khách
+                            Tối đa {room.toi_da_tong || ((room.toi_da_nguoi_lon || 2) + (room.toi_da_tre_em || 1))} khách
                           </div>
                         </div>
                         <div className="p-space-lg flex-1 flex flex-col justify-between">
@@ -737,7 +737,7 @@ function Home() {
                   <span>•</span>
                   <span className="flex items-center gap-1">
                     <span className="material-symbols-outlined text-[16px] text-secondary">group</span>
-                    Tối đa {selectedRoomDetail.toi_da_tong || (selectedRoomDetail.toi_da_nguoi_lon + selectedRoomDetail.toi_da_tre_em)} khách
+                    Tối đa {selectedRoomDetail.toi_da_tong || ((selectedRoomDetail.toi_da_nguoi_lon || 2) + (selectedRoomDetail.toi_da_tre_em || 1))} khách
                   </span>
                   {selectedRoomDetail.dien_tich && (
                     <>
