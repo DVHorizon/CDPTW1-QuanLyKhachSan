@@ -18,7 +18,7 @@ const callApi = async (method, path = '', body) => {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
-      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined,
+      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined,
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && data.success !== false, status: res.status, data };
@@ -178,6 +178,7 @@ const QuanLyTaiKhoan = () => {
   const [modalNhatKy, setModalNhatKy] = useState(false);
   const [modalXacThuc, setModalXacThuc] = useState(false);
   const [modalThuHoi, setModalThuHoi] = useState(false);
+  const [modalCapLaiQuyen, setModalCapLaiQuyen] = useState(false);
   const [modalNhanBan, setModalNhanBan] = useState(false);
 
   // Form nhân viên mới
@@ -351,9 +352,13 @@ const QuanLyTaiKhoan = () => {
       return;
     }
 
-    // Validate số điện thoại nếu có
-    if (phone && !/^[0-9+\s._\-]{8,20}$/.test(phone)) {
-      setLoiFormNVMoi('Số điện thoại chỉ gồm chữ số và ký tự + - . _');
+    // Validate số điện thoại bắt buộc (không được để trống và phải đúng 10 số)
+    if (!phone) {
+      setLoiFormNVMoi('Số điện thoại không được để trống.');
+      return;
+    }
+    if (!/^[0-9]{10}$/.test(phone)) {
+      setLoiFormNVMoi('Số điện thoại phải gồm đúng 10 chữ số (ví dụ: 0912345678).');
       return;
     }
 
@@ -454,6 +459,16 @@ const QuanLyTaiKhoan = () => {
     if (!email) { setLoiFormSua('Địa chỉ email không được để trống.'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setLoiFormSua('Địa chỉ email không đúng định dạng hợp lệ.');
+      return;
+    }
+
+    // Validate số điện thoại bắt buộc (không được để trống và phải đúng 10 số)
+    if (!phone) {
+      setLoiFormSua('Số điện thoại không được để trống.');
+      return;
+    }
+    if (!/^[0-9]{10}$/.test(phone)) {
+      setLoiFormSua('Số điện thoại phải gồm đúng 10 chữ số (ví dụ: 0912345678).');
       return;
     }
 
@@ -659,6 +674,66 @@ const QuanLyTaiKhoan = () => {
       `Thu hồi toàn bộ quyền & đình chỉ tài khoản ${nvDangChon.hoTen}`);
     hienThongBao(`Đã thu hồi quyền truy cập của ${nvDangChon.hoTen} [${nvDangChon.id}].`, 'thong_tin');
     setModalThuHoi(false);
+    taiDuLieuTuBackend();
+  };
+
+  // ─── CẤP LẠI QUYỀN TRUY CẬP (KHÔI PHỤC HOẠT ĐỘNG VÀ QUYỀN RBAC) ───────────
+  const khoiDongCapLaiQuyen = () => {
+    if (!kiemTraQuyenAdmin() || !nvDangChon) return;
+    setModalCapLaiQuyen(true);
+  };
+
+  const xacNhanCapLaiQuyen = async () => {
+    if (!nvDangChon) return;
+    const rawId = nvDangChon.rawId || parseInt(String(nvDangChon.id).replace(/\D/g, ''), 10);
+    const vaiTro = nvDangChon.vaiTro || '';
+
+    // Khôi phục quyền mặc định theo vai trò nhân viên
+    const quyenKhoiPhuc = {
+      quyen_checkin: vaiTro.includes('Lễ Tân') || vaiTro.includes('Trưởng Ca'),
+      quyen_chuyen_phong: vaiTro.includes('Lễ Tân') || vaiTro.includes('Quản Trị'),
+      quyen_the_tu: true,
+      quyen_buong_phong: vaiTro.includes('Buồng') || vaiTro.includes('Dọn'),
+      quyen_night_audit: vaiTro.includes('Kiểm Toán') || vaiTro.includes('Kế Toán'),
+      quyen_he_thong: vaiTro.includes('Quản Trị') || vaiTro.includes('Admin'),
+    };
+
+    const res = await callApi('PUT', `/${rawId}`, {
+      trangThai: 'hoat_dong',
+      quyenHan: quyenKhoiPhuc
+    });
+
+    if (!res) {
+      hienThongBao('Mất kết nối máy chủ MySQL.', 'loi');
+      setModalCapLaiQuyen(false);
+      return;
+    }
+
+    if (res.status === 404 || res.data?.isRecordDeleted) {
+      setModalCapLaiQuyen(false);
+      setSyncErrorModal({
+        title: 'CẢNH BÁO: TÀI KHOẢN ĐÃ BỊ XÓA!',
+        message: `Tài khoản [${nvDangChon.hoTen}] đã bị người khác xóa khỏi database trước đó!`,
+        actionText: 'Tải Lại Danh Sách',
+        onAction: () => {
+          setSyncErrorModal(null);
+          taiDuLieuTuBackend();
+        }
+      });
+      return;
+    }
+
+    if (!res.ok) {
+      hienThongBao(res.data?.message || 'Không thể cấp lại quyền cho tài khoản.', 'loi');
+      setModalCapLaiQuyen(false);
+      return;
+    }
+
+    ghiNhatKy('CẤP LẠI QUYỀN TRUY CẬP', nvDangChon.id,
+      `Cấp lại quyền truy cập & kích hoạt lại tài khoản ${nvDangChon.hoTen}`);
+    hienThongBao(`Đã cấp lại quyền và kích hoạt tài khoản ${nvDangChon.hoTen} [${nvDangChon.id}] thành công!`, 'thanh_cong');
+    setModalCapLaiQuyen(false);
+    setDaCoBanLuu(false);
     taiDuLieuTuBackend();
   };
 
@@ -1064,9 +1139,21 @@ const QuanLyTaiKhoan = () => {
                             </span>
                           </td>
 
-                          {/* Thao Tác (Sửa / Xóa) */}
+                          {/* Thao Tác (Sửa / Xóa / Cấp lại quyền) */}
                           <td className="py-3 px-space-md whitespace-nowrap">
                             <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                              {(nv.trangThai === 'da_thu_hoi' || nv.trangThai === 'tam_dung') && (
+                                <button
+                                  onClick={() => {
+                                    setIdDangChon(nv.id);
+                                    setModalCapLaiQuyen(true);
+                                  }}
+                                  className="p-1.5 rounded-lg hover:bg-admin-primary/15 text-admin-primary transition-colors cursor-pointer"
+                                  title="Cấp lại quyền truy cập cho tài khoản"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                                </button>
+                              )}
                               <button
                                 onClick={() => {
                                   setIdDangChon(nv.id);
@@ -1436,13 +1523,23 @@ const QuanLyTaiKhoan = () => {
                       <span className="material-symbols-outlined text-[18px]">content_copy</span>
                       Nhân Bản Vai Trò
                     </button>
-                    <button
-                      onClick={khoiDongThuHoi}
-                      className="flex items-center justify-center gap-space-xs px-space-md py-space-sm bg-error/5 text-error font-label-lg text-label-lg font-semibold rounded-xl border border-error/25 hover:bg-error/10 transition-all cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">block</span>
-                      Thu Hồi Quyền
-                    </button>
+                    {nvDangChon.trangThai === 'da_thu_hoi' || nvDangChon.trangThai === 'tam_dung' ? (
+                      <button
+                        onClick={khoiDongCapLaiQuyen}
+                        className="flex items-center justify-center gap-space-xs px-space-md py-space-sm bg-admin-primary/10 text-admin-primary hover:bg-admin-primary/20 font-label-lg text-label-lg font-bold rounded-xl border border-admin-primary/30 transition-all cursor-pointer shadow-sm"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                        Cấp Lại Quyền
+                      </button>
+                    ) : (
+                      <button
+                        onClick={khoiDongThuHoi}
+                        className="flex items-center justify-center gap-space-xs px-space-md py-space-sm bg-error/5 text-error font-label-lg text-label-lg font-semibold rounded-xl border border-error/25 hover:bg-error/10 transition-all cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">block</span>
+                        Thu Hồi Quyền
+                      </button>
+                    )}
                   </div>
                 </div>
               </>
@@ -1517,15 +1614,22 @@ const QuanLyTaiKhoan = () => {
               {/* Số điện thoại */}
               <div>
                 <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5 uppercase font-bold">
-                  Số Điện Thoại Liên Hệ
+                  Số Điện Thoại Liên Hệ <span className="text-error">*</span>
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  required
+                  inputMode="numeric"
+                  maxLength={10}
                   value={formNVMoi.phone}
-                  onChange={e => setFormNVMoi(p => ({ ...p, phone: e.target.value }))}
-                  placeholder="VD: 0912345678"
+                  onChange={e => {
+                    const cleanPhone = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormNVMoi(p => ({ ...p, phone: cleanPhone }));
+                  }}
+                  placeholder="VD: 0912345678 (đúng 10 số)"
                   className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-admin-primary focus:ring-1 focus:ring-admin-primary/30 transition-all font-mono"
                 />
+                <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">Bắt buộc nhập số, độ dài đúng 10 số (không được để trống)</p>
               </div>
 
               {/* Phòng Ban */}
@@ -1626,14 +1730,22 @@ const QuanLyTaiKhoan = () => {
               {/* Số điện thoại */}
               <div>
                 <label className="block font-label-md text-label-md text-on-surface-variant mb-1.5 uppercase font-bold">
-                  Số Điện Thoại
+                  Số Điện Thoại <span className="text-error">*</span>
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  required
+                  inputMode="numeric"
+                  maxLength={10}
                   value={formSua.phone}
-                  onChange={e => setFormSua(p => ({ ...p, phone: e.target.value }))}
+                  onChange={e => {
+                    const cleanPhone = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormSua(p => ({ ...p, phone: cleanPhone }));
+                  }}
+                  placeholder="VD: 0912345678 (đúng 10 số)"
                   className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all font-mono"
                 />
+                <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">Bắt buộc nhập số, độ dài đúng 10 số (không được để trống)</p>
               </div>
 
               {/* Phòng Ban */}
@@ -1984,8 +2096,47 @@ const QuanLyTaiKhoan = () => {
           </div>
         </div>
       )}
+      {/* ── Modal 7: Xác Nhận Cấp Lại Quyền ────────────────────────────────── */}
+      {modalCapLaiQuyen && nvDangChon && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface w-full max-w-md rounded-2xl shadow-3 border border-admin-primary/30 overflow-hidden">
+            <div className="flex items-center gap-space-sm px-space-lg py-space-md bg-admin-primary/10 border-b border-admin-primary/20">
+              <span className="material-symbols-outlined text-[22px] text-admin-primary">verified_user</span>
+              <div>
+                <div className="font-title-md text-title-md text-on-surface font-semibold">Cấp Lại Quyền Truy Cập</div>
+                <div className="font-label-sm text-label-sm text-on-surface-variant">Khôi phục quyền truy cập cho nhân viên</div>
+              </div>
+            </div>
+            <div className="p-space-lg space-y-space-md">
+              <p className="font-body-md text-body-md text-on-surface">
+                Bạn có chắc chắn muốn cấp lại quyền và kích hoạt tài khoản cho nhân viên{' '}
+                <strong>{nvDangChon.hoTen}</strong> <span className="font-mono text-on-surface-variant">({nvDangChon.id})</span>?
+              </p>
+              <div className="flex items-start gap-space-sm p-space-md bg-admin-primary/5 border border-admin-primary/20 rounded-xl">
+                <span className="material-symbols-outlined text-[18px] text-admin-primary flex-shrink-0 mt-0.5">check_circle</span>
+                <div className="font-body-sm text-body-sm text-on-surface space-y-1">
+                  <p>Trạng thái tài khoản sẽ chuyển thành <strong>Đang Hoạt Động</strong>.</p>
+                  <p>Các quyền RBAC tiêu chuẩn theo vai trò <strong>{nvDangChon.vaiTro}</strong> sẽ được kích hoạt lại.</p>
+                  <p>Nhân viên có thể đăng nhập và làm việc bình thường ngay lập tức.</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-space-sm pt-space-sm border-t border-outline-variant">
+                <button type="button" onClick={() => setModalCapLaiQuyen(false)}
+                  className="px-space-lg py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-lg text-label-lg font-semibold hover:bg-surface-container-high transition-all cursor-pointer">
+                  Hủy Bỏ
+                </button>
+                <button type="button" onClick={xacNhanCapLaiQuyen}
+                  className="px-space-lg py-2.5 rounded-xl bg-admin-primary text-white font-label-lg text-label-lg font-bold hover:brightness-110 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all cursor-pointer">
+                  Xác Nhận Cấp Lại Quyền
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 };
 
 export default QuanLyTaiKhoan;
+
