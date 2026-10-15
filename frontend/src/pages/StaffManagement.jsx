@@ -18,7 +18,7 @@ const callApi = async (method, path = '', body) => {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
-      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined,
+      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined,
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && data.success !== false, status: res.status, data };

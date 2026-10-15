@@ -170,10 +170,13 @@ router.get('/:id', async (req, res) => {
     if (typeof perms === 'string') {
       try { perms = JSON.parse(perms); } catch (_) { perms = DEFAULT_PERMS; }
     }
+    if (!perms) perms = DEFAULT_PERMS;
+
     let policy = u.SecurityPolicy;
     if (typeof policy === 'string') {
       try { policy = JSON.parse(policy); } catch (_) { policy = DEFAULT_POLICY; }
     }
+    if (!policy) policy = DEFAULT_POLICY;
 
     res.json({
       success: true,
