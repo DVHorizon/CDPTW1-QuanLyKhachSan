@@ -222,6 +222,11 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Địa chỉ email không đúng định dạng hợp lệ' });
     }
 
+    // Validate số điện thoại nếu có (phải gồm đúng 10 chữ số)
+    if (phone && String(phone).trim() && !/^[0-9]{10}$/.test(String(phone).trim())) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại chỉ được chứa chữ số và phải có đúng 10 số' });
+    }
+
     if (!vaiTro || !String(vaiTro).trim()) {
       return res.status(400).json({ success: false, message: 'Phải gán ít nhất một vai trò cho nhân viên mới' });
     }
@@ -342,6 +347,11 @@ router.put('/:id', async (req, res) => {
       if (dup.length > 0) {
         return res.status(409).json({ success: false, message: `Email "${cleanEmail}" đã được dùng bởi nhân viên khác!` });
       }
+    }
+
+    // Validate số điện thoại nếu có cập nhật (phải gồm đúng 10 chữ số)
+    if (phone !== undefined && String(phone).trim() && !/^[0-9]{10}$/.test(String(phone).trim())) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại chỉ được chứa chữ số và phải có đúng 10 số' });
     }
 
     // Chuẩn bị câu lệnh UPDATE

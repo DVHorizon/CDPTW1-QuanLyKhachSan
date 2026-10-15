@@ -351,9 +351,9 @@ const QuanLyTaiKhoan = () => {
       return;
     }
 
-    // Validate số điện thoại nếu có
-    if (phone && !/^[0-9+\s._\-]{8,20}$/.test(phone)) {
-      setLoiFormNVMoi('Số điện thoại chỉ gồm chữ số và ký tự + - . _');
+    // Validate số điện thoại (chỉ cho phép nhập số và phải đúng 10 số)
+    if (phone && !/^[0-9]{10}$/.test(phone)) {
+      setLoiFormNVMoi('Số điện thoại chỉ được chứa chữ số và phải có đúng 10 số (ví dụ: 0912345678).');
       return;
     }
 
@@ -454,6 +454,12 @@ const QuanLyTaiKhoan = () => {
     if (!email) { setLoiFormSua('Địa chỉ email không được để trống.'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setLoiFormSua('Địa chỉ email không đúng định dạng hợp lệ.');
+      return;
+    }
+
+    // Validate số điện thoại (chỉ cho phép nhập số và phải đúng 10 số)
+    if (phone && !/^[0-9]{10}$/.test(phone)) {
+      setLoiFormSua('Số điện thoại chỉ được chứa chữ số và phải có đúng 10 số (ví dụ: 0912345678).');
       return;
     }
 
@@ -1520,12 +1526,18 @@ const QuanLyTaiKhoan = () => {
                   Số Điện Thoại Liên Hệ
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={formNVMoi.phone}
-                  onChange={e => setFormNVMoi(p => ({ ...p, phone: e.target.value }))}
-                  placeholder="VD: 0912345678"
+                  onChange={e => {
+                    const cleanPhone = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormNVMoi(p => ({ ...p, phone: cleanPhone }));
+                  }}
+                  placeholder="VD: 0912345678 (đúng 10 số)"
                   className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-admin-primary focus:ring-1 focus:ring-admin-primary/30 transition-all font-mono"
                 />
+                <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">Chỉ cho phép nhập số và đúng 10 số</p>
               </div>
 
               {/* Phòng Ban */}
@@ -1629,11 +1641,18 @@ const QuanLyTaiKhoan = () => {
                   Số Điện Thoại
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={formSua.phone}
-                  onChange={e => setFormSua(p => ({ ...p, phone: e.target.value }))}
+                  onChange={e => {
+                    const cleanPhone = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormSua(p => ({ ...p, phone: cleanPhone }));
+                  }}
+                  placeholder="VD: 0912345678 (đúng 10 số)"
                   className="w-full px-space-md py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body-md text-body-md text-on-surface focus:outline-none focus:border-admin-primary transition-all font-mono"
                 />
+                <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">Chỉ cho phép nhập số và đúng 10 số</p>
               </div>
 
               {/* Phòng Ban */}
