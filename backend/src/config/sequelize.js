@@ -18,6 +18,13 @@ if (dbConfig.dialect === 'sqlite') {
       port: dbConfig.port || process.env.DB_PORT,
       dialect: dbConfig.dialect || 'mysql',
       logging: dbConfig.logging,
+      dialectOptions: {
+        charset: 'utf8mb4'
+      },
+      define: {
+        charset: 'utf8mb4',
+        collate: 'utf8mb4_unicode_ci'
+      },
       pool: {
         max: 10,
         min: 0,

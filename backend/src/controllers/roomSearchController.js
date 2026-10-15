@@ -500,7 +500,7 @@ exports.searchRooms = async (req, res) => {
         : amenitiesFilter.split(',').map(a => a.trim().toLowerCase());
       if (amenitiesList.length > 0) {
         filteredResults = filteredResults.filter(r =>
-          amenitiesList.some(amenity =>
+          amenitiesList.every(amenity =>
             (r.amenities || []).some(a => a.toLowerCase().includes(amenity))
           )
         );
@@ -683,4 +683,94 @@ exports.suggestRooms = async (req, res) => {
     });
   }
 };
+
+
+/**
+ * Tạo đơn đặt phòng trực tiếp (Booking Creation)
+ * POST /api/v1/rooms/book
+ */
+exports.createBooking = async (req, res) => {
+
+  const transaction = await sequelize.transaction();
+  try {
+    const {
+      roomTypeId,
+      checkInDate,
+      checkOutDate,
+      guestName,
+      guestPhone,
+      guestEmail,
+      specialRequest,
+      adults = 1,
+      children = 0,
+      roomQuantity = 1
+    } = req.body;
+
+    if (!roomTypeId || !checkInDate || !checkOutDate) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        message: 'Vui lòng điền đầy đủ hạng phòng và thời gian lưu trú.'
+      });
+    }
+
+    const roomType = await RoomType.findByPk(roomTypeId, { transaction });
+    if (!roomType) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Hạng phòng không tồn tại.'
+      });
+    }
+
+    const d1 = new Date(checkInDate);
+    const d2 = new Date(checkOutDate);
+    const diffTime = Math.max(d2 - d1, 86400000);
+    const numberOfNights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+    const basePrice = parseFloat(roomType.BasePrice || 0);
+    const totalAmount = numberOfNights * basePrice * (roomQuantity || 1);
+    const confirmationCode = 'GH-' + Math.floor(100000 + Math.random() * 900000);
+
+    const booking = await Booking.create({
+      UserId: req.user?.id || req.user?.UserId || 1,
+      RoomTypeId: roomTypeId,
+      CheckInDate: checkInDate,
+      CheckOutDate: checkOutDate,
+      NumberOfNights: numberOfNights,
+      Adults: adults,
+      Children: children,
+      RoomQuantity: roomQuantity,
+      RoomSubtotal: totalAmount,
+      TotalAmount: totalAmount,
+      Status: 'Confirmed',
+      BookingSource: 'DirectWeb',
+      ConfirmationCode: confirmationCode
+    }, { transaction });
+
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Đặt phòng thành công.',
+      data: {
+        bookingId: booking.BookingId,
+        confirmationCode: booking.ConfirmationCode,
+        totalAmount: booking.TotalAmount,
+        numberOfNights: booking.NumberOfNights
+      }
+    });
+  } catch (error) {
+    if (transaction) await transaction.rollback();
+    console.error('Error creating booking:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: 'Không thể tạo đơn đặt phòng.'
+    });
+  }
+};
+
 
