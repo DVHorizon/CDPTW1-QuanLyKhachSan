@@ -10,6 +10,30 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../config/db');
 
+// Helper chuẩn hoá đối tượng ngày sang chuỗi YYYY-MM-DD
+const toDateStr = (val, fallback = null) => {
+  if (!val) return fallback;
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return fallback;
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    return s.slice(0, 10);
+  }
+  const dt = new Date(val);
+  if (!isNaN(dt.getTime())) {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return fallback;
+};
+
 // Helper broadcast WebSocket
 const emitAvailabilityChange = (req, payload = {}) => {
   try {
@@ -25,14 +49,14 @@ const emitAvailabilityChange = (req, payload = {}) => {
 // ─── 1. GET /api/admin/room-availability ─────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    let { checkIn, checkOut, floor, wing, status, q } = req.query;
+    let { checkIn, checkOut } = req.query;
 
-    // Tự động gán nếu để trống
+    // Tự động gán ngày hôm nay và ngày mai nếu để trống
     const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
+    const todayStr = toDateStr(now);
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+    const tomorrowStr = toDateStr(tomorrow);
 
     if (!checkIn || !String(checkIn).trim()) checkIn = todayStr;
     if (!checkOut || !String(checkOut).trim()) checkOut = tomorrowStr;
@@ -55,7 +79,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    // Truy vấn dữ liệu từ MySQL: Kết hợp Rooms, RoomTypes, Stays, Bookings, Users
+    // Truy vấn dữ liệu thực tế từ MySQL: Kết hợp Rooms, RoomTypes, Stays, Bookings, Users
     const query = `
       SELECT 
         r.RoomId,
@@ -79,20 +103,20 @@ router.get('/', async (req, res) => {
         u.FullName AS GuestName
       FROM Rooms r
       LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
-      LEFT JOIN Stays s ON r.RoomId = s.RoomId AND s.Status = 'Active'
-      LEFT JOIN Bookings b ON (s.BookingId = b.BookingId OR (b.RoomTypeId = r.RoomTypeId AND b.Status IN ('Confirmed', 'CheckedIn') AND b.CheckInDate <= ? AND b.CheckOutDate >= ?))
+      LEFT JOIN Stays s ON r.RoomId = s.RoomId AND s.Status IN ('CheckedIn', 'Active')
+      LEFT JOIN Bookings b ON s.BookingId = b.BookingId
       LEFT JOIN Users u ON b.UserId = u.UserId
       WHERE r.IsDeleted = 0
       ORDER BY r.Floor ASC, r.RoomNumber ASC
     `;
 
-    const [rows] = await pool.query(query, [checkOut, checkIn]);
+    const [rows] = await pool.query(query);
 
     // Chuẩn hoá dữ liệu trả về cho frontend RoomAvailability.jsx
     const roomsMap = new Map();
 
     for (const r of rows) {
-      if (roomsMap.has(r.RoomId)) continue; // lấy bản ghi booking đầu tiên nếu có nhiều
+      if (roomsMap.has(r.RoomId)) continue; // tránh lặp nếu có nhiều dòng join
 
       // Xác định Wing: từ Description "KHU-A", hoặc chữ cái trong số phòng, hoặc chẵn/lẻ
       let wingVal = 'A';
@@ -112,26 +136,28 @@ router.get('/', async (req, res) => {
       let statusVal = 'available';
       if (r.RawStatus === 'OutOfOrder') {
         statusVal = 'ooo';
-      } else if (r.RawStatus === 'DirtyVacant' || r.RawStatus === 'DirtyOccupied') {
+      } else if (r.RawStatus === 'DirtyVacant' || r.RawStatus === 'DirtyOccupied' || r.RawStatus === 'Dirty') {
         statusVal = 'dirty';
-      } else if (r.RawStatus === 'CleanOccupied') {
-        statusVal = 'available'; // Frontend sẽ tự derive thành 'occupied' nhờ booking
       } else {
         statusVal = 'available';
       }
 
       // Xác định booking nếu có
       let bookingObj = null;
-      if (r.BookingId || r.StayId) {
+      if (r.StayId || r.BookingId) {
+        const inDate = toDateStr(r.CheckInDate) || toDateStr(r.ActualCheckIn) || checkIn;
+        const outDate = toDateStr(r.CheckOutDate) || toDateStr(r.ExpectedCheckOut) || checkOut;
+        const isCheckedIn = (r.StayStatus === 'CheckedIn' || r.StayStatus === 'Active' || r.BookingStatus === 'CheckedIn');
+
         bookingObj = {
           id: r.BookingId ? `BK-${r.BookingId}` : `ST-${r.StayId}`,
           guestName: r.GuestName || 'Khách Lưu Trú',
           confirmationNo: r.ConfirmationCode || `CONF-${r.BookingId || r.StayId}`,
-          checkIn: r.CheckInDate ? String(r.CheckInDate).slice(0, 10) : (r.ActualCheckIn ? String(r.ActualCheckIn).slice(0, 10) : checkIn),
-          checkOut: r.CheckOutDate ? String(r.CheckOutDate).slice(0, 10) : (r.ExpectedCheckOut ? String(r.ExpectedCheckOut).slice(0, 10) : checkOut),
-          status: (r.StayStatus === 'Active' || r.BookingStatus === 'CheckedIn') ? 'checked_in' : 'confirmed',
-          balance: Number(r.TotalAmount || 0) - Number(r.DepositAmount || 0),
-          keys: r.StayStatus === 'Active' ? 2 : 0
+          checkIn: inDate,
+          checkOut: outDate,
+          status: isCheckedIn ? 'checked_in' : 'confirmed',
+          balance: Math.max(0, Number(r.TotalAmount || 0) - Number(r.DepositAmount || 0)),
+          keys: isCheckedIn ? 2 : 0
         };
       }
 
@@ -200,27 +226,28 @@ router.post('/:id/action', async (req, res) => {
     // Xử lý từng hành động
     if (action === 'clean') {
       // Dọn phòng: từ Dirty -> Clean
-      if (room.Status !== 'DirtyVacant' && room.Status !== 'DirtyOccupied') {
+      if (room.Status !== 'DirtyVacant' && room.Status !== 'DirtyOccupied' && room.Status !== 'Dirty') {
         return res.status(400).json({
           success: false,
           message: `Phòng ${room.RoomNumber} hiện không ở trạng thái bẩn chờ dọn (Trạng thái hiện tại: ${room.Status})`
         });
       }
 
-      const nextStatus = room.Status === 'DirtyOccupied' ? 'CleanOccupied' : 'CleanAvailable';
+      const [stayCheck] = await pool.query('SELECT StayId FROM Stays WHERE RoomId = ? AND Status IN ("Active", "CheckedIn") LIMIT 1', [rawId]);
+      const nextStatus = stayCheck.length > 0 ? 'Occupied' : 'CleanAvailable';
       await pool.query('UPDATE Rooms SET Status = ?, UpdatedAt = NOW() WHERE RoomId = ?', [nextStatus, rawId]);
 
-      emitAvailabilityChange(req, { roomId: rawId, action: 'clean' });
+      emitAvailabilityChange(req, { roomId: rawId, action: 'clean', status: nextStatus });
       return res.json({
         success: true,
-        message: `Đã giao buồng phòng và cập nhật phòng ${room.RoomNumber} thành sạch sẽ!`,
+        message: `Đã hoàn tất dọn phòng ${room.RoomNumber} và cập nhật sang trạng thái sạch sẽ!`,
         data: { roomId: rawId, status: nextStatus }
       });
     }
 
     if (action === 'checkout') {
-      // Trả phòng: kiểm tra có Stay Active không
-      const [stayRows] = await pool.query('SELECT StayId, BookingId FROM Stays WHERE RoomId = ? AND Status = "Active" LIMIT 1', [rawId]);
+      // Trả phòng: kiểm tra có Stay CheckedIn không
+      const [stayRows] = await pool.query('SELECT StayId, BookingId FROM Stays WHERE RoomId = ? AND Status IN ("Active", "CheckedIn") LIMIT 1', [rawId]);
       if (stayRows.length === 0) {
         return res.status(400).json({
           success: false,
@@ -230,25 +257,25 @@ router.post('/:id/action', async (req, res) => {
 
       const stay = stayRows[0];
       // Hoàn tất Stay
-      await pool.query('UPDATE Stays SET Status = "Completed", ActualCheckOut = NOW(), UpdatedAt = NOW() WHERE StayId = ?', [stay.StayId]);
+      await pool.query('UPDATE Stays SET Status = "CheckedOut", ActualCheckOut = NOW(), UpdatedAt = NOW() WHERE StayId = ?', [stay.StayId]);
       // Cập nhật Booking
       if (stay.BookingId) {
         await pool.query('UPDATE Bookings SET Status = "CheckedOut", UpdatedAt = NOW() WHERE BookingId = ?', [stay.BookingId]);
       }
-      // Chuyển phòng thành Bẩn chờ dọn
-      await pool.query('UPDATE Rooms SET Status = "DirtyVacant", UpdatedAt = NOW() WHERE RoomId = ?', [rawId]);
+      // Chuyển phòng thành Bẩn chờ dọn (Dirty)
+      await pool.query('UPDATE Rooms SET Status = "Dirty", UpdatedAt = NOW() WHERE RoomId = ?', [rawId]);
 
-      emitAvailabilityChange(req, { roomId: rawId, action: 'checkout' });
+      emitAvailabilityChange(req, { roomId: rawId, action: 'checkout', status: 'Dirty' });
       return res.json({
         success: true,
         message: `Đã hoàn tất thanh toán & trả phòng cho phòng ${room.RoomNumber}. Phòng đã chuyển sang trạng thái bẩn chờ dọn!`,
-        data: { roomId: rawId, status: 'DirtyVacant' }
+        data: { roomId: rawId, status: 'Dirty' }
       });
     }
 
     if (action === 'key') {
-      // Tạo thẻ từ: kiểm tra có khách không
-      const [stayRows] = await pool.query('SELECT StayId FROM Stays WHERE RoomId = ? AND Status = "Active" LIMIT 1', [rawId]);
+      // Cấp thêm thẻ từ: kiểm tra có khách không
+      const [stayRows] = await pool.query('SELECT StayId FROM Stays WHERE RoomId = ? AND Status IN ("Active", "CheckedIn") LIMIT 1', [rawId]);
       if (stayRows.length === 0) {
         return res.status(400).json({
           success: false,
@@ -266,12 +293,31 @@ router.post('/:id/action', async (req, res) => {
 
     if (action === 'ooo') {
       // Khóa kỹ thuật bảo trì OOO
+      const [stayRows] = await pool.query('SELECT StayId FROM Stays WHERE RoomId = ? AND Status IN ("Active", "CheckedIn") LIMIT 1', [rawId]);
+      if (stayRows.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Không thể khóa phòng ${room.RoomNumber} vì hiện đang có khách lưu trú!`
+        });
+      }
+
       await pool.query('UPDATE Rooms SET Status = "OutOfOrder", UpdatedAt = NOW() WHERE RoomId = ?', [rawId]);
-      emitAvailabilityChange(req, { roomId: rawId, action: 'ooo' });
+      emitAvailabilityChange(req, { roomId: rawId, action: 'ooo', status: 'OutOfOrder' });
       return res.json({
         success: true,
         message: `Đã khóa phòng ${room.RoomNumber} vào diện kỹ thuật bảo trì (Out Of Order)!`,
         data: { roomId: rawId, status: 'OutOfOrder' }
+      });
+    }
+
+    if (action === 'available') {
+      // Mở khóa OOO -> CleanAvailable
+      await pool.query('UPDATE Rooms SET Status = "CleanAvailable", UpdatedAt = NOW() WHERE RoomId = ?', [rawId]);
+      emitAvailabilityChange(req, { roomId: rawId, action: 'available', status: 'CleanAvailable' });
+      return res.json({
+        success: true,
+        message: `Đã mở khóa phòng ${room.RoomNumber} và chuyển sang trạng thái sẵn sàng đón khách!`,
+        data: { roomId: rawId, status: 'CleanAvailable' }
       });
     }
 

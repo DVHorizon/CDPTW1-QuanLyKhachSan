@@ -8,8 +8,30 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const iso = (d) => d.toISOString().slice(0, 10);
 const addDays = (s, n) => { const d = new Date(s); d.setDate(d.getDate() + n); return iso(d); };
 const today = iso(new Date());
-const d10 = (v) => String(v).slice(0, 10);
-const vd = (s) => d10(s).split('-').reverse().join('/');
+const d10 = (v) => {
+    if (!v) return '';
+    const str = String(v).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+    const dt = new Date(str);
+    if (!isNaN(dt.getTime())) return iso(dt);
+    return str.slice(0, 10);
+};
+const vd = (s) => {
+    if (!s) return '—';
+    const str = String(s).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const parts = str.slice(0, 10).split('-');
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    const dt = new Date(str);
+    if (!isNaN(dt.getTime())) {
+        const d = String(dt.getDate()).padStart(2, '0');
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const y = dt.getFullYear();
+        return `${d}/${m}/${y}`;
+    }
+    return str;
+};
 const vnd = (n) => `${Number(n || 0).toLocaleString('vi-VN')} đ`;
 
 const CSS = `
@@ -194,12 +216,15 @@ export default function RoomAvailability() {
         if (kind === 'out' && !b) {
             return setNotice(`Phòng ${n} chưa có khách để làm thủ tục trả phòng.`);
         }
+        if (kind === 'ooo' && b) {
+            return setNotice(`Phòng ${n} đang có khách lưu trú, không thể khóa bảo trì.`);
+        }
         if (kind === 'detail') {
             return setNotice(b ? `Mã xác nhận #${b.confirmationNo} · Khách: ${b.guestName} · ${vd(b.checkIn)} → ${vd(b.checkOut)}` : `Phòng ${n} đang trống sẵn sàng đón khách.`);
         }
 
         try {
-            const actionMap = { clean: 'clean', key: 'key', out: 'checkout' };
+            const actionMap = { clean: 'clean', key: 'key', out: 'checkout', ooo: 'ooo', available: 'available' };
             const res = await fetch(`${API}/api/admin/room-availability/${sel.id}/action`, {
                 method: 'POST',
                 headers: {
@@ -330,6 +355,15 @@ export default function RoomAvailability() {
                                     <button onClick={() => act('clean')} disabled={sel.state !== 'dirty'}>Lệnh Dọn Buồng</button>
                                     <button onClick={() => act('key')} disabled={!b}>Tạo Thẻ E-Key</button>
                                     <button className="pri" onClick={() => act('out')} disabled={!b}>Thanh Toán &amp; Trả Phòng</button>
+                                    {sel.state === 'ooo' ? (
+                                        <button onClick={() => act('available')} style={{ gridColumn: 'span 2', background: 'var(--g)', color: '#fff' }}>
+                                            ✓ Mở Khóa Kỹ Thuật (Sẵn Sàng Đón Khách)
+                                        </button>
+                                    ) : !b ? (
+                                        <button onClick={() => act('ooo')} style={{ gridColumn: 'span 2', background: 'var(--xs)', color: 'var(--x)' }}>
+                                            🔧 Khóa Kỹ Thuật Bảo Trì (OOO)
+                                        </button>
+                                    ) : null}
                                 </div>
                             </section>
                         )}

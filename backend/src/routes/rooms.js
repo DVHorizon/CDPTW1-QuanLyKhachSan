@@ -24,9 +24,13 @@ function encodeStatus(buong_phong, luu_tru) {
 function decodeStatus(status) {
   switch (status) {
     case 'OutOfOrder':     return { buong_phong: 'ooo',   luu_tru: 'vacant' };
-    case 'CleanOccupied':  return { buong_phong: 'clean', luu_tru: 'inhouse' };
+    case 'CleanOccupied':
+    case 'Occupied':       return { buong_phong: 'clean', luu_tru: 'inhouse' };
     case 'DirtyOccupied':  return { buong_phong: 'dirty', luu_tru: 'inhouse' };
-    case 'DirtyVacant':    return { buong_phong: 'dirty', luu_tru: 'vacant' };
+    case 'DirtyVacant':
+    case 'Dirty':          return { buong_phong: 'dirty', luu_tru: 'vacant' };
+    case 'Inspected':
+    case 'CleanAvailable':
     default:               return { buong_phong: 'clean', luu_tru: 'vacant' };
   }
 }
