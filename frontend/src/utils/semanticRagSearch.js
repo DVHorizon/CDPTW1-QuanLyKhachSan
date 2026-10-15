@@ -15,10 +15,6 @@
 /**
  * Loại bỏ dấu tiếng Việt chuẩn
  */
-const str = (v) => (v == null ? '' : String(v));
-const lower = (v) => str(v).toLowerCase();
-const has = (list, item) =>
-  Array.isArray(list) ? list.includes(item) : typeof list === 'string' ? list.includes(item) : false;
 
 export function removeVietnameseDiacritics(str = '') {
   if (!str) return '';
@@ -502,30 +498,30 @@ export function generateRagAnswer(query = '', topRooms = []) {
     answerContent = `${intentSummary}, hệ thống AI đã phân tích cơ sở dữ liệu khách sạn và gợi ý lựa chọn tối ưu nhất là [${bestMatch.code}] - ${bestMatch.name}. `;
 
     // Nêu lý do vì sao phù hợp
-    const reasonsStr = bestMatch.matchedReasons.slice(0, 3).join(', ');
+    const reasonsStr = (bestMatch.matchedReasons || []).slice(0, 3).join(', ');
     if (reasonsStr) {
       answerContent += `Phòng này đáp ứng xuất sắc các tiêu chí (${reasonsStr}). `;
     }
 
-    answerContent += `Thông số chính: Diện tích ${bestMatch.area} m², quy cách ${bestMatch.bedding}, hướng nhìn ${bestMatch.view}, sức chứa ${bestMatch.maxAdults} người lớn + ${bestMatch.maxChildren} trẻ em với mức giá niêm yết ${Number(bestMatch.baseRate).toLocaleString('vi-VN')} ₫/đêm.`;
+    answerContent += `Thông số chính: Diện tích ${bestMatch.area || 0} m², quy cách ${bestMatch.bedding || 'Tiêu chuẩn'}, hướng nhìn ${bestMatch.view || 'Thoáng đãng'}, sức chứa ${bestMatch.maxAdults || 2} người lớn + ${bestMatch.maxChildren || 0} trẻ em với mức giá niêm yết ${Number(bestMatch.baseRate || 0).toLocaleString('vi-VN')} ₫/đêm.`;
 
     recommendations.push({
       room: bestMatch,
-      highlight: `Lựa chọn số 1: [${bestMatch.code}] với điểm tương thích ${bestMatch.semanticScore}%`,
+      highlight: `Lựa chọn số 1: [${bestMatch.code || ''}] với điểm tương thích ${bestMatch.semanticScore || 100}%`,
     });
   }
 
-  if (secondMatch && secondMatch.semanticScore >= 30) {
-    answerContent += `\n\nNgoài ra, bạn cũng có thể cân nhắc thêm [${secondMatch.code}] - ${secondMatch.name} (${Number(secondMatch.baseRate).toLocaleString('vi-VN')} ₫/đêm). `;
-    if (secondMatch.baseRate < bestMatch.baseRate) {
-      answerContent += `Đây là phương án giúp tiết kiệm hơn ${(Number(bestMatch.baseRate) - Number(secondMatch.baseRate)).toLocaleString('vi-VN')} ₫/đêm mà vẫn đảm bảo tiện nghi chuẩn resort.`;
+  if (secondMatch && (secondMatch.semanticScore || 0) >= 30) {
+    answerContent += `\n\nNgoài ra, bạn cũng có thể cân nhắc thêm [${secondMatch.code || ''}] - ${secondMatch.name || ''} (${Number(secondMatch.baseRate || 0).toLocaleString('vi-VN')} ₫/đêm). `;
+    if ((secondMatch.baseRate || 0) < (bestMatch.baseRate || 0)) {
+      answerContent += `Đây là phương án giúp tiết kiệm hơn ${(Number(bestMatch.baseRate || 0) - Number(secondMatch.baseRate || 0)).toLocaleString('vi-VN')} ₫/đêm mà vẫn đảm bảo tiện nghi chuẩn resort.`;
     } else {
-      answerContent += `Đây là phương án mở rộng không gian với diện tích ${secondMatch.area} m² và dịch vụ cao cấp hơn.`;
+      answerContent += `Đây là phương án mở rộng không gian với diện tích ${secondMatch.area || 0} m² và dịch vụ cao cấp hơn.`;
     }
 
     recommendations.push({
       room: secondMatch,
-      highlight: `Lựa chọn số 2: [${secondMatch.code}] - Điểm tương thích ${secondMatch.semanticScore}%`,
+      highlight: `Lựa chọn số 2: [${secondMatch.code || ''}] - Điểm tương thích ${secondMatch.semanticScore || 0}%`,
     });
   }
 

@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
-import AdminLayout from '../components/layout/AdminLayout';
+import AdminLayout from '../components/admin/layout/AdminLayout';
 import {
   performSemanticSearch,
   generateRagAnswer,
   trackUserInteraction,
-  getUserPreferences,
 } from '../utils/semanticRagSearch';
 
 
@@ -215,16 +214,7 @@ const QUICK_SEMANTIC_PROMPTS = [
 // =============================================================================
 const RoomTypeManagement = () => {
   // Quản lý danh sách loại phòng với LocalStorage đồng bộ
-  const [roomTypes, setRoomTypes] = useState(() => {
-    try {
-      const saved = localStorage.getItem('qlks_room_types');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (_) { }
-    return INITIAL_ROOM_TYPES;
-  });
+  const [roomTypes, setRoomTypes] = useState(INITIAL_ROOM_TYPES);
 
   const [selectedId, setSelectedId] = useState(2);
   const [form, setForm] = useState({ ...INITIAL_ROOM_TYPES[1] });
@@ -277,8 +267,10 @@ const RoomTypeManagement = () => {
     } catch (_) { }
   }, [roomTypes]);
 
-  // Thử kết nối backend API khi tải trang
+  // Luôn fetch từ Backend khi tải trang (ưu tiên DB hơn localStorage)
   useEffect(() => {
+    // Xóa cache cũ để tránh hiển thị dữ liệu mẫu thay vì dữ liệu thật từ DB
+    localStorage.removeItem('qlks_room_types');
     fetchFromBackend();
   }, []);
 
@@ -286,8 +278,8 @@ const RoomTypeManagement = () => {
     setIsSyncing(true);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-      const res = await fetch(`${API_BASE_URL}?limit=200`, { signal: controller.signal });
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(API_BASE_URL, { signal: controller.signal });
       clearTimeout(timeoutId);
 
       if (res.ok) {
@@ -297,7 +289,7 @@ const RoomTypeManagement = () => {
             id: r.id,
             code: r.ma_loai,
             name: r.ten_loai,
-            subtitle: r.tang_vi_tri ? `Tầng: ${r.tang_vi_tri}` : '',
+            subtitle: r.tang_vi_tri ? `Tầng: ${r.tang_vi_tri}` : (r.huong_view || ''),
             status: r.trang_thai,
             floors: r.tang_vi_tri || '',
             maxAdults: r.toi_da_nguoi_lon || 2,
@@ -618,7 +610,10 @@ const RoomTypeManagement = () => {
       setRoomTypes((p) =>
         p.map((r) => (r.id === selectedId ? { ...payload, id: selectedId } : r))
       );
-      showToast(`Đã cập nhật thành công loại phòng "${payload.name}".`, 'success');
+      showToast(`Đã cập nhật thành công loại phòng "${payload.name}" và đồng bộ CSDL!`, 'success');
+      if (backendConnected) {
+        fetchFromBackend();
+      }
     } else {
       let newId = Date.now();
 
@@ -784,7 +779,11 @@ const RoomTypeManagement = () => {
     const remaining = roomTypes.filter((r) => r.id !== selectedId);
     setRoomTypes(remaining);
     setShowDeleteConfirm(false);
-    showToast(`Đã xóa loại phòng "${currentName}" thành công.`, 'success');
+    showToast(`Đã xóa loại phòng "${currentName}" thành công và đồng bộ CSDL!`, 'success');
+
+    if (backendConnected) {
+      fetchFromBackend();
+    }
 
     if (remaining.length > 0) {
       selectRow(remaining[0]);

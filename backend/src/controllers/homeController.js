@@ -1,142 +1,90 @@
-const pool = require('../config/db');
+const { Branch, RoomType, Room, Amenity, User, Booking, Review } = require('../models');
 
-// Fallback images cho phòng không có ảnh
-const FALLBACK_IMAGES = [
-  'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=1200&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?q=80&w=1200&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?q=80&w=1200&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?q=80&w=1200&auto=format&fit=crop',
-];
-
-// Gán Category dựa vào tên phòng / sức chứa
-function inferCategory(typeName, maxOccupancy) {
-  const name = (typeName || '').toLowerCase();
-  if (name.includes('villa') || name.includes('biệt thự') || name.includes('bungalow')) return 'villa';
-  if (name.includes('suite') || name.includes('penthouse') || name.includes('presidential')) return 'suite';
-  if (name.includes('family') || name.includes('gia đình') || (maxOccupancy >= 4)) return 'family';
-  return 'deluxe';
-}
-
-// Gán ViewType dựa vào tên phòng
-function inferViewType(typeName) {
-  const name = (typeName || '').toLowerCase();
-  if (name.includes('ocean') || name.includes('biển') || name.includes('beach')) return 'Trực diện biển';
-  if (name.includes('garden') || name.includes('vườn')) return 'Vườn nhiệt đới';
-  if (name.includes('pool') || name.includes('hồ bơi')) return 'Hướng hồ bơi';
-  if (name.includes('mountain') || name.includes('núi')) return 'Hướng núi';
-  return 'Cảnh quan resort';
-}
-
-// Gán Badge dựa vào category
-function inferBadge(category, idx) {
-  const badges = {
-    villa: 'Biệt Thự Cao Cấp',
-    suite: 'Suite 5 Sao',
-    family: 'Dành Cho Gia Đình',
-    deluxe: 'Grand Horizon 5 Sao',
+// ─── Helper: Map RoomType DB record → Vietnamese field names (đồng bộ với /api/loai-phong) ───
+function toUIFormat(r) {
+  let tien_ich = [];
+  try { tien_ich = r.Amenities ? JSON.parse(r.Amenities) : []; } catch (_) {}
+  return {
+    id:                 r.RoomTypeId,
+    ma_loai:            r.TypeCode || String(r.RoomTypeId),
+    ten_loai:           r.TypeName,
+    mo_ta:              r.Description || '',
+    hinh_anh:           r.ImageUrl || '',
+    dien_tich:          r.AreaSqm   ?? null,
+    so_phong_ton_kho:   r.TotalRooms || 0,
+    gia_co_ban:         parseFloat(r.BasePrice) || 0,
+    loai_giuong:        r.BedType   || '1 Giường King (2m x 2m)',
+    huong_view:         r.ViewType  || 'Hướng Biển (Ocean View)',
+    tang_vi_tri:        r.FloorRange || null,
+    toi_da_nguoi_lon:   r.AdultCapacity  || 2,
+    toi_da_tre_em:      r.ChildCapacity  || 1,
+    toi_da_tong:        r.MaxOccupancy   || (r.AdultCapacity || 2) + (r.ChildCapacity || 1),
+    thoi_gian_don_phong: r.TurnoverMinutes || 30,
+    he_so_cuoi_tuan:    parseFloat(r.WeekendMultiplier) || 1.0,
+    tien_ich,
+    trang_thai:         r.Status === 'Active' ? 'active' : 'inactive',
+    // Alias cho guest search
+    RoomTypeId:  r.RoomTypeId,
+    TypeName:    r.TypeName,
+    BasePrice:   parseFloat(r.BasePrice) || 0,
+    ImageUrl:    r.ImageUrl || '',
+    MaxOccupancy: r.MaxOccupancy || 2,
   };
-  return badges[category] || 'Grand Horizon 5 Sao';
 }
 
 /**
- * Controller: Xử lý nghiệp vụ cho Trang chủ (dùng mysql2/promise để đảm bảo encoding utf8mb4)
+ * GET /api/home — Dữ liệu tổng hợp cho Trang chủ
  */
 exports.getHomeData = async (req, res) => {
   try {
-    // 1. Lấy danh sách Chi Nhánh hoạt động
-    const [branches] = await pool.query(
-      'SELECT BranchId, BranchName, Address, Phone, Status FROM Branches WHERE Status = ? ORDER BY BranchId ASC LIMIT 10',
-      ['Active']
-    );
-
-    // 2. Lấy danh sách Hạng Phòng nổi bật
-    const [roomTypesRaw] = await pool.query(
-      'SELECT RoomTypeId, TypeName, Description, BasePrice, MaxOccupancy, AdultCapacity, ChildCapacity, ImageUrl, Status FROM RoomTypes WHERE Status = ? AND IsDeleted = 0 ORDER BY RoomTypeId ASC LIMIT 6',
-      ['Active']
-    );
-
-    // Enrich dữ liệu RoomType với các trường frontend cần
-    const featuredRoomTypes = roomTypesRaw.map((rt, idx) => {
-      const category = inferCategory(rt.TypeName, rt.MaxOccupancy);
-      const imageUrl = rt.ImageUrl || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];
-      return {
-        RoomTypeId: rt.RoomTypeId,
-        TypeName: rt.TypeName,
-        Description: rt.Description,
-        BasePrice: parseFloat(rt.BasePrice),
-        MaxOccupancy: rt.MaxOccupancy,
-        AdultCapacity: rt.AdultCapacity,
-        ChildCapacity: rt.ChildCapacity,
-        ImageUrl: imageUrl,
-        Status: rt.Status,
-        Category: category,
-        ViewType: inferViewType(rt.TypeName),
-        Badge: inferBadge(category, idx),
-        SizeM2: 55 + idx * 15, // Ước lượng diện tích theo thứ tự
-        BedType: rt.AdultCapacity <= 2 ? '1 Giường King' : '1 Giường King + Giường phụ',
-        Rating: 4.8 + (idx % 3) * 0.1,
-        TotalReviews: 42 + idx * 17,
-        Gallery: [imageUrl],
-      };
-    });
-
-    // 3. Lấy danh sách Tiện nghi cao cấp
-    const [amenities] = await pool.query(
-      'SELECT AmenityId, AmenityName, Description, IconUrl FROM Amenities ORDER BY AmenityId ASC LIMIT 8'
-    );
-
-    // 4. Lấy Đánh giá từ khách hàng
-    let reviews = [];
-    try {
-      const [reviewRows] = await pool.query(
-        `SELECT r.ReviewId, r.ReviewTitle, r.ReviewBody, r.OverallRating, r.TripClassification, r.CreatedAt,
-                u.FullName AS ReviewerName
-         FROM Reviews r
-         LEFT JOIN Users u ON r.UserId = u.UserId
-         ORDER BY r.ReviewId ASC LIMIT 4`
-      );
-      reviews = reviewRows.map(r => ({
-        ReviewId: r.ReviewId,
-        ReviewTitle: r.ReviewTitle,
-        ReviewBody: r.ReviewBody,
-        OverallRating: r.OverallRating,
-        TripClassification: r.TripClassification,
-        CreatedAt: r.CreatedAt,
-        ReviewerName: r.ReviewerName || 'Thượng Khách VIP',
-      }));
-    } catch (e) {
-      // Reviews table có thể chưa có dữ liệu
-    }
-
-    // 5. Thống kê tổng thể
-    let stats = { totalRooms: 0, totalBookings: 0, totalBranches: branches.length, avgRating: 5.0 };
-    try {
-      const [[roomCount]] = await pool.query('SELECT COUNT(*) AS cnt FROM Rooms WHERE IsDeleted = 0');
-      const [[bookingCount]] = await pool.query('SELECT COUNT(*) AS cnt FROM Bookings');
-      stats.totalRooms = roomCount.cnt;
-      stats.totalBookings = bookingCount.cnt;
-    } catch (e) { /* ignore */ }
+    const [branches, roomTypesRaw, amenities, reviews, totalRooms, totalBookings, totalBranches] =
+      await Promise.all([
+        Branch.findAll({
+          where: { Status: 'Active' },
+          attributes: ['BranchId', 'BranchName', 'Address', 'Phone', 'Status'],
+          order: [['BranchId', 'ASC']], limit: 10
+        }),
+        RoomType.findAll({
+          where: { Status: 'Active', IsDeleted: false },
+          order: [['RoomTypeId', 'ASC']], limit: 6
+        }),
+        Amenity.findAll({
+          attributes: ['AmenityId', 'AmenityName', 'Description', 'IconUrl'],
+          order: [['AmenityId', 'ASC']], limit: 8
+        }),
+        Review.findAll({
+          attributes: ['ReviewId', 'ReviewTitle', 'ReviewBody', 'OverallRating', 'TripClassification', 'CreatedAt'],
+          include: [{ model: User, as: 'user', attributes: ['FullName'] }],
+          order: [['ReviewId', 'ASC']], limit: 4
+        }),
+        Room.count({ where: { IsDeleted: false } }),
+        Booking.count(),
+        Branch.count({ where: { Status: 'Active' } }),
+      ]);
 
     return res.status(200).json({
       success: true,
       message: 'Lấy dữ liệu trang chủ thành công',
       data: {
         branches,
-        featuredRoomTypes,
+        // featuredRoomTypes dùng Vietnamese field names — đồng bộ với /api/loai-phong
+        featuredRoomTypes: roomTypesRaw.map(toUIFormat),
         amenities,
-        reviews,
-        stats,
+        reviews: reviews.map(r => ({
+          ReviewId: r.ReviewId,
+          ReviewTitle: r.ReviewTitle,
+          ReviewBody: r.ReviewBody,
+          OverallRating: r.OverallRating,
+          TripClassification: r.TripClassification,
+          CreatedAt: r.CreatedAt,
+          ReviewerName: r.user?.FullName || 'Thượng Khách VIP',
+        })),
+        stats: { totalRooms, totalBookings, totalBranches, avgRating: 5.0 },
       },
     });
   } catch (error) {
     console.error('Lỗi trong homeController:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi máy chủ khi lấy dữ liệu trang chủ',
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: error.message });
   }
 };
 
@@ -145,7 +93,9 @@ exports.getHomeData = async (req, res) => {
  */
 exports.getBranches = async (req, res) => {
   try {
-    const [branches] = await pool.query('SELECT * FROM Branches ORDER BY BranchId ASC');
+    const branches = await Branch.findAll({
+      order: [['BranchId', 'ASC']]
+    });
     return res.status(200).json({ success: true, data: branches });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
@@ -158,10 +108,11 @@ exports.getBranches = async (req, res) => {
 exports.getRoomTypes = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 12;
-    const [roomTypes] = await pool.query(
-      'SELECT * FROM RoomTypes WHERE Status = ? AND IsDeleted = 0 ORDER BY RoomTypeId ASC LIMIT ?',
-      ['Active', limit]
-    );
+    const roomTypes = await RoomType.findAll({
+      where: { Status: 'Active', IsDeleted: false },
+      order: [['RoomTypeId', 'ASC']],
+      limit
+    });
     return res.status(200).json({ success: true, data: roomTypes });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
