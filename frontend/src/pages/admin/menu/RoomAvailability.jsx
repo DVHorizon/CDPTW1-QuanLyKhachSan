@@ -108,7 +108,9 @@ function derive(room) {
 const nightsOf = (b) => Math.max(1, Math.round((new Date(d10(b.checkOut)) - new Date(d10(b.checkIn))) / 864e5));
 
 export default function RoomAvailability() {
-    const range = useMemo(() => ({ checkIn: today, checkOut: addDays(today, 1) }), []);
+    const [checkIn, setCheckIn] = useState(today);
+    const [checkOut, setCheckOut] = useState(addDays(today, 1));
+    const range = useMemo(() => ({ checkIn, checkOut }), [checkIn, checkOut]);
     const [raw, setRaw] = useState([]);
     const [ovr, setOvr] = useState({});
     const [isMock, setIsMock] = useState(false);
@@ -121,12 +123,25 @@ export default function RoomAvailability() {
     const [cd, setCd] = useState(30);
 
     const load = useCallback(async () => {
+        if (!range.checkIn || !range.checkOut) {
+            setNotice('Ngày nhận phòng và ngày trả phòng không được để trống.');
+            return;
+        }
+        if (range.checkOut <= range.checkIn) {
+            setNotice('Ngày trả phòng phải sau ngày nhận phòng.');
+            return;
+        }
         try {
-            const res = await fetch(`${API}/api/admin/room-availability?${new URLSearchParams(range)}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } });
+            const res = await fetch(`${API}/api/admin/room-availability?${new URLSearchParams(range)}`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+            });
             const json = await res.json();
-            if (!res.ok || !json.rooms?.length) throw new Error('empty');
+            if (!res.ok || !json.rooms?.length) throw new Error(json.message || 'empty');
             setRaw(json.rooms); setIsMock(false); setOvr({});
-        } catch { setRaw(mockFor(range)); setIsMock(true); }
+        } catch (err) {
+            console.warn('Fallback to mock rooms:', err.message);
+            setRaw(mockFor(range)); setIsMock(true);
+        }
         setCd(30);
     }, [range]);
     const loadRef = useRef(load);
@@ -137,7 +152,7 @@ export default function RoomAvailability() {
         return () => clearInterval(t);
     }, []);
     useEffect(() => {
-        const s = io(API, { transports: ['websocket'], reconnection: true, timeout: 4000 });
+        const s = io(API, { transports: ['websocket', 'polling'], reconnection: true, timeout: 4000 });
         let t;
         s.on('connect', () => setLive(true)); s.on('disconnect', () => setLive(false)); s.on('connect_error', () => setLive(false));
         s.on('availability:changed', () => { clearTimeout(t); t = setTimeout(() => loadRef.current(), 300); });
@@ -165,23 +180,43 @@ export default function RoomAvailability() {
     }, [shown]);
     const sel = rooms.find((r) => r.id === selId) || rooms.find((r) => r.booking) || rooms[0];
 
-    const patch = (id, p) => setOvr((o) => ({ ...o, [id]: { ...o[id], ...p } }));
-    const act = (kind) => {
+    const act = async (kind) => {
         if (!sel) return;
         const n = sel.roomNumber, b = sel.booking;
-        if (kind === 'clean') {
-            if (sel.state !== 'dirty') return setNotice(`Phòng ${n} không ở trạng thái bẩn.`);
-            patch(sel.id, { status: 'available' }); return setNotice(`Đã giao buồng phòng dọn ${n}.`);
+
+        // Bắt lỗi các trường hợp trước khi gọi API
+        if (kind === 'clean' && sel.state !== 'dirty') {
+            return setNotice(`Phòng ${n} không ở trạng thái bẩn chờ dọn.`);
         }
-        if (kind === 'key') {
-            if (!b) return setNotice('Phòng chưa có khách để tạo thẻ.');
-            patch(sel.id, { booking: { ...b, keys: (b.keys || 0) + 1 } }); return setNotice(`Đã tạo thẻ E-Key mới cho ${n}.`);
+        if (kind === 'key' && !b) {
+            return setNotice(`Phòng ${n} chưa có khách để tạo thẻ E-Key.`);
         }
-        if (kind === 'out') {
-            if (!b) return setNotice('Phòng chưa có khách để trả.');
-            patch(sel.id, { booking: null, status: 'dirty' }); return setNotice(`Đã thanh toán & trả phòng ${n}. Phòng chuyển sang bẩn chờ dọn.`);
+        if (kind === 'out' && !b) {
+            return setNotice(`Phòng ${n} chưa có khách để làm thủ tục trả phòng.`);
         }
-        if (kind === 'detail') return setNotice(b ? `Mã xác nhận #${b.confirmationNo} · ${vd(b.checkIn)} → ${vd(b.checkOut)}` : 'Phòng đang không có đặt phòng.');
+        if (kind === 'detail') {
+            return setNotice(b ? `Mã xác nhận #${b.confirmationNo} · Khách: ${b.guestName} · ${vd(b.checkIn)} → ${vd(b.checkOut)}` : `Phòng ${n} đang trống sẵn sàng đón khách.`);
+        }
+
+        try {
+            const actionMap = { clean: 'clean', key: 'key', out: 'checkout' };
+            const res = await fetch(`${API}/api/admin/room-availability/${sel.id}/action`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${localStorage.getItem('token') || ''}`
+                },
+                body: JSON.stringify({ action: actionMap[kind] || kind })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                return setNotice(data.message || 'Thao tác không thành công.');
+            }
+            setNotice(data.message || 'Thao tác thành công!');
+            load(); // Cập nhật đồng bộ dữ liệu thật từ database MySQL
+        } catch (err) {
+            setNotice('Lỗi kết nối máy chủ backend: ' + err.message);
+        }
     };
 
     const b = sel?.booking;
@@ -191,15 +226,36 @@ export default function RoomAvailability() {
                 <style>{CSS}</style>
 
                 <div className="main">
-                    {isMock && <div className="warn">Đang hiển thị DỮ LIỆU MẪU vì API chưa trả về dữ liệu phòng. Khi backend có dữ liệu, trang tự chuyển sang dữ liệu thật.</div>}
+                    {isMock && <div className="warn">Đang hiển thị DỮ LIỆU MẪU vì API chưa kết nối được. Khi backend có dữ liệu, trang tự chuyển sang dữ liệu thật từ CSDL MySQL.</div>}
 
                     <section className="card head">
                         <div>
-                            <span className={`live ${live || isMock ? '' : 'off'}`}>● {live || isMock ? 'DIRECT LIVE FEED' : 'MẤT KẾT NỐI'}</span>
+                            <span className={`live ${live || isMock ? '' : 'off'}`}>● {live ? 'DIRECT LIVE FEED (MYSQL)' : (isMock ? 'DỮ LIỆU MẪU' : 'MẤT KẾT NỐI')}</span>
                             <h1>Front Desk Operations Center • Sơ đồ phòng và tình trạng thời gian thực</h1>
-                            <div className="sub">Trực quan hóa thời gian thực (tự động làm mới mỗi 30s) • <span className="m">Tổng số: {rooms.length} phòng vận hành</span></div>
+                            <div className="sub">Đồng bộ trực tiếp MySQL • Làm mới tự động mỗi 30s • <span className="m">Tổng số: {rooms.length} phòng vận hành</span></div>
                         </div>
-                        <div className="hb"><button onClick={load}>⟳ Làm Mới</button><button disabled>⏱ Chu kỳ kế {cd}s</button></div>
+                        <div className="hb" style={{ alignItems: 'center' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600 }}>
+                                Nhận:
+                                <input type="date" value={checkIn} onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (!val) { setNotice('Ngày nhận phòng không được để trống.'); return; }
+                                    if (val >= checkOut) { setNotice('Ngày nhận phòng phải trước ngày trả phòng.'); return; }
+                                    setCheckIn(val);
+                                }} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', background: '#fff' }} />
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600 }}>
+                                Trả:
+                                <input type="date" value={checkOut} onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (!val) { setNotice('Ngày trả phòng không được để trống.'); return; }
+                                    if (val <= checkIn) { setNotice('Ngày trả phòng phải sau ngày nhận phòng.'); return; }
+                                    setCheckOut(val);
+                                }} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', background: '#fff' }} />
+                            </label>
+                            <button onClick={load}>⟳ Làm Mới</button>
+                            <button disabled>⏱ {cd}s</button>
+                        </div>
                     </section>
 
                     <div className="stats">

@@ -26,6 +26,7 @@ app.use('/api/loai-phong', require('./routes/roomTypes'));
 app.use('/api/phong',      require('./routes/rooms'));
 app.use('/api/so-do-phong', require('./routes/rooms'));
 app.use('/api/room-status', require('./routes/rooms'));
+app.use('/api/admin/room-availability', require('./routes/admin/roomAvailability'));
 
 // Route Quản lý người dùng & nhân viên
 app.use('/api/users', require('./routes/users'));
