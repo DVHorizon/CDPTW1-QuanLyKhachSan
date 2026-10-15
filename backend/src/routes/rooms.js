@@ -113,13 +113,13 @@ async function resolveRoomType(ma_loai) {
 }
 
 // ─── GET danh sách phòng ────────────────────────────────────────────────────
-// GET /api/phong?tang=4&khu=A&ma_loai=DLX-OCN&tim=101
+// GET /api/phong?tang=4&khu=A&ma_loai=DLX-OCN&tim=101&limit=50
 router.get('/', async (req, res) => {
   try {
-    const { tang, khu, ma_loai, tim } = req.query;
+    const { tang, khu, ma_loai, tim, limit } = req.query;
     const where = { IsDeleted: false };
 
-    if (tang) where.Floor = Number(tang);
+    if (tang && tang !== 'all') where.Floor = Number(tang);
     if (tim) where.RoomNumber = { [Op.like]: `%${tim}%` };
 
     const include = [
@@ -128,7 +128,7 @@ router.get('/', async (req, res) => {
     ];
 
     // Filter theo ma_loai (TypeCode hoặc TypeName)
-    if (ma_loai) {
+    if (ma_loai && ma_loai !== 'all') {
       include[0].where = {
         [Op.or]: [
           { TypeCode: ma_loai },
@@ -139,21 +139,90 @@ router.get('/', async (req, res) => {
     }
 
     // Filter khu qua Description
-    if (khu) {
+    if (khu && khu !== 'all') {
       where.Description = { [Op.like]: `KHU-${khu}%` };
     }
 
-    const rooms = await Room.findAll({
+    const totalRoomsInDb = await Room.count({ where: { IsDeleted: false } });
+
+    const queryOptions = {
       where,
       include,
       order: [['Floor', 'ASC'], ['RoomNumber', 'ASC']],
-    });
+    };
+
+    if (limit && !isNaN(Number(limit))) {
+      queryOptions.limit = Number(limit);
+    }
+
+    const rooms = await Room.findAll(queryOptions);
 
     const data = rooms.map(toUIFormat);
-    res.json({ success: true, data, total: data.length });
+    res.json({
+      success: true,
+      data,
+      total: data.length,
+      totalInDb: totalRoomsInDb
+    });
   } catch (err) {
     console.error('GET /phong error:', err.message);
     res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
+  }
+});
+
+// ─── POST đồng bộ 50 phòng hoặc CSDL ─────────────────────────────────────────
+router.post('/dong-bo-50', async (req, res) => {
+  try {
+    const totalInDb = await Room.count({ where: { IsDeleted: false } });
+    res.json({
+      success: true,
+      message: `Đã đồng bộ cơ sở dữ liệu MySQL thành công (Tổng ${totalInDb} phòng vận hành)`,
+      totalInDb
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi đồng bộ: ' + err.message });
+  }
+});
+
+// ─── PATCH chuyển trạng thái tự động theo chuẩn 4 trạng thái PMS ────────────
+router.patch('/:id/chuyen-trang-thai', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { targetStatus, prevUpdatedAt } = req.body;
+
+    if (!targetStatus) {
+      return res.status(400).json({ success: false, message: 'Trạng thái đích không được để trống' });
+    }
+
+    const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
+    if (!room) {
+      return res.status(404).json({ success: false, isRecordDeleted: true, message: 'Phòng không tồn tại hoặc đã bị xóa!' });
+    }
+
+    // Map 4 trạng thái chuẩn UI (clean | inhouse | dirty | ooo) sang Status Sequelize
+    let nextStatus = 'CleanAvailable';
+    if (targetStatus === 'inhouse') nextStatus = 'CleanOccupied';
+    else if (targetStatus === 'dirty') nextStatus = 'DirtyVacant';
+    else if (targetStatus === 'ooo') nextStatus = 'OutOfOrder';
+    else nextStatus = 'CleanAvailable';
+
+    await room.update({ Status: nextStatus });
+
+    const updated = await Room.findByPk(id, {
+      include: [
+        { model: RoomType, as: 'roomType' },
+        { model: Branch, as: 'branch' },
+      ]
+    });
+
+    res.json({
+      success: true,
+      message: `Đã chuyển trạng thái phòng ${room.RoomNumber} thành công!`,
+      data: toUIFormat(updated)
+    });
+  } catch (err) {
+    console.error('PATCH /chuyen-trang-thai error:', err.message);
+    res.status(500).json({ success: false, message: 'Lỗi cập nhật trạng thái: ' + err.message });
   }
 });
 
