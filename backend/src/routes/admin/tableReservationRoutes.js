@@ -9,10 +9,10 @@ const { verifyToken, optionalVerifyToken } = require('../../middlewares/authMidd
 router.get('/available-tables', optionalVerifyToken, tableReservationController.getAvailableTables);
 
 // 2. Tạo lượt đặt bàn trước tại nhà hàng (FEAT-FNB-09: A4.9)
-router.post('/', verifyToken, tableReservationController.createReservation);
+router.post('/', optionalVerifyToken, tableReservationController.createReservation);
 
 // 3. Danh sách lượt đặt bàn
-router.get('/', verifyToken, tableReservationController.getReservations);
+router.get('/', optionalVerifyToken, tableReservationController.getReservations);
 
 // 4. Nhân viên check-in bàn khi khách đến
 router.patch('/:reservationId/check-in', verifyToken, tableReservationController.checkInReservation);

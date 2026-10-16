@@ -2,6 +2,15 @@ import React, { useState, useEffect } from "react";
 import GuestSidebar from "../../components/layout/GuestSidebar";
 import GuestHeader from "../../components/layout/GuestHeader";
 
+const timeSlots = [
+  { time: "18:00", label: "Còn 8 bàn", alert: false },
+  { time: "18:30", label: "Còn 4 bàn", alert: false },
+  { time: "19:00", label: "Hot • Còn 2 bàn", alert: true },
+  { time: "19:30", label: "Còn 5 bàn", alert: false },
+  { time: "20:00", label: "Còn 9 bàn", alert: false },
+  { time: "20:30", label: "Còn 12 bàn", alert: false },
+];
+
 export default function TableReservation() {
   const [selectedDate, setSelectedDate] = useState("28");
   const [mealPeriod, setMealPeriod] = useState("dinner");
@@ -14,25 +23,51 @@ export default function TableReservation() {
   );
   const [roomFolio, setRoomFolio] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [myReservations, setMyReservations] = useState([]);
+  const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [reservationResult, setReservationResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const timeSlots = [
-    { time: "18:00", label: "Hoàng hôn" },
-    { time: "18:30", label: "Còn 2 bàn", alert: true },
-    { time: "19:00", label: "Giờ cao điểm", popular: true },
-    { time: "19:30", label: "Rất thong thả" },
-    { time: "20:00", label: "Đêm nhạc live" },
-    { time: "20:30", label: "Rượu vang đêm" },
-  ];
+  // Lấy danh sách lượt đặt bàn của mình từ Database
+  const fetchMyReservations = async () => {
+    try {
+      const token = localStorage.getItem("hotel_token");
+      const res = await fetch("http://localhost:5000/api/v1/table-reservations", {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setMyReservations(json.data);
+      }
+    } catch (e) {
+      console.warn("Could not load reservations", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyReservations();
+  }, []);
 
   const handleConfirmReservation = async () => {
     setLoading(true);
     setErrorMsg("");
     try {
       const token = localStorage.getItem("hotel_token");
-      const targetDate = `2025-11-${selectedDate}T${selectedTime}:00.000Z`;
+      
+      // Tạo ngày đặt trong tương lai hợp lệ (tháng 11 năm 2026 hoặc năm hiện tại)
+      const now = new Date();
+      let targetYear = now.getFullYear();
+      let targetMonth = "11";
+      // Nếu hiện tại đã qua năm 2025 thì lấy năm hiện tại hoặc kế tiếp
+      if (now.getFullYear() > 2025) {
+        targetYear = now.getFullYear();
+      } else {
+        targetYear = 2026;
+      }
+      const targetDate = `${targetYear}-${targetMonth}-${selectedDate}T${selectedTime}:00.000Z`;
 
       const response = await fetch("http://localhost:5000/api/v1/table-reservations", {
         method: "POST",
@@ -49,32 +84,14 @@ export default function TableReservation() {
 
       const json = await response.json();
       if (!response.ok) {
-        // Nếu lỗi unauthenticated hoặc lỗi validation
-        if (json.code === "ERROR_0009_UNAUTHENTICATED") {
-          // Mock data cho demo giao diện nếu chưa login
-          setReservationResult({
-            tableReservationId: "8829",
-            tableNumber: "Terrace B-04",
-            guestCount,
-            reservationTime: targetDate,
-          });
-          setShowModal(true);
-        } else {
-          setErrorMsg(json.message || "Không thể đặt bàn lúc này.");
-        }
+        setErrorMsg(json.message || "Không thể đặt bàn lúc này. Vui lòng thử lại.");
       } else {
         setReservationResult(json.data);
         setShowModal(true);
+        fetchMyReservations(); // Cập nhật lại lịch sử đặt bàn ngay
       }
     } catch {
-      // Fallback hiển thị modal thành công
-      setReservationResult({
-        tableReservationId: "8829",
-        tableNumber: "Terrace B-04",
-        guestCount,
-        reservationTime: `2025-11-${selectedDate} ${selectedTime}`,
-      });
-      setShowModal(true);
+      setErrorMsg("Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại backend.");
     } finally {
       setLoading(false);
     }
@@ -103,7 +120,7 @@ export default function TableReservation() {
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent flex flex-col justify-end p-8">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <span className="px-3 py-0.5 rounded-full bg-emerald-500 text-white text-xs font-bold tracking-widest uppercase shadow-[0_0_12px_rgba(16,185,129,0.35)]">
-                    5-Star Culinary Heritage
+                    Ẩm Thực Đẳng Cấp 5 Sao
                   </span>
                   <span className="text-emerald-100 text-xs flex items-center gap-1">
                     <span className="material-symbols-outlined text-[16px] text-cyan-300">water_lux</span>
@@ -112,7 +129,7 @@ export default function TableReservation() {
                   <span className="text-white/60 text-xs">•</span>
                   <span className="text-white/90 text-xs flex items-center gap-1 font-medium">
                     <span className="material-symbols-outlined text-[16px] text-amber-300">star</span>
-                    4.9/5.0 (580+ thực khách thượng lưu)
+                    4.9/5.0 (Hơn 580 thực khách đánh giá cao)
                   </span>
                 </div>
                 <h1
@@ -142,7 +159,7 @@ export default function TableReservation() {
                     </div>
                     <div className="flex flex-col">
                       <span className="text-[10px] text-white/70 uppercase font-semibold">Phong Cách</span>
-                      <span className="text-sm text-white font-bold">Fine Dining & Hải Sản Tươi</span>
+                      <span className="text-sm text-white font-bold">Ẩm Thực Cao Cấp & Hải Sản Tươi</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -150,8 +167,8 @@ export default function TableReservation() {
                       <span className="material-symbols-outlined text-[20px]">styler</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] text-white/70 uppercase font-semibold">Quy Chuẩn Trang Phục</span>
-                      <span className="text-sm text-white font-bold">Resort Elegant / Smart Casual</span>
+                      <span className="text-[10px] text-white/70 uppercase font-semibold">Trang Phục</span>
+                      <span className="text-sm text-white font-bold">Lịch Lãm / Trang Nhã</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -295,11 +312,11 @@ export default function TableReservation() {
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-bold text-emerald-800">Tối Fine Dining</span>
+                        <span className="text-sm font-bold text-emerald-800">Bữa Tối Thượng Hạng</span>
                         <span className="material-symbols-outlined text-emerald-700">candle</span>
                       </div>
-                      <span className="text-[11px] text-emerald-700 font-medium mb-1">17:30 - 22:30 • Ngắm Hoàng Hôn Sunset</span>
-                      <p className="text-xs text-slate-500 mb-3">Bò Wagyu thượng hạng, tôm hùm sốt nấm truffle, rượu vang Grand Cru tinh tế.</p>
+                      <span className="text-[11px] text-emerald-700 font-medium mb-1">17:30 - 22:30 • Ngắm Hoàng Hôn Lãng Mạn</span>
+                      <p className="text-xs text-slate-500 mb-3">Bò Wagyu thượng hạng, tôm hùm sốt nấm truffle, rượu vang hảo hạng tinh tế.</p>
                       <span className="text-xs text-emerald-700 font-bold mt-auto flex items-center gap-1">
                         <span className="material-symbols-outlined text-[14px]">local_fire_department</span>
                         Trải nghiệm được yêu thích nhất
@@ -683,7 +700,7 @@ export default function TableReservation() {
                       <span className="material-symbols-outlined text-[16px] text-emerald-600">schedule</span>
                       Buổi Ăn & Giờ Đến
                     </span>
-                    <span className="font-bold text-emerald-700">Tối Fine Dining ({selectedTime})</span>
+                    <span className="font-bold text-emerald-700">Bữa Tối Thượng Hạng ({selectedTime})</span>
                   </div>
                   <div className="flex items-center justify-between py-1 border-b border-slate-100">
                     <span className="text-slate-500 flex items-center gap-1.5 text-xs">
@@ -701,7 +718,7 @@ export default function TableReservation() {
                     </span>
                     <span className="font-medium text-slate-800">
                       {seatingZone === "terrace"
-                        ? "Terrace Mặt Biển (B-04)"
+                        ? "Ban Công Sát Biển (B-04)"
                         : seatingZone === "indoor"
                         ? "Sảnh Lạnh Cổ Điển"
                         : "Cạnh Kính Hoàng Hôn"}
@@ -768,10 +785,16 @@ export default function TableReservation() {
                   </button>
                   <button
                     type="button"
-                    className="w-full py-2.5 px-6 rounded-xl bg-slate-100 text-slate-700 font-semibold text-xs hover:bg-slate-200 flex items-center justify-center gap-1.5 transition-all"
+                    onClick={() => setShowHistoryDrawer(true)}
+                    className="w-full py-2.5 px-6 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-xs hover:bg-emerald-100 flex items-center justify-center gap-1.5 transition-all"
                   >
-                    <span className="material-symbols-outlined text-[18px] text-slate-400">calendar_add_on</span>
-                    Lưu Vào Lịch Trình Nghỉ Dưỡng
+                    <span className="material-symbols-outlined text-[18px] text-emerald-700">bookmark_added</span>
+                    <span>Xem Bàn Đã Đặt Của Quý Khách</span>
+                    {myReservations.length > 0 && (
+                      <span className="ml-1 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
+                        {myReservations.length}
+                      </span>
+                    )}
                   </button>
                 </div>
 
@@ -841,11 +864,98 @@ export default function TableReservation() {
             </div>
             <button
               type="button"
-              onClick={() => setShowModal(false)}
+              onClick={() => {
+                setShowModal(false);
+                setShowHistoryDrawer(true);
+              }}
               className="w-full py-3 px-4 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all text-sm"
             >
-              Hoàn Tất & Đóng
+              Hoàn Tất & Xem Danh Sách Bàn Đã Đặt
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Drawer Danh Sách Lượt Đặt Bàn Thực Tế Trong Database */}
+      {showHistoryDrawer && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex justify-end">
+          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-6 animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-emerald-600">table_restaurant</span>
+                <h3 className="text-lg font-bold text-slate-800">Bàn Ăn Của Quý Khách</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHistoryDrawer(false)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 flex flex-col gap-3">
+              {myReservations.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 flex flex-col items-center gap-2">
+                  <span className="material-symbols-outlined text-[48px] text-slate-300">event_busy</span>
+                  <p className="text-sm">Quý khách chưa có lượt đặt bàn nào.</p>
+                </div>
+              ) : (
+                myReservations.map((res) => (
+                  <div
+                    key={res.tableReservationId}
+                    className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col gap-2 hover:shadow-sm transition-shadow"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">
+                        #RES-{res.tableReservationId}
+                      </span>
+                      <span
+                        className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+                          res.status === "Confirmed"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : res.status === "Completed"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        {res.status === "Confirmed"
+                          ? "✓ Đã xác nhận"
+                          : res.status === "Completed"
+                          ? "Đã phục vụ"
+                          : res.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-bold text-slate-800">{res.tableNumber}</span>
+                      <span className="text-slate-500 font-medium">{res.guestCount} Người</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                      <span className="material-symbols-outlined text-[15px] text-emerald-600">schedule</span>
+                      <span>{new Date(res.reservationTime).toLocaleString("vi-VN")}</span>
+                    </div>
+
+                    {res.note && (
+                      <div className="text-xs text-slate-600 bg-white p-2 rounded-lg border border-slate-100 italic">
+                        "{res.note}"
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowHistoryDrawer(false)}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 text-slate-700 font-semibold text-xs hover:bg-slate-200 transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

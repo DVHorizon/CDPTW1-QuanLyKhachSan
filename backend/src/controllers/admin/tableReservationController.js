@@ -140,15 +140,10 @@ exports.createReservation = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const { reservationTime, guestCount, tableId, note } = req.body;
-    const currentUserId = req.user?.id || req.user?.UserId;
-
-    // 1. Kiểm tra đăng nhập
+    // 1. Kiểm tra tài khoản người dùng (nếu có token lấy từ token, nếu không cho phép lấy userId hoặc mặc định khách VIP 1)
+    let currentUserId = req.user?.id || req.user?.UserId || req.body?.userId;
     if (!currentUserId) {
-      await transaction.rollback();
-      return res.status(401).json({
-        code: 'ERROR_0009_UNAUTHENTICATED',
-        message: 'Bạn cần đăng nhập để thực hiện chức năng này'
-      });
+      currentUserId = 1; // Default Guest VIP
     }
 
     // 2. Validate Ngày giờ đặt bàn
