@@ -3,7 +3,42 @@ import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext';
 import AdminLayout from '../../components/admin/layout/AdminLayout';
 
-const API_BASE = 'http://localhost:5000/api/v1/allocation';
+// Hỗ trợ cả kết nối trực tiếp cổng 5000 và qua Proxy /api của Vite
+const API_ENDPOINTS = [
+  'http://localhost:5000/api/v1/allocation',
+  '/api/v1/allocation',
+];
+
+// Hàm gọi API an toàn, chống lỗi Unexpected token '<', "<!DOCTYPE "...
+async function safeFetchJson(path, options = {}) {
+  let lastErr = null;
+  for (const base of API_ENDPOINTS) {
+    try {
+      const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+      const res = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+        ...options,
+      });
+
+      const text = await res.text();
+      // Nếu server trả về HTML (404/500/Nginx/Vite fallback) thay vì JSON
+      if (text.trim().startsWith('<') || text.trim().startsWith('<!DOCTYPE')) {
+        lastErr = new Error('Máy chủ phản hồi trang lỗi HTML thay vì JSON. Đang thử kênh kết nối dự phòng...');
+        continue;
+      }
+
+      const data = JSON.parse(text);
+      return { status: res.status, ok: res.ok, data };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Không thể kết nối đến máy chủ backend.');
+}
 
 // ─── Tiện ích định dạng ─────────────────────────────────────────────────────
 const fmtMoney = (n) => {
@@ -66,7 +101,7 @@ const ConcurrencyConflictModal = ({ conflictData, onReload }) => {
           </div>
           <div>
             <h3 className="text-lg font-bold text-rose-300">Phát Hiện Xung Đột Dữ Liệu Đồng Thời</h3>
-            <p className="text-xs text-on-surface-variant">Hệ thống đồng bộ hóa Grand Horizon PMS</p>
+            <p className="text-xs text-on-surface-variant">Hệ thống đồng bộ dữ liệu Grand Horizon</p>
           </div>
         </div>
 
@@ -76,7 +111,7 @@ const ConcurrencyConflictModal = ({ conflictData, onReload }) => {
             {conflictData.message || 'Dữ liệu đặt phòng đã bị xóa hoặc thay đổi bởi người dùng khác trong cơ sở dữ liệu.'}
           </p>
           <p className="text-xs text-rose-200/80">
-            Để đảm bảo tính toàn vẹn và tránh ghi đè dữ liệu sai lệch, thao tác hiện tại đã tạm dừng. Vui lòng tải lại trang để nạp thông tin mới nhất từ máy chủ.
+            Để đảm bảo tính toàn vẹn và tránh sai lệch thông tin phòng, thao tác hiện tại đã tạm dừng. Vui lòng nhấn nút bên dưới để tải lại trang và nhận dữ liệu mới nhất.
           </p>
         </div>
 
@@ -86,7 +121,7 @@ const ConcurrencyConflictModal = ({ conflictData, onReload }) => {
             className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm shadow-lg shadow-rose-900/50 transition-all cursor-pointer"
           >
             <span className="material-symbols-outlined text-lg">refresh</span>
-            Tải Lại Trang Ngay (Reload Data)
+            Tải Lại Trang Ngay
           </button>
         </div>
       </div>
@@ -113,8 +148,8 @@ const PrintVoucherModal = ({ booking, room, onClose }) => {
 
         <div className="border border-dashed border-outline-variant/40 rounded-xl p-5 bg-surface-container-lowest space-y-4 font-mono text-xs">
           <div className="text-center space-y-1">
-            <h4 className="font-bold text-sm tracking-widest text-admin-primary">GRAND HORIZON RESORT & HOTELS</h4>
-            <p className="text-[10px] text-on-surface-variant">ROOM ALLOCATION & CHECK-IN VOUCHER</p>
+            <h4 className="font-bold text-sm tracking-widest text-admin-primary">KHÁCH SẠN VÀ KHU NGHỈ DƯỠNG GRAND HORIZON</h4>
+            <p className="text-[10px] text-on-surface-variant">PHIẾU ĐIỀU PHỐI & GÁN PHÒNG LƯU TRÚ</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 border-t border-b border-outline-variant/20 py-3">
@@ -123,37 +158,37 @@ const PrintVoucherModal = ({ booking, room, onClose }) => {
               <strong className="text-sm text-admin-primary font-mono">{booking.ConfirmationCode}</strong>
             </div>
             <div>
-              <span className="text-on-surface-variant block">PHÒNG ĐƯỢC GÁN:</span>
+              <span className="text-on-surface-variant block">SỐ PHÒNG ĐƯỢC GÁN:</span>
               <strong className="text-sm text-emerald-400 font-bold">{room ? room.RoomNumber : 'CHƯA GÁN'}</strong>
             </div>
             <div>
-              <span className="text-on-surface-variant block">KHÁCH HÀNG:</span>
+              <span className="text-on-surface-variant block">HỌ TÊN KHÁCH:</span>
               <span className="font-medium text-on-surface">{booking.GuestName}</span>
             </div>
             <div>
               <span className="text-on-surface-variant block">HẠNG HỘI VIÊN:</span>
-              <span className="text-amber-400 font-semibold">{booking.VipTier || 'STANDARD'}</span>
+              <span className="text-amber-400 font-semibold">{booking.VipTier || 'TIÊU CHUẨN'}</span>
             </div>
             <div>
-              <span className="text-on-surface-variant block">NGÀY NHẬN:</span>
+              <span className="text-on-surface-variant block">NGÀY NHẬN PHÒNG:</span>
               <span>{fmtDateMonth(booking.CheckInDate)}</span>
             </div>
             <div>
-              <span className="text-on-surface-variant block">NGÀY TRẢ:</span>
+              <span className="text-on-surface-variant block">NGÀY TRẢ PHÒNG:</span>
               <span>{fmtDateMonth(booking.CheckOutDate)} ({booking.NumberOfNights} đêm)</span>
             </div>
           </div>
 
           <div className="flex justify-between items-center text-[11px]">
-            <span>TỔNG THANH TOÁN (FOLIO):</span>
+            <span>TỔNG CHI PHÍ DỰ TOÁN:</span>
             <span className="font-bold text-on-surface">{fmtMoney(booking.totalFolio)}</span>
           </div>
           <div className="flex justify-between items-center text-[11px]">
-            <span>ĐÃ ĐẶT CỌC:</span>
+            <span>TIỀN ĐÃ ĐẶT CỌC:</span>
             <span className="text-emerald-400 font-medium">{fmtMoney(booking.depositPaid)}</span>
           </div>
           <div className="flex justify-between items-center text-[11px] font-bold text-rose-400">
-            <span>CÒN LẠI CẦN THU (BALANCE DUE):</span>
+            <span>CÔNG NỢ CẦN THU KHI CHECK-IN:</span>
             <span>{fmtMoney(booking.balanceDue)}</span>
           </div>
         </div>
@@ -282,7 +317,7 @@ export default function RoomAssignment() {
       if (remaining <= 0) {
         setIsHoldExpired(true);
         setHeldRoom(null);
-        addToast('warn', 'Thời gian giữ phòng (15 phút) đã hết hạn. Vui lòng chọn lại!', 'HẾT HẠN GIỮ PHÒNG');
+        addToast('warn', 'Thời gian giữ phòng tạm (15 phút) đã hết hạn. Vui lòng chọn lại!', 'HẾT HẠN GIỮ PHÒNG');
         clearInterval(interval);
       }
     }, 1000);
@@ -293,16 +328,14 @@ export default function RoomAssignment() {
   const fetchBookings = useCallback(async () => {
     try {
       setLoadingBookings(true);
-      const res = await fetch(`${API_BASE}/bookings`);
-      const data = await res.json();
+      const { data } = await safeFetchJson('/bookings');
       if (data.success && Array.isArray(data.data)) {
         setBookingsList(data.data);
-        // Nếu chưa chọn booking nào hoặc booking hiện tại không hợp lệ, chọn booking đầu tiên
         if (!selectedBookingId && data.data.length > 0) {
           setSelectedBookingId(String(data.data[0].BookingId));
         }
       } else {
-        addToast('error', data.message || 'Không thể tải danh sách booking', 'LỖI HỆ THỐNG');
+        addToast('error', data.message || 'Không thể tải danh sách đặt phòng', 'LỖI HỆ THỐNG');
       }
     } catch (err) {
       console.error('Fetch bookings error:', err);
@@ -324,11 +357,10 @@ export default function RoomAssignment() {
     }
     try {
       setLoadingDossier(true);
-      const res = await fetch(`${API_BASE}/booking/${bId}`);
-      const data = await res.json();
+      const { status, data } = await safeFetchJson(`/booking/${bId}`);
 
       // Kiểm tra nếu dữ liệu đã bị xóa (Concurrency Check)
-      if (res.status === 404 || data.isRecordDeleted) {
+      if (status === 404 || data.isRecordDeleted) {
         setConcurrencyConflict({
           isOpen: true,
           message: data.message || 'Đặt phòng này đã bị xóa hoặc không còn tồn tại trong cơ sở dữ liệu.',
@@ -349,7 +381,7 @@ export default function RoomAssignment() {
       }
     } catch (err) {
       console.error('Fetch booking dossier error:', err);
-      addToast('error', 'Không thể kết nối máy chủ để tải hồ sơ booking: ' + err.message, 'LỖI MẠNG');
+      addToast('error', 'Không thể kết nối máy chủ để tải hồ sơ đặt phòng: ' + err.message, 'LỖI KẾT NỐI');
     } finally {
       setLoadingDossier(false);
     }
@@ -358,7 +390,6 @@ export default function RoomAssignment() {
   useEffect(() => {
     if (selectedBookingId) {
       fetchBookingDossier(selectedBookingId);
-      // Reset hold lease khi đổi booking
       setHeldRoom(null);
       setHoldExpiresAt(null);
       setIsHoldExpired(false);
@@ -379,12 +410,10 @@ export default function RoomAssignment() {
         search: searchRoomQuery,
       });
 
-      const res = await fetch(`${API_BASE}/recommended-rooms?${q.toString()}`);
-      const data = await res.json();
+      const { data } = await safeFetchJson(`/recommended-rooms?${q.toString()}`);
 
       if (data.success && Array.isArray(data.data)) {
         setRecommendedRooms(data.data);
-        // Tự động chọn phòng gợi ý tốt nhất nếu chưa có phòng được chọn
         if (!selectedRoomId && data.data.length > 0) {
           setSelectedRoomId(data.data[0].RoomId);
         }
@@ -406,8 +435,7 @@ export default function RoomAssignment() {
   const fetchCadFloorSchematic = useCallback(async (floorNum) => {
     try {
       setLoadingCad(true);
-      const res = await fetch(`${API_BASE}/floor-schematic?floor=${floorNum}`);
-      const data = await res.json();
+      const { data } = await safeFetchJson(`/floor-schematic?floor=${floorNum}`);
       if (data.success && Array.isArray(data.data)) {
         setCadRooms(data.data);
       }
@@ -423,16 +451,13 @@ export default function RoomAssignment() {
   }, [cadFloor, fetchCadFloorSchematic]);
 
   // ─── 5. Heartbeat đồng bộ Concurrency định kỳ ─────────────────────────────
-  // Kiểm tra xem booking có bị người khác sửa hoặc xóa trong DB không
   useEffect(() => {
     if (!selectedBookingId) return;
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`${API_BASE}/check-sync/${selectedBookingId}`);
-        const data = await res.json();
-
-        if (res.status === 404 || data.isRecordDeleted) {
+        const { status, data } = await safeFetchJson(`/check-sync/${selectedBookingId}`);
+        if (status === 404 || data.isRecordDeleted) {
           setConcurrencyConflict({
             isOpen: true,
             message: data.message || 'Đặt phòng này vừa bị xóa hoặc hủy bỏ bởi người dùng khác trong cơ sở dữ liệu!',
@@ -441,7 +466,7 @@ export default function RoomAssignment() {
       } catch (e) {
         // bỏ qua lỗi gián đoạn mạng tạm thời
       }
-    }, 15000); // 15 giây poll một lần
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [selectedBookingId]);
@@ -459,7 +484,7 @@ export default function RoomAssignment() {
         RoomStatus: 'CleanAvailable',
         ViewAspect: 'HƯỚNG BIỂN TRỰC DIỆN (OCEAN FRONT)',
         AreaSqm: 55,
-        BedConfig: '1 King Bed (200x220)',
+        BedConfig: '1 Giường King Đôi (200x220)',
         Corner: 'GÓC ĐÔNG NAM (YÊN TĨNH)',
         Wing: 'TÒA B (WING B)',
         MatchPercent: 96,
@@ -467,7 +492,6 @@ export default function RoomAssignment() {
     );
   }, [recommendedRooms, cadRooms, selectedRoomId, bookingDossier]);
 
-  // Cập nhật tầng CAD khi chọn phòng
   useEffect(() => {
     if (currentSelectedRoom && currentSelectedRoom.Floor) {
       setCadFloor(Number(currentSelectedRoom.Floor));
@@ -477,7 +501,7 @@ export default function RoomAssignment() {
   // ─── HÀNH ĐỘNG 1: Tự Động Phân Bổ (Auto-Allocate Best Match) ───────────────
   const handleAutoAllocate = () => {
     if (!recommendedRooms.length) {
-      addToast('error', 'Không có phòng phù hợp để gán tự động.', 'ALLOCATION ENGINE');
+      addToast('error', 'Không có phòng phù hợp để gán tự động.', 'BỘ ĐIỀU PHỐI PHÒNG');
       return;
     }
     const bestRoom = recommendedRooms[0];
@@ -485,7 +509,7 @@ export default function RoomAssignment() {
     setCadFloor(Number(bestRoom.Floor) || 8);
     addToast(
       'success',
-      `Auto-Allocate đã chọn Phòng ${bestRoom.RoomNumber} với độ phù hợp cao nhất (${bestRoom.MatchPercent}%).`,
+      `Đã tự động chọn Phòng ${bestRoom.RoomNumber} có độ phù hợp cao nhất (${bestRoom.MatchPercent}%).`,
       'TỰ ĐỘNG ĐIỀU PHỐI'
     );
   };
@@ -497,14 +521,12 @@ export default function RoomAssignment() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/hold`, {
+      const { status, data } = await safeFetchJson('/hold', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId: selectedRoomId, bookingId: selectedBookingId }),
       });
-      const data = await res.json();
 
-      if (res.status === 404 || data.isRecordDeleted) {
+      if (status === 404 || data.isRecordDeleted) {
         setConcurrencyConflict({
           isOpen: true,
           message: data.message || 'Đặt phòng hoặc phòng đã bị xóa bởi người dùng khác.',
@@ -512,7 +534,7 @@ export default function RoomAssignment() {
         return;
       }
 
-      if (res.status === 409 || data.isConflict) {
+      if (status === 409 || data.isConflict) {
         addToast('error', data.message || 'Phòng vừa được gán hoặc giữ bởi người khác.', 'XUNG ĐỘT PHÒNG');
         fetchRecommendedRooms();
         return;
@@ -529,16 +551,15 @@ export default function RoomAssignment() {
         addToast('error', data.message, 'LỖI GIỮ PHÒNG');
       }
     } catch (err) {
-      addToast('error', 'Lỗi kết nối máy chủ: ' + err.message, 'LỖI');
+      addToast('error', 'Lỗi kết nối máy chủ: ' + err.message, 'LỖI MẠNG');
     }
   };
 
   // ─── HÀNH ĐỘNG 3: Hủy Giữ Phòng (Release Hold) ─────────────────────────────
   const handleReleaseHold = async () => {
     if (selectedRoomId) {
-      await fetch(`${API_BASE}/release-hold`, {
+      await safeFetchJson('/release-hold', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId: selectedRoomId, bookingId: selectedBookingId }),
       });
     }
@@ -557,9 +578,8 @@ export default function RoomAssignment() {
 
     try {
       setConfirming(true);
-      const res = await fetch(`${API_BASE}/confirm`, {
+      const { status, data } = await safeFetchJson('/confirm', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bookingId: selectedBookingId,
           roomId: selectedRoomId,
@@ -571,10 +591,8 @@ export default function RoomAssignment() {
         }),
       });
 
-      const data = await res.json();
-
       // Kiểm tra xóa đồng thời
-      if (res.status === 404 || data.isRecordDeleted) {
+      if (status === 404 || data.isRecordDeleted) {
         setConcurrencyConflict({
           isOpen: true,
           message: data.message || 'Dữ liệu đặt phòng đã bị xóa bởi người dùng khác trong cơ sở dữ liệu.',
@@ -583,7 +601,7 @@ export default function RoomAssignment() {
       }
 
       // Kiểm tra hết hạn giữ phòng
-      if (res.status === 410 || data.isExpired) {
+      if (status === 410 || data.isExpired) {
         setIsHoldExpired(true);
         addToast('warn', data.message || 'Thời gian giữ phòng đã hết, vui lòng gán lại.', 'HẾT HẠN GIỮ PHÒNG');
         fetchRecommendedRooms();
@@ -591,7 +609,7 @@ export default function RoomAssignment() {
       }
 
       // Kiểm tra xung đột phòng đã bị người khác gán
-      if (res.status === 409 || data.isConflict) {
+      if (status === 409 || data.isConflict) {
         addToast('error', data.message || 'Phòng vừa được gán cho booking khác, vui lòng chọn phòng khác.', 'XUNG ĐỘT GÁN PHÒNG');
         fetchRecommendedRooms();
         return;
@@ -601,7 +619,6 @@ export default function RoomAssignment() {
         addToast('success', data.message, 'XÁC NHẬN THÀNH CÔNG');
         setHeldRoom(null);
         setHoldExpiresAt(null);
-        // Tải lại dữ liệu
         await fetchBookingDossier(selectedBookingId);
         await fetchBookings();
         await fetchRecommendedRooms();
@@ -644,7 +661,7 @@ export default function RoomAssignment() {
           </div>
           <h2 className="text-xl font-bold text-rose-400">Bạn không có quyền truy cập chức năng này</h2>
           <p className="text-sm text-on-surface-variant max-w-md">
-            Chức năng Điều phối & Gán Phòng (Room Allocation) chỉ dành cho Quản Trị Viên, Lễ Tân và Bộ phận Quản Lý buồng phòng.
+            Chức năng Điều phối & Gán Phòng chỉ dành cho Quản Trị Viên, Lễ Tân và Quản Lý buồng phòng.
           </p>
           <Link
             to="/admin/bookings"
@@ -660,7 +677,7 @@ export default function RoomAssignment() {
   return (
     <AdminLayout>
       <div className="space-y-6 pb-12">
-        {/* ─── Breadcrumbs & Main Title ─────────────────────────────────────── */}
+        {/* ─── Tiêu Đề & Thanh Điều Hướng ───────────────────────────────────── */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-outline-variant/20 pb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs text-on-surface-variant">
@@ -668,7 +685,7 @@ export default function RoomAssignment() {
                 Quản Lý Đặt Phòng
               </Link>
               <span>/</span>
-              <span className="text-admin-primary font-medium">Điều Phối & Gán Số Phòng (Room Allocation)</span>
+              <span className="text-admin-primary font-medium">Điều Phối & Gán Số Phòng</span>
             </div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight text-on-surface flex items-center gap-2">
@@ -676,15 +693,15 @@ export default function RoomAssignment() {
                 Xác Nhận & Gán Số Phòng Cụ Thể
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-admin-primary/15 text-admin-primary border border-admin-primary/30">
-                GRAND HORIZON PMS
+                HỆ THỐNG PMS GRAND HORIZON
               </span>
             </div>
             <p className="text-xs text-on-surface-variant">
-              Khớp phòng tự động theo sở thích hội viên VIP, sơ đồ mặt bằng CAD tương tác và khóa bảo vệ giữ phòng 15 phút.
+              Tự động khớp phòng theo sở thích hội viên VIP, sơ đồ mặt bằng CAD tương tác và khóa bảo vệ giữ phòng 15 phút.
             </p>
           </div>
 
-          {/* Quick Metrics & System Clock */}
+          {/* Đồng Hồ & Công Suất Phòng */}
           <div className="flex items-center gap-3">
             <div className="bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 flex items-center gap-3 shadow-sm">
               <div className="flex items-center gap-2">
@@ -703,7 +720,7 @@ export default function RoomAssignment() {
                 fetchBookings();
                 if (selectedBookingId) fetchBookingDossier(selectedBookingId);
                 fetchRecommendedRooms();
-                addToast('info', 'Đã làm mới dữ liệu từ cơ sở dữ liệu.', 'LÀM MỚI');
+                addToast('info', 'Đã nạp lại dữ liệu mới nhất từ cơ sở dữ liệu.', 'LÀM MỚI');
               }}
               className="p-2.5 rounded-xl border border-outline-variant/30 bg-surface-container hover:bg-surface-container-high text-on-surface transition-all cursor-pointer shadow-sm"
               title="Tải lại dữ liệu từ máy chủ"
@@ -713,7 +730,7 @@ export default function RoomAssignment() {
           </div>
         </div>
 
-        {/* ─── 1. BỘ CHỌN ĐẶT PHÒNG CẦN GÁN (QUICK BOOKING PICKER) ─────────── */}
+        {/* ─── 1. BỘ CHỌN ĐẶT PHÒNG CẦN GÁN ─────────────────────────────────── */}
         <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-4 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -738,7 +755,7 @@ export default function RoomAssignment() {
             </div>
           </div>
 
-          {/* Booking Cards Horizontal Carousel / Scroller */}
+          {/* Băng Chuyền Đặt Phòng */}
           {loadingBookings ? (
             <div className="flex items-center justify-center p-6 text-xs text-on-surface-variant gap-2">
               <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
@@ -786,7 +803,7 @@ export default function RoomAssignment() {
           )}
         </div>
 
-        {/* ─── 2. ALLOCATION ENGINE TOOLBAR ─────────────────────────────────── */}
+        {/* ─── 2. THANH CÔNG CỤ ĐIỀU PHỐI (ALLOCATION ENGINE TOOLBAR) ─────────── */}
         <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-4 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-admin-primary/20 border border-admin-primary/40 flex items-center justify-center text-admin-primary">
@@ -794,13 +811,13 @@ export default function RoomAssignment() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-bold text-sm text-on-surface">Allocation Engine</h2>
+                <h2 className="font-bold text-sm text-on-surface">Bộ Điều Phối & Gán Phòng Tự Động</h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                  REAL-TIME SYNC
+                  ĐỒNG BỘ THỜI GIAN THỰC
                 </span>
               </div>
               <p className="text-xs text-on-surface-variant font-mono">
-                Booking Ref: <span className="text-admin-primary font-bold">{bookingDossier?.ConfirmationCode || '---'}</span> • ID #{selectedBookingId || '---'}
+                Mã Booking: <span className="text-admin-primary font-bold">{bookingDossier?.ConfirmationCode || '---'}</span> • ID #{selectedBookingId || '---'}
               </p>
             </div>
           </div>
@@ -811,7 +828,7 @@ export default function RoomAssignment() {
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-semibold text-xs transition-all shadow-md cursor-pointer"
             >
               <span className="material-symbols-outlined text-base">bolt</span>
-              Auto-Allocate Best Match
+              Gán Tự Động Phòng Phù Hợp Nhất
             </button>
 
             <button
@@ -825,7 +842,7 @@ export default function RoomAssignment() {
               <span className="material-symbols-outlined text-base">
                 {heldRoom ? 'lock_open' : 'lock_clock'}
               </span>
-              {heldRoom ? 'Hủy Khóa Giữ Phòng' : 'Hold Reservation (15m)'}
+              {heldRoom ? 'Hủy Giữ Phòng Tạm' : 'Giữ Phòng Tạm (15 Phút)'}
             </button>
 
             <button
@@ -838,30 +855,30 @@ export default function RoomAssignment() {
           </div>
         </div>
 
-        {/* ─── 3. DOSSIER & FINANCIAL FOLIO (2-COLUMN GRID) ────────────────── */}
+        {/* ─── 3. HỒ SƠ KHÁCH HÀNG & TÀI CHÍNH DỰ TOÁN ──────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* CỘT TRÁI: HỒ SƠ KHÁCH LƯU TRÚ (GUEST DOSSIER) */}
+          {/* CỘT TRÁI: HỒ SƠ CHI TIẾT KHÁCH HÀNG */}
           <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-admin-primary text-xl">badge</span>
-                <h3 className="font-bold text-sm text-on-surface">Hồ Sơ Khách Lưu Trú (Guest Dossier)</h3>
+                <h3 className="font-bold text-sm text-on-surface">Hồ Sơ Chi Tiết Khách Hàng</h3>
               </div>
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                {bookingDossier?.stayHistory?.vipTier || 'VIP TIER: STANDARD'}
+                {bookingDossier?.stayHistory?.vipTier || 'HẠNG HỘI VIÊN: TIÊU CHUẨN'}
               </span>
             </div>
 
             {loadingDossier ? (
               <div className="p-8 text-center text-xs text-on-surface-variant flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
-                Đang nạp hồ sơ khách...
+                Đang nạp hồ sơ khách hàng...
               </div>
             ) : bookingDossier ? (
               <div className="space-y-4">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-admin-primary/20 border border-admin-primary/40 flex items-center justify-center text-admin-primary font-bold text-lg flex-shrink-0">
-                    {bookingDossier.GuestName ? bookingDossier.GuestName.charAt(0).toUpperCase() : 'G'}
+                    {bookingDossier.GuestName ? bookingDossier.GuestName.charAt(0).toUpperCase() : 'K'}
                   </div>
                   <div className="flex-1 space-y-1">
                     <h4 className="font-bold text-base text-on-surface">{bookingDossier.GuestName}</h4>
@@ -874,7 +891,7 @@ export default function RoomAssignment() {
                         Mã Hội Viên: <strong className="text-admin-primary">{bookingDossier.stayHistory?.membershipRef}</strong>
                       </span>
                       <span className="bg-surface-container-lowest px-2 py-0.5 rounded-lg border border-outline-variant/20 text-on-surface-variant">
-                        Doanh Nghiệp: <strong className="text-on-surface">{bookingDossier.stayHistory?.corpCode}</strong>
+                        Mã Doanh Nghiệp: <strong className="text-on-surface">{bookingDossier.stayHistory?.corpCode}</strong>
                       </span>
                       <span className="bg-surface-container-lowest px-2 py-0.5 rounded-lg border border-outline-variant/20 text-emerald-400">
                         {bookingDossier.stayHistory?.passportHash}
@@ -886,7 +903,7 @@ export default function RoomAssignment() {
                 {/* Ghi chú lịch sử lưu trú */}
                 <div className="bg-surface-container-lowest rounded-xl p-3 border border-outline-variant/20 space-y-1.5">
                   <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                    Lịch Sử Lưu Trú & Ghi Chú Giám Sát (Audit History)
+                    Lịch Sử Lưu Trú & Ghi Chú Kiểm Tra
                   </span>
                   <p className="text-xs text-on-surface leading-relaxed font-mono">
                     {bookingDossier.stayHistory?.auditNote}
@@ -898,12 +915,12 @@ export default function RoomAssignment() {
             )}
           </div>
 
-          {/* CỘT PHẢI: THÔNG SỐ LƯU TRÚ & TÀI CHÍNH FOLIO */}
+          {/* CỘT PHẢI: THÔNG SỐ LƯU TRÚ & TÀI CHÍNH DỰ TOÁN */}
           <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-admin-primary text-xl">payments</span>
-                <h3 className="font-bold text-sm text-on-surface">Thông Số Lưu Trú & Tài Chính Folio</h3>
+                <h3 className="font-bold text-sm text-on-surface">Thông Số Lưu Trú & Dự Toán Chi Phí</h3>
               </div>
               <span className="text-xs font-mono text-on-surface-variant">
                 {bookingDossier?.NumberOfNights || 1} ĐÊM • {bookingDossier?.Adults || 1} NGƯỜI LỚN
@@ -912,7 +929,7 @@ export default function RoomAssignment() {
 
             {bookingDossier ? (
               <div className="space-y-4">
-                {/* Stay Dates */}
+                {/* Thời Gian Lưu Trú */}
                 <div className="grid grid-cols-2 gap-3 bg-surface-container-lowest p-3 rounded-xl border border-outline-variant/20">
                   <div>
                     <span className="text-[10px] text-on-surface-variant uppercase block">Ngày Nhận Phòng</span>
@@ -928,7 +945,7 @@ export default function RoomAssignment() {
                   </div>
                 </div>
 
-                {/* Financial Summary */}
+                {/* Bảng Chi Tiết Tài Chính */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-surface-container-lowest p-3 rounded-xl border border-outline-variant/20">
                     <span className="text-[10px] text-on-surface-variant block uppercase">Giá Gốc / Đêm</span>
@@ -944,9 +961,9 @@ export default function RoomAssignment() {
                   </div>
                 </div>
 
-                {/* Total Folio */}
+                {/* Tổng Chi Phí */}
                 <div className="flex items-center justify-between p-3 rounded-xl bg-admin-primary/10 border border-admin-primary/30">
-                  <span className="text-xs font-semibold text-on-surface">Tổng Dự Toán Hóa Đơn (Total Folio):</span>
+                  <span className="text-xs font-semibold text-on-surface">Tổng Dự Toán Hóa Đơn:</span>
                   <span className="text-base font-bold text-admin-primary">{fmtMoney(bookingDossier.totalFolio)}</span>
                 </div>
               </div>
@@ -961,10 +978,10 @@ export default function RoomAssignment() {
           <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-amber-400 text-xl">fact_check</span>
-              <h3 className="font-bold text-sm text-on-surface">Yêu Cầu Đặc Biệt & Tiêu Chí Gán Phòng (Guest Preferences)</h3>
+              <h3 className="font-bold text-sm text-on-surface">Yêu Cầu & Sở Thích Của Khách Hàng</h3>
             </div>
             <span className="text-xs text-on-surface-variant font-mono">
-              TRỌNG SỐ THUẬT TOÁN: <strong className="text-admin-primary">100% WEIGHT</strong>
+              TRỌNG SỐ THUẬT TOÁN: <strong className="text-admin-primary">100%</strong>
             </span>
           </div>
 
@@ -1004,17 +1021,17 @@ export default function RoomAssignment() {
           </div>
         </div>
 
-        {/* ─── 5. BỘ LỌC PHÒNG & DANH SÁCH GỢI Ý (RECOMMENDED UNITS) ────────── */}
+        {/* ─── 5. DANH SÁCH PHÒNG PHÙ HỢP NHẤT ĐƯỢC CHẤM ĐIỂM ────────────────── */}
         <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-outline-variant/20 pb-3">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-admin-primary text-xl">recommend</span>
               <h3 className="font-bold text-sm text-on-surface">
-                Danh Sách Phòng Phù Hợp Được Chấm Điểm (Compatibility Ranking)
+                Danh Sách Phòng Phù Hợp Nhất (Xếp Hạng Tương Thích)
               </h3>
             </div>
 
-            {/* Quick Filters */}
+            {/* Bộ Lọc Nhanh */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               {/* Tầng */}
               <select
@@ -1022,8 +1039,8 @@ export default function RoomAssignment() {
                 onChange={(e) => setFilterFloor(e.target.value)}
                 className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-admin-primary"
               >
-                <option value="all">Tất Cả Tầng</option>
-                <option value="high">Tầng Cao (Tầng 8+)</option>
+                <option value="all">Tất Cả Các Tầng</option>
+                <option value="high">Tầng Cao (Tầng 8 Trở Lên)</option>
                 <option value="mid">Tầng Trung (Tầng 4 - 7)</option>
                 <option value="low">Tầng Thấp (Tầng 1 - 3)</option>
               </select>
@@ -1034,8 +1051,8 @@ export default function RoomAssignment() {
                 onChange={(e) => setFilterHK(e.target.value)}
                 className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-admin-primary"
               >
-                <option value="clean">Đã Dọn Sạch (Clean / Inspected)</option>
-                <option value="clean_inspected">Chỉ Phòng Đã Kiểm Tra (Inspected)</option>
+                <option value="clean">Đã Dọn Sạch (Sẵn Sàng Gán)</option>
+                <option value="clean_inspected">Chỉ Phòng Đã Kiểm Tra Kỹ (Inspected)</option>
                 <option value="all">Tất Cả Trạng Thái</option>
               </select>
 
@@ -1046,8 +1063,8 @@ export default function RoomAssignment() {
                 className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-admin-primary"
               >
                 <option value="all">Tất Cả Hướng Nhìn</option>
-                <option value="ocean">Hướng Biển (Ocean View)</option>
-                <option value="city">Hướng Phố (City View)</option>
+                <option value="ocean">Hướng Nhìn Biển (Ocean View)</option>
+                <option value="city">Hướng Nhìn Thành Phố (City View)</option>
               </select>
 
               {/* Search room */}
@@ -1056,12 +1073,12 @@ export default function RoomAssignment() {
                 placeholder="Tìm số phòng..."
                 value={searchRoomQuery}
                 onChange={(e) => setSearchRoomQuery(e.target.value)}
-                className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs text-on-surface w-28 focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs text-on-surface w-32 focus:outline-none focus:ring-1 focus:ring-admin-primary"
               />
             </div>
           </div>
 
-          {/* Room Cards Grid */}
+          {/* Lưới Thẻ Phòng */}
           {loadingRooms ? (
             <div className="p-12 text-center text-xs text-on-surface-variant flex items-center justify-center gap-2">
               <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
@@ -1102,7 +1119,7 @@ export default function RoomAssignment() {
                         : 'bg-surface-container-lowest border-outline-variant/20 hover:border-outline-variant/50'
                     }`}
                   >
-                    {/* Header: Room Number & Match % */}
+                    {/* Header: Số Phòng & % Phù Hợp */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="w-8 h-8 rounded-xl bg-surface-container-high flex items-center justify-center font-bold text-sm text-on-surface">
@@ -1116,7 +1133,7 @@ export default function RoomAssignment() {
                         </div>
                       </div>
 
-                      {/* Match Badge */}
+                      {/* Huy Hiệu Phù Hợp */}
                       <div className="text-right">
                         <span
                           className={`text-xs font-bold px-2.5 py-1 rounded-xl border ${
@@ -1127,15 +1144,15 @@ export default function RoomAssignment() {
                               : 'bg-surface-container-high text-on-surface-variant border-outline-variant/30'
                           }`}
                         >
-                          {room.MatchPercent}% Match
+                          {room.MatchPercent}% Phù Hợp
                         </span>
                       </div>
                     </div>
 
-                    {/* Progress Bar of Compatibility */}
+                    {/* Thanh Tiến Trình Độ Phù Hợp */}
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px] text-on-surface-variant">
-                        <span>Độ phù hợp tiêu chí ({room.SatisfiedCount}/{room.TotalCriteria})</span>
+                        <span>Thỏa mãn tiêu chí ({room.SatisfiedCount}/{room.TotalCriteria})</span>
                         <span className="font-mono text-emerald-400">{room.MatchPercent}%</span>
                       </div>
                       <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
@@ -1148,12 +1165,12 @@ export default function RoomAssignment() {
                       </div>
                     </div>
 
-                    {/* Attributes Pill Line */}
+                    {/* Đặc Tính Phòng */}
                     <div className="text-[10px] text-on-surface-variant line-clamp-1 border-t border-outline-variant/10 pt-2 font-mono">
                       {room.UnitAttributes}
                     </div>
 
-                    {/* Inspection Timelog */}
+                    {/* Kiểm Định Sạch */}
                     <div className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 rounded-lg px-2.5 py-1 border border-emerald-500/20 flex items-center justify-between">
                       <span>{room.InspectionTimelog}</span>
                       {room.RoomStatus === 'Inspected' && (
@@ -1161,7 +1178,7 @@ export default function RoomAssignment() {
                       )}
                     </div>
 
-                    {/* Action Select Radio */}
+                    {/* Thao Tác Chọn */}
                     <div className="flex items-center justify-between pt-1">
                       {isHeld && (
                         <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
@@ -1171,7 +1188,7 @@ export default function RoomAssignment() {
                       )}
                       {room.IsUpgrade && (
                         <span className="text-[10px] text-violet-400 font-bold bg-violet-500/15 px-2 py-0.5 rounded-full border border-violet-500/30">
-                          Upgrade Candidate
+                          Ưu Tiên Nâng Hạng
                         </span>
                       )}
                       <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-admin-primary">
@@ -1188,22 +1205,22 @@ export default function RoomAssignment() {
           )}
         </div>
 
-        {/* ─── 6. SƠ ĐỒ MẶT BẰNG CAD TƯƠNG TÁC (ARCHITECTURAL SCHEMATIC) ─────── */}
+        {/* ─── 6. SƠ ĐỒ MẶT BẰNG TẦNG CAD TƯƠNG TÁC ─────────────────────────── */}
         <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-outline-variant/20 pb-3">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-cyan-400 text-xl">map</span>
               <div>
                 <h3 className="font-bold text-sm text-on-surface">
-                  Sơ Đồ Mặt Bằng Tầng CAD Tương Tác (Architectural Floor Blueprint)
+                  Sơ Đồ Mặt Bằng CAD Tương Tác
                 </h3>
                 <p className="text-xs text-on-surface-variant font-mono">
-                  TẦNG {cadFloor} • GRAND TOWER • BẤM PHÒNG ĐỂ GÁN NGAY
+                  TẦNG {cadFloor} • TÒA THÁP CHÍNH • BẤM VÀO PHÒNG ĐỂ CHỌN NGAY
                 </p>
               </div>
             </div>
 
-            {/* Chuyển tầng nhanh */}
+            {/* Chuyển Tầng Nhanh */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-on-surface-variant font-medium">Chọn Tầng:</span>
               <div className="flex gap-1">
@@ -1224,9 +1241,8 @@ export default function RoomAssignment() {
             </div>
           </div>
 
-          {/* Interactive SVG / Blueprint Viewport */}
+          {/* Sơ Đồ Vector CAD */}
           <div className="bg-[#0b1329] border border-cyan-500/30 rounded-2xl p-5 relative overflow-hidden shadow-inner">
-            {/* Blueprint Grid Lines Background */}
             <div
               className="absolute inset-0 opacity-10 pointer-events-none"
               style={{
@@ -1236,12 +1252,12 @@ export default function RoomAssignment() {
               }}
             ></div>
 
-            {/* Compass / Orientation & Legend */}
+            {/* Chú Thích Phương Hướng & Trạng Thái */}
             <div className="flex items-center justify-between text-[11px] font-mono text-cyan-400/80 mb-4 border-b border-cyan-500/20 pb-2">
               <div className="flex items-center gap-4">
-                <span>[ WING A // NORTH ]</span>
-                <span>--- CENTRAL CORRIDOR ---</span>
-                <span>[ WING B // OCEAN SOUTH ]</span>
+                <span>[ KHU A // PHÍA BẮC ]</span>
+                <span>--- HÀNH LANG TRUNG TÂM ---</span>
+                <span>[ KHU B // HƯỚNG BIỂN NAM ]</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
@@ -1256,11 +1272,11 @@ export default function RoomAssignment() {
               </div>
             </div>
 
-            {/* Room Blocks Matrix */}
+            {/* Ma Trận Các Phòng Trên Tầng */}
             {loadingCad ? (
               <div className="py-12 text-center text-xs text-cyan-300 font-mono flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined animate-spin">progress_activity</span>
-                Rendering CAD Schematic Vectors...
+                Đang kết xuất sơ đồ mặt bằng CAD...
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 relative z-10">
@@ -1286,7 +1302,7 @@ export default function RoomAssignment() {
                     >
                       <div className="text-xs font-bold">{rm.RoomNumber}</div>
                       <div className="text-[10px] uppercase truncate opacity-80 mt-0.5">
-                        {isOccupied ? 'OCCUPIED' : rm.Status === 'Inspected' ? 'INSPECTED' : 'CLEAN'}
+                        {isOccupied ? 'CÓ KHÁCH' : rm.Status === 'Inspected' ? 'ĐÃ KIỂM ĐỊNH' : 'ĐÃ DỌN SẠCH'}
                       </div>
                       {isSelected && (
                         <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-cyan-400 ring-2 ring-white animate-ping"></span>
@@ -1297,35 +1313,35 @@ export default function RoomAssignment() {
               </div>
             )}
 
-            {/* Infrastructure Row: Elevator, Stairs, RFID Key Station */}
+            {/* Hạ Tầng Phụ Trợ */}
             <div className="mt-5 pt-3 border-t border-cyan-500/20 flex flex-wrap items-center justify-between text-[11px] font-mono text-cyan-300/80 gap-2">
               <div className="flex items-center gap-3">
                 <span className="bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30">
                   🛗 HỘC THANG MÁY TRUNG TÂM
                 </span>
                 <span className="bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30">
-                  🚪 THANG THOÁT HIỂM ĐÔNG
+                  🚪 CẦU THANG THOÁT HIỂM ĐÔNG
                 </span>
               </div>
               <div className="bg-cyan-950/80 px-2.5 py-0.5 rounded border border-cyan-500/30 text-emerald-400">
-                📶 TRẠM LẬP THẺ TỪ RFID: ONLINE (DESK #2)
+                📶 TRẠM LẬP THẺ TỪ RFID: ĐANG KẾT NỐI (BÀN SỐ 2)
               </div>
             </div>
           </div>
 
-          {/* Chi tiết thông số phòng được chọn */}
+          {/* Chi Tiết Phòng Đang Chọn */}
           {currentSelectedRoom && (
             <div className="bg-surface-container-lowest rounded-xl p-4 border border-outline-variant/20 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
               <div>
                 <span className="text-[10px] text-on-surface-variant block uppercase">Diện Tích Phòng</span>
-                <strong className="text-on-surface">{currentSelectedRoom.AreaSqm || 55} m² (King Suite)</strong>
+                <strong className="text-on-surface">{currentSelectedRoom.AreaSqm || 55} m² (Phòng King Suite)</strong>
               </div>
               <div>
                 <span className="text-[10px] text-on-surface-variant block uppercase">Cấu Hình Giường</span>
-                <strong className="text-on-surface">{currentSelectedRoom.BedConfig || '1 King Bed (200x220)'}</strong>
+                <strong className="text-on-surface">{currentSelectedRoom.BedConfig || '1 Giường King Đôi (200x220)'}</strong>
               </div>
               <div>
-                <span className="text-[10px] text-on-surface-variant block uppercase">Hướng Nhìn (Aspect)</span>
+                <span className="text-[10px] text-on-surface-variant block uppercase">Hướng Nhìn</span>
                 <strong className="text-emerald-400">{currentSelectedRoom.ViewAspect}</strong>
               </div>
               <div>
@@ -1336,10 +1352,10 @@ export default function RoomAssignment() {
           )}
         </div>
 
-        {/* ─── 7. THANH XÁC NHẬN & GIỮ CHỖ (ACTION BAR & DISPATCH CONTROLS) ─── */}
+        {/* ─── 7. THANH ĐIỀU KHIỂN & XÁC NHẬN GÁN PHÒNG (STICKY ACTION BAR) ─── */}
         <div className="sticky bottom-4 z-40 bg-surface-container-high/95 backdrop-blur-md border border-admin-primary/40 rounded-2xl p-4 shadow-2xl space-y-3">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Status & 15-Minute Lease Timer */}
+            {/* Trạng Thái & Đồng Hồ 15 Phút Lease */}
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-admin-primary/20 border border-admin-primary/40 flex items-center justify-center text-admin-primary flex-shrink-0">
                 <span className="material-symbols-outlined text-2xl">
@@ -1350,26 +1366,26 @@ export default function RoomAssignment() {
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-sm text-on-surface">
                     {heldRoom
-                      ? `Phòng ${heldRoom.RoomNumber} Đang Được Khóa Giữ (Lock Pending)`
+                      ? `Phòng ${heldRoom.RoomNumber} Đang Được Giữ Tạm`
                       : currentSelectedRoom
                       ? `Đã chọn Phòng ${currentSelectedRoom.RoomNumber} để gán`
-                      : 'Chưa chọn phòng cụ thể'}
+                      : 'Chưa chọn số phòng'}
                   </span>
                   {heldRoom && (
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
-                      LEASE: {timeFormatted}
+                      THỜI GIAN GIỮ: {timeFormatted}
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-on-surface-variant">
                   {bookingDossier
-                    ? `Khách: ${bookingDossier.GuestName} • Hạng phòng: ${bookingDossier.RoomTypeName}`
+                    ? `Khách hàng: ${bookingDossier.GuestName} • Hạng phòng: ${bookingDossier.RoomTypeName}`
                     : 'Vui lòng chọn đặt phòng'}
                 </p>
               </div>
             </div>
 
-            {/* Automation Options Checkboxes */}
+            {/* Checkbox Tự Động Hóa */}
             <div className="flex flex-wrap items-center gap-4 text-xs">
               <label className="flex items-center gap-1.5 cursor-pointer text-on-surface select-none">
                 <input
@@ -1378,7 +1394,7 @@ export default function RoomAssignment() {
                   onChange={(e) => setSendSmsEmail(e.target.checked)}
                   className="rounded border-outline-variant text-admin-primary focus:ring-admin-primary"
                 />
-                <span>SMS & Email thông báo khách</span>
+                <span>Gửi SMS & Email báo số phòng</span>
               </label>
 
               <label className="flex items-center gap-1.5 cursor-pointer text-on-surface select-none">
@@ -1398,18 +1414,18 @@ export default function RoomAssignment() {
                   onChange={(e) => setPreProgramKeycard(e.target.checked)}
                   className="rounded border-outline-variant text-admin-primary focus:ring-admin-primary"
                 />
-                <span>Mã hóa thẻ từ RFID</span>
+                <span>Lập mã thẻ từ RFID</span>
               </label>
             </div>
 
-            {/* Action Buttons */}
+            {/* Nút Hành Động */}
             <div className="flex items-center gap-3">
               {heldRoom && (
                 <button
                   onClick={handleReleaseHold}
                   className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer"
                 >
-                  Hủy Giữ Chỗ
+                  Hủy Giữ Phòng
                 </button>
               )}
 
@@ -1427,13 +1443,13 @@ export default function RoomAssignment() {
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs transition-all cursor-pointer shadow-lg shadow-admin-primary/20 disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-base">login</span>
-                Gán & Check-In Ngay
+                Gán & Nhận Phòng Ngay
               </button>
             </div>
           </div>
         </div>
 
-        {/* ─── TOAST NOTIFICATIONS ────────────────────────────────────────── */}
+        {/* ─── TOAST THÔNG BÁO ────────────────────────────────────────────── */}
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
         {/* ─── MODAL CẢNH BÁO XUNG ĐỘT CONCURRENCY ─────────────────────────── */}
