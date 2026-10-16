@@ -20,6 +20,7 @@ import ServiceManagement from './pages/ServiceManagement';
 import RoomStatusManagement from './pages/RoomStatusManagement';
 import BookingManagement from './pages/BookingManagement';
 import RoomAssignment from './pages/admin/RoomAssignment';
+import CheckInDesk from './pages/admin/CheckInDesk';
 
 
 function App() {
@@ -49,6 +50,9 @@ function App() {
           <Route path="/admin/room-assignment/:bookingId" element={<RoomAssignment />} />
           <Route path="/admin/room-allocation" element={<RoomAssignment />} />
           <Route path="/admin/gan-phong" element={<RoomAssignment />} />
+          <Route path="/admin/check-in" element={<CheckInDesk />} />
+          <Route path="/admin/check-in/:bookingId" element={<CheckInDesk />} />
+          <Route path="/admin/guest-check-in" element={<CheckInDesk />} />
           <Route path="/admin/room-availability" element={<RoomAvailability />} />
           <Route path="/admin/so-do-phong" element={<RoomStatusManagement />} />
           <Route path="/admin/room-status" element={<RoomStatusManagement />} />

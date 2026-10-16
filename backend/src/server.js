@@ -43,6 +43,10 @@ app.use('/api/admin/room-availability', require('./routes/admin/roomAvailability
 app.use('/api/v1/allocation', require('./routes/admin/roomAllocationRoutes'));
 app.use('/api/allocation', require('./routes/admin/roomAllocationRoutes'));
 
+// Route Nghiệp vụ Check-in tại quầy (Front Desk Express Check-In Workflow)
+app.use('/api/v1/check-in', require('./routes/admin/checkInRoutes'));
+app.use('/api/check-in', require('./routes/admin/checkInRoutes'));
+
 // Route Quản lý người dùng & nhân viên
 app.use('/api/users', require('./routes/users'));
 app.use('/api/v1/users', require('./routes/users'));
