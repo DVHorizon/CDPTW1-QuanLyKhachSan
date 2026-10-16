@@ -8,7 +8,7 @@ const pool = require('../../config/db');
 // Key: roomId, Value: { bookingId, expiresAt: Date, holdToken: string }
 const activeRoomLocks = new Map();
 
-// Dọn dẹp lock hết hạn mỗi 30 giây
+// Dọn dẹp lock hết hạn mỗi 15 giây
 setInterval(() => {
   const now = Date.now();
   for (const [roomId, lock] of activeRoomLocks.entries()) {
@@ -16,16 +16,12 @@ setInterval(() => {
       activeRoomLocks.delete(roomId);
     }
   }
-}, 30000);
+}, 15000);
 
-// Tiện ích định dạng ngày YYYY-MM-DD
-const toDateStr = (d) => {
-  if (!d) return null;
-  const dt = new Date(d);
-  if (isNaN(dt.getTime())) return String(d).slice(0, 10);
-  const p = (n) => String(n).padStart(2, '0');
-  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
-};
+// Tiện ích padZero
+function padZero(n) {
+  return String(n).padStart(2, '0');
+}
 
 // ─── GET /api/v1/allocation/bookings ────────────────────────────────────────
 // Danh sách các booking cần gán phòng hoặc đến hôm nay
@@ -48,14 +44,18 @@ router.get('/bookings', async (req, res) => {
         COALESCE(bg.FullName, u.FullName, 'Khách Vãng Lai') AS GuestName,
         COALESCE(bg.Phone, u.Phone, '---') AS GuestPhone,
         COALESCE(bg.Email, u.Email, '---') AS GuestEmail,
+        COALESCE(mt.TierName, 'Standard') AS VipTier,
         COALESCE(rt.TypeName, 'Hạng Tiêu Chuẩn') AS RoomTypeName,
         rt.RoomTypeId,
         r.RoomId AS AssignedRoomId,
         r.RoomNumber AS AssignedRoomNumber,
-        s.StayId
+        r.Floor AS AssignedFloor,
+        s.StayId,
+        s.Status AS StayStatus
       FROM Bookings b
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
+      LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
@@ -63,7 +63,7 @@ router.get('/bookings', async (req, res) => {
       ORDER BY
         (r.RoomId IS NULL) DESC,
         (DATE(b.CheckInDate) = ?) DESC,
-        b.CheckInDate ASC
+        b.BookingId DESC
       LIMIT 100
     `;
 
@@ -81,7 +81,7 @@ router.get('/bookings', async (req, res) => {
 });
 
 // ─── GET /api/v1/allocation/booking/:id ──────────────────────────────────────
-// Hồ sơ đặt phòng chi tiết để gán phòng
+// Hồ sơ đặt phòng chi tiết để gán phòng kèm xử lý concurrency check
 router.get('/booking/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -100,22 +100,26 @@ router.get('/booking/:id', async (req, res) => {
         b.BookingSource,
         b.Note,
         CAST(b.CreatedAt AS CHAR)    AS CreatedAt,
-        COALESCE(bg.FullName, u.FullName, 'SARAH CONNOR') AS GuestName,
-        COALESCE(bg.Phone, u.Phone, '+1 (555) 000-1984') AS GuestPhone,
-        COALESCE(bg.Email, u.Email, 's.connor@sky.net') AS GuestEmail,
-        COALESCE(bg.IdNumber, u.IdNumber, '9482-1082-9912') AS NationalId,
+        CAST(b.UpdatedAt AS CHAR)    AS UpdatedAt,
+        COALESCE(bg.FullName, u.FullName, 'Khách Vãng Lai') AS GuestName,
+        COALESCE(bg.Phone, u.Phone, '---') AS GuestPhone,
+        COALESCE(bg.Email, u.Email, '---') AS GuestEmail,
+        COALESCE(bg.IdNumber, u.IdNumber, 'ID-VERIFIED-HASH') AS NationalId,
         COALESCE(bg.IdType, u.IdType, 'CCCD / Hộ Chiếu') AS IdType,
-        COALESCE(rt.TypeName, 'DELUXE KING SUITE (DLX-KNG)') AS RoomTypeName,
+        COALESCE(mt.TierName, 'VIP-2 / GOLD ELITE') AS VipTier,
+        COALESCE(rt.TypeName, 'DELUXE SUITE') AS RoomTypeName,
         COALESCE(rt.BasePrice, 2400000) AS BasePrice,
         rt.RoomTypeId,
         r.RoomId AS AssignedRoomId,
         r.RoomNumber AS AssignedRoomNumber,
         r.Floor AS AssignedFloor,
         s.StayId,
-        s.Status AS StayStatus
+        s.Status AS StayStatus,
+        (SELECT COUNT(*) FROM Bookings pb WHERE pb.UserId = b.UserId AND pb.Status IN ('Completed', 'CheckedIn', 'CheckedOut') AND pb.BookingId != b.BookingId) AS PastStaysCount
       FROM Bookings b
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
+      LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
@@ -125,12 +129,25 @@ router.get('/booking/:id', async (req, res) => {
 
     const [rows] = await pool.query(sql, [id]);
     if (!rows.length) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy đặt phòng.' });
+      return res.status(404).json({
+        success: false,
+        isRecordDeleted: true,
+        message: 'Đặt phòng này đã bị xóa hoặc không còn tồn tại trên hệ thống. Vui lòng tải lại trang!',
+      });
     }
 
     const b = rows[0];
 
-    // Tính toán tài chính mô phỏng (Folio)
+    // Nếu trạng thái đã bị hủy bỏ bởi người khác
+    if (b.Status === 'Cancelled') {
+      return res.status(410).json({
+        success: false,
+        isRecordDeleted: true,
+        message: 'Đặt phòng này đã bị hủy bởi nhân viên khác hoặc hệ thống. Vui lòng tải lại trang!',
+      });
+    }
+
+    // Tính toán tài chính Folio
     const baseRate = Number(b.BasePrice) || 2400000;
     const nights = Math.max(1, Number(b.NumberOfNights) || 1);
     const subtotal = baseRate * nights;
@@ -141,20 +158,21 @@ router.get('/booking/:id', async (req, res) => {
 
     // Tiêu chí đặc biệt & lịch sử lưu trú
     const specialRequests = [
-      { id: 'req_high_floor', label: 'Tầng cao ưu tiên (Tầng 08+)', tag: 'HIGH FLOOR PREFERENCE (LEVEL 08+)', satisfiedKey: 'highFloor', defaultChecked: true },
-      { id: 'req_quiet', label: 'Xa hộc thang máy / Góc yên tĩnh', tag: 'AWAY FROM ELEVATOR BANK // QUIET CORNER', satisfiedKey: 'quietCorner', defaultChecked: true },
-      { id: 'req_nonsmoking', label: 'Khu vực không hút thuốc bắt buộc', tag: 'NON-SMOKING WING MANDATORY', satisfiedKey: 'nonSmoking', defaultChecked: true },
-      { id: 'req_allergy', label: 'Chăn gối chống dị ứng / Không lông vũ', tag: 'FEATHER-FREE / HYPOALLERGENIC BEDDING', satisfiedKey: 'hypoallergenic', defaultChecked: false },
-      { id: 'req_ocean', label: 'Hướng nhìn trực diện biển (Ocean Front)', tag: 'DIRECT OCEAN FRONT ASPECT', satisfiedKey: 'oceanFront', defaultChecked: true },
+      { id: 'req_high_floor', label: 'Tầng cao ưu tiên (Tầng 08+)', tag: 'TẦNG CAO (LEVEL 08+)', satisfiedKey: 'highFloor', defaultChecked: true },
+      { id: 'req_quiet', label: 'Xa hộc thang máy / Góc yên tĩnh', tag: 'XA THANG MÁY // YÊN TĨNH', satisfiedKey: 'quietCorner', defaultChecked: true },
+      { id: 'req_nonsmoking', label: 'Khu vực không hút thuốc bắt buộc', tag: 'KHÔNG HÚT THUỐC', satisfiedKey: 'nonSmoking', defaultChecked: true },
+      { id: 'req_allergy', label: 'Chăn gối chống dị ứng cao cấp', tag: 'HYPOALLERGENIC BEDDING', satisfiedKey: 'hypoallergenic', defaultChecked: false },
+      { id: 'req_ocean', label: 'Hướng nhìn trực diện biển (Ocean View)', tag: 'OCEAN FRONT ASPECT', satisfiedKey: 'oceanFront', defaultChecked: true },
     ];
 
+    const pastCount = Math.max(1, Number(b.PastStaysCount) || 3);
     const stayHistory = {
-      staysCount: 3,
-      vipTier: 'VIP TIER: VIP-2 / BUSINESS CORPORATE',
-      corpCode: 'CYBR-984',
+      staysCount: pastCount,
+      vipTier: `${b.VipTier.toUpperCase()} // HỘI VIÊN THÂN THIẾT`,
+      corpCode: `CORP-${String(b.BookingId).slice(-3).padStart(3, '0')}`,
       membershipRef: `#GH-MEM-${String(b.BookingId).padStart(5, '0')}`,
-      passportHash: 'SHA256:7a8f902b...VERIFIED',
-      auditNote: '3 STAYS RECORDED AT GRAND HORIZON. PREFERS WING B, HIGH OCEAN ASPECT. ZERO INCIDENT LOGS. LAST STAY OCT 2024 (UNIT 804 ASSIGNED).',
+      passportHash: `HASH:${(b.NationalId || 'VERIFIED').slice(0, 10).toUpperCase()}...OK`,
+      auditNote: `${pastCount} LƯỢT LƯU TRÚ TẠI GRAND HORIZON HOTELS. ƯU TIÊN PHÒNG HƯỚNG BIỂN, KHÔNG HÚT THUỐC. KHÔNG CÓ BÁO CÁO PHÀN NÀN NÀO ĐƯỢC GHI NHẬN.`,
     };
 
     res.json({
@@ -176,6 +194,57 @@ router.get('/booking/:id', async (req, res) => {
   }
 });
 
+// ─── GET /api/v1/allocation/check-sync/:id (Kiểm tra xung đột đồng thời) ────
+// Trả về trạng thái hiện tại của booking để frontend phát hiện người khác đã sửa hoặc xóa
+router.get('/check-sync/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query(
+      `SELECT
+         b.BookingId,
+         b.Status,
+         CAST(b.UpdatedAt AS CHAR) AS UpdatedAt,
+         s.RoomId,
+         r.RoomNumber
+       FROM Bookings b
+       LEFT JOIN Stays s ON b.BookingId = s.BookingId
+       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+       WHERE b.BookingId = ?
+       LIMIT 1`,
+      [id]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({
+        success: false,
+        isRecordDeleted: true,
+        message: 'Dữ liệu đặt phòng đã bị xóa bởi người dùng khác. Vui lòng tải lại trang!',
+      });
+    }
+
+    const b = rows[0];
+    if (b.Status === 'Cancelled') {
+      return res.status(410).json({
+        success: false,
+        isRecordDeleted: true,
+        message: 'Đặt phòng này đã bị hủy bởi người dùng khác. Vui lòng tải lại trang!',
+      });
+    }
+
+    res.json({
+      success: true,
+      exists: true,
+      status: b.Status,
+      updatedAt: b.UpdatedAt,
+      assignedRoomId: b.RoomId,
+      assignedRoomNumber: b.RoomNumber,
+    });
+  } catch (err) {
+    console.error('GET /allocation/check-sync/:id error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ─── GET /api/v1/allocation/recommended-rooms ───────────────────────────────
 // Danh sách phòng gợi ý có tính toán % phù hợp (Compatibility Match Engine)
 router.get('/recommended-rooms', async (req, res) => {
@@ -184,8 +253,9 @@ router.get('/recommended-rooms', async (req, res) => {
       roomTypeId,
       bookingId,
       targetFloor = 'all',   // 'all' | 'high' | 'mid' | 'low'
-      hkStatus = 'clean',      // 'clean_inspected' | 'clean' | 'all'
-      viewAspect = 'all',     // 'all' | 'ocean' | 'city' | 'garden'
+      hkStatus = 'clean',    // 'clean_inspected' | 'clean' | 'all'
+      viewAspect = 'all',   // 'all' | 'ocean' | 'city' | 'garden'
+      search = '',
     } = req.query;
 
     let sql = `
@@ -212,15 +282,20 @@ router.get('/recommended-rooms', async (req, res) => {
 
     // Lọc theo trạng thái dọn buồng phòng
     if (hkStatus === 'clean_inspected') {
-      sql += ` AND r.Status IN ('CleanAvailable', 'Inspected')`;
+      sql += ` AND r.Status = 'Inspected'`;
     } else if (hkStatus === 'clean') {
       sql += ` AND r.Status IN ('CleanAvailable', 'Inspected')`;
     }
 
-    // Không hiển thị phòng đang có người ở (Occupied)
-    sql += ` AND r.Status != 'Occupied' AND s.StayId IS NULL`;
+    // Không hiển thị phòng đang có người ở (Occupied) hoặc hỏng nặng
+    sql += ` AND r.Status NOT IN ('Occupied', 'OutOfOrder') AND s.StayId IS NULL`;
 
-    sql += ` ORDER BY r.Floor DESC, r.RoomNumber ASC LIMIT 50`;
+    if (search && search.trim()) {
+      sql += ` AND r.RoomNumber LIKE ?`;
+      params.push(`%${search.trim()}%`);
+    }
+
+    sql += ` ORDER BY r.Floor DESC, r.RoomNumber ASC LIMIT 60`;
 
     const [rows] = await pool.query(sql, params);
 
@@ -232,30 +307,30 @@ router.get('/recommended-rooms', async (req, res) => {
       const isHighFloor = floorNum >= 8;
       const isOcean = (r.ViewType && r.ViewType.toLowerCase().includes('ocean')) || index % 2 === 0;
       const isQuiet = index % 3 === 0 || floorNum >= 6;
-      const isCleanInspected = r.RoomStatus === 'Inspected' || r.RoomStatus === 'CleanAvailable';
+      const isInspected = r.RoomStatus === 'Inspected';
 
       // Kiểm tra xem phòng có đang bị khóa bởi phiên khác không
       const lock = activeRoomLocks.get(r.RoomId);
       const isLockedByOther = lock && lock.expiresAt > now && String(lock.bookingId) !== String(bookingId);
       const isLockedByMe = lock && lock.expiresAt > now && String(lock.bookingId) === String(bookingId);
 
-      // Thuộc tính kiến trúc
-      const wing = floorNum % 2 === 0 ? 'WING B' : 'WING A';
-      const corner = index % 2 === 0 ? 'EAST CORNER' : 'MID-CORRIDOR';
-      const inspectionTime = `13:${padZero(45 - (index * 5) % 40)} BY M. CHEN`;
+      // Thuộc tính vị trí kiến trúc
+      const wing = floorNum % 2 === 0 ? 'TÒA B (WING B)' : 'TÒA A (WING A)';
+      const corner = index % 2 === 0 ? 'GÓC ĐÔNG NAM (YÊN TĨNH)' : 'HÀNH LANG TRUNG TÂM';
+      const inspectionTime = `13:${padZero(45 - (index * 4) % 40)} BỞI GS. TRẦN KIỆM`;
 
-      // Tính điểm Match Score (tối đa 100%)
-      let score = 70;
+      // Tính điểm Match Score (tối đa 99%)
+      let score = 72;
       let satisfiedCount = 2;
       const totalCriteria = 4;
 
-      if (isHighFloor) { score += 15; satisfiedCount += 1; }
+      if (isHighFloor) { score += 12; satisfiedCount += 1; }
       if (isOcean) { score += 10; satisfiedCount += 1; }
       if (isQuiet) { score += 5; }
-      if (r.RoomStatus === 'Inspected') { score += 5; }
+      if (isInspected) { score += 5; satisfiedCount += 1; }
 
-      // Giới hạn max 99%
-      score = Math.min(99, Math.max(65, score - (index * 4)));
+      // Trừ nhẹ theo vị trí để đa dạng hóa
+      score = Math.min(99, Math.max(68, score - (index * 3)));
 
       const isUpgrade = roomTypeId && Number(r.RoomTypeId) !== Number(roomTypeId) && Number(r.BasePrice) > 3000000;
 
@@ -266,17 +341,17 @@ router.get('/recommended-rooms', async (req, res) => {
         Wing: wing,
         Corner: corner,
         RoomStatus: r.RoomStatus,
-        RoomTypeName: r.RoomTypeName,
+        RoomTypeName: r.RoomTypeName || 'Grand Luxury Suite',
         RoomTypeId: r.RoomTypeId,
-        BasePrice: r.BasePrice,
-        AreaSqm: r.AreaSqm || (50 + (index * 4)),
-        BedConfig: r.BedType || '1 KING (200x200)',
-        ViewAspect: isOcean ? 'OCEAN FRONT (WING B)' : 'CITY SKYLINE',
+        BasePrice: r.BasePrice || 2500000,
+        AreaSqm: r.AreaSqm || (45 + (index * 5) % 35),
+        BedConfig: r.BedType || '1 Giường King Đôi (200x220)',
+        ViewAspect: isOcean ? 'HƯỚNG BIỂN TRỰC DIỆN (OCEAN FRONT)' : 'HƯỚNG THÀNH PHỐ (CITY VIEW)',
         MatchPercent: score,
         SatisfiedCount: Math.min(totalCriteria, satisfiedCount),
         TotalCriteria: totalCriteria,
-        InspectionTimelog: `[ VACANT CLEAN // INSPECTED: ${inspectionTime} ]`,
-        UnitAttributes: `${isOcean ? 'OCEAN VIEW' : 'CITY VIEW'} // ${isHighFloor ? 'HIGH FLOOR' : 'MID FLOOR'} // ${isQuiet ? 'QUIET CORNER' : 'STANDARD'} // RFID #${8800 + r.RoomId}`,
+        InspectionTimelog: `[ KIỂM ĐỊNH SẠCH SẴN SÀNG: ${inspectionTime} ]`,
+        UnitAttributes: `${isOcean ? 'HƯỚNG BIỂN' : 'HƯỚNG PHỐ'} • ${isHighFloor ? 'TẦNG CAO (LEVEL 08+)' : 'TẦNG TRUNG'} • ${isQuiet ? 'GÓC YÊN TĨNH' : 'TIÊU CHUẨN'} • RFID CHÍNH CHỦ #${8800 + r.RoomId}`,
         IsUpgrade: isUpgrade,
         IsLockedByOther: Boolean(isLockedByOther),
         IsLockedByMe: Boolean(isLockedByMe),
@@ -295,7 +370,9 @@ router.get('/recommended-rooms', async (req, res) => {
     }
 
     if (viewAspect === 'ocean') {
-      filtered = filtered.filter((r) => r.ViewAspect.includes('OCEAN'));
+      filtered = filtered.filter((r) => r.ViewAspect.includes('BIỂN') || r.ViewAspect.includes('OCEAN'));
+    } else if (viewAspect === 'city') {
+      filtered = filtered.filter((r) => r.ViewAspect.includes('PHỐ') || r.ViewAspect.includes('CITY'));
     }
 
     // Sắp xếp theo % match cao nhất
@@ -312,12 +389,102 @@ router.get('/recommended-rooms', async (req, res) => {
   }
 });
 
+// ─── GET /api/v1/allocation/floor-schematic ─────────────────────────────────
+// Trả về danh sách phòng cho sơ đồ CAD mặt bằng theo tầng
+router.get('/floor-schematic', async (req, res) => {
+  try {
+    const floor = Number(req.query.floor) || 8;
+    const sql = `
+      SELECT
+        r.RoomId,
+        r.RoomNumber,
+        r.Floor,
+        r.Status,
+        rt.TypeName AS RoomTypeName,
+        rt.AreaSqm,
+        rt.BedType,
+        rt.ViewType
+      FROM Rooms r
+      LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
+      WHERE r.Floor = ? AND r.IsDeleted = 0
+      ORDER BY r.RoomNumber ASC
+      LIMIT 16
+    `;
+
+    const [rows] = await pool.query(sql, [floor]);
+    const now = Date.now();
+
+    const schematicRooms = rows.map((r) => {
+      const lock = activeRoomLocks.get(r.RoomId);
+      const isLocked = lock && lock.expiresAt > now;
+      return {
+        ...r,
+        IsLocked: Boolean(isLocked),
+        LockExpiresAt: isLocked ? lock.expiresAt : null,
+      };
+    });
+
+    res.json({
+      success: true,
+      floor,
+      data: schematicRooms,
+    });
+  } catch (err) {
+    console.error('GET /allocation/floor-schematic error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi tải sơ đồ mặt bằng: ' + err.message });
+  }
+});
+
 // ─── POST /api/v1/allocation/hold (Giữ tạm phòng 15 phút) ───────────────────
 router.post('/hold', async (req, res) => {
   try {
     const { roomId, bookingId } = req.body;
     if (!roomId || !bookingId) {
-      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp RoomId và BookingId.' });
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ RoomId và BookingId.' });
+    }
+
+    // 1. Kiểm tra booking còn tồn tại không (Chống concurrency deletion)
+    const [bookingCheck] = await pool.query(
+      'SELECT BookingId, ConfirmationCode, Status FROM Bookings WHERE BookingId = ?',
+      [bookingId]
+    );
+
+    if (!bookingCheck.length) {
+      return res.status(404).json({
+        success: false,
+        isRecordDeleted: true,
+        message: 'Dữ liệu đặt phòng này đã bị xóa bởi người dùng khác. Vui lòng tải lại trang!',
+      });
+    }
+
+    if (bookingCheck[0].Status === 'Cancelled') {
+      return res.status(410).json({
+        success: false,
+        isRecordDeleted: true,
+        message: 'Đặt phòng này đã bị hủy bởi người dùng khác. Vui lòng tải lại trang!',
+      });
+    }
+
+    // 2. Kiểm tra phòng vật lý
+    const [roomCheck] = await pool.query(
+      'SELECT RoomId, RoomNumber, Status, IsDeleted FROM Rooms WHERE RoomId = ?',
+      [roomId]
+    );
+
+    if (!roomCheck.length || roomCheck[0].IsDeleted) {
+      return res.status(404).json({
+        success: false,
+        isRecordDeleted: true,
+        message: 'Phòng này đã bị xóa hoặc ngừng khai thác trên hệ thống. Vui lòng chọn phòng khác!',
+      });
+    }
+
+    if (roomCheck[0].Status === 'Occupied') {
+      return res.status(409).json({
+        success: false,
+        isConflict: true,
+        message: `Phòng ${roomCheck[0].RoomNumber} hiện đang có khách lưu trú. Vui lòng chọn phòng khác!`,
+      });
     }
 
     const now = Date.now();
@@ -327,6 +494,7 @@ router.post('/hold', async (req, res) => {
     if (existingLock && existingLock.expiresAt > now && String(existingLock.bookingId) !== String(bookingId)) {
       return res.status(409).json({
         success: false,
+        isConflict: true,
         message: 'Phòng vừa được gán hoặc giữ tạm bởi nhân viên khác, vui lòng chọn phòng khác.',
       });
     }
@@ -346,6 +514,7 @@ router.post('/hold', async (req, res) => {
       success: true,
       message: `Đã kích hoạt khóa giữ tạm phòng (Lock Pending) trong 15 phút. Mã Lease: ${holdToken}`,
       roomId: Number(roomId),
+      roomNumber: roomCheck[0].RoomNumber,
       expiresAt,
       expiresInSeconds: 900,
       holdToken,
@@ -353,6 +522,22 @@ router.post('/hold', async (req, res) => {
   } catch (err) {
     console.error('POST /allocation/hold error:', err);
     res.status(500).json({ success: false, message: 'Lỗi giữ tạm phòng: ' + err.message });
+  }
+});
+
+// ─── POST /api/v1/allocation/release-hold (Hủy giữ phòng) ─────────────────
+router.post('/release-hold', async (req, res) => {
+  try {
+    const { roomId, bookingId } = req.body;
+    if (roomId) {
+      const lock = activeRoomLocks.get(Number(roomId));
+      if (!bookingId || (lock && String(lock.bookingId) === String(bookingId))) {
+        activeRoomLocks.delete(Number(roomId));
+      }
+    }
+    res.json({ success: true, message: 'Đã hủy giữ phòng thành công.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -383,7 +568,7 @@ router.post('/confirm', async (req, res) => {
       return res.status(410).json({
         success: false,
         isExpired: true,
-        message: 'Thời gian giữ phòng đã hết, vui lòng gán lại.',
+        message: 'Thời gian giữ phòng đã hết hạn (15 phút), vui lòng thực hiện lại.',
       });
     }
 
@@ -391,13 +576,14 @@ router.post('/confirm', async (req, res) => {
     if (lock && String(lock.bookingId) !== String(bookingId)) {
       return res.status(409).json({
         success: false,
-        message: 'Phòng vừa được gán cho booking khác, vui lòng chọn phòng khác.',
+        isConflict: true,
+        message: 'Phòng vừa được gán hoặc giữ tạm bởi nhân viên khác, vui lòng chọn phòng khác.',
       });
     }
 
     await conn.beginTransaction();
 
-    // 1. Kiểm tra phòng vật lý trong CSDL
+    // 1. Kiểm tra phòng vật lý trong CSDL (FOR UPDATE ngăn race condition)
     const [roomRows] = await conn.query(
       'SELECT RoomId, RoomNumber, Floor, Status, IsDeleted FROM Rooms WHERE RoomId = ? FOR UPDATE',
       [roomId]
@@ -405,7 +591,11 @@ router.post('/confirm', async (req, res) => {
 
     if (!roomRows.length || roomRows[0].IsDeleted) {
       await conn.rollback();
-      return res.status(404).json({ success: false, message: 'Phòng không tồn tại trong hệ thống.' });
+      return res.status(404).json({
+        success: false,
+        isRecordDeleted: true,
+        message: 'Phòng này đã bị xóa hoặc không còn tồn tại trên hệ thống. Vui lòng tải lại trang!',
+      });
     }
 
     const room = roomRows[0];
@@ -413,11 +603,12 @@ router.post('/confirm', async (req, res) => {
       await conn.rollback();
       return res.status(409).json({
         success: false,
+        isConflict: true,
         message: 'Phòng vừa được gán cho booking khác, vui lòng chọn phòng khác.',
       });
     }
 
-    // 2. Kiểm tra booking
+    // 2. Kiểm tra booking (FOR UPDATE)
     const [bookingRows] = await conn.query(
       'SELECT BookingId, ConfirmationCode, Status, CheckInDate, CheckOutDate FROM Bookings WHERE BookingId = ? FOR UPDATE',
       [bookingId]
@@ -425,10 +616,22 @@ router.post('/confirm', async (req, res) => {
 
     if (!bookingRows.length) {
       await conn.rollback();
-      return res.status(404).json({ success: false, message: 'Đặt phòng không tồn tại trong cơ sở dữ liệu.' });
+      return res.status(404).json({
+        success: false,
+        isRecordDeleted: true,
+        message: 'Đặt phòng này đã bị xóa bởi người dùng khác trong khi bạn đang thao tác. Vui lòng tải lại trang!',
+      });
     }
 
     const booking = bookingRows[0];
+    if (booking.Status === 'Cancelled') {
+      await conn.rollback();
+      return res.status(410).json({
+        success: false,
+        isRecordDeleted: true,
+        message: 'Đặt phòng này đã bị hủy bởi người dùng khác. Vui lòng tải lại trang!',
+      });
+    }
 
     // 3. Cập nhật hoặc tạo lượt lưu trú (Stays)
     const [stayRows] = await conn.query(
@@ -437,7 +640,6 @@ router.post('/confirm', async (req, res) => {
     );
 
     const targetStayStatus = proceedToCheckIn ? 'CheckedIn' : 'Confirmed';
-    const targetRoomStatus = proceedToCheckIn ? 'Occupied' : room.Status;
     const targetBookingStatus = proceedToCheckIn ? 'CheckedIn' : 'Confirmed';
 
     if (stayRows.length) {
@@ -514,9 +716,5 @@ router.post('/confirm', async (req, res) => {
     conn.release();
   }
 });
-
-function padZero(n) {
-  return String(n).padStart(2, '0');
-}
 
 module.exports = router;
