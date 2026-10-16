@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { loginUser, registerUser, fetchCurrentUser, loginWithGoogle, loginWithFacebook } from '../api/authApi';
+import { loginUser, registerUser, fetchCurrentUser } from '../api/authApi';
 
 const AuthContext = createContext(null);
 
@@ -68,8 +68,6 @@ export const AuthProvider = ({ children }) => {
     isLoading,
     login: handleLogin,
     register: handleRegister,
-    loginGoogle: handleGoogleLogin,
-    loginFacebook: handleFacebookLogin,
     logout: handleLogout,
     updateUser
   };
