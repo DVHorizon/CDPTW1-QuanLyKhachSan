@@ -23,7 +23,7 @@ const callApi = async (method, path = '', body) => {
     }
 };
 
-// Dòng MySQL  <->  đối tượng phòng trên giao diện
+// Dòng MySQL  <->  đối tượng phòng trên giao diện (Đồng bộ CSDL MySQL trực tiếp, không qua localStorage)
 const toUI = (r) => ({
     id: r.id,
     number: r.so_phong,
@@ -35,6 +35,8 @@ const toUI = (r) => ({
     note: r.ghi_chu || '',
     hk: r.buong_phong,
     occ: r.luu_tru,
+    updated_at: r.updated_at || null,
+    is_deleted: r.is_deleted || 0,
 });
 const toAPI = (r) => ({
     so_phong: r.number,
@@ -46,6 +48,7 @@ const toAPI = (r) => ({
     ghi_chu: r.note,
     buong_phong: r.hk,
     luu_tru: r.occ,
+    prev_updated_at: r.updated_at || undefined,
 });
 
 const WINGS = ['A', 'B', 'C'];
@@ -128,13 +131,7 @@ const EMPTY_FORM = {
 const RoomManagement = () => {
     const [roomTypes, setRoomTypes] = useState(loadRoomTypes);
 
-    const [rooms, setRooms] = useState(() => {
-        try {
-            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-            if (Array.isArray(saved) && saved.length > 0) return saved;
-        } catch (_) { }
-        return buildSampleRooms();
-    });
+    const [rooms, setRooms] = useState([]);
     const [logs, setLogs] = useState(() => {
         try {
             const saved = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
@@ -142,6 +139,11 @@ const RoomManagement = () => {
         } catch (_) { }
         return [];
     });
+
+    // Quản lý Thùng Rác (Soft Delete: IsDeleted = 1 / true)
+    const [trashModalOpen, setTrashModalOpen] = useState(false);
+    const [trashRooms, setTrashRooms] = useState([]);
+    const [trashLoading, setTrashLoading] = useState(false);
 
     const [filters, setFilters] = useState({ wing: 'all', floor: 'all', type: 'all', status: 'all' });
     const [search, setSearch] = useState('');
@@ -161,11 +163,43 @@ const RoomManagement = () => {
     const [syncErrorModal, setSyncErrorModal] = useState(null);
 
     useEffect(() => {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms)); } catch (_) { }
-    }, [rooms]);
-    useEffect(() => {
         try { localStorage.setItem(LOG_KEY, JSON.stringify(logs)); } catch (_) { }
     }, [logs]);
+
+    // Tải danh sách phòng trong Thùng Rác (IsDeleted = true)
+    const fetchTrashRooms = async () => {
+        setTrashLoading(true);
+        try {
+            const res = await callApi('GET', '/thung-rac');
+            if (res && res.ok && Array.isArray(res.data.data)) {
+                setTrashRooms(res.data.data.map(toUI));
+            } else {
+                setTrashRooms([]);
+            }
+        } catch (_) {
+            setTrashRooms([]);
+        } finally {
+            setTrashLoading(false);
+        }
+    };
+
+    const openTrashModal = () => {
+        setTrashModalOpen(true);
+        fetchTrashRooms();
+    };
+
+    const handleRestoreRoom = async (roomId, roomNumber) => {
+        const res = await callApi('PATCH', `/${roomId}/khoi-phuc`);
+        if (!res) return lostConnection();
+        if (!res.ok) {
+            showToast(res.data?.message || 'Không thể khôi phục phòng', 'error');
+            return;
+        }
+        showToast(`Đã khôi phục thành công phòng ${roomNumber} (IsDeleted: 1 -> 0)!`, 'success');
+        addLog(`Khôi phục phòng ${roomNumber} từ thùng rác`);
+        setTrashRooms((prev) => prev.filter((r) => r.id !== roomId));
+        reloadDataFromBackend();
+    };
 
     // Tải danh sách loại phòng thật từ MySQL Database
     const fetchRoomTypes = async () => {
@@ -323,8 +357,23 @@ const RoomManagement = () => {
 
     const runRowAction = async (room, action) => {
         if (backendConnected) {
-            const r = await callApi('PATCH', `/${room.id}/thao-tac`, { action });
+            const r = await callApi('PATCH', `/${room.id}/thao-tac`, { 
+                action, 
+                prev_updated_at: room.updated_at 
+            });
             if (!r) return lostConnection();
+            if (r.status === 409 || r.data?.isConflict) {
+                setSyncErrorModal({
+                    title: 'XUNG ĐỘT DỮ LIỆU (OPTIMISTIC LOCKING)!',
+                    message: r.data?.message || `Phòng ${room.number} đã bị người khác thay đổi trạng thái trong lúc bạn thao tác! Hệ thống đã kích hoạt khóa lạc quan (Optimistic Locking) để đảm bảo toàn vẹn dữ liệu.`,
+                    actionText: 'Tải Lại Dữ Liệu Mới Nhất',
+                    onAction: () => {
+                        setSyncErrorModal(null);
+                        reloadDataFromBackend();
+                    },
+                });
+                return;
+            }
             if (r.status === 404 || r.data?.isRecordDeleted) {
                 setSyncErrorModal({
                     title: 'CẢNH BÁO: PHÒNG ĐÃ BỊ XÓA KHỎI CƠ SỞ DỮ LIỆU!',
@@ -503,6 +552,21 @@ const RoomManagement = () => {
                 : await callApi('PUT', `/${modal.id}`, body);
             if (!r) return lostConnection();
 
+            // Phát hiện xung đột dữ liệu Optimistic Locking (Phòng đã bị sửa bởi người khác)
+            if (r.status === 409 || r.data?.isConflict) {
+                setSyncErrorModal({
+                    title: 'CẢNH BÁO: XUNG ĐỘT DỮ LIỆU (OPTIMISTIC LOCKING)!',
+                    message: r.data?.message || `Trong lúc bạn đang chỉnh sửa, phòng [${form.number}] đã được cập nhật bởi một người dùng hoặc tiến trình khác! Hệ thống đã kích hoạt khóa lạc quan (Optimistic Locking) để tránh ghi đè mất mát dữ liệu.`,
+                    actionText: 'Tải Lại Dữ Liệu Mới Nhất',
+                    onAction: () => {
+                        setSyncErrorModal(null);
+                        reloadDataFromBackend();
+                    },
+                });
+                setModal(null);
+                return;
+            }
+
             // Phát hiện phòng đã bị xóa trong CSDL bởi người khác
             if (r.status === 404 || r.data?.isRecordDeleted) {
                 setSyncErrorModal({
@@ -678,6 +742,15 @@ const RoomManagement = () => {
                         >
                             <span className="material-symbols-outlined text-[18px]">lock</span>
                             <span>Khóa Cả Tầng</span>
+                        </button>
+                        <button
+                            id="btn-trash-bin"
+                            type="button"
+                            onClick={openTrashModal}
+                            className="flex items-center gap-space-xs px-space-md py-space-sm bg-tertiary-container/30 text-on-surface rounded-lg font-label-md text-label-md font-semibold hover:bg-tertiary-container/50 transition-colors shadow-sm border border-tertiary/20 cursor-pointer"
+                        >
+                            <span className="material-symbols-outlined text-[18px] text-tertiary">delete_sweep</span>
+                            <span>Thùng Rác (Xóa Logic)</span>
                         </button>
                     </div>
                 </div>
@@ -1204,6 +1277,121 @@ const RoomManagement = () => {
                                     <span>{syncErrorModal.actionText}</span>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 🗑️ MODAL THÙNG RÁC: QUẢN LÝ CÁC PHÒNG ĐÃ XÓA LOGIC (SOFT DELETE) */}
+            {trashModalOpen && (
+                <div className="fixed inset-0 z-[350] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-surface-container-lowest w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-outline-variant flex flex-col max-h-[85vh]">
+                        {/* Header modal */}
+                        <div className="bg-surface-container px-6 py-4 flex items-center justify-between border-b border-outline-variant">
+                            <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-[26px] text-tertiary">
+                                    delete_sweep
+                                </span>
+                                <div>
+                                    <h3 className="font-title-lg text-title-lg font-bold text-on-surface">
+                                        Thùng Rác Phòng Vật Lý (Soft Delete)
+                                    </h3>
+                                    <p className="text-body-sm text-on-surface-variant">
+                                        Cơ chế xóa logic (IsDeleted: 0 → 1). Dữ liệu được bảo toàn trong MySQL và có thể khôi phục bất cứ lúc nào.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setTrashModalOpen(false)}
+                                className="p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">close</span>
+                            </button>
+                        </div>
+
+                        {/* Danh sách phòng trong thùng rác */}
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {trashLoading ? (
+                                <div className="py-12 flex flex-col items-center justify-center gap-3 text-on-surface-variant">
+                                    <span className="material-symbols-outlined text-[32px] animate-spin text-admin-primary">
+                                        progress_activity
+                                    </span>
+                                    <span>Đang truy vấn cơ sở dữ liệu MySQL...</span>
+                                </div>
+                            ) : trashRooms.length === 0 ? (
+                                <div className="py-12 flex flex-col items-center justify-center gap-3 text-on-surface-variant text-center">
+                                    <span className="material-symbols-outlined text-[48px] text-outline-variant">
+                                        auto_delete
+                                    </span>
+                                    <p className="font-title-md text-title-md font-semibold text-on-surface">
+                                        Thùng rác trống
+                                    </p>
+                                    <p className="text-body-sm max-w-md">
+                                        Hiện không có phòng nào bị xóa logic (IsDeleted = 1) trong cơ sở dữ liệu. Mọi phòng đang hoạt động bình thường.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+                                    <table className="w-full text-left text-body-sm">
+                                        <thead className="bg-surface-container font-label-md text-label-md font-bold text-on-surface-variant uppercase tracking-wider border-b border-outline-variant">
+                                            <tr>
+                                                <th className="py-3 px-4">Số Phòng</th>
+                                                <th className="py-3 px-4">Tầng / Khu</th>
+                                                <th className="py-3 px-4">Loại Phòng</th>
+                                                <th className="py-3 px-4">Trạng Thái DB</th>
+                                                <th className="py-3 px-4 text-right">Thao Tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-outline-variant/60 font-body-sm">
+                                            {trashRooms.map((r) => (
+                                                <tr key={r.id} className="hover:bg-surface-container-low transition-colors">
+                                                    <td className="py-3 px-4 font-mono font-bold text-on-surface">
+                                                        {r.number}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-on-surface-variant">
+                                                        Tầng {r.floor} • Khu {r.wing}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-on-surface-variant">
+                                                        {typeName(r.typeCode)}
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-error/10 text-error">
+                                                            IsDeleted: 1 (True)
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRestoreRoom(r.id, r.number)}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-admin-primary/10 hover:bg-admin-primary/20 text-admin-primary font-label-sm text-label-sm font-bold transition-all cursor-pointer shadow-sm"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[16px]">
+                                                                restore_from_trash
+                                                            </span>
+                                                            <span>Khôi Phục (0)</span>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer modal */}
+                        <div className="bg-surface-container px-6 py-3 flex items-center justify-between border-t border-outline-variant">
+                            <span className="text-body-sm text-on-surface-variant">
+                                Tổng cộng: <strong className="text-on-surface">{trashRooms.length}</strong> phòng trong thùng rác
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setTrashModalOpen(false)}
+                                className="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md transition-colors"
+                            >
+                                Đóng
+                            </button>
                         </div>
                     </div>
                 </div>

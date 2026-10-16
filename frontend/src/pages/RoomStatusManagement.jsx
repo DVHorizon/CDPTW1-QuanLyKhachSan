@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import AdminLayout from '../components/admin/layout/AdminLayout';
+import { useSocket } from '../context/SocketContext';
 
 // ─── Cấu hình API Backend ──────────────────────────────────────────────────
 const API_BASE = 'http://localhost:5000/api/phong';
@@ -87,6 +88,9 @@ const DEFAULT_TYPES = [
 ];
 
 const RoomStatusManagement = () => {
+  // Hook kết nối WebSocket Realtime tập trung
+  const { isConnected, subscribe } = useSocket();
+
   // State phòng & CSDL
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -179,6 +183,70 @@ const RoomStatusManagement = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // ─── Lắng nghe sự kiện WebSocket Realtime ──────────────────────────────
+  useEffect(() => {
+    // 1. Thay đổi trạng thái buồng phòng đơn lẻ (Clean / Inhouse / Dirty / OOO)
+    const unsubStatus = subscribe('ROOM_STATUS_CHANGED', (payload) => {
+      if (payload?.room) {
+        setRooms((prev) => prev.map((r) => (r.id === payload.roomId ? { ...r, ...payload.room } : r)));
+        setSelectedRoom((prev) => (prev && prev.id === payload.roomId ? { ...prev, ...payload.room } : prev));
+      } else {
+        fetchRealRooms(true);
+      }
+      showToast(`⚡ Phòng ${payload?.roomNumber || ''} vừa cập nhật trạng thái (${payload?.action || 'thao tác'})`, 'info');
+    });
+
+    // 2. Thao tác hàng loạt hoặc khóa cả tầng
+    const unsubBatch = subscribe('ROOMS_BATCH_UPDATED', (payload) => {
+      fetchRealRooms(true);
+      showToast(`⚡ Cập nhật hàng loạt ${payload?.count || ''} phòng (${payload?.action || ''})`, 'info');
+    });
+
+    // 3. Thêm / Sửa / Xóa phòng
+    const unsubCreated = subscribe('ROOM_CREATED', () => {
+      fetchRealRooms(true);
+      showToast('⚡ Có phòng mới vừa được thêm vào sơ đồ', 'success');
+    });
+    const unsubUpdated = subscribe('ROOM_UPDATED', (payload) => {
+      if (payload?.room) {
+        setRooms((prev) => prev.map((r) => (r.id === payload.room.id ? payload.room : r)));
+      } else {
+        fetchRealRooms(true);
+      }
+    });
+    const unsubDeleted = subscribe('ROOM_DELETED', (payload) => {
+      fetchRealRooms(true);
+      showToast(`⚡ Phòng ${payload?.roomNumber || ''} vừa được xóa khỏi hệ thống`, 'warning');
+    });
+
+    // 4. Khách hàng khóa phòng trực tuyến 15 phút
+    const unsubLockAcquired = subscribe('ROOM_LOCK_ACQUIRED', (payload) => {
+      showToast(`🔒 Khách đang giữ chỗ ${payload?.quantity || 1} phòng (Hạng #${payload?.roomTypeId}) trong 15p`, 'warning');
+    });
+
+    // 5. Nhả phòng về kho trống
+    const unsubLockReleased = subscribe('ROOM_LOCK_RELEASED', (payload) => {
+      showToast(`🔓 Phòng giữ chỗ (Hạng #${payload?.roomTypeId}) đã được nhả về kho trống`, 'info');
+    });
+
+    // 6. Đơn đặt phòng mới
+    const unsubBooking = subscribe('BOOKING_CREATED', (payload) => {
+      showToast(`🎉 Đơn đặt phòng mới: ${payload?.confirmationCode || ''} (${payload?.guestName || 'Khách trực tuyến'})`, 'success');
+      fetchRealRooms(true);
+    });
+
+    return () => {
+      unsubStatus();
+      unsubBatch();
+      unsubCreated();
+      unsubUpdated();
+      unsubDeleted();
+      unsubLockAcquired();
+      unsubLockReleased();
+      unsubBooking();
+    };
+  }, [subscribe]);
 
   // ─── Chuyển đổi trạng thái phòng tự động ─────────────────────────────────
   const handleChangeStatus = async (roomId, targetStatus) => {
@@ -465,6 +533,21 @@ const RoomStatusManagement = () => {
           </div>
 
           <div className="flex items-center gap-space-sm flex-wrap">
+            {/* Realtime Live Indicator Badge */}
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border shadow-xs transition-all ${
+              isConnected 
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' 
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 animate-pulse'
+            }`}>
+              <span className="relative flex h-2 w-2">
+                {isConnected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${isConnected ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+              </span>
+              <span className="text-[11px] font-bold tracking-wide uppercase">
+                {isConnected ? 'Realtime Live' : 'Đang kết nối lại'}
+              </span>
+            </div>
+
             {/* Countdown auto-refresh badge */}
             <div className="flex items-center gap-2 bg-surface-container-high px-space-md py-1.5 rounded-xl border border-outline-variant/20 shadow-xs">
               <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[18px]">
