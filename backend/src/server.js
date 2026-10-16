@@ -5,7 +5,7 @@ const http = require('http');
 const cors = require('cors');
 require('dotenv').config();
 
-const { initWebSocket } = require('./services/websocketService');
+const { initSocket } = require('./sockets/socketHandler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -60,7 +60,7 @@ app.use(require('./shared/middlewares/errorHandler'));
 // ─── HTTP Server & WebSocket ───────────────────────────────────────────────
 const server = http.createServer(app);
 try {
-  initWebSocket(server);
+  initSocket(server);
 } catch (wsErr) {
   console.warn('⚠️ WebSocket init warning:', wsErr.message);
 }
