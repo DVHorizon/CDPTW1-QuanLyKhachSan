@@ -25,7 +25,6 @@ async function safeFetchJson(path, options = {}) {
       });
 
       const text = await res.text();
-      // Nếu server trả về HTML (404/500/Nginx/Vite fallback) thay vì JSON
       if (text.trim().startsWith('<') || text.trim().startsWith('<!DOCTYPE')) {
         lastErr = new Error('Máy chủ phản hồi trang lỗi HTML thay vì JSON. Đang thử kênh kết nối dự phòng...');
         continue;
@@ -37,7 +36,7 @@ async function safeFetchJson(path, options = {}) {
       lastErr = err;
     }
   }
-  throw lastErr || new Error('Không thể kết nối đến máy chủ backend.');
+  throw lastErr || new Error('Không thể kết nối đến máy chủ cơ sở dữ liệu backend.');
 }
 
 // ─── Tiện ích định dạng ─────────────────────────────────────────────────────
@@ -129,84 +128,414 @@ const ConcurrencyConflictModal = ({ conflictData, onReload }) => {
   );
 };
 
-// ─── Modal In Phiếu Gán Phòng (Print Allocation Voucher) ─────────────────────
+// ─── Modal In & Xem Trước Phiếu Gán Phòng (Chuyên Nghiệp Cho Cả Xem Trước & In Ra) ───
 const PrintVoucherModal = ({ booking, room, onClose }) => {
   if (!booking) return null;
 
+  const assignedRoomNum = room ? room.RoomNumber : booking.AssignedRoomNumber || 'Chưa Gán';
+  const assignedRoomType = room ? room.RoomTypeName : booking.RoomTypeName;
+  const assignedFloor = room ? room.Floor : booking.AssignedFloor || '—';
+  const nowStr = new Date().toLocaleString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+  // Hàm in phiếu trực tiếp ra cửa sổ in chuyên nghiệp (Chỉ in duy nhất phiếu này)
+  const handlePrintDirectly = () => {
+    const voucherElement = document.getElementById('printable-voucher-sheet');
+    if (!voucherElement) {
+      window.print();
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=900,height=1100');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="vi">
+        <head>
+          <meta charset="utf-8" />
+          <title>Phieu_Gan_Phong_${booking.ConfirmationCode}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 10mm 12mm;
+            }
+            body {
+              font-family: 'Times New Roman', Times, serif, system-ui;
+              background-color: #ffffff !important;
+              color: #0f172a !important;
+              margin: 0;
+              padding: 0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            * {
+              box-sizing: border-box;
+            }
+            .voucher-container {
+              width: 100%;
+              max-width: 820px;
+              margin: 0 auto;
+              padding: 16px;
+              border: 2px solid #0f172a;
+              background: #ffffff;
+            }
+            .header-table {
+              width: 100%;
+              border-bottom: 2px solid #0f172a;
+              padding-bottom: 12px;
+              margin-bottom: 16px;
+            }
+            .title-block {
+              text-align: center;
+              margin-bottom: 16px;
+            }
+            .title-main {
+              font-size: 19px;
+              font-weight: bold;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              margin: 0;
+              color: #0f172a;
+            }
+            .title-sub {
+              font-size: 11px;
+              font-style: italic;
+              color: #475569;
+              margin-top: 3px;
+            }
+            .info-grid {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 14px;
+            }
+            .info-grid td, .info-grid th {
+              border: 1px solid #cbd5e1;
+              padding: 6px 10px;
+              font-size: 13px;
+            }
+            .info-grid th {
+              background-color: #f1f5f9 !important;
+              color: #0f172a;
+              font-weight: bold;
+              text-align: left;
+            }
+            .room-highlight-box {
+              background-color: #ecfdf5 !important;
+              border: 2px solid #059669;
+              padding: 8px 12px;
+              text-align: center;
+              border-radius: 6px;
+            }
+            .room-number-text {
+              font-size: 22px;
+              font-weight: 900;
+              color: #047857;
+              letter-spacing: 1px;
+            }
+            .finance-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+              margin-bottom: 14px;
+            }
+            .finance-table td, .finance-table th {
+              border: 1px solid #cbd5e1;
+              padding: 6px 10px;
+              font-size: 13px;
+            }
+            .finance-table th {
+              background-color: #f8fafc !important;
+              font-weight: 600;
+            }
+            .balance-due-row {
+              background-color: #fff1f2 !important;
+              font-weight: bold;
+              font-size: 14px;
+              color: #e11d48;
+            }
+            .policy-box {
+              font-size: 11px;
+              color: #475569;
+              border: 1px dashed #94a3b8;
+              padding: 8px 12px;
+              border-radius: 4px;
+              margin-bottom: 20px;
+              line-height: 1.5;
+            }
+            .signatures-table {
+              width: 100%;
+              margin-top: 20px;
+            }
+            .signatures-table td {
+              width: 50%;
+              text-align: center;
+              vertical-align: top;
+              font-size: 13px;
+            }
+            .signature-space {
+              height: 70px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="voucher-container">
+            ${voucherElement.innerHTML}
+          </div>
+          <script>
+            window.onload = function() {
+              window.focus();
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[400] flex items-center justify-center p-4">
-      <div className="bg-surface-container rounded-2xl border border-outline-variant/40 max-w-xl w-full p-6 text-on-surface space-y-4 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[400] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      {/* Vùng Modal Chứa Chế Độ Xem Trước & Nút Thao Tác */}
+      <div className="bg-surface-container rounded-3xl border border-outline-variant/40 max-w-4xl w-full my-auto flex flex-col max-h-[94vh] shadow-2xl overflow-hidden">
+        {/* Header Thanh Công Cụ Xem Trước */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/20 bg-surface-container-high/60">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-admin-primary/20 border border-admin-primary/40 flex items-center justify-center text-admin-primary">
+              <span className="material-symbols-outlined text-xl">visibility</span>
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-on-surface">Xem Trước Phiếu Điều Phối & Gán Phòng</h3>
+              <p className="text-xs text-on-surface-variant">Chế độ hiển thị xem trước trang in khổ A4 tiêu chuẩn khách sạn</p>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-admin-primary">print</span>
-            <h3 className="font-bold text-base">Phiếu Điều Phối & Gán Phòng Khách Sạn</h3>
-          </div>
-          <button onClick={onClose} className="text-on-surface-variant hover:text-white cursor-pointer">
-            <span className="material-symbols-outlined text-xl">close</span>
-          </button>
-        </div>
-
-        <div className="border border-dashed border-outline-variant/40 rounded-xl p-5 bg-surface-container-lowest space-y-4 font-mono text-xs">
-          <div className="text-center space-y-1">
-            <h4 className="font-bold text-sm tracking-widest text-admin-primary">KHÁCH SẠN VÀ KHU NGHỈ DƯỠNG GRAND HORIZON</h4>
-            <p className="text-[10px] text-on-surface-variant">PHIẾU ĐIỀU PHỐI & GÁN PHÒNG LƯU TRÚ</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 border-t border-b border-outline-variant/20 py-3">
-            <div>
-              <span className="text-on-surface-variant block">MÃ ĐẶT PHÒNG:</span>
-              <strong className="text-sm text-admin-primary font-mono">{booking.ConfirmationCode}</strong>
-            </div>
-            <div>
-              <span className="text-on-surface-variant block">SỐ PHÒNG ĐƯỢC GÁN:</span>
-              <strong className="text-sm text-emerald-400 font-bold">{room ? room.RoomNumber : 'CHƯA GÁN'}</strong>
-            </div>
-            <div>
-              <span className="text-on-surface-variant block">HỌ TÊN KHÁCH:</span>
-              <span className="font-medium text-on-surface">{booking.GuestName}</span>
-            </div>
-            <div>
-              <span className="text-on-surface-variant block">HẠNG HỘI VIÊN:</span>
-              <span className="text-amber-400 font-semibold">{booking.VipTier || 'TIÊU CHUẨN'}</span>
-            </div>
-            <div>
-              <span className="text-on-surface-variant block">NGÀY NHẬN PHÒNG:</span>
-              <span>{fmtDateMonth(booking.CheckInDate)}</span>
-            </div>
-            <div>
-              <span className="text-on-surface-variant block">NGÀY TRẢ PHÒNG:</span>
-              <span>{fmtDateMonth(booking.CheckOutDate)} ({booking.NumberOfNights} đêm)</span>
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center text-[11px]">
-            <span>TỔNG CHI PHÍ DỰ TOÁN:</span>
-            <span className="font-bold text-on-surface">{fmtMoney(booking.totalFolio)}</span>
-          </div>
-          <div className="flex justify-between items-center text-[11px]">
-            <span>TIỀN ĐÃ ĐẶT CỌC:</span>
-            <span className="text-emerald-400 font-medium">{fmtMoney(booking.depositPaid)}</span>
-          </div>
-          <div className="flex justify-between items-center text-[11px] font-bold text-rose-400">
-            <span>CÔNG NỢ CẦN THU KHI CHECK-IN:</span>
-            <span>{fmtMoney(booking.balanceDue)}</span>
+            <button
+              onClick={handlePrintDirectly}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs shadow-lg shadow-admin-primary/30 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">print</span>
+              In Phiếu Ngay
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-on-surface-variant hover:text-white hover:bg-surface-container-highest transition-colors cursor-pointer"
+              title="Đóng bản xem trước"
+            >
+              <span className="material-symbols-outlined text-xl">close</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-outline-variant/30 text-xs font-medium hover:bg-surface-container-high transition-colors cursor-pointer"
+        {/* Nội Dung Bản Xem Trước (Tờ Giấy A4 Trắng Tinh Chuẩn In Ấn) */}
+        <div className="p-4 sm:p-8 overflow-y-auto bg-slate-900/80 flex justify-center">
+          <div
+            id="printable-voucher-sheet"
+            className="bg-white text-slate-900 w-full max-w-[780px] p-6 sm:p-10 rounded-xl shadow-2xl border border-slate-300 font-sans relative"
           >
-            Đóng
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="px-4 py-2 rounded-lg bg-admin-primary hover:bg-admin-primary/90 text-on-primary text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-md"
-          >
-            <span className="material-symbols-outlined text-sm">print</span>
-            In Phiếu
-          </button>
+            {/* 1. Header Khách Sạn */}
+            <div className="border-b-2 border-slate-900 pb-4 mb-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-amber-600 font-bold text-sm tracking-widest">★★★★★</span>
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">RESORT & LUXURY SUITES</span>
+                </div>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-wider uppercase font-serif">
+                  GRAND HORIZON HOTELS
+                </h1>
+                <p className="text-xs text-slate-600 mt-1">
+                  Địa chỉ: 01 Võ Nguyên Giáp, P. Phước Mỹ, Q. Sơn Trà, TP. Đà Nẵng, Việt Nam
+                </p>
+                <p className="text-xs text-slate-600">
+                  Hotline: <strong>1900 6868</strong> • Email: reservations@grandhorizon.vn
+                </p>
+              </div>
+
+              {/* Mã vạch & QR Code giả lập */}
+              <div className="text-right flex flex-col items-end sm:items-end">
+                <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">MÃ ĐẶT PHÒNG HỆ THỐNG</span>
+                <span className="font-mono text-base font-black text-slate-900 bg-slate-100 border border-slate-300 px-3 py-1 rounded-md mt-1 inline-block">
+                  {booking.ConfirmationCode}
+                </span>
+                <div className="mt-2 text-[10px] font-mono text-slate-500">
+                  IN LÚC: {nowStr}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Tiêu Đề Phiếu */}
+            <div className="text-center mb-6">
+              <h2 className="text-lg sm:text-xl font-bold uppercase tracking-wider text-slate-900 font-serif">
+                PHIẾU ĐIỀU PHỐI GÁN PHÒNG & XÁC NHẬN LƯU TRÚ
+              </h2>
+              <p className="text-xs text-slate-500 italic mt-0.5">
+                (ROOM ALLOCATION & GUEST REGISTRATION CARD)
+              </p>
+            </div>
+
+            {/* 3. Ô Nổi Bật Số Phòng Gán Được Đồng Bộ CSDL */}
+            <div className="bg-emerald-50 border-2 border-emerald-600 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">
+                  SỐ PHÒNG GÁN CỤ THỂ (ASSIGNED ROOM UNIT)
+                </span>
+                <div className="text-2xl sm:text-3xl font-black text-emerald-700 tracking-wide mt-0.5 font-mono">
+                  PHÒNG {assignedRoomNum}
+                </div>
+                <span className="text-xs text-emerald-800 font-medium">
+                  {assignedRoomType} • Tầng {assignedFloor} • Tháp Grand Tower
+                </span>
+              </div>
+
+              <div className="text-right">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white inline-block">
+                  ĐÃ XÁC NHẬN ĐIỀU PHỐI
+                </span>
+                <p className="text-[11px] text-emerald-800 mt-1">Đồng bộ cơ sở dữ liệu thời gian thực</p>
+              </div>
+            </div>
+
+            {/* 4. Bảng Thông Tin Khách Hàng */}
+            <div className="mb-5">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-300 pb-1.5 mb-2.5">
+                1. THÔNG TIN KHÁCH HÀNG (GUEST INFORMATION)
+              </h3>
+              <table className="w-full text-xs border border-slate-300">
+                <tbody>
+                  <tr className="border-b border-slate-200">
+                    <td className="w-1/4 bg-slate-50 p-2 font-semibold text-slate-700">Họ và tên khách:</td>
+                    <td className="w-1/4 p-2 font-bold text-slate-900">{booking.GuestName}</td>
+                    <td className="w-1/4 bg-slate-50 p-2 font-semibold text-slate-700">Hạng hội viên:</td>
+                    <td className="w-1/4 p-2 font-bold text-amber-700">{booking.VipTier || 'TIÊU CHUẨN'}</td>
+                  </tr>
+                  <tr className="border-b border-slate-200">
+                    <td className="bg-slate-50 p-2 font-semibold text-slate-700">Số điện thoại:</td>
+                    <td className="p-2 text-slate-800">{booking.GuestPhone || '---'}</td>
+                    <td className="bg-slate-50 p-2 font-semibold text-slate-700">Email:</td>
+                    <td className="p-2 text-slate-800">{booking.GuestEmail || '---'}</td>
+                  </tr>
+                  <tr>
+                    <td className="bg-slate-50 p-2 font-semibold text-slate-700">CCCD / Hộ chiếu:</td>
+                    <td className="p-2 font-mono text-slate-900">{booking.NationalId || 'ID-VERIFIED'}</td>
+                    <td className="bg-slate-50 p-2 font-semibold text-slate-700">Số lượng khách:</td>
+                    <td className="p-2 text-slate-800">
+                      <strong>{booking.Adults || 1}</strong> Người lớn, <strong>{booking.Children || 0}</strong> Trẻ em
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* 5. Bảng Thông Số Lưu Trú */}
+            <div className="mb-5">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-300 pb-1.5 mb-2.5">
+                2. THỜI GIAN VÀ ĐẶC TÍNH LƯU TRÚ (STAY SPECIFICATIONS)
+              </h3>
+              <table className="w-full text-xs border border-slate-300">
+                <tbody>
+                  <tr className="border-b border-slate-200">
+                    <td className="w-1/4 bg-slate-50 p-2 font-semibold text-slate-700">Ngày nhận phòng:</td>
+                    <td className="w-1/4 p-2 font-bold text-slate-900">
+                      {fmtDateMonth(booking.CheckInDate)} <span className="text-[10px] text-slate-500 font-normal">(Từ 14:00)</span>
+                    </td>
+                    <td className="w-1/4 bg-slate-50 p-2 font-semibold text-slate-700">Ngày trả phòng:</td>
+                    <td className="w-1/4 p-2 font-bold text-slate-900">
+                      {fmtDateMonth(booking.CheckOutDate)} <span className="text-[10px] text-slate-500 font-normal">(Trước 12:00)</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="bg-slate-50 p-2 font-semibold text-slate-700">Số đêm lưu trú:</td>
+                    <td className="p-2 font-bold text-slate-900">{booking.NumberOfNights} đêm</td>
+                    <td className="bg-slate-50 p-2 font-semibold text-slate-700">Nguồn đặt phòng:</td>
+                    <td className="p-2 text-slate-800">{booking.BookingSource || 'WalkIn'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* 6. Bảng Kê Dự Toán Tài Chính */}
+            <div className="mb-5">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-300 pb-1.5 mb-2.5">
+                3. CHI TIẾT TÀI CHÍNH DỰ TOÁN (FINANCIAL FOLIO BREAKDOWN)
+              </h3>
+              <table className="w-full text-xs border border-slate-300">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300">
+                    <th className="p-2 text-left">Hạng Mục</th>
+                    <th className="p-2 text-center w-24">Số Lượng</th>
+                    <th className="p-2 text-right w-36">Đơn Giá / Đêm</th>
+                    <th className="p-2 text-right w-36">Thành Tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-slate-200">
+                    <td className="p-2">Tiền phòng ({assignedRoomType})</td>
+                    <td className="p-2 text-center">{booking.NumberOfNights} đêm</td>
+                    <td className="p-2 text-right">{fmtMoney(booking.baseRate)}</td>
+                    <td className="p-2 text-right font-medium">{fmtMoney(Number(booking.baseRate) * Number(booking.NumberOfNights))}</td>
+                  </tr>
+                  <tr className="border-b border-slate-200">
+                    <td className="p-2">Thuế VAT (8%) và Phí dịch vụ (5%)</td>
+                    <td className="p-2 text-center">Gói</td>
+                    <td className="p-2 text-right">—</td>
+                    <td className="p-2 text-right font-medium">{fmtMoney(booking.taxesAndFees)}</td>
+                  </tr>
+                  <tr className="border-b border-slate-200 font-bold bg-slate-50">
+                    <td colSpan="3" className="p-2 text-right">Tổng Dự Toán Hóa Đơn:</td>
+                    <td className="p-2 text-right text-slate-900">{fmtMoney(booking.totalFolio)}</td>
+                  </tr>
+                  <tr className="border-b border-slate-200 text-emerald-700 font-semibold">
+                    <td colSpan="3" className="p-2 text-right">Số Tiền Đã Thanh Toán / Đặt Cọc:</td>
+                    <td className="p-2 text-right">-{fmtMoney(booking.depositPaid)}</td>
+                  </tr>
+                  <tr className="bg-rose-50 text-rose-700 font-bold text-sm">
+                    <td colSpan="3" className="p-2 text-right uppercase">CÔNG NỢ CẦN THU TẠI QUẦY LỄ TÂN:</td>
+                    <td className="p-2 text-right">{fmtMoney(booking.balanceDue)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* 7. Quy Định & Chính Sách */}
+            <div className="border border-slate-300 rounded-lg p-3 text-[11px] text-slate-600 mb-6 space-y-1 bg-slate-50/50">
+              <span className="font-bold text-slate-800 uppercase block">Quy định & Chính sách lưu trú:</span>
+              <p>• Thời gian nhận phòng tiêu chuẩn từ 14:00, trả phòng trước 12:00 trưa. Trả phòng trễ phụ thu theo biểu phí khách sạn.</p>
+              <p>• Khách sạn áp dụng chính sách 100% không hút thuốc lá trong tất cả các phòng nghỉ.</p>
+              <p>• Vui lòng bảo quản tài sản có giá trị trong két sắt an toàn tại phòng hoặc gửi quầy lễ tân.</p>
+            </div>
+
+            {/* 8. Phần Chữ Ký Xác Nhận */}
+            <div className="grid grid-cols-2 gap-8 text-center pt-2">
+              <div>
+                <span className="text-xs font-bold text-slate-800 uppercase block">ĐẠI DIỆN LỄ TÂN KHÁCH SẠN</span>
+                <span className="text-[10px] text-slate-500 italic block">(Ký và ghi rõ họ tên)</span>
+                <div className="h-16"></div>
+                <div className="border-t border-dashed border-slate-400 pt-1 text-xs text-slate-700 font-medium">
+                  Nhân viên ca trực PMS
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xs font-bold text-slate-800 uppercase block">KHÁCH HÀNG XÁC NHẬN</span>
+                <span className="text-[10px] text-slate-500 italic block">(Ký xác nhận thông tin lưu trú)</span>
+                <div className="h-16"></div>
+                <div className="border-t border-dashed border-slate-400 pt-1 text-xs text-slate-900 font-bold">
+                  {booking.GuestName}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -237,9 +566,9 @@ export default function RoomAssignment() {
   const [loadingDossier, setLoadingDossier] = useState(false);
 
   // Bộ lọc phòng gợi ý
-  const [filterFloor, setFilterFloor] = useState('all'); // 'all' | 'high' | 'mid' | 'low'
-  const [filterHK, setFilterHK] = useState('clean'); // 'clean_inspected' | 'clean' | 'all'
-  const [filterView, setFilterView] = useState('all'); // 'all' | 'ocean' | 'city'
+  const [filterFloor, setFilterFloor] = useState('all');
+  const [filterHK, setFilterHK] = useState('clean');
+  const [filterView, setFilterView] = useState('all');
   const [searchRoomQuery, setSearchRoomQuery] = useState('');
 
   // Yêu cầu đặc biệt checklist
@@ -324,7 +653,7 @@ export default function RoomAssignment() {
     return () => clearInterval(interval);
   }, [holdExpiresAt, addToast]);
 
-  // ─── 1. Tải danh sách bookings cần gán phòng ──────────────────────────────
+  // ─── 1. Tải danh sách bookings cần gán phòng từ CSDL ──────────────────────
   const fetchBookings = useCallback(async () => {
     try {
       setLoadingBookings(true);
@@ -349,7 +678,7 @@ export default function RoomAssignment() {
     fetchBookings();
   }, [fetchBookings]);
 
-  // ─── 2. Tải chi tiết booking đang chọn ─────────────────────────────────────
+  // ─── 2. Tải chi tiết booking đang chọn từ CSDL ────────────────────────────
   const fetchBookingDossier = useCallback(async (bId) => {
     if (!bId) {
       setBookingDossier(null);
@@ -359,7 +688,6 @@ export default function RoomAssignment() {
       setLoadingDossier(true);
       const { status, data } = await safeFetchJson(`/booking/${bId}`);
 
-      // Kiểm tra nếu dữ liệu đã bị xóa (Concurrency Check)
       if (status === 404 || data.isRecordDeleted) {
         setConcurrencyConflict({
           isOpen: true,
@@ -396,7 +724,7 @@ export default function RoomAssignment() {
     }
   }, [selectedBookingId, fetchBookingDossier]);
 
-  // ─── 3. Tải danh sách phòng gợi ý ──────────────────────────────────────────
+  // ─── 3. Tải danh sách phòng gợi ý từ CSDL ──────────────────────────────────
   const fetchRecommendedRooms = useCallback(async () => {
     if (!selectedBookingId) return;
     try {
@@ -431,7 +759,7 @@ export default function RoomAssignment() {
     fetchRecommendedRooms();
   }, [fetchRecommendedRooms]);
 
-  // ─── 4. Tải sơ đồ CAD mặt bằng theo tầng ──────────────────────────────────
+  // ─── 4. Tải sơ đồ CAD mặt bằng từ CSDL ────────────────────────────────────
   const fetchCadFloorSchematic = useCallback(async (floorNum) => {
     try {
       setLoadingCad(true);
@@ -569,7 +897,7 @@ export default function RoomAssignment() {
     addToast('info', 'Đã hủy giữ phòng tạm thời.', 'GIẢI PHÓNG PHÒNG');
   };
 
-  // ─── HÀNH ĐỘNG 4: Xác Nhận Gán Phòng Chính Thức ────────────────────────────
+  // ─── HÀNH ĐỘNG 4: Xác Nhận Gán Phòng Chính Thức & Đồng Bộ CSDL ────────────
   const handleConfirmAllocation = async (proceedToCheckIn = false) => {
     if (!selectedRoomId) {
       addToast('warn', 'Vui lòng chọn một số phòng cụ thể để gán cho khách.', 'THIẾU THÔNG TIN');
@@ -591,7 +919,6 @@ export default function RoomAssignment() {
         }),
       });
 
-      // Kiểm tra xóa đồng thời
       if (status === 404 || data.isRecordDeleted) {
         setConcurrencyConflict({
           isOpen: true,
@@ -600,7 +927,6 @@ export default function RoomAssignment() {
         return;
       }
 
-      // Kiểm tra hết hạn giữ phòng
       if (status === 410 || data.isExpired) {
         setIsHoldExpired(true);
         addToast('warn', data.message || 'Thời gian giữ phòng đã hết, vui lòng gán lại.', 'HẾT HẠN GIỮ PHÒNG');
@@ -608,7 +934,6 @@ export default function RoomAssignment() {
         return;
       }
 
-      // Kiểm tra xung đột phòng đã bị người khác gán
       if (status === 409 || data.isConflict) {
         addToast('error', data.message || 'Phòng vừa được gán cho booking khác, vui lòng chọn phòng khác.', 'XUNG ĐỘT GÁN PHÒNG');
         fetchRecommendedRooms();
@@ -619,6 +944,7 @@ export default function RoomAssignment() {
         addToast('success', data.message, 'XÁC NHẬN THÀNH CÔNG');
         setHeldRoom(null);
         setHoldExpiresAt(null);
+        // Đồng bộ tức thời lại toàn bộ dữ liệu từ CSDL
         await fetchBookingDossier(selectedBookingId);
         await fetchBookings();
         await fetchRecommendedRooms();
@@ -697,7 +1023,7 @@ export default function RoomAssignment() {
               </span>
             </div>
             <p className="text-xs text-on-surface-variant">
-              Tự động khớp phòng theo sở thích hội viên VIP, sơ đồ mặt bằng CAD tương tác và khóa bảo vệ giữ phòng 15 phút.
+              Dữ liệu đồng bộ trực tiếp cơ sở dữ liệu MySQL, khớp phòng tự động và khóa bảo vệ 15 phút.
             </p>
           </div>
 
@@ -847,10 +1173,11 @@ export default function RoomAssignment() {
 
             <button
               onClick={() => setShowPrintModal(true)}
-              className="p-2 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:bg-surface-container-highest text-on-surface transition-all cursor-pointer"
-              title="In phiếu điều phối"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold transition-all cursor-pointer shadow-sm"
+              title="Xem trước và in phiếu điều phối"
             >
-              <span className="material-symbols-outlined text-base">print</span>
+              <span className="material-symbols-outlined text-base text-admin-primary">print</span>
+              Xem & In Phiếu Gán Phòng
             </button>
           </div>
         </div>
@@ -1033,7 +1360,6 @@ export default function RoomAssignment() {
 
             {/* Bộ Lọc Nhanh */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              {/* Tầng */}
               <select
                 value={filterFloor}
                 onChange={(e) => setFilterFloor(e.target.value)}
@@ -1045,7 +1371,6 @@ export default function RoomAssignment() {
                 <option value="low">Tầng Thấp (Tầng 1 - 3)</option>
               </select>
 
-              {/* Buồng phòng */}
               <select
                 value={filterHK}
                 onChange={(e) => setFilterHK(e.target.value)}
@@ -1056,7 +1381,6 @@ export default function RoomAssignment() {
                 <option value="all">Tất Cả Trạng Thái</option>
               </select>
 
-              {/* Hướng nhìn */}
               <select
                 value={filterView}
                 onChange={(e) => setFilterView(e.target.value)}
@@ -1067,7 +1391,6 @@ export default function RoomAssignment() {
                 <option value="city">Hướng Nhìn Thành Phố (City View)</option>
               </select>
 
-              {/* Search room */}
               <input
                 type="text"
                 placeholder="Tìm số phòng..."
@@ -1460,7 +1783,7 @@ export default function RoomAssignment() {
           }}
         />
 
-        {/* ─── MODAL IN PHIẾU GÁN PHÒNG ───────────────────────────────────── */}
+        {/* ─── MODAL IN & XEM TRƯỚC PHIẾU GÁN PHÒNG CHUẨN IN ẤN ────────────── */}
         {showPrintModal && (
           <PrintVoucherModal
             booking={bookingDossier}
