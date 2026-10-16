@@ -14,7 +14,6 @@ const NAV_ITEMS = [
   { icon: "soup_kitchen", label: "Màn Hình Bếp (KDS)", to: "/admin/fnb/kitchen" },
   { icon: "local_shipping", label: "Theo Dõi & Giao Món", to: "/admin/fnb/dispatch" },
   { icon: "receipt_long", label: "Lịch Sử & Tổng Hợp F&B", to: "/admin/fnb/history" },
-  { icon: "point_of_sale", label: "POS & Room Service", to: "/room-service" },
   { icon: "account_balance", label: "Tài Chính & Sổ Cái", to: "/admin/tai-chinh" },
   { icon: "neurology", label: "AI Concierge & Chatbot", to: "/admin/ai-concierge" },
   { icon: "loyalty", label: "Khách Hàng & Hội Viên", to: "/admin/loyalty" },

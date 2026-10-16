@@ -32,49 +32,26 @@ export default function GuestSidebar() {
           </div>
         </div>
 
-        {/* Trạm trực hiện tại badge */}
+        {/* Thông tin phòng & lưu trú của khách */}
         <div className="px-3 py-2">
-          <div className="p-3 rounded-lg bg-emerald-50/60 border border-emerald-100/50 flex flex-col gap-1">
+          <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100 flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Trạm Trực Hiện Tại</span>
-              <span className="flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Trực Tuyến
+              <span className="text-[10px] text-emerald-800 uppercase tracking-wider font-bold">Kỳ Nghỉ Của Quý Khách</span>
+              <span className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Đang Lưu Trú
               </span>
             </div>
-            <div className="text-sm font-semibold text-slate-800 truncate">Sảnh Tiếp Đón & Quầy Lễ Tân</div>
+            <div className="text-sm font-bold text-slate-800 truncate">Phòng Deluxe Ban Công #804</div>
             <div className="text-xs text-slate-500 flex items-center justify-between">
-              <span>Ca trực: Sáng - Chiều (06:00 - 14:30)</span>
-              <span className="font-semibold text-emerald-700">PQC-T1</span>
+              <span>Nhận: 28/11 • Trả: 02/12</span>
+              <span className="font-bold text-emerald-700">Tháp B</span>
             </div>
           </div>
         </div>
 
-        {/* Phân hệ Quản lý vận hành */}
-        <div className="px-3 pt-2 pb-1">
-          <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider px-2">Phân Hệ Quản Lý Vận Hành</span>
-        </div>
-        <nav className="px-3 flex flex-col gap-1">
-          <NavLink to="/admin/menu" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">analytics</span>
-            <span className="text-sm">Tổng Quan Vận Hành</span>
-          </NavLink>
-          <NavLink to="/admin/fnb/tables" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">table_restaurant</span>
-            <span className="text-sm">Sơ Đồ Bàn Ăn Trực Quan</span>
-          </NavLink>
-          <NavLink to="/admin/fnb/kitchen" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">inventory_2</span>
-            <span className="text-sm">Kho Nguyên Liệu Bếp</span>
-          </NavLink>
-          <NavLink to="/admin/buong-phong" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">bed</span>
-            <span className="text-sm">Điều Phối Buồng Phòng</span>
-          </NavLink>
-        </nav>
-
         {/* Cổng khách hàng & Dịch vụ */}
         <div className="px-3 pt-3 pb-1">
-          <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider px-2">Cổng Khách Hàng & Dịch Vụ</span>
+          <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider px-2">Dịch Vụ Khách Hàng</span>
         </div>
         <nav className="px-3 flex flex-col gap-1">
           <NavLink to="/fnb/dat-ban" className={navItemClass}>
@@ -89,13 +66,13 @@ export default function GuestSidebar() {
             <span className="material-symbols-outlined text-[20px]">room_service</span>
             <span className="text-sm">Đặt Món Tại Phòng</span>
           </NavLink>
+          <NavLink to="/rooms" className={navItemClass}>
+            <span className="material-symbols-outlined text-[20px]">compare</span>
+            <span className="text-sm">Khám Phá Phòng Nghỉ</span>
+          </NavLink>
           <NavLink to="/fnb/danh-gia" className={navItemClass}>
             <span className="material-symbols-outlined text-[20px]">reviews</span>
             <span className="text-sm">Đánh Giá Món Ăn</span>
-          </NavLink>
-          <NavLink to="/rooms" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">compare</span>
-            <span className="text-sm">So Sánh Phòng Nghỉ</span>
           </NavLink>
           <NavLink to="/wishlist" className={navItemClass}>
             <span className="material-symbols-outlined text-[20px]">bookmark_heart</span>
@@ -107,18 +84,20 @@ export default function GuestSidebar() {
       {/* User Card Bottom */}
       <div className="p-3 m-3 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-[20px]">person</span>
+          <div className="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0 font-bold">
+            {user?.fullName ? user.fullName.charAt(0).toUpperCase() : <span className="material-symbols-outlined text-[20px]">person</span>}
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <span className="text-sm text-slate-800 font-semibold truncate">
-              {user?.fullName || user?.name || "Lê Minh Anh"}
+              {user?.fullName || user?.name || "Khách Lưu Trú"}
             </span>
-            <span className="text-[11px] text-slate-400 truncate">Quản Lý Ẩm Thực & Lễ Tân</span>
+            <span className="text-[11px] text-emerald-700 font-medium truncate">
+              {user?.tierName ? `Hạng ${user.tierName}` : "Thành Viên Thượng Lưu"}
+            </span>
           </div>
         </div>
         <div className="flex items-center justify-between pt-1 border-t border-slate-200/50">
-          <span className="text-xs text-slate-500">Mã nhân sự: #GHR-982</span>
+          <span className="text-xs text-slate-500">Phòng: #804 Deluxe</span>
           <button
             onClick={handleLogout}
             title="Đăng xuất"
