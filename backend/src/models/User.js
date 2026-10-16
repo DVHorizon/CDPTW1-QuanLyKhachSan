@@ -51,6 +51,23 @@ module.exports = (sequelize) => {
     Status: {
       type: DataTypes.STRING(30),
       defaultValue: 'Active'
+    },
+    Department: {
+      type: DataTypes.STRING(100),
+      allowNull: true
+    },
+    Permissions: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    SecurityPolicy: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    IsDeleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
     }
   }, {
     tableName: 'Users',
