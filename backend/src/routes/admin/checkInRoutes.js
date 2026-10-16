@@ -2,7 +2,37 @@
 
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const pool = require('../../config/db');
+
+// Lưu ảnh Base64 thành file vật lý trong public/uploads
+function saveBase64Image(base64Str, subfolder = 'id_cards', prefix = 'SCAN') {
+  if (!base64Str || typeof base64Str !== 'string' || !base64Str.startsWith('data:image')) {
+    return null;
+  }
+  try {
+    const matches = base64Str.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+    const rawExt = matches[1].toLowerCase();
+    const ext = rawExt === 'jpeg' ? 'jpg' : rawExt === 'svg+xml' ? 'svg' : rawExt;
+    const dataBuffer = Buffer.from(matches[2], 'base64');
+
+    const uploadDir = path.join(__dirname, '../../../public/uploads', subfolder);
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const cleanPrefix = String(prefix).replace(/[^a-zA-Z0-9_-]/g, '');
+    const filename = `${cleanPrefix}_${Date.now()}.${ext}`;
+    const filePath = path.join(uploadDir, filename);
+    fs.writeFileSync(filePath, dataBuffer);
+    return `/uploads/${subfolder}/${filename}`;
+  } catch (err) {
+    console.warn('saveBase64Image warning:', err.message);
+    return null;
+  }
+}
 
 // Tiện ích format
 const toDateStr = (d) => {
@@ -411,6 +441,7 @@ router.post('/complete', async (req, res) => {
       dateOfBirth,
       nationality = 'Việt Nam',
       signatureData,
+      idCardImage,
       dispatchNfc = true,
       keycardCount = 2,
       paymentSettled = true,
@@ -441,6 +472,10 @@ router.post('/complete', async (req, res) => {
         message: 'Thông tin giấy tờ (Họ tên, số CCCD/Hộ chiếu) không được để trống.',
       });
     }
+
+    // 0. Lưu hình ảnh vật lý vào thư mục backend/public/uploads/
+    const savedIdCardUrl = saveBase64Image(idCardImage, 'id_cards', `CCCD_${idNumber || 'DOC'}`);
+    const savedSignatureUrl = saveBase64Image(signatureData, 'signatures', `SIG_B${bookingId}`);
 
     await conn.beginTransaction();
 
@@ -613,6 +648,8 @@ router.post('/complete', async (req, res) => {
           IdType: idType,
           KeycardsEncoded: keycardCount,
           DispatchNfc: dispatchNfc,
+          IdCardImage: savedIdCardUrl,
+          SignatureImage: savedSignatureUrl,
           HasSignature: Boolean(signatureData),
         }),
       ]
@@ -627,6 +664,10 @@ router.post('/complete', async (req, res) => {
       roomId: targetRoomId,
       roomNumber: room.RoomNumber,
       status: 'CheckedIn',
+      savedFiles: {
+        idCardUrl: savedIdCardUrl,
+        signatureUrl: savedSignatureUrl,
+      },
     });
   } catch (err) {
     await conn.rollback();

@@ -1048,6 +1048,188 @@ const TestQrModal = ({ bookingCode = 'GHNDF2TAGMLT', onClose }) => {
   );
 };
 
+// ─── Modal 4: Thanh Tra Vị Trí Lưu Trữ Dữ Liệu & Hình Ảnh (Storage & Database Audit) ─
+const StorageInspectorModal = ({ savedResult, capturedIdSnapshot, signatureImage, bookingData, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[550] flex items-center justify-center p-4 animate-in fade-in duration-200 font-mono">
+      <div className="bg-surface-container rounded-2xl border-2 border-emerald-500/60 max-w-2xl w-full p-6 text-on-surface space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-outline-variant/30 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-emerald-400 text-2xl">
+              database
+            </span>
+            <div>
+              <h3 className="font-bold text-sm text-emerald-300 uppercase">
+                BÁO CÁO VỊ TRÍ LƯU TRỮ HÌNH ẢNH & DỮ LIỆU CSDL
+              </h3>
+              <p className="text-[11px] text-on-surface-variant">
+                Quy trình lưu trữ vật lý trên Server & Cơ sở dữ liệu MySQL Grand Horizon
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-on-surface-variant hover:text-white hover:bg-surface-container-highest cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+
+        {/* 1. NƠI LƯU HÌNH ẢNH */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold text-cyan-300 uppercase flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">folder_open</span>
+            1. VỊ TRÍ LƯU TRỮ HÌNH ẢNH TRÊN MÁY CHỦ (SERVER FILE STORAGE)
+          </h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            {/* Ảnh CCCD / Bằng lái */}
+            <div className="bg-[#0b1329] border border-cyan-500/40 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-cyan-200">ẢNH THẺ CCCD / GIẤY TỜ</span>
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded">.JPG FILE</span>
+              </div>
+              <div className="text-[11px] text-on-surface-variant space-y-1">
+                <div>
+                  <span className="text-cyan-400 font-semibold block">Thư mục vật lý trên server:</span>
+                  <code className="text-[10px] bg-black/60 px-1.5 py-0.5 rounded text-amber-300 block truncate">
+                    backend/public/uploads/id_cards/
+                  </code>
+                </div>
+                <div>
+                  <span className="text-cyan-400 font-semibold block">URL truy cập trực tuyến:</span>
+                  <code className="text-[10px] bg-black/60 px-1.5 py-0.5 rounded text-emerald-300 block truncate">
+                    {savedResult?.savedFiles?.idCardUrl || '/uploads/id_cards/CCCD_...jpg'}
+                  </code>
+                </div>
+              </div>
+              {capturedIdSnapshot ? (
+                <div className="pt-2 border-t border-cyan-500/20 text-center">
+                  <span className="text-[10px] text-cyan-400 block mb-1">Ảnh thực tế vừa quét/chụp:</span>
+                  <img
+                    src={capturedIdSnapshot}
+                    alt="Preview CCCD"
+                    className="max-h-24 mx-auto rounded border border-cyan-500/40 object-contain"
+                  />
+                </div>
+              ) : (
+                <p className="text-[10px] text-on-surface-variant italic pt-1">
+                  Chưa có ảnh (sẽ tự động chụp & lưu vào thư mục này khi mở camera quét CCCD)
+                </p>
+              )}
+            </div>
+
+            {/* Ảnh chữ ký */}
+            <div className="bg-[#0b1329] border border-emerald-500/40 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-emerald-200">CHỮ KÝ ĐIỆN TỬ CỦA KHÁCH</span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">.PNG FILE</span>
+              </div>
+              <div className="text-[11px] text-on-surface-variant space-y-1">
+                <div>
+                  <span className="text-emerald-400 font-semibold block">Thư mục vật lý trên server:</span>
+                  <code className="text-[10px] bg-black/60 px-1.5 py-0.5 rounded text-amber-300 block truncate">
+                    backend/public/uploads/signatures/
+                  </code>
+                </div>
+                <div>
+                  <span className="text-emerald-400 font-semibold block">URL truy cập trực tuyến:</span>
+                  <code className="text-[10px] bg-black/60 px-1.5 py-0.5 rounded text-emerald-300 block truncate">
+                    {savedResult?.savedFiles?.signatureUrl || '/uploads/signatures/SIG_B...png'}
+                  </code>
+                </div>
+              </div>
+              {signatureImage ? (
+                <div className="pt-2 border-t border-emerald-500/20 text-center">
+                  <span className="text-[10px] text-emerald-400 block mb-1">Ảnh chữ ký vừa ghi nhận:</span>
+                  <img
+                    src={signatureImage}
+                    alt="Preview Chữ ký"
+                    className="max-h-24 mx-auto bg-slate-900 rounded p-1 border border-emerald-500/40 object-contain"
+                  />
+                </div>
+              ) : (
+                <p className="text-[10px] text-on-surface-variant italic pt-1">
+                  Chưa có chữ ký (sẽ tự động lưu vào thư mục này khi khách ký tên trên bảng vẽ)
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 2. NƠI LƯU DỮ LIỆU CƠ SỞ DỮ LIỆU */}
+        <div className="space-y-2.5 pt-2 border-t border-outline-variant/30">
+          <h4 className="text-xs font-bold text-amber-300 uppercase flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">table_chart</span>
+            2. VỊ TRÍ LƯU TRỮ DỮ LIỆU TRONG DATABASE MySQL (hotel_management)
+          </h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+            <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="font-bold text-admin-primary flex items-center justify-between">
+                <span>Bảng `BookingGuests`</span>
+                <span className="text-[9px] text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded">Hồ sơ khách</span>
+              </div>
+              <p className="text-on-surface-variant text-[10px]">
+                Lưu Họ tên, Số CCCD, Loại giấy tờ, Ngày sinh, Giới tính, Quốc tịch lấy từ OCR hoặc mã QR CCCD gắn chip.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="font-bold text-cyan-400 flex items-center justify-between">
+                <span>Bảng `PoliceDeclarations`</span>
+                <span className="text-[9px] text-cyan-400 bg-cyan-500/20 px-1.5 py-0.2 rounded">Công An Lưu Trú</span>
+              </div>
+              <p className="text-on-surface-variant text-[10px]">
+                Tự động tạo bản ghi Khai báo tạm trú gửi Công an phường theo luật cư trú (StayId, Họ tên, CCCD, Status: 'Pending').
+              </p>
+            </div>
+
+            <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="font-bold text-emerald-400 flex items-center justify-between">
+                <span>Bảng `Bookings` & `Stays`</span>
+                <span className="text-[9px] text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded">Trạng thái</span>
+              </div>
+              <p className="text-on-surface-variant text-[10px]">
+                Cập nhật `Status = 'CheckedIn'`, `ActualCheckIn = NOW()`, gắn số phòng thực tế `RoomId` và gán mã phiên lưu trú.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="font-bold text-indigo-400 flex items-center justify-between">
+                <span>Bảng `Rooms` & `Payments`</span>
+                <span className="text-[9px] text-indigo-400 bg-indigo-500/20 px-1.5 py-0.2 rounded">Phòng & POS</span>
+              </div>
+              <p className="text-on-surface-variant text-[10px]">
+                Phòng chuyển thành `Status = 'Occupied'`. Lưu bản ghi thanh toán POS quầy, tiền phòng và tạm giữ cọc bảo đảm.
+              </p>
+            </div>
+
+            <div className="col-span-1 md:col-span-2 bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="font-bold text-amber-400 flex items-center justify-between">
+                <span>Bảng `SmartLockLogs` & `AuditLogs`</span>
+                <span className="text-[9px] text-amber-400 bg-amber-500/20 px-1.5 py-0.2 rounded">Mã hóa thẻ & Nhật ký</span>
+              </div>
+              <p className="text-on-surface-variant text-[10px]">
+                Lưu lịch sử cấp thẻ từ RFID khóa cửa ASSA ABLOY COM-3 và nhật ký kiểm toán bảo mật chứa liên kết 2 file ảnh trên ổ đĩa server.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs cursor-pointer shadow-md"
+          >
+            ĐÃ HIỂU & ĐÓNG LẠI
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Trang Chính: CheckInDesk ───────────────────────────────────────────────
 export default function CheckInDesk() {
   const { user } = useAuth();
@@ -1058,30 +1240,33 @@ export default function CheckInDesk() {
   // Kiểm tra quyền vai trò (RBAC)
   const isUnauthorized = user && user.role && !['Admin', 'Manager', 'Staff', 'Receptionist'].includes(user.role);
 
-  // Search input mã REF# / QR
-  const [searchQuery, setSearchQuery] = useState(params.bookingId || searchParams.get('bookingId') || '1');
+  // Lấy mã booking từ URL params nếu có (ví dụ khi click từ Danh sách đặt phòng chuyển sang)
+  const initialBookingParam = params.bookingId || searchParams.get('bookingId') || '';
+  const [searchQuery, setSearchQuery] = useState(initialBookingParam);
   const [loadingLookup, setLoadingLookup] = useState(false);
-  const [bookingData, setBookingData] = useState(null);
+  const [bookingData, setBookingData] = useState(null); // Mặc định TRẮNG khi mới vào trang
 
-  // Modal QR & Modal In thẻ & Quét CCCD
+  // Modal QR & Modal In thẻ & Quét CCCD & Báo cáo CSDL
   const [showQrModal, setShowQrModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showIdCameraModal, setShowIdCameraModal] = useState(false);
   const [showTestQrModal, setShowTestQrModal] = useState(false);
+  const [showStorageModal, setShowStorageModal] = useState(false);
   const [arrivalsList, setArrivalsList] = useState([]);
   const [loadingArrivals, setLoadingArrivals] = useState(false);
   const [capturedIdSnapshot, setCapturedIdSnapshot] = useState(null);
+  const [savedCheckInResult, setSavedCheckInResult] = useState(null);
 
-  // ─── CỘT 1: Quét OCR & Chữ Ký Điện Tử ───
-  const [docType, setDocType] = useState('passport'); // 'passport' | 'natl_id' | 'driver_lic'
+  // ─── CỘT 1: Quét OCR & Chữ Ký Điện Tử (Mặc định để TRỐNG, chỉ nạp khi quét) ───
+  const [docType, setDocType] = useState('natl_id'); // 'natl_id' (CCCD) | 'passport' | 'driver_lic'
   const [ocrScanning, setOcrScanning] = useState(false);
-  const [ocrConfidence, setOcrConfidence] = useState(99.4);
+  const [ocrConfidence, setOcrConfidence] = useState(0);
   const [ocrData, setOcrData] = useState({
-    legalFullName: 'ALEXANDER MORGAN',
-    documentNumber: 'P-482190342',
-    issuingState: 'Việt Nam (VNM)',
-    birthDate: '1988-04-15',
-    expirationDate: '2031-08-20',
+    legalFullName: '',
+    documentNumber: '',
+    issuingState: '',
+    birthDate: '',
+    expirationDate: '',
   });
 
   // Chữ ký điện tử Canvas
@@ -1235,10 +1420,12 @@ export default function CheckInDesk() {
     }
   }, [searchQuery, addToast]);
 
-  // Tự động load booking khi vào trang
+  // Tự động load booking CHỈ KHI có mã trên URL (nếu vào thẳng trang thì giữ trắng hoàn toàn để chờ quét)
   useEffect(() => {
-    handleLookupBooking(searchQuery);
-  }, []);
+    if (initialBookingParam && initialBookingParam !== '1') {
+      handleLookupBooking(initialBookingParam);
+    }
+  }, [initialBookingParam]);
 
   // ─── 2. Thao tác Quét lại OCR (Re-Scan) ────────────────────────────────────
   const handleOcrScan = async () => {
@@ -1433,6 +1620,7 @@ export default function CheckInDesk() {
           dateOfBirth: ocrData.birthDate,
           nationality: ocrData.issuingState,
           signatureData: signatureImage,
+          idCardImage: capturedIdSnapshot,
           dispatchNfc,
           keycardCount,
           paymentSettled,
@@ -1449,9 +1637,12 @@ export default function CheckInDesk() {
       }
 
       if (data.success) {
+        setSavedCheckInResult(data);
+        setShowStorageModal(true);
         addToast('success', data.message, 'CHECK-IN HOÀN TẤT THÀNH CÔNG');
         // Nạp lại dữ liệu mới từ CSDL
         await handleLookupBooking(bookingData.BookingId);
+        await fetchArrivals();
       } else {
         addToast('error', data.message || 'Lỗi hoàn tất check-in.', 'LỖI THỰC THI');
       }
@@ -1711,8 +1902,155 @@ export default function CheckInDesk() {
           </div>
         </div>
 
-        {/* ─── 4. KHÔNG GIAN LÀM VIỆC 3 CỘT (MATCHING EXACT WIREFRAME) ──────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* ─── 4. KHÔNG GIAN LÀM VIỆC CHÍNH (STANDBY VIEW KHI TRẮNG / 3 CỘT KHI ĐÃ NẠP) ── */}
+        {!bookingData ? (
+          /* ════════════ MÀN HÌNH CHỜ QUÉT // DỮ LIỆU ĐANG TRẮNG ════════════ */
+          <div className="space-y-6">
+            <div className="bg-surface-container border-2 border-dashed border-admin-primary/40 rounded-3xl p-8 md:p-12 text-center space-y-6 shadow-xl relative overflow-hidden font-mono">
+              <div className="absolute top-0 right-0 w-72 h-72 bg-admin-primary/5 rounded-full blur-3xl pointer-events-none"></div>
+              <div className="absolute bottom-0 left-0 w-72 h-72 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+              <div className="w-24 h-24 mx-auto rounded-3xl bg-admin-primary/10 border-2 border-admin-primary/50 flex items-center justify-center text-admin-primary shadow-lg shadow-admin-primary/10 relative">
+                <span className="material-symbols-outlined text-5xl animate-pulse">
+                  qr_code_scanner
+                </span>
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-admin-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-admin-primary"></span>
+                </span>
+              </div>
+
+              <div className="max-w-2xl mx-auto space-y-2">
+                <div className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-bold tracking-wider">
+                  TIỀN SẢNH // TRẠNG THÁI STANDBY CHỜ QUÉT ĐẶT PHÒNG
+                </div>
+                <h2 className="text-xl md:text-2xl font-black text-on-surface uppercase tracking-wide">
+                  DỮ LIỆU ĐANG TRẮNG · HỆ THỐNG CHỜ QUÉT MÃ QR HOẶC TRA CỨU
+                </h2>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Khi khách đến quầy, hãy sử dụng <strong>Camera Laptop hoặc Điện Thoại</strong> để quét mã QR trên phiếu xác nhận đặt phòng, hoặc chọn nhanh một hồ sơ khách đến hôm nay từ danh sách CSDL bên trên. Dữ liệu đặt phòng thực tế sẽ được nạp vào hệ thống để tiếp tục quy trình xác minh CCCD, thanh toán và kích hoạt thẻ phòng.
+                </p>
+              </div>
+
+              {/* Nút hành động chính */}
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => setShowQrModal(true)}
+                  className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-admin-primary to-amber-500 hover:from-admin-primary/90 hover:to-amber-400 text-on-primary font-bold text-xs flex items-center gap-2 shadow-xl shadow-admin-primary/20 transition-all cursor-pointer transform hover:scale-105"
+                >
+                  <span className="material-symbols-outlined text-lg animate-pulse">photo_camera</span>
+                  BẬT CAMERA QUÉT MÃ QR ĐẶT PHÒNG
+                </button>
+
+                <button
+                  onClick={() => setShowStorageModal(true)}
+                  className="px-5 py-3.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">database</span>
+                  XEM VỊ TRÍ LƯU TRỮ HÌNH ẢNH & CSDL
+                </button>
+
+                <button
+                  onClick={() => setShowTestQrModal(true)}
+                  className="px-5 py-3.5 rounded-2xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">devices</span>
+                  LẤY MÃ QR MẪU ĐỂ TEST
+                </button>
+              </div>
+            </div>
+
+            {/* 3 Khung mô phỏng luồng làm việc trống (Placeholder Skeleton) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 font-mono text-xs opacity-75">
+              <div className="bg-surface-container border border-dashed border-outline-variant/40 rounded-2xl p-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-surface-container-highest mx-auto flex items-center justify-center text-cyan-400">
+                  <span className="material-symbols-outlined text-2xl">badge</span>
+                </div>
+                <h3 className="font-bold text-on-surface uppercase">01 // XÁC MINH DANH TÍNH (CCCD/PASSPORT)</h3>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                  Đang ở trạng thái trắng. Sau khi quét mã QR đặt phòng, hệ thống sẽ mở camera để quét CCCD gắn chip và bảng ký tên điện tử.
+                </p>
+                <span className="inline-block text-[10px] text-on-surface-variant/70 border border-outline-variant/30 px-2 py-0.5 rounded">
+                  [ CHỜ NẠP ĐẶT PHÒNG ]
+                </span>
+              </div>
+
+              <div className="bg-surface-container border border-dashed border-outline-variant/40 rounded-2xl p-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-surface-container-highest mx-auto flex items-center justify-center text-emerald-400">
+                  <span className="material-symbols-outlined text-2xl">meeting_room</span>
+                </div>
+                <h3 className="font-bold text-on-surface uppercase">02 // SỐ PHÒNG & THẺ TỪ RFID</h3>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                  Đang ở trạng thái trắng. Hệ thống sẽ tải số phòng đã phân bổ, sơ đồ tầng và kích hoạt đầu đọc thẻ từ ASSA ABLOY COM-3.
+                </p>
+                <span className="inline-block text-[10px] text-on-surface-variant/70 border border-outline-variant/30 px-2 py-0.5 rounded">
+                  [ CHỜ NẠP ĐẶT PHÒNG ]
+                </span>
+              </div>
+
+              <div className="bg-surface-container border border-dashed border-outline-variant/40 rounded-2xl p-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-surface-container-highest mx-auto flex items-center justify-center text-amber-400">
+                  <span className="material-symbols-outlined text-2xl">point_of_sale</span>
+                </div>
+                <h3 className="font-bold text-on-surface uppercase">03 // QUYẾT TOÁN FOLIO & POS</h3>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                  Đang ở trạng thái trắng. Bảng kê công nợ tiền phòng, tiền cọc và cổng thanh toán POS Verifone P400 sẽ tải tự động.
+                </p>
+                <span className="inline-block text-[10px] text-on-surface-variant/70 border border-outline-variant/30 px-2 py-0.5 rounded">
+                  [ CHỜ NẠP ĐẶT PHÒNG ]
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ════════════ KHI ĐÃ CÓ DỮ LIỆU ĐẶT PHÒNG (100% DATABASE DRIVEN) ════════════ */
+          <div className="space-y-5">
+            {/* Thanh tiêu đề hồ sơ đang nạp */}
+            <div className="bg-surface-container-high border-2 border-admin-primary/50 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 font-mono shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-admin-primary/20 border border-admin-primary flex items-center justify-center text-admin-primary font-black">
+                  ✓
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-admin-primary font-bold">HỒ SƠ ĐANG NẠP:</span>
+                    <span className="text-sm font-black text-on-surface font-mono bg-surface-container-lowest px-2.5 py-0.5 rounded border border-outline-variant/30">
+                      {bookingData.ConfirmationCode}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-500/20 text-amber-300">
+                      {bookingData.VipTier || 'STANDARD VIP'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Khách: <strong className="text-on-surface">{bookingData.GuestName}</strong> • SĐT: {bookingData.GuestPhone || '—'} • Ngày: {fmtDateMonth(bookingData.CheckInDate)} ➔ {fmtDateMonth(bookingData.CheckOutDate)} ({bookingData.NumberOfNights || 1} đêm)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end md:self-auto">
+                <button
+                  onClick={() => setShowStorageModal(true)}
+                  className="px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">database</span>
+                  Xem Lưu Trữ CSDL & Ảnh
+                </button>
+                <button
+                  onClick={() => {
+                    setBookingData(null);
+                    setSearchQuery('');
+                    addToast('info', 'Đã đóng hồ sơ đặt phòng. Màn hình trở về trạng thái trắng chờ quét.', 'ĐÓNG HỒ SƠ');
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                  Đóng / Đổi Khách Khác
+                </button>
+              </div>
+            </div>
+
+            {/* 3 Cột Làm Việc Chi Tiết */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* ════════════ CỘT 1: 01 // XÁC MINH DANH TÍNH & QUÉT OCR ════════════ */}
           <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
@@ -2136,57 +2474,78 @@ export default function CheckInDesk() {
             </div>
           </div>
         </div>
+      </div>
+    )}
 
         {/* ─── 5. THANH ĐIỀU KHIỂN DƯỚI CÙNG (BOTTOM STICKY ACTION BAR) ──────── */}
         <div className="sticky bottom-4 z-40 bg-surface-container-high/95 backdrop-blur-md border border-admin-primary/40 rounded-2xl p-4 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4 font-mono">
           <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-            <button
-              onClick={() => {
-                setKeycardEncoded(false);
-                setPaymentSettled(false);
-                setTermsAccepted(false);
-                clearSignature();
-                addToast('info', 'Đã hủy phiên làm việc hiện tại.', 'HỦY CHECK-IN');
-              }}
-              className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer text-rose-400"
-            >
-              ⊗ HỦY BỎ CHECK-IN
-            </button>
+            {bookingData ? (
+              <>
+                <button
+                  onClick={() => {
+                    setKeycardEncoded(false);
+                    setPaymentSettled(false);
+                    setTermsAccepted(false);
+                    clearSignature();
+                    addToast('info', 'Đã hủy phiên làm việc hiện tại.', 'HỦY CHECK-IN');
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer text-rose-400"
+                >
+                  ⊗ HỦY BỎ CHECK-IN
+                </button>
 
-            <button
-              onClick={() => setShowPrintModal(true)}
-              className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer flex items-center gap-1.5 text-on-surface"
-            >
-              <span className="material-symbols-outlined text-sm">print</span>
-              IN THẺ ĐĂNG KÝ
-            </button>
+                <button
+                  onClick={() => setShowPrintModal(true)}
+                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer flex items-center gap-1.5 text-on-surface"
+                >
+                  <span className="material-symbols-outlined text-sm">print</span>
+                  IN THẺ ĐĂNG KÝ
+                </button>
 
-            <button
-              onClick={() => addToast('info', `Chi tiết Folio #${bookingData?.BookingId}: Tổng ${fmtMoney(bookingData?.totalFolio)}, Cọc ${fmtMoney(bookingData?.depositPaid)}, Còn lại ${fmtMoney(bookingData?.netBalanceDue)}`, 'CHI TIẾT FOLIO')}
-              className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer text-on-surface"
-            >
-              XEM CHI TIẾT FOLIO
-            </button>
+                <button
+                  onClick={() => addToast('info', `Chi tiết Folio #${bookingData?.BookingId}: Tổng ${fmtMoney(bookingData?.totalFolio)}, Cọc ${fmtMoney(bookingData?.depositPaid)}, Còn lại ${fmtMoney(bookingData?.netBalanceDue)}`, 'CHI TIẾT FOLIO')}
+                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer text-on-surface"
+                >
+                  XEM CHI TIẾT FOLIO
+                </button>
+              </>
+            ) : (
+              <span className="text-xs text-on-surface-variant flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                [ CHẾ ĐỘ CHỜ: Vui lòng quét mã QR đặt phòng hoặc chọn từ danh sách CSDL để kích hoạt các bước ]
+              </span>
+            )}
           </div>
 
           <div className="w-full md:w-auto flex items-center gap-3">
-            <button
-              disabled={completingCheckIn || !allStepsComplete}
-              onClick={handleCompleteCheckIn}
-              className={`w-full md:w-auto px-6 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
-                allStepsComplete
-                  ? 'bg-admin-primary hover:bg-admin-primary/90 text-on-primary shadow-admin-primary/30 ring-2 ring-admin-primary'
-                  : 'bg-surface-container-highest text-on-surface-variant opacity-60 cursor-not-allowed'
-              }`}
-            >
-              <span className="material-symbols-outlined text-base">
-                {completingCheckIn ? 'sync' : 'key'}
-              </span>
-              {completingCheckIn
-                ? 'ĐANG KÍCH HOẠT...'
-                : `HOÀN TẤT CHECK-IN & KÍCH HOẠT PHÒNG ${bookingData?.RoomNumber || '804'}`}
-              <span className="material-symbols-outlined text-base">arrow_forward</span>
-            </button>
+            {bookingData ? (
+              <button
+                disabled={completingCheckIn || !allStepsComplete}
+                onClick={handleCompleteCheckIn}
+                className={`w-full md:w-auto px-6 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
+                  allStepsComplete
+                    ? 'bg-admin-primary hover:bg-admin-primary/90 text-on-primary shadow-admin-primary/30 ring-2 ring-admin-primary'
+                    : 'bg-surface-container-highest text-on-surface-variant opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">
+                  {completingCheckIn ? 'sync' : 'key'}
+                </span>
+                {completingCheckIn
+                  ? 'ĐANG KÍCH HOẠT...'
+                  : `HOÀN TẤT CHECK-IN & KÍCH HOẠT PHÒNG ${bookingData?.RoomNumber || ''}`}
+                <span className="material-symbols-outlined text-base">arrow_forward</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowQrModal(true)}
+                className="w-full md:w-auto px-5 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-admin-primary/20 text-admin-primary border border-admin-primary/50 hover:bg-admin-primary/30 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">photo_camera</span>
+                QUÉT QR ĐẶT PHÒNG NGAY
+              </button>
+            )}
           </div>
         </div>
 
@@ -2221,6 +2580,16 @@ export default function CheckInDesk() {
           <TestQrModal
             bookingCode={bookingData?.ConfirmationCode || (arrivalsList[0]?.ConfirmationCode) || 'GHNDF2TAGMLT'}
             onClose={() => setShowTestQrModal(false)}
+          />
+        )}
+
+        {showStorageModal && (
+          <StorageInspectorModal
+            savedResult={savedCheckInResult}
+            capturedIdSnapshot={capturedIdSnapshot}
+            signatureImage={signatureImage}
+            bookingData={bookingData}
+            onClose={() => setShowStorageModal(false)}
           />
         )}
 
