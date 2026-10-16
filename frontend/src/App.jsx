@@ -51,7 +51,6 @@ function App() {
           <Route path="/admin/fnb/kitchen" element={<KitchenDisplay />} />
           <Route path="/admin/fnb/dispatch" element={<OrderDispatchHub />} />
           <Route path="/admin/fnb/history" element={<FnbOrderHistory />} />
-          <Route path="/admin/fnb/room-service" element={<RoomService />} />
           <Route path="/admin/services" element={<ServiceManagement />} />
           <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
           {/* Redirect everything else to home for now */}
