@@ -21,8 +21,8 @@ const Auth = () => {
   const [activeTab, setActiveTab] = useState(initialMode);
 
   // Form states - Đăng nhập
-  const [loginIdentifier, setLoginIdentifier] = useState('vip.guest@grandhorizon.com');
-  const [loginPassword, setLoginPassword] = useState('123456');
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
 
