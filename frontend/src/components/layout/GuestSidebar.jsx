@@ -28,7 +28,7 @@ export default function GuestSidebar() {
           </div>
           <div className="flex flex-col min-w-0">
             <span className="font-bold text-sm text-emerald-800 tracking-tight truncate">GRAND HORIZON</span>
-            <span className="text-[10px] text-slate-400 tracking-wider uppercase truncate">Phu Quoc Luxury PMS</span>
+            <span className="text-[10px] text-slate-400 tracking-wider uppercase truncate">Khách Sạn & Nghỉ Dưỡng Phú Quốc</span>
           </div>
         </div>
 
@@ -41,9 +41,9 @@ export default function GuestSidebar() {
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Trực Tuyến
               </span>
             </div>
-            <div className="text-sm font-semibold text-slate-800 truncate">Grand Lounge & Front Desk</div>
+            <div className="text-sm font-semibold text-slate-800 truncate">Sảnh Tiếp Đón & Quầy Lễ Tân</div>
             <div className="text-xs text-slate-500 flex items-center justify-between">
-              <span>Ca: Sáng - Chiều (06:00 - 14:30)</span>
+              <span>Ca trực: Sáng - Chiều (06:00 - 14:30)</span>
               <span className="font-semibold text-emerald-700">PQC-T1</span>
             </div>
           </div>
@@ -81,6 +81,14 @@ export default function GuestSidebar() {
             <span className="material-symbols-outlined text-[20px]">restaurant</span>
             <span className="text-sm">Đặt Bàn Thưởng Vị</span>
           </NavLink>
+          <NavLink to="/fnb/history" className={navItemClass}>
+            <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+            <span className="text-sm">Lịch Sử Gọi Món</span>
+          </NavLink>
+          <NavLink to="/room-service" className={navItemClass}>
+            <span className="material-symbols-outlined text-[20px]">room_service</span>
+            <span className="text-sm">Đặt Món Tại Phòng</span>
+          </NavLink>
           <NavLink to="/fnb/danh-gia" className={navItemClass}>
             <span className="material-symbols-outlined text-[20px]">reviews</span>
             <span className="text-sm">Đánh Giá Món Ăn</span>
@@ -106,7 +114,7 @@ export default function GuestSidebar() {
             <span className="text-sm text-slate-800 font-semibold truncate">
               {user?.fullName || user?.name || "Lê Minh Anh"}
             </span>
-            <span className="text-[11px] text-slate-400 truncate">Quản Lý F&B & Lễ Tân</span>
+            <span className="text-[11px] text-slate-400 truncate">Quản Lý Ẩm Thực & Lễ Tân</span>
           </div>
         </div>
         <div className="flex items-center justify-between pt-1 border-t border-slate-200/50">

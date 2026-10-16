@@ -61,7 +61,7 @@ export default function GuestHeader() {
             <span className="text-sm font-semibold text-slate-800">
               {user?.fullName || user?.name || "Lê Minh Anh"}
             </span>
-            <span className="text-xs text-emerald-700">Duty Manager</span>
+            <span className="text-xs text-emerald-700">Quản Lý Trực Ban</span>
           </div>
           <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center">
             <span className="material-symbols-outlined text-white text-[18px]">person</span>
