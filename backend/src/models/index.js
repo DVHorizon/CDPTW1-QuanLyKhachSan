@@ -19,6 +19,8 @@ const defineFoodOrderDetail = require('./FoodOrderDetail');
 const defineInvoice = require('./Invoice');
 const defineInvoiceDetail = require('./InvoiceDetail');
 const definePayment = require('./Payment');
+const defineServiceCategory = require('./ServiceCategory');
+const defineService = require('./Service');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -38,6 +40,8 @@ const FoodOrderDetail = defineFoodOrderDetail(sequelize);
 const Invoice = defineInvoice(sequelize);
 const InvoiceDetail = defineInvoiceDetail(sequelize);
 const Payment = definePayment(sequelize);
+const ServiceCategory = defineServiceCategory(sequelize);
+const Service = defineService(sequelize);
 
 // Setup Relationships / Associations
 // 1. Role & User
@@ -106,6 +110,10 @@ FoodOrderDetail.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
 MenuItem.hasMany(FoodOrderDetail, { foreignKey: 'MenuItemId' });
 FoodOrderDetail.belongsTo(MenuItem, { foreignKey: 'MenuItemId' });
 
+// 15. ServiceCategory & Service
+ServiceCategory.hasMany(Service, { foreignKey: 'CategoryId', as: 'services' });
+Service.belongsTo(ServiceCategory, { foreignKey: 'CategoryId', as: 'category' });
+
 module.exports = {
   sequelize,
   Branch,
@@ -124,6 +132,9 @@ module.exports = {
   FoodOrderDetail,
   Invoice,
   InvoiceDetail,
-  Payment
+  Payment,
+  ServiceCategory,
+  Service
 };
+
 
