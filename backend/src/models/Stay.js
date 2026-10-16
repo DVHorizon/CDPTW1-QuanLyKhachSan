@@ -19,6 +19,10 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true
     },
+    CheckInTime: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
     ExpectedCheckOut: {
       type: DataTypes.DATE,
       allowNull: true
@@ -27,9 +31,13 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true
     },
+    CheckOutTime: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
     Status: {
-      type: DataTypes.ENUM('Active', 'Completed'),
-      defaultValue: 'Active'
+      type: DataTypes.STRING(30),
+      defaultValue: 'CheckedIn'
     }
   }, {
     tableName: 'Stays',
