@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../../components/layout/Header';
-import { checkRoomAvailabilityApi, lockRoomSessionApi, releaseRoomLockApi, getRoomDetailApi } from '../../api/roomApi';
+import { checkRoomAvailabilityApi, lockRoomSessionApi, releaseRoomLockApi, getRoomDetailApi, createBookingApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 
 // Helper format VND
 const formatVND = (num) => {
@@ -19,6 +20,7 @@ const formatDateInput = (date) => {
 };
 
 export default function RoomDetail() {
+  const { subscribe } = useSocket();
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -61,6 +63,18 @@ export default function RoomDetail() {
   const [showDailyModal, setShowDailyModal] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [showShareToast, setShowShareToast] = useState(false);
+
+  // Trạng thái Thanh toán & Đặt phòng chính thức
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const [bookingSuccessData, setBookingSuccessData] = useState(null);
+  const [checkoutForm, setCheckoutForm] = useState({
+    guestName: '',
+    guestPhone: '',
+    guestEmail: '',
+    paymentMethod: 'credit_card',
+    specialRequest: ''
+  });
 
   // 1. Tải thông tin phòng từ backend hoặc fallback
   useEffect(() => {
@@ -140,6 +154,52 @@ export default function RoomDetail() {
     };
   }, [roomType?.RoomTypeId, id, checkInDate, checkOutDate, quantity, lockSession?.lockSessionId]);
 
+  // Lắng nghe WebSocket Realtime: tự động gọi lại checkRealtime() khi có người đặt phòng, khóa phòng hoặc đổi trạng thái
+  useEffect(() => {
+    const activeRoomTypeId = Number(roomType?.RoomTypeId || id || 1);
+
+    const handleRoomEvent = (payload) => {
+      // Nếu sự kiện liên quan đến chính hạng phòng này hoặc thay đổi chung
+      if (!payload?.roomTypeId || Number(payload.roomTypeId) === activeRoomTypeId) {
+        checkRoomAvailabilityApi({
+          roomTypeId: activeRoomTypeId,
+          checkInDate,
+          checkOutDate,
+          quantity,
+          lockSessionId: lockSession?.lockSessionId
+        }).then((res) => {
+          if (res?.success && res.data) {
+            setAvailabilityData(res.data);
+            if (res.code === 'ERROR_0022_ROOM_SOLD_OUT') {
+              setErrorCode('ERROR_0022_ROOM_SOLD_OUT');
+              setErrorMessage(res.message);
+            } else if (res.code === 'ERROR_0023_INSUFFICIENT_ROOMS') {
+              setErrorCode('ERROR_0023_INSUFFICIENT_ROOMS');
+              setErrorMessage(res.message);
+            } else {
+              setErrorCode('');
+              setErrorMessage('');
+            }
+          }
+        }).catch(() => {});
+      }
+    };
+
+    const unsub1 = subscribe('ROOM_STATUS_CHANGED', handleRoomEvent);
+    const unsub2 = subscribe('ROOM_LOCK_ACQUIRED', handleRoomEvent);
+    const unsub3 = subscribe('ROOM_LOCK_RELEASED', handleRoomEvent);
+    const unsub4 = subscribe('BOOKING_CREATED', handleRoomEvent);
+    const unsub5 = subscribe('ROOMS_BATCH_UPDATED', handleRoomEvent);
+
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+      unsub5();
+    };
+  }, [subscribe, roomType?.RoomTypeId, id, checkInDate, checkOutDate, quantity, lockSession?.lockSessionId]);
+
   // 3. Đếm ngược 15 phút khi giữ phòng
   useEffect(() => {
     if (!lockSession || lockTimeRemaining <= 0) return;
@@ -161,6 +221,19 @@ export default function RoomDetail() {
 
   // 4. Xử lý giữ phòng tạm thời (Tiến hành đặt phòng - Anti Overbooking Lock)
   const handleProceedBooking = async () => {
+    // NẾU ĐÃ CÓ PHIÊN GIỮ PHÒNG: Chuyển sang bước Điền thông tin & Xác nhận thanh toán
+    if (lockSession) {
+      setCheckoutForm({
+        guestName: user?.FullName || user?.name || '',
+        guestPhone: user?.PhoneNumber || user?.phone || '',
+        guestEmail: user?.Email || user?.email || '',
+        paymentMethod: 'credit_card',
+        specialRequest: ''
+      });
+      setShowCheckoutModal(true);
+      return;
+    }
+
     const activeRoomTypeId = roomType?.RoomTypeId || id || 1;
     setIsLocking(true);
     setErrorMessage('');
@@ -187,6 +260,48 @@ export default function RoomDetail() {
       setIsLocking(false);
       setErrorCode('ERROR_0024_CONCURRENT_LOCK_FAILED');
       setErrorMessage('Rất tiếc, phòng vừa được khách hàng khác giữ chỗ. Vui lòng chọn khoảng ngày hoặc hạng phòng khác');
+    }
+  };
+
+  // 4b. Xác nhận thanh toán chính thức (Atomic Check & Commit)
+  const handleConfirmPayment = async (e) => {
+    e?.preventDefault();
+    setIsSubmittingBooking(true);
+    setErrorMessage('');
+    setErrorCode('');
+
+    try {
+      const activeRoomTypeId = Number(roomType?.RoomTypeId || id || 1);
+      const res = await createBookingApi({
+        roomTypeId: activeRoomTypeId,
+        checkInDate,
+        checkOutDate,
+        lockSessionId: lockSession?.lockSessionId,
+        roomQuantity: quantity,
+        adults,
+        children,
+        guestName: checkoutForm.guestName || user?.FullName || 'Khách trực tuyến',
+        guestPhone: checkoutForm.guestPhone || '0901234567',
+        guestEmail: checkoutForm.guestEmail || 'guest@example.com',
+        specialRequest: checkoutForm.specialRequest
+      });
+
+      setIsSubmittingBooking(false);
+
+      if (res.success && res.data) {
+        setShowCheckoutModal(false);
+        setBookingSuccessData(res.data);
+        setLockSession(null);
+        setLockTimeRemaining(0);
+      } else {
+        // Tranh chấp phòng: người khác thanh toán trước
+        setErrorCode(res.code || 'ERROR_0022_ROOM_SOLD_OUT');
+        setErrorMessage(res.message || 'Rất tiếc! Trong lúc bạn thao tác, phòng đã được khách hàng khác hoàn tất thanh toán trước hoặc đã hết phòng.');
+      }
+    } catch (err) {
+      setIsSubmittingBooking(false);
+      setErrorCode('ERROR_PAYMENT');
+      setErrorMessage('Lỗi hệ thống khi thanh toán: ' + err.message);
     }
   };
 
@@ -991,6 +1106,156 @@ export default function RoomDetail() {
                   Đóng
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* CHECKOUT / PAYMENT CONFIRMATION MODAL */}
+        {showCheckoutModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl border border-[#725b38]/20 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="font-serif font-bold text-xl text-[#0b1c30]">
+                    Xác Nhận Thanh Toán &amp; Đặt Phòng
+                  </h3>
+                  <p className="text-xs text-amber-700 font-medium mt-0.5">
+                    ⏱️ Phòng đang được giữ riêng cho bạn: <strong>{formatTimer(lockTimeRemaining)}</strong>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCheckoutModal(false)}
+                  className="text-gray-400 hover:text-gray-700 text-xl font-bold p-1"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Tóm tắt phòng đặt */}
+              <div className="bg-[#fcf9f4] p-4 rounded-2xl border border-[#725b38]/15 text-xs space-y-1.5">
+                <div className="flex justify-between font-bold text-[#0b1c30]">
+                  <span>{roomType?.TypeName || 'Biệt Thự Cao Cấp'}</span>
+                  <span>{formatVND(pricing.totalAmount)}</span>
+                </div>
+                <p className="text-gray-500">
+                  {checkInDate} → {checkOutDate} ({numberOfNights} đêm) • {quantity} Biệt thự ({adults} lớn, {children} trẻ)
+                </p>
+              </div>
+
+              {/* Form thông tin khách */}
+              <form onSubmit={handleConfirmPayment} className="space-y-3.5 text-xs">
+                {errorMessage && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-bold">
+                    ⚠️ {errorMessage}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">Họ &amp; Tên Khách Hàng *</label>
+                    <input
+                      type="text"
+                      required
+                      value={checkoutForm.guestName}
+                      onChange={(e) => setCheckoutForm({ ...checkoutForm, guestName: e.target.value })}
+                      placeholder="Nguyễn Văn A"
+                      className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-[#725b38]/30 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">Số Điện Thoại *</label>
+                    <input
+                      type="tel"
+                      required
+                      value={checkoutForm.guestPhone}
+                      onChange={(e) => setCheckoutForm({ ...checkoutForm, guestPhone: e.target.value })}
+                      placeholder="0912 345 678"
+                      className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-[#725b38]/30 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Email Nhận Xác Nhận *</label>
+                  <input
+                    type="email"
+                    required
+                    value={checkoutForm.guestEmail}
+                    onChange={(e) => setCheckoutForm({ ...checkoutForm, guestEmail: e.target.value })}
+                    placeholder="guest@example.com"
+                    className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-[#725b38]/30 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Phương Thức Thanh Toán</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer hover:bg-gray-50 border-[#725b38]/30 bg-[#725b38]/5">
+                      <input
+                        type="radio"
+                        name="pm"
+                        checked={checkoutForm.paymentMethod === 'credit_card'}
+                        onChange={() => setCheckoutForm({ ...checkoutForm, paymentMethod: 'credit_card' })}
+                      />
+                      <span>💳 Thẻ Quốc Tế / Thẻ Nội Địa</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="pm"
+                        checked={checkoutForm.paymentMethod === 'hotel_pay'}
+                        onChange={() => setCheckoutForm({ ...checkoutForm, paymentMethod: 'hotel_pay' })}
+                      />
+                      <span>🏨 Thanh Toán Tại Khách Sạn</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowCheckoutModal(false)}
+                    className="px-4 py-2.5 rounded-xl border border-gray-300 font-bold hover:bg-gray-50"
+                  >
+                    Quay Lại
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingBooking}
+                    className="px-6 py-2.5 bg-[#725b38] hover:bg-[#584323] text-white font-bold rounded-xl shadow-md active:scale-95 transition-all flex items-center gap-2"
+                  >
+                    {isSubmittingBooking ? '🔄 Đang xác nhận thanh toán...' : `Xác Nhận & Thanh Toán ${formatVND(pricing.totalAmount)}`}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* BOOKING SUCCESS MODAL */}
+        {bookingSuccessData && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border border-emerald-500/20 animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-16 h-16 mx-auto bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl">
+                ✓
+              </div>
+              <h3 className="font-serif font-bold text-2xl text-[#0b1c30]">
+                Đặt Phòng Thành Công!
+              </h3>
+              <p className="text-xs text-gray-500">
+                Chúc mừng bạn đã hoàn tất đặt phòng tại Grand Horizon Resorts.
+              </p>
+              <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-200/50 text-xs text-left space-y-1">
+                <p><strong>Mã xác nhận:</strong> <span className="font-mono text-emerald-800 font-bold text-sm">{bookingSuccessData.confirmationCode}</span></p>
+                <p><strong>Số đêm lưu trú:</strong> {bookingSuccessData.numberOfNights} đêm</p>
+                <p><strong>Tổng thanh toán:</strong> {formatVND(bookingSuccessData.totalAmount)}</p>
+              </div>
+              <button
+                onClick={() => setBookingSuccessData(null)}
+                className="w-full py-3 bg-[#725b38] hover:bg-[#584323] text-white font-bold rounded-xl shadow-md"
+              >
+                Hoàn Tất
+              </button>
             </div>
           </div>
         )}

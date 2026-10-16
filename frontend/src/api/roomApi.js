@@ -194,3 +194,39 @@ export const suggestRoomsApi = async (q) => {
     return { data: null };
   }
 };
+
+/**
+ * Tạo đơn đặt phòng chính thức (Thanh toán)
+ * POST /api/v1/rooms/book
+ */
+export const createBookingApi = async (payload) => {
+  try {
+    let res = await fetch(`${API_BASE_URL}/v1/rooms/book`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/book`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi createBookingApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ thanh toán đặt phòng.'
+    };
+  }
+};

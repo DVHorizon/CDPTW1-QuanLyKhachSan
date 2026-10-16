@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { RoomType, Room, Booking, Stay, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const { broadcastRoomEvent } = require('../sockets/socketHandler');
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -21,13 +22,29 @@ const activeLocks = new Map();
 /**
  * Background cleaner: Tự động nhả phòng về kho trống sau 15 phút nếu chưa thanh toán
  */
-setInterval(() => {
+setInterval(async () => {
   const now = Date.now();
   for (const [id, lock] of activeLocks.entries()) {
     if (lock.expiresAt <= now) {
       activeLocks.delete(id);
+      broadcastRoomEvent('ROOM_LOCK_RELEASED', { lockSessionId: id, roomTypeId: lock.roomTypeId, reason: 'TIMEOUT' });
     }
   }
+
+  // Dọn dẹp trong MySQL Database: Tự động hủy các đơn Pending HoldLock quá 15 phút
+  try {
+    const expiredThreshold = new Date(Date.now() - LOCK_TIMEOUT_MS);
+    await Booking.update(
+      { Status: 'Cancelled' },
+      {
+        where: {
+          Status: 'Pending',
+          BookingSource: 'HoldLock',
+          CreatedAt: { [Op.lt]: expiredThreshold }
+        }
+      }
+    );
+  } catch (_) {}
 }, 30000);
 
 /**
@@ -310,21 +327,60 @@ async function acquireRoomLock({ roomTypeId, checkInDate, checkOutDate, quantity
     expiresAt
   });
 
-  return {
+  const lockData = {
     lockSessionId,
     expiresAt: new Date(expiresAt).toISOString(),
     timeoutSeconds: Math.floor(LOCK_TIMEOUT_MS / 1000),
     pricingSummary: check.pricingSummary,
     roomType: check.roomType
   };
+
+  // Lưu phiên giữ phòng trực tiếp vào MySQL Database (Persistence)
+  try {
+    await Booking.create({
+      UserId: 1,
+      RoomTypeId: Number(roomTypeId),
+      CheckInDate: checkInDate,
+      CheckOutDate: checkOutDate,
+      RoomQuantity: numQuantity,
+      Status: 'Pending',
+      BookingSource: 'HoldLock',
+      ConfirmationCode: `HOLD-${lockSessionId}`,
+      RoomSubtotal: check.pricingSummary.roomSubtotal,
+      TotalAmount: check.pricingSummary.totalAmount
+    });
+  } catch (dbErr) {
+    console.warn('⚠️ Ghi hold lock vào MySQL:', dbErr.message);
+  }
+
+  broadcastRoomEvent('ROOM_LOCK_ACQUIRED', {
+    lockSessionId,
+    roomTypeId: Number(roomTypeId),
+    checkInDate,
+    checkOutDate,
+    quantity: numQuantity,
+    expiresAt: lockData.expiresAt
+  });
+
+  return lockData;
 }
 
 /**
  * Nhả khóa phòng thủ công (khi khách hủy hoặc hoàn tất thanh toán)
  */
 function releaseRoomLock(lockSessionId) {
+  // Cập nhật trạng thái hủy giữ chỗ trong MySQL Database
+  try {
+    Booking.update(
+      { Status: 'Cancelled' },
+      { where: { ConfirmationCode: `HOLD-${lockSessionId}` } }
+    ).catch(() => {});
+  } catch (_) {}
+
   if (activeLocks.has(lockSessionId)) {
+    const lock = activeLocks.get(lockSessionId);
     activeLocks.delete(lockSessionId);
+    broadcastRoomEvent('ROOM_LOCK_RELEASED', { lockSessionId, roomTypeId: lock?.roomTypeId, reason: 'MANUAL' });
     return true;
   }
   return false;

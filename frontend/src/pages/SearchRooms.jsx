@@ -4,6 +4,7 @@ import MainLayout from '../layouts/MainLayout';
 import RoomDetailModal from '../components/modals/RoomDetailModal';
 import QuickBookingModal from '../components/modals/QuickBookingModal';
 import { searchRoomsApi, getBranchesApi, suggestRoomsApi } from '../api/roomApi';
+import { useSocket } from '../context/SocketContext';
 
 // Helper format VND
 const formatVND = (num) => {
@@ -38,6 +39,7 @@ const formatDisplayDate = (dStr) => {
 };
 
 export default function SearchRooms() {
+  const { subscribe } = useSocket();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -278,6 +280,28 @@ export default function SearchRooms() {
   useEffect(() => {
     executeSearch();
   }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, debouncedPriceMax]);
+
+  // Lắng nghe sự kiện WebSocket Realtime để đồng bộ kho phòng trống tức thì
+  useEffect(() => {
+    const handleRoomEvent = () => {
+      // Tự động cập nhật lại kết quả tìm kiếm khi có phòng thay đổi trạng thái hoặc có người đặt
+      executeSearch();
+    };
+
+    const unsubStatus = subscribe('ROOM_STATUS_CHANGED', handleRoomEvent);
+    const unsubBatch = subscribe('ROOMS_BATCH_UPDATED', handleRoomEvent);
+    const unsubLockAcq = subscribe('ROOM_LOCK_ACQUIRED', handleRoomEvent);
+    const unsubLockRel = subscribe('ROOM_LOCK_RELEASED', handleRoomEvent);
+    const unsubBooking = subscribe('BOOKING_CREATED', handleRoomEvent);
+
+    return () => {
+      unsubStatus();
+      unsubBatch();
+      unsubLockAcq();
+      unsubLockRel();
+      unsubBooking();
+    };
+  }, [subscribe]);
 
   // Xử lý Wishlist
   const toggleWishlist = (roomId) => {
