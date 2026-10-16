@@ -115,11 +115,27 @@ exports.getAvailableTables = async (req, res) => {
 
     const suitableTables = tablesData.filter(t => t.isAvailable);
 
+    // Thống kê số lượng bàn trống theo từng khu vực
+    const locationStats = {};
+    tablesData.forEach(t => {
+      if (!locationStats[t.location]) {
+        locationStats[t.location] = { total: 0, available: 0, booked: 0 };
+      }
+      locationStats[t.location].total += 1;
+      if (t.isBooked) {
+        locationStats[t.location].booked += 1;
+      }
+      if (t.isAvailable) {
+        locationStats[t.location].available += 1;
+      }
+    });
+
     return res.status(200).json({
       success: true,
       data: {
         totalTables: allTables.length,
         availableCount: suitableTables.length,
+        locationStats,
         tables: tablesData
       }
     });
@@ -242,17 +258,37 @@ exports.createReservation = async (req, res) => {
         });
       }
     } else {
-      // Hệ thống tự động tìm bàn phù hợp nhất (Capacity >= guestCount, gần nhất)
-      const potentialTables = await RestaurantTable.findAll({
-        where: {
-          IsDeleted: false,
-          Status: { [Op.ne]: 'Inactive' },
-          Capacity: { [Op.gte]: parsedGuestCount }
-        },
+      // Hệ thống tự động tìm bàn phù hợp nhất (Capacity >= guestCount, ưu tiên theo location nếu có)
+      const { location } = req.body;
+      const whereCondition = {
+        IsDeleted: false,
+        Status: { [Op.ne]: 'Inactive' },
+        Capacity: { [Op.gte]: parsedGuestCount }
+      };
+      if (location) {
+        whereCondition.Location = location;
+      }
+
+      let potentialTables = await RestaurantTable.findAll({
+        where: whereCondition,
         order: [['Capacity', 'ASC'], ['TableNumber', 'ASC']],
         transaction,
         lock: transaction.LOCK.UPDATE
       });
+
+      // Nếu tìm theo location không còn thì fallback sang tất cả khu vực
+      if (potentialTables.length === 0 && location) {
+        potentialTables = await RestaurantTable.findAll({
+          where: {
+            IsDeleted: false,
+            Status: { [Op.ne]: 'Inactive' },
+            Capacity: { [Op.gte]: parsedGuestCount }
+          },
+          order: [['Capacity', 'ASC'], ['TableNumber', 'ASC']],
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+      }
 
       for (const t of potentialTables) {
         const booked = await isTableBooked(t.TableId, resTime, null, transaction);
@@ -336,15 +372,19 @@ exports.getReservations = async (req, res) => {
 
     const where = {};
     if (!isStaff) {
-      where.UserId = currentUser.id || currentUser.UserId;
+      const guestId = currentUser?.id || currentUser?.UserId || req.query.userId;
+      if (guestId) {
+        where.UserId = guestId;
+      }
     } else {
       if (req.query.status) where.Status = req.query.status;
       if (req.query.tableId) where.TableId = req.query.tableId;
+      if (req.query.userId) where.UserId = req.query.userId;
     }
 
     const reservations = await TableReservation.findAll({
       where,
-      order: [['ReservationTime', 'DESC']],
+      order: [['TableReservationId', 'DESC']],
       include: [
         { model: RestaurantTable, as: 'table' },
         { model: User, as: 'user', attributes: ['UserId', 'FullName', 'Email', 'Phone'] }
