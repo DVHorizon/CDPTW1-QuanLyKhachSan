@@ -493,14 +493,14 @@ exports.searchRooms = async (req, res) => {
       );
     }
 
-    // Lọc theo Tiện nghi (Amenities)
+    // Lọc theo Tiện nghi (Amenities) - Chuẩn Apache Solr / Lucene BooleanQuery MUST (+)
     if (amenitiesFilter) {
       const amenitiesList = Array.isArray(amenitiesFilter)
         ? amenitiesFilter
         : amenitiesFilter.split(',').map(a => a.trim().toLowerCase());
       if (amenitiesList.length > 0) {
         filteredResults = filteredResults.filter(r =>
-          amenitiesList.some(amenity =>
+          amenitiesList.every(amenity =>
             (r.amenities || []).some(a => a.toLowerCase().includes(amenity))
           )
         );
