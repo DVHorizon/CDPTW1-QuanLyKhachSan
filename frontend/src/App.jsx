@@ -7,14 +7,19 @@ import Auth from './pages/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
+import RoomAvailability from './pages/admin/menu/RoomAvailability';
 import StaffManagement from './pages/StaffManagement';
 import RoomService from './pages/client/RoomService';
+import Profile from './pages/client/Profile';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
+import FnbOrderHistory from './pages/admin/fnb/FnbOrderHistory';
+import GuestOrderHistory from './pages/client/GuestOrderHistory';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 import ServiceManagement from './pages/ServiceManagement';
 import RoomStatusManagement from './pages/RoomStatusManagement';
 import BookingManagement from './pages/BookingManagement';
+
 
 function App() {
   return (
@@ -26,6 +31,9 @@ function App() {
           <Route path="/rooms/search" element={<SearchRooms />} />
           <Route path="/tim-kiem" element={<SearchRooms />} />
           <Route path="/room-service" element={<RoomService />} />
+          <Route path="/fnb/history" element={<GuestOrderHistory />} />
+          <Route path="/lich-su-dat-mon" element={<GuestOrderHistory />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/register" element={<Auth />} />
@@ -36,6 +44,7 @@ function App() {
           <Route path="/admin/bookings" element={<BookingManagement />} />
           <Route path="/admin/dat-phong" element={<BookingManagement />} />
           <Route path="/admin/danh-sach-dat-phong" element={<BookingManagement />} />
+          <Route path="/admin/room-availability" element={<RoomAvailability />} />
           <Route path="/admin/so-do-phong" element={<RoomStatusManagement />} />
           <Route path="/admin/room-status" element={<RoomStatusManagement />} />
           <Route path="/admin/le-tan" element={<RoomStatusManagement />} />
@@ -45,6 +54,8 @@ function App() {
           <Route path="/admin/quan-tri" element={<StaffManagement />} />
           <Route path="/admin/fnb/kitchen" element={<KitchenDisplay />} />
           <Route path="/admin/fnb/dispatch" element={<OrderDispatchHub />} />
+          <Route path="/admin/fnb/history" element={<FnbOrderHistory />} />
+          <Route path="/admin/fnb/room-service" element={<RoomService />} />
           <Route path="/admin/services" element={<ServiceManagement />} />
           <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
           {/* Redirect everything else to home for now */}
