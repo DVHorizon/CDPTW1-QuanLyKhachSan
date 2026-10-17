@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import AdminLayout from '../../components/admin/layout/AdminLayout';
+import GuestSidebar from '../../components/layout/GuestSidebar';
+import GuestHeader from '../../components/layout/GuestHeader';
 
 const RoomService = () => {
   // FEAT-FNB-04 & FEAT-FNB-07 State
@@ -292,50 +293,31 @@ const RoomService = () => {
     }
   };
 
-
-
   return (
-    <AdminLayout>
-      <div className="flex flex-col w-full -mx-space-lg -mt-16">
-        {/* Top Command & Header Ribbon */}
-        <div className="w-full bg-surface-container-lowest px-space-lg py-space-md shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-space-md px-space-lg">
-            <div className="flex items-center gap-space-md min-w-0">
-              <div className="w-10 h-10 rounded-lg bg-admin-primary/10 flex items-center justify-center text-admin-primary">
-                <span className="material-symbols-outlined text-[24px]">room_service</span>
+    <div className="bg-[#f4fbf4] min-h-screen text-slate-800 font-sans antialiased">
+      <GuestSidebar />
+      <div className="pl-72">
+        <GuestHeader />
+        <main className="relative pt-24 px-8 pb-12 w-full max-w-[1600px] mx-auto">
+          {/* Header Ribbon */}
+          <div className="w-full bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[28px]">room_service</span>
               </div>
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-space-xs">
-                  <span className="font-label-sm text-label-sm text-admin-primary uppercase tracking-widest">MODULE 31 // KHU ẨM THỰC PHÒNG</span>
-                  <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
-                  <span className="font-label-sm text-label-sm text-on-surface-variant font-semibold">TỰ ĐỘNG GHI NỢ PHÒNG (IRD)</span>
-                </div>
-                <h1 className="font-headline-md text-headline-md text-on-surface font-semibold tracking-tight truncate">
-                  Đặt Món Tại Phòng &amp; Ghi Nợ Folio Tức Thời
+              <div>
+                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-widest block">
+                  Dịch Vụ Phục Vụ Tại Phòng
+                </span>
+                <h1 className="text-2xl font-bold text-slate-800" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  Đặt Món Ẩm Thực Tận Phòng
                 </h1>
               </div>
             </div>
-            {/* Live Terminal Status Strip */}
-            <div className="flex items-center gap-space-sm bg-surface-container-low px-space-md py-space-xs rounded-xl">
-              <div className="flex items-center gap-space-xs">
-                <span className="w-2.5 h-2.5 rounded-full bg-admin-primary-container shadow-sm animate-pulse"></span>
-                <span className="font-label-sm text-label-sm text-on-surface font-bold">KẾT NỐI BẾP TRUNG TÂM</span>
-              </div>
-              <span className="h-4 w-px bg-outline-variant mx-space-xs"></span>
-              <div className="font-body-sm text-body-sm text-on-surface-variant">
-                Cổng <span className="font-semibold text-on-surface">Micros Simphony v4.2</span>
-              </div>
-              <span className="h-4 w-px bg-outline-variant mx-space-xs"></span>
-              <div className="flex items-center gap-space-xs text-admin-primary font-label-sm text-label-sm">
-                <span className="material-symbols-outlined text-[16px]">bolt</span>
-                <span>100ms</span>
-              </div>
-            </div>
           </div>
-        </div>
-        {/* Primary 3-Column Console Canvas */}
-        <div className="w-full px-space-lg py-space-lg">
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start px-space-lg">
+          {/* Primary 3-Column Console Canvas */}
+          <div className="w-full px-space-lg py-space-lg">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start px-space-lg">
             {/* ========================================================================= */}
             {/* CỘT 1: HỒ SƠ KHÁCH IN-HOUSE & THÔNG SỐ GIAO MÓN (28% -> Col span 3 or 4) */}
             {/* ========================================================================= */}
@@ -824,7 +806,6 @@ const RoomService = () => {
               <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-md space-y-space-md">
                 {/* Header Ticket */}
                 <div className="flex items-center justify-between pb-space-xs">
-                  <div className="flex flex-col">
                     <div className="flex items-center gap-space-xs">
                       <span className="font-headline-sm text-headline-sm font-bold text-on-surface">Phiếu Gọi Món</span>
                       <span className="font-label-sm text-label-sm text-admin-primary font-semibold">#IRD-4092</span>
@@ -932,364 +913,360 @@ const RoomService = () => {
                   <div className="flex items-center justify-between">
                     <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider block font-bold">Hình thức thanh toán (A4.7)</span>
                     <span className="text-[11px] px-2 py-0.5 rounded-full bg-admin-primary/10 text-admin-primary font-semibold">Bắt buộc</span>
-                  </div>
-
-                  {/* Lựa chọn 1: RoomInvoice */}
-                  <label 
-                    onClick={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
-                    className={`flex items-start gap-space-sm p-space-sm rounded-xl cursor-pointer transition-all border ${
-                      paymentMode === 'RoomInvoice'
+                    {/* Lựa chọn 1: RoomInvoice */}
+                    <label
+                      onClick={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
+                      className={`flex items-start gap-space-sm p-space-sm rounded-xl cursor-pointer transition-all border ${paymentMode === 'RoomInvoice'
                         ? 'bg-admin-primary/10 border-admin-primary shadow-sm'
                         : 'bg-surface-container border-transparent hover:bg-surface-container-high'
-                    }`}
-                  >
-                    <input 
-                      type="radio" 
-                      name="payment_mode" 
-                      checked={paymentMode === 'RoomInvoice'} 
-                      onChange={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
-                      className="mt-1 text-admin-primary focus:ring-0" 
-                    />
-                    <div className="flex flex-col">
-                      <span className="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[18px] text-admin-primary">domain</span>
-                        Gộp vào hóa đơn phòng (RoomInvoice)
-                      </span>
-                      <span className="font-body-sm text-body-sm text-on-surface-variant text-[12px]">
-                        Tạo folio charge liên kết Booking lưu trú (#FL-88031-C). Đơn giữ Pending gửi Bếp.
-                      </span>
-                    </div>
-                  </label>
-
-                  {/* Lựa chọn 2: PayNow */}
-                  <div className={`p-space-sm rounded-xl transition-all border ${
-                    paymentMode === 'PayNow'
-                      ? 'bg-admin-primary/10 border-admin-primary shadow-sm'
-                      : 'bg-surface-container border-transparent'
-                  }`}>
-                    <label 
-                      onClick={() => setPaymentMode('PayNow')}
-                      className="flex items-start gap-space-sm cursor-pointer"
+                        }`}
                     >
-                      <input 
-                        type="radio" 
-                        name="payment_mode" 
-                        checked={paymentMode === 'PayNow'} 
-                        onChange={() => setPaymentMode('PayNow')}
-                        className="mt-1 text-admin-primary focus:ring-0" 
+                      <input
+                        type="radio"
+                        name="payment_mode"
+                        checked={paymentMode === 'RoomInvoice'}
+                        onChange={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
+                        className="mt-1 text-admin-primary focus:ring-0"
                       />
                       <div className="flex flex-col">
                         <span className="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-[18px] text-admin-primary">payments</span>
-                          Thanh toán ngay (PayNow)
+                          <span className="material-symbols-outlined text-[18px] text-admin-primary">domain</span>
+                          Gộp vào hóa đơn phòng (RoomInvoice)
                         </span>
                         <span className="font-body-sm text-body-sm text-on-surface-variant text-[12px]">
-                          Cổng thanh toán online hoặc thu tiền mặt trực tiếp trước khi chuyển đơn.
+                          Tạo folio charge liên kết Booking lưu trú (#FL-88031-C). Đơn giữ Pending gửi Bếp.
                         </span>
                       </div>
                     </label>
 
-                    {/* Danh sách cổng thanh toán PayNow */}
-                    {paymentMode === 'PayNow' && (
-                      <div className="mt-3 pt-3 border-t border-outline-variant/30 space-y-2">
-                        <span className="font-label-sm text-[11px] text-outline font-semibold uppercase tracking-wider block">
-                          Chọn cổng thanh toán:
-                        </span>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            { id: 'VNPay', label: 'Cổng VNPAY-QR', icon: 'qr_code_scanner', color: 'text-blue-600' },
-                            { id: 'MoMo', label: 'Ví MoMo', icon: 'account_balance_wallet', color: 'text-pink-600' },
-                            { id: 'VietQR', label: 'VietQR Napas247', icon: 'qr_code_2', color: 'text-emerald-600' },
-                            { id: 'Cash', label: 'Tiền mặt tại phòng', icon: 'attach_money', color: 'text-amber-600' }
-                          ].map(pm => (
-                            <button
-                              key={pm.id}
-                              type="button"
-                              onClick={() => setPaymentMethod(pm.id)}
-                              className={`flex items-center gap-2 p-2 rounded-lg text-left transition-all text-xs font-semibold ${
-                                paymentMethod === pm.id
+                    {/* Lựa chọn 2: PayNow */}
+                    <div className={`p-space-sm rounded-xl transition-all border ${paymentMode === 'PayNow'
+                      ? 'bg-admin-primary/10 border-admin-primary shadow-sm'
+                      : 'bg-surface-container border-transparent'
+                      }`}>
+                      <label
+                        onClick={() => setPaymentMode('PayNow')}
+                        className="flex items-start gap-space-sm cursor-pointer"
+                      >
+                        <input
+                          type="radio"
+                          name="payment_mode"
+                          checked={paymentMode === 'PayNow'}
+                          onChange={() => setPaymentMode('PayNow')}
+                          className="mt-1 text-admin-primary focus:ring-0"
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[18px] text-admin-primary">payments</span>
+                            Thanh toán ngay (PayNow)
+                          </span>
+                          <span className="font-body-sm text-body-sm text-on-surface-variant text-[12px]">
+                            Cổng thanh toán online hoặc thu tiền mặt trực tiếp trước khi chuyển đơn.
+                          </span>
+                        </div>
+                      </label>
+
+                      {/* Danh sách cổng thanh toán PayNow */}
+                      {paymentMode === 'PayNow' && (
+                        <div className="mt-3 pt-3 border-t border-outline-variant/30 space-y-2">
+                          <span className="font-label-sm text-[11px] text-outline font-semibold uppercase tracking-wider block">
+                            Chọn cổng thanh toán:
+                          </span>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { id: 'VNPay', label: 'Cổng VNPAY-QR', icon: 'qr_code_scanner', color: 'text-blue-600' },
+                              { id: 'MoMo', label: 'Ví MoMo', icon: 'account_balance_wallet', color: 'text-pink-600' },
+                              { id: 'VietQR', label: 'VietQR Napas247', icon: 'qr_code_2', color: 'text-emerald-600' },
+                              { id: 'Cash', label: 'Tiền mặt tại phòng', icon: 'attach_money', color: 'text-amber-600' }
+                            ].map(pm => (
+                              <button
+                                key={pm.id}
+                                type="button"
+                                onClick={() => setPaymentMethod(pm.id)}
+                                className={`flex items-center gap-2 p-2 rounded-lg text-left transition-all text-xs font-semibold ${paymentMethod === pm.id
                                   ? 'bg-surface-container-lowest text-admin-primary border-2 border-admin-primary shadow-sm'
                                   : 'bg-surface-container-lowest/70 text-on-surface border border-outline-variant hover:border-admin-primary/50'
-                              }`}
-                            >
-                              <span className={`material-symbols-outlined text-[18px] ${pm.color}`}>{pm.icon}</span>
-                              <span className="truncate">{pm.label}</span>
-                            </button>
-                          ))}
+                                  }`}
+                              >
+                                <span className={`material-symbols-outlined text-[18px] ${pm.color}`}>{pm.icon}</span>
+                                <span className="truncate">{pm.label}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Mô phỏng tình huống cổng thanh toán trả về thất bại (Negative test) */}
+                          <label className="flex items-center gap-2 mt-2 pt-2 text-[11px] text-outline cursor-pointer hover:text-on-surface">
+                            <input
+                              type="checkbox"
+                              checked={simulateFailure}
+                              onChange={(e) => setSimulateFailure(e.target.checked)}
+                              className="rounded text-error focus:ring-0"
+                            />
+                            <span>Mô phỏng: Cổng thanh toán báo lỗi (Negative Case TC07)</span>
+                          </label>
                         </div>
-
-                        {/* Mô phỏng tình huống cổng thanh toán trả về thất bại (Negative test) */}
-                        <label className="flex items-center gap-2 mt-2 pt-2 text-[11px] text-outline cursor-pointer hover:text-on-surface">
-                          <input 
-                            type="checkbox" 
-                            checked={simulateFailure} 
-                            onChange={(e) => setSimulateFailure(e.target.checked)}
-                            className="rounded text-error focus:ring-0" 
-                          />
-                          <span>Mô phỏng: Cổng thanh toán báo lỗi (Negative Case TC07)</span>
-                        </label>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Thông báo lỗi / Thành công theo SPEC */}
-                {errorMessage && (
-                  <div className="p-space-sm bg-error-container/40 border border-error/30 rounded-xl flex items-start gap-2 text-error text-xs animate-shake">
-                    <span className="material-symbols-outlined text-[18px] flex-shrink-0">error</span>
-                    <span className="font-semibold leading-relaxed">{errorMessage}</span>
-                  </div>
-                )}
+                  {/* Thông báo lỗi / Thành công theo SPEC */}
+                  {errorMessage && (
+                    <div className="p-space-sm bg-error-container/40 border border-error/30 rounded-xl flex items-start gap-2 text-error text-xs animate-shake">
+                      <span className="material-symbols-outlined text-[18px] flex-shrink-0">error</span>
+                      <span className="font-semibold leading-relaxed">{errorMessage}</span>
+                    </div>
+                  )}
 
-                {successMessage && (
-                  <div className="p-space-sm bg-emerald-500/15 border border-emerald-500/30 rounded-xl flex items-start gap-2 text-emerald-800 text-xs">
-                    <span className="material-symbols-outlined text-[18px] flex-shrink-0">check_circle</span>
-                    <span className="font-semibold leading-relaxed">{successMessage}</span>
-                  </div>
-                )}
+                  {successMessage && (
+                    <div className="p-space-sm bg-emerald-500/15 border border-emerald-500/30 rounded-xl flex items-start gap-2 text-emerald-800 text-xs">
+                      <span className="material-symbols-outlined text-[18px] flex-shrink-0">check_circle</span>
+                      <span className="font-semibold leading-relaxed">{successMessage}</span>
+                    </div>
+                  )}
 
-                {/* Nút Thực Thi Nghiệp Vụ Chính */}
-                <div className="space-y-space-xs pt-space-sm">
-                  <button 
-                    disabled={isSubmitting}
-                    onClick={handleOpenPaymentFlow}
-                    className="w-full py-3 px-space-md rounded-xl bg-admin-primary-container text-on-admin-primary-container font-label-lg text-label-lg font-bold flex items-center justify-center gap-space-sm shadow-md hover:brightness-105 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all" 
-                    type="button"
-                  >
-                    {isSubmitting ? (
-                      <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                        Đang xử lý thanh toán...
-                      </span>
-                    ) : (
-                      <>
-                        <span className="material-symbols-outlined text-[20px]">
-                          {paymentMode === 'PayNow' && paymentMethod !== 'Cash' ? 'qr_code_scanner' : 'send_and_archive'}
+                  {/* Nút Thực Thi Nghiệp Vụ Chính */}
+                  <div className="space-y-space-xs pt-space-sm">
+                    <button
+                      disabled={isSubmitting}
+                      onClick={handleOpenPaymentFlow}
+                      className="w-full py-3 px-space-md rounded-xl bg-admin-primary-container text-on-admin-primary-container font-label-lg text-label-lg font-bold flex items-center justify-center gap-space-sm shadow-md hover:brightness-105 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      type="button"
+                    >
+                      {isSubmitting ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                          Đang xử lý thanh toán...
                         </span>
-                        {paymentMode === 'RoomInvoice' 
-                          ? 'XÁC NHẬN GỬI BẾP & GHI NỢ PHÒNG' 
-                          : paymentMethod === 'Cash' 
-                            ? 'XÁC NHẬN TRẢ TIỀN MẶT & GỬI BẾP'
-                            : 'MỞ MÃ QR THANH TOÁN & GỬI BẾP'}
-                      </>
-                    )}
-                  </button>
-                  <div className="grid grid-cols-2 gap-space-xs pt-1">
-                    <button className="py-2 rounded-lg bg-surface-container text-on-surface-variant hover:bg-surface-container-high font-label-sm text-label-sm flex items-center justify-center gap-1 transition-colors" type="button">
-                      <span className="material-symbols-outlined text-[16px]">print</span>
-                      In Phiếu Bếp (KOT)
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[20px]">
+                            {paymentMode === 'PayNow' && paymentMethod !== 'Cash' ? 'qr_code_scanner' : 'send_and_archive'}
+                          </span>
+                          {paymentMode === 'RoomInvoice'
+                            ? 'XÁC NHẬN GỬI BẾP & GHI NỢ PHÒNG'
+                            : paymentMethod === 'Cash'
+                              ? 'XÁC NHẬN TRẢ TIỀN MẶT & GỬI BẾP'
+                              : 'MỞ MÃ QR THANH TOÁN & GỬI BẾP'}
+                        </>
+                      )}
                     </button>
-                    <button className="py-2 rounded-lg bg-surface-container text-on-surface-variant hover:bg-surface-container-high font-label-sm text-label-sm flex items-center justify-center gap-1 transition-colors" type="button">
-                      <span className="material-symbols-outlined text-[16px]">save</span>
-                      Lưu Nháp Tạm
-                    </button>
+                    <div className="grid grid-cols-2 gap-space-xs pt-1">
+                      <button className="py-2 rounded-lg bg-surface-container text-on-surface-variant hover:bg-surface-container-high font-label-sm text-label-sm flex items-center justify-center gap-1 transition-colors" type="button">
+                        <span className="material-symbols-outlined text-[16px]">print</span>
+                        In Phiếu Bếp (KOT)
+                      </button>
+                      <button className="py-2 rounded-lg bg-surface-container text-on-surface-variant hover:bg-surface-container-high font-label-sm text-label-sm flex items-center justify-center gap-1 transition-colors" type="button">
+                        <span className="material-symbols-outlined text-[16px]">save</span>
+                        Lưu Nháp Tạm
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Bảo mật & Xác thực kiểm toán */}
-                <div className="text-center pt-space-xs">
-                  <span className="font-body-sm text-[11px] text-outline">
-                    Chứng từ ký nợ tuân theo chuẩn kế toán khách sạn USALI 11th Edition.
+                  {/* Bảo mật & Xác thực kiểm toán */}
+                  <div className="text-center pt-space-xs">
+                    <span className="font-body-sm text-[11px] text-outline">
+                      Chứng từ ký nợ tuân theo chuẩn kế toán khách sạn USALI 11th Edition.
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* MODAL QUÉT MÃ QR THANH TOÁN (PAYNOW) */}
+          {showQrModal && qrModalData && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+              <div
+                className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant relative flex flex-col items-center text-center animate-scale-up"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Nút đóng */}
+                <button
+                  onClick={() => setShowQrModal(false)}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+
+                {/* Badge cổng thanh toán */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="font-bold text-xs uppercase tracking-wider text-admin-primary">
+                    CỔNG THANH TOÁN {qrModalData.method.toUpperCase()}
                   </span>
                 </div>
 
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+                <h3 className="font-serif text-xl font-bold text-on-surface mb-1">
+                  Quét Mã Để Thanh Toán
+                </h3>
+                <p className="text-xs text-on-surface-variant mb-4">
+                  Phòng 804 • Mã GD: <span className="font-mono font-semibold">{qrModalData.transactionCode}</span>
+                </p>
 
-      {/* MODAL QUÉT MÃ QR THANH TOÁN (PAYNOW) */}
-      {showQrModal && qrModalData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div 
-            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant relative flex flex-col items-center text-center animate-scale-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Nút đóng */}
-            <button
-              onClick={() => setShowQrModal(false)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[18px]">close</span>
-            </button>
+                {/* Khung chứa mã QR Code chuẩn theo từng cổng thanh toán */}
+                <div className="p-4 bg-surface-container-lowest rounded-2xl border-2 border-dashed border-admin-primary/40 shadow-inner flex flex-col items-center mb-4 w-full">
+                  {(() => {
+                    const amount = qrModalData.amount;
+                    const memo = `FNB P804 ${qrModalData.transactionCode.slice(-6)}`;
 
-            {/* Badge cổng thanh toán */}
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-bold text-xs uppercase tracking-wider text-admin-primary">
-                CỔNG THANH TOÁN {qrModalData.method.toUpperCase()}
-              </span>
-            </div>
+                    // 1. Trường hợp VÍ MOMO: Dùng trực tiếp ảnh QR MoMo thật của bạn
+                    if (qrModalData.method === 'MoMo') {
+                      return (
+                        <div className="w-full flex flex-col items-center">
+                          <div className="flex items-center gap-2 mb-3 px-3 py-1 bg-pink-50 border border-pink-200 rounded-lg text-[#a50064] text-xs font-bold">
+                            <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+                            CỔNG THANH TOÁN VÍ ĐIỆN TỬ MOMO GATEWAY
+                          </div>
 
-            <h3 className="font-serif text-xl font-bold text-on-surface mb-1">
-              Quét Mã Để Thanh Toán
-            </h3>
-            <p className="text-xs text-on-surface-variant mb-4">
-              Phòng 804 • Mã GD: <span className="font-mono font-semibold">{qrModalData.transactionCode}</span>
-            </p>
+                          {/* Khung QR MoMo chính thức */}
+                          <div className="p-2.5 bg-gradient-to-b from-[#fce4ec] to-[#f8bbd0] rounded-2xl border-2 border-[#d82d8b] shadow-lg flex flex-col items-center max-w-[280px]">
+                            <img
+                              src="/momo-qr.png"
+                              alt="MoMo QR Code - NGUYEN XUAN THU TRANG"
+                              className="w-full h-auto object-contain rounded-xl shadow-sm"
+                            />
+                          </div>
 
-            {/* Khung chứa mã QR Code chuẩn theo từng cổng thanh toán */}
-            <div className="p-4 bg-surface-container-lowest rounded-2xl border-2 border-dashed border-admin-primary/40 shadow-inner flex flex-col items-center mb-4 w-full">
-              {(() => {
-                const amount = qrModalData.amount;
-                const memo = `FNB P804 ${qrModalData.transactionCode.slice(-6)}`;
+                          <div className="mt-3 flex flex-col items-center gap-1 text-center">
+                            <div className="flex items-center gap-1.5 font-bold text-[#a50064] text-xs">
+                              <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                              Mở ứng dụng MoMo để quét mã QR thanh toán
+                            </div>
+                            <div className="text-xs text-on-surface">
+                              Chủ tài khoản: <strong className="text-on-surface font-bold uppercase">NGUYEN XUAN THU TRANG</strong>
+                            </div>
+                            <span className="text-[11px] text-on-surface-variant font-mono">
+                              Nội dung chuyển: <strong className="text-on-surface font-semibold">{memo}</strong>
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
 
-                // 1. Trường hợp VÍ MOMO: Dùng trực tiếp ảnh QR MoMo thật của bạn
-                if (qrModalData.method === 'MoMo') {
-                  return (
-                    <div className="w-full flex flex-col items-center">
-                      <div className="flex items-center gap-2 mb-3 px-3 py-1 bg-pink-50 border border-pink-200 rounded-lg text-[#a50064] text-xs font-bold">
-                        <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
-                        CỔNG THANH TOÁN VÍ ĐIỆN TỬ MOMO GATEWAY
-                      </div>
-                      
-                      {/* Khung QR MoMo chính thức */}
-                      <div className="p-2.5 bg-gradient-to-b from-[#fce4ec] to-[#f8bbd0] rounded-2xl border-2 border-[#d82d8b] shadow-lg flex flex-col items-center max-w-[280px]">
-                        <img 
-                          src="/momo-qr.png"
-                          alt="MoMo QR Code - NGUYEN XUAN THU TRANG"
-                          className="w-full h-auto object-contain rounded-xl shadow-sm"
+                    // 2. Trường hợp VNPAY-QR: Cổng VNPAY liên kết các ngân hàng
+                    if (qrModalData.method === 'VNPay') {
+                      const BANK_ID = 'VCB'; // Vietcombank đối tác cổng VNPAY
+                      const ACCOUNT_NO = '999908048888';
+                      const ACCOUNT_NAME = 'VNPAY - GRAND HORIZON';
+                      const vnpayQrUrl = `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT_NO}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
+
+                      return (
+                        <>
+                          <div className="flex items-center gap-2 mb-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-xs font-bold">
+                            <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
+                            CỔNG THANH TOÁN VNPAY-QR (VNPAY GATEWAY)
+                          </div>
+                          <img
+                            src={vnpayQrUrl}
+                            alt="VNPAY QR Gateway"
+                            className="w-56 h-auto rounded-xl object-contain shadow-sm border border-blue-200"
+                          />
+                          <div className="mt-3 flex flex-col items-center gap-1 text-xs">
+                            <div className="flex items-center gap-1.5 font-bold text-blue-700">
+                              <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                              Quét bằng ứng dụng VNPAY hoặc 30+ Mobile Banking
+                            </div>
+                            <span className="text-[11px] text-on-surface-variant font-mono">
+                              Mã hóa đơn VNPAY: <strong className="text-on-surface">{memo}</strong>
+                            </span>
+                          </div>
+                        </>
+                      );
+                    }
+
+                    // 3. Mặc định / VietQR Napas247:
+                    const BANK_ID = 'MB'; // MBBank
+                    const ACCOUNT_NO = '090123456789';
+                    const ACCOUNT_NAME = 'GRAND HORIZON HOTEL';
+                    const vietQrUrl = `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT_NO}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
+
+                    return (
+                      <>
+                        <div className="flex items-center gap-2 mb-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-xs font-bold">
+                          <span className="material-symbols-outlined text-[16px]">account_balance</span>
+                          VIETQR NAPAS247 (LIÊN NGÂN HÀNG 24/7)
+                        </div>
+                        <img
+                          src={vietQrUrl}
+                          alt="VietQR Napas247"
+                          className="w-56 h-auto rounded-xl object-contain shadow-sm border border-emerald-200"
                         />
-                      </div>
-
-                      <div className="mt-3 flex flex-col items-center gap-1 text-center">
-                        <div className="flex items-center gap-1.5 font-bold text-[#a50064] text-xs">
-                          <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
-                          Mở ứng dụng MoMo để quét mã QR thanh toán
+                        <div className="mt-3 flex flex-col items-center gap-1 text-xs">
+                          <div className="flex items-center gap-1.5 font-bold text-emerald-700">
+                            <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                            Quét bằng App mọi ngân hàng tại Việt Nam
+                          </div>
+                          <span className="text-[11px] text-on-surface-variant font-mono">
+                            Nội dung CK: <strong className="text-on-surface">{memo}</strong>
+                          </span>
                         </div>
-                        <div className="text-xs text-on-surface">
-                          Chủ tài khoản: <strong className="text-on-surface font-bold uppercase">NGUYEN XUAN THU TRANG</strong>
-                        </div>
-                        <span className="text-[11px] text-on-surface-variant font-mono">
-                          Nội dung chuyển: <strong className="text-on-surface font-semibold">{memo}</strong>
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // 2. Trường hợp VNPAY-QR: Cổng VNPAY liên kết các ngân hàng
-                if (qrModalData.method === 'VNPay') {
-                  const BANK_ID = 'VCB'; // Vietcombank đối tác cổng VNPAY
-                  const ACCOUNT_NO = '999908048888';
-                  const ACCOUNT_NAME = 'VNPAY - GRAND HORIZON';
-                  const vnpayQrUrl = `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT_NO}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
-
-                  return (
-                    <>
-                      <div className="flex items-center gap-2 mb-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-xs font-bold">
-                        <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
-                        CỔNG THANH TOÁN VNPAY-QR (VNPAY GATEWAY)
-                      </div>
-                      <img 
-                        src={vnpayQrUrl}
-                        alt="VNPAY QR Gateway"
-                        className="w-56 h-auto rounded-xl object-contain shadow-sm border border-blue-200"
-                      />
-                      <div className="mt-3 flex flex-col items-center gap-1 text-xs">
-                        <div className="flex items-center gap-1.5 font-bold text-blue-700">
-                          <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
-                          Quét bằng ứng dụng VNPAY hoặc 30+ Mobile Banking
-                        </div>
-                        <span className="text-[11px] text-on-surface-variant font-mono">
-                          Mã hóa đơn VNPAY: <strong className="text-on-surface">{memo}</strong>
-                        </span>
-                      </div>
-                    </>
-                  );
-                }
-
-                // 3. Mặc định / VietQR Napas247:
-                const BANK_ID = 'MB'; // MBBank
-                const ACCOUNT_NO = '090123456789';
-                const ACCOUNT_NAME = 'GRAND HORIZON HOTEL';
-                const vietQrUrl = `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT_NO}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
-
-                return (
-                  <>
-                    <div className="flex items-center gap-2 mb-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-xs font-bold">
-                      <span className="material-symbols-outlined text-[16px]">account_balance</span>
-                      VIETQR NAPAS247 (LIÊN NGÂN HÀNG 24/7)
-                    </div>
-                    <img 
-                      src={vietQrUrl}
-                      alt="VietQR Napas247"
-                      className="w-56 h-auto rounded-xl object-contain shadow-sm border border-emerald-200"
-                    />
-                    <div className="mt-3 flex flex-col items-center gap-1 text-xs">
-                      <div className="flex items-center gap-1.5 font-bold text-emerald-700">
-                        <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
-                        Quét bằng App mọi ngân hàng tại Việt Nam
-                      </div>
-                      <span className="text-[11px] text-on-surface-variant font-mono">
-                        Nội dung CK: <strong className="text-on-surface">{memo}</strong>
-                      </span>
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
+                      </>
+                    );
+                  })()}
+                </div>
 
 
-            {/* Số tiền cần thanh toán */}
-            <div className="w-full bg-surface-container-low rounded-xl p-3 mb-4 flex justify-between items-center text-sm">
-              <span className="text-on-surface-variant font-medium">Tổng tiền thanh toán:</span>
-              <span className="font-headline-sm font-bold text-admin-primary text-xl tracking-tight">
-                {qrModalData.amount.toLocaleString('vi-VN')} đ
-              </span>
-            </div>
+                {/* Số tiền cần thanh toán */}
+                <div className="w-full bg-surface-container-low rounded-xl p-3 mb-4 flex justify-between items-center text-sm">
+                  <span className="text-on-surface-variant font-medium">Tổng tiền thanh toán:</span>
+                  <span className="font-headline-sm font-bold text-admin-primary text-xl tracking-tight">
+                    {qrModalData.amount.toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
 
-            {/* Chú thích kiểm thử quy trình */}
-            <div className="w-full bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 mb-4 text-[11px] text-amber-800 text-center">
-              💡 <strong>Kiểm thử chức năng A4.7:</strong> Bạn có thể dùng App MoMo quét mã thật ở trên, hoặc bấm 1 trong 2 nút bên dưới để mô phỏng phản hồi từ Cổng Thanh Toán.
-            </div>
+                {/* Chú thích kiểm thử quy trình */}
+                <div className="w-full bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 mb-4 text-[11px] text-amber-800 text-center">
+                  💡 <strong>Kiểm thử chức năng A4.7:</strong> Bạn có thể dùng App MoMo quét mã thật ở trên, hoặc bấm 1 trong 2 nút bên dưới để mô phỏng phản hồi từ Cổng Thanh Toán.
+                </div>
 
-            {/* Các nút hành động mô phỏng Cổng Thanh Toán */}
-            <div className="w-full flex flex-col gap-2">
-              <div className="flex gap-2.5">
-                {/* Nút mô phỏng thất bại TC07 */}
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => executePaymentAPI(true)}
-                  className="flex-1 py-2.5 px-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-700 font-semibold text-xs hover:bg-rose-100 active:scale-95 transition-all flex items-center justify-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-[16px]">cancel</span>
-                  Mô Phỏng Thất Bại (TC07)
-                </button>
+                {/* Các nút hành động mô phỏng Cổng Thanh Toán */}
+                <div className="w-full flex flex-col gap-2">
+                  <div className="flex gap-2.5">
+                    {/* Nút mô phỏng thất bại TC07 */}
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => executePaymentAPI(true)}
+                      className="flex-1 py-2.5 px-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-700 font-semibold text-xs hover:bg-rose-100 active:scale-95 transition-all flex items-center justify-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">cancel</span>
+                      Mô Phỏng Thất Bại (TC07)
+                    </button>
 
-                {/* Nút xác nhận thành công TC06 */}
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => executePaymentAPI(false)}
-                  className="flex-1 py-2.5 px-3 rounded-xl bg-admin-primary-container text-on-admin-primary-container font-bold text-xs shadow hover:brightness-105 active:scale-95 transition-all flex items-center justify-center gap-1"
-                >
-                  {isSubmitting ? (
-                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                      Thanh Toán Thành Công (TC06)
-                    </>
-                  )}
-                </button>
+                    {/* Nút xác nhận thành công TC06 */}
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => executePaymentAPI(false)}
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-admin-primary-container text-on-admin-primary-container font-bold text-xs shadow hover:brightness-105 active:scale-95 transition-all flex items-center justify-center gap-1"
+                    >
+                      {isSubmitting ? (
+                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                          Thanh Toán Thành Công (TC06)
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowQrModal(false)}
+                    className="w-full py-2 text-xs font-semibold text-outline hover:text-on-surface transition-colors"
+                  >
+                    Đóng cửa sổ
+                  </button>
+                </div>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowQrModal(false)}
-                className="w-full py-2 text-xs font-semibold text-outline hover:text-on-surface transition-colors"
-              >
-                Đóng cửa sổ
-              </button>
             </div>
-          </div>
-        </div>
-      )}
-    </AdminLayout>
+          )}
+        </main>
+      </div>
+    </div>
   );
 };
 
