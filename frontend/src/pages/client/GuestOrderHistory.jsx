@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import GuestSidebar from "../../components/layout/GuestSidebar";
 import GuestHeader from "../../components/layout/GuestHeader";
+import { useAuth } from "../../context/AuthContext";
 
 const API = "http://localhost:5000/api/v1/fnb-orders/history?view=guest";
 
@@ -30,6 +31,7 @@ function fmtDate(d) {
 
 export default function GuestOrderHistory() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,15 +47,18 @@ export default function GuestOrderHistory() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      // Lấy user id từ localStorage nếu có
+      // Lấy user id từ context hoặc localStorage
       let url = API;
-      try {
-        const savedUser = JSON.parse(localStorage.getItem("hotel_user") || "{}");
-        const uid = savedUser?.id || savedUser?.UserId || savedUser?.userId;
-        if (uid) {
-          url += `&userId=${uid}`;
-        }
-      } catch {}
+      let uid = user?.userId || user?.id || user?.UserId;
+      if (!uid) {
+        try {
+          const savedUser = JSON.parse(localStorage.getItem("hotel_user") || "{}");
+          uid = savedUser?.id || savedUser?.UserId || savedUser?.userId;
+        } catch {}
+      }
+      if (uid) {
+        url += `&userId=${uid}`;
+      }
 
       const res = await fetch(url, { headers });
       const json = await res.json();
