@@ -1,13 +1,21 @@
-const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room, Booking, Invoice, InvoiceDetail, Payment } = require('../../models');
+const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room, Booking, User, Invoice, InvoiceDetail, Payment } = require('../../models');
 const { broadcastOrderStatus } = require('../../services/websocketService');
 
 
-// Lấy danh sách lượt lưu trú đang Active để chọn phòng đặt món
+// Lấy danh sách lượt lưu trú đang hoạt động (CheckedIn / Active) để chọn phòng đặt món / đặt bàn
 exports.getActiveStays = async (req, res) => {
   try {
     const stays = await Stay.findAll({
-      where: { Status: 'Active' },
-      include: [{ model: Room }],
+      where: { 
+        Status: { [require('sequelize').Op.in]: ['CheckedIn', 'Active'] } 
+      },
+      include: [
+        { model: Room },
+        { 
+          model: Booking, 
+          include: [{ model: User, as: 'user', attributes: ['UserId', 'FullName', 'Email', 'Phone'] }] 
+        }
+      ],
       order: [['StayId', 'ASC']]
     });
     return res.status(200).json({
@@ -17,7 +25,10 @@ exports.getActiveStays = async (req, res) => {
         roomId: s.RoomId,
         roomNumber: s.Room?.RoomNumber || `Phòng ${s.RoomId}`,
         floor: s.Room?.Floor || 1,
-        guestName: 'Khách lưu trú P.' + (s.Room?.RoomNumber || s.RoomId)
+        guestName: s.Booking?.user?.FullName || ('Khách lưu trú P.' + (s.Room?.RoomNumber || s.RoomId)),
+        userId: s.Booking?.user?.UserId || null,
+        phone: s.Booking?.user?.Phone || null,
+        expectedCheckOut: s.ExpectedCheckOut
       }))
     });
   } catch (error) {
