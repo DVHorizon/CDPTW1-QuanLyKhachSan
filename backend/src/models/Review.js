@@ -57,11 +57,13 @@ module.exports = (sequelize) => {
     },
     ReviewTitle: {
       type: DataTypes.STRING(80),
-      allowNull: false
+      allowNull: true,
+      defaultValue: 'Đánh giá món ăn & dịch vụ F&B'
     },
     ReviewBody: {
       type: DataTypes.STRING(1000),
-      allowNull: false
+      allowNull: true,
+      defaultValue: ''
     },
     IsAnonymous: {
       type: DataTypes.BOOLEAN,

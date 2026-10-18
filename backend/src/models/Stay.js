@@ -19,10 +19,6 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true
     },
-    CheckInTime: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
     ExpectedCheckOut: {
       type: DataTypes.DATE,
       allowNull: true
@@ -31,8 +27,8 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true
     },
-    CheckOutTime: {
-      type: DataTypes.DATE,
+    DepositAmount: {
+      type: DataTypes.DECIMAL(10, 2),
       allowNull: true
     },
     Status: {

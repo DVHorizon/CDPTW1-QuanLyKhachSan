@@ -10,6 +10,7 @@ const defineMembershipTier = require('./MembershipTier');
 const defineUser = require('./User');
 const defineBooking = require('./Booking');
 const defineReview = require('./Review');
+const defineReviewPhoto = require('./ReviewPhoto');
 const defineMenuCategory = require('./MenuCategory');
 const defineMenuItem = require('./MenuItem');
 
@@ -32,6 +33,7 @@ const MembershipTier = defineMembershipTier(sequelize);
 const User = defineUser(sequelize);
 const Booking = defineBooking(sequelize);
 const Review = defineReview(sequelize);
+const ReviewPhoto = defineReviewPhoto(sequelize);
 const MenuCategory = defineMenuCategory(sequelize);
 const MenuItem = defineMenuItem(sequelize);
 const Stay = defineStay(sequelize);
@@ -73,6 +75,11 @@ Booking.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
 User.hasMany(Review, { foreignKey: 'UserId', as: 'reviews' });
 Review.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 
+// 7b. Review & ReviewPhoto
+Review.hasMany(ReviewPhoto, { foreignKey: 'ReviewId', as: 'photos' });
+ReviewPhoto.belongsTo(Review, { foreignKey: 'ReviewId', as: 'review' });
+
+
 // 8. MenuCategory & MenuItem
 MenuCategory.hasMany(MenuItem, { foreignKey: 'CategoryId' });
 MenuItem.belongsTo(MenuCategory, { foreignKey: 'CategoryId' });
@@ -108,6 +115,12 @@ FoodOrderDetail.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
 
 // 14. MenuItem & FoodOrderDetail
 MenuItem.hasMany(FoodOrderDetail, { foreignKey: 'MenuItemId' });
+FoodOrderDetail.belongsTo(MenuItem, { foreignKey: 'MenuItemId' });
+
+// 14b. FoodOrder & Review (FEAT-FNB-10)
+FoodOrder.hasOne(Review, { foreignKey: 'FoodOrderId', as: 'review' });
+Review.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId', as: 'foodOrder' });
+
 // 15. RestaurantTable & TableReservation
 const defineRestaurantTable = require('./RestaurantTable');
 const defineTableReservation = require('./TableReservation');
@@ -135,6 +148,7 @@ module.exports = {
   User,
   Booking,
   Review,
+  ReviewPhoto,
   MenuCategory,
   MenuItem,
   Stay,

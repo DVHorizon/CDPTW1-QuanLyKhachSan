@@ -358,20 +358,42 @@ export default function GuestOrderHistory() {
                             ))}
                           </div>
 
-                          {/* Footer Info */}
-                          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
-                            <div className="flex items-center gap-1.5">
-                              <span className="material-symbols-outlined text-[16px] text-emerald-600">credit_card</span>
-                              <span>Phương thức:</span>
-                              <strong className="text-slate-800 font-semibold">
-                                {order.paymentMode === "RoomInvoice" ? "Gộp vào hóa đơn phòng khi trả phòng" : "Thanh toán ngay"}
-                              </strong>
-                            </div>
-                            {order.note && (
-                              <div className="text-slate-500 italic">
-                                Yêu cầu: <span className="text-slate-700 font-medium">"{order.note}"</span>
+                          {/* Footer Info & Actions */}
+                          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-3">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <div className="flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-[16px] text-emerald-600">credit_card</span>
+                                <span>Phương thức:</span>
+                                <strong className="text-slate-800 font-semibold">
+                                  {order.paymentMode === "RoomInvoice" ? "Gộp vào hóa đơn phòng khi trả phòng" : "Thanh toán ngay"}
+                                </strong>
                               </div>
-                            )}
+                              {order.note && (
+                                <div className="text-slate-500 italic">
+                                  Yêu cầu: <span className="text-slate-700 font-medium">"{order.note}"</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* FEAT-FNB-10 (A4.10): Đánh giá món ăn và chất lượng phục vụ F&B */}
+                            <div className="flex items-center gap-2">
+                              {order.status === "Served" && (
+                                order.hasReviewed ? (
+                                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200/80 font-bold text-xs">
+                                    <span className="material-symbols-outlined text-[16px] text-amber-500" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                                    <span>Đã đánh giá ({order.review?.rating || 5}★)</span>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => navigate(`/fnb/danh-gia?orderId=${order.foodOrderId}`)}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer"
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">rate_review</span>
+                                    <span>Đánh Giá Món Ăn</span>
+                                  </button>
+                                )
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
