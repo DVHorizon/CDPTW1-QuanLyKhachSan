@@ -5,22 +5,24 @@
  * 👤 OWNER: Bảo — Guest Portal
  * Mount tại: /api/v1/guest
  *
- * Bao gồm: Search, Booking, Review, Wishlist, Home, Newsletter, Compare
+ * Bao gồm: Search, Room Availability, Booking, Review, Wishlist, Home, Newsletter, Compare
  */
 
 const express = require('express');
 const router = express.Router();
 
-// Search & Room browsing — dùng lại roomSearchController hiện có
 const roomSearchController = require('../../controllers/roomSearchController');
-router.get('/rooms/search',  roomSearchController.searchRooms);
-router.get('/rooms/suggest', roomSearchController.suggestRooms);
-router.get('/rooms/:id',     roomSearchController.getRoomDetail);
-router.get('/branches',      roomSearchController.getBranches);
+const roomAvailabilityController = require('../../controllers/roomAvailabilityController');
 
-// router.use('/bookings',   require('./routes/bookingRoutes'));   // TODO: Bảo
-// router.use('/reviews',    require('./routes/reviewRoutes'));    // TODO: Bảo
-// router.use('/wishlist',   require('./routes/wishlistRoutes')); // TODO: Bảo
-// router.use('/newsletter', require('./routes/homeRoutes'));      // TODO: Bảo
+// ─── TÍNH NĂNG 4: REAL-TIME AVAILABILITY & LOCK (FEAT-GUEST-04) ─────────────
+router.get('/rooms/availability',    roomAvailabilityController.checkRoomAvailability);
+router.post('/rooms/lock',           roomAvailabilityController.lockRoomSession);
+router.delete('/rooms/lock/:sessionId', roomAvailabilityController.releaseRoomLock);
+
+// ─── TÌM KIẾM & XEM PHÒNG ──────────────────────────────────────────────────
+router.get('/rooms/search',          roomSearchController.searchRooms);
+router.get('/rooms/suggest',         roomSearchController.suggestRooms);
+router.get('/rooms/:id',             roomSearchController.getRoomDetail);
+router.get('/branches',              roomSearchController.getBranches);
 
 module.exports = router;

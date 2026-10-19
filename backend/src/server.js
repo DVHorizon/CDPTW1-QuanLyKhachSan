@@ -1,8 +1,11 @@
 'use strict';
 
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 require('dotenv').config();
+
+const { initSocket } = require('./sockets/socketHandler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -78,13 +81,15 @@ app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 app.use(require('./shared/middlewares/errorHandler'));
 
-// ─── Start server with WebSocket ───────────────────────────────────────────
-const http = require('http');
-const { initWebSocket } = require('./services/websocketService');
-
+// ─── HTTP Server & WebSocket ───────────────────────────────────────────────
 const server = http.createServer(app);
-initWebSocket(server);
+try {
+  initSocket(server);
+} catch (wsErr) {
+  console.warn('⚠️ WebSocket init warning:', wsErr.message);
+}
 
+// ─── Start server ──────────────────────────────────────────────────────────
 server.listen(PORT, () => {
   console.log(`✅ Backend server with WebSocket running on port ${PORT}`);
   console.log(`   Modules: /api/v1/{guest|pms|services|fnb|operations}`);
