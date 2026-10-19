@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import AdminLayout from '../../../components/admin/layout/AdminLayout';
+import OrderPrintModal from '../../../components/admin/fnb/OrderPrintModal';
 
 
-const Ticket = ({ order, onCheck, onReady }) => {
+const Ticket = ({ order, onCheck, onReady, onPrint }) => {
   const isOverSLA = order.isOverSLA;
   const color = order.priorityVip ? 'admin-primary' : (isOverSLA ? 'tertiary' : 'secondary');
   const bgHeader = order.priorityVip ? 'bg-admin-primary/5' : (isOverSLA ? 'bg-tertiary-fixed/30' : 'bg-surface-container');
@@ -72,6 +73,28 @@ const Ticket = ({ order, onCheck, onReady }) => {
           <span className="material-symbols-outlined text-[18px]">done_all</span>
           <span>{allCompleted ? 'HOÀN TẤT ĐƠN (BUMP)' : 'CHƯA XONG MÓN'}</span>
         </button>
+
+        {/* Nút In phiếu bếp & Hóa đơn tạm tính (FEAT-FNB-11) */}
+        <div className="grid grid-cols-2 gap-space-xs mt-1">
+          <button
+            onClick={() => onPrint && onPrint(order.foodOrderId, 'KitchenTicket', 'Print')}
+            className="py-1.5 bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant font-label-sm text-label-sm rounded flex items-center justify-center gap-1 transition-colors cursor-pointer border border-surface-container-high font-semibold"
+            type="button"
+            title="In phiếu order chuyển Bếp (KOT)"
+          >
+            <span className="material-symbols-outlined text-[15px] text-amber-600">print</span>
+            <span>In lại phiếu</span>
+          </button>
+          <button
+            onClick={() => onPrint && onPrint(order.foodOrderId, 'ProvisionalBill', 'View')}
+            className="py-1.5 bg-surface-container-lowest hover:bg-surface-container text-admin-primary font-label-sm text-label-sm rounded flex items-center justify-center gap-1 transition-colors cursor-pointer border border-surface-container-high font-semibold"
+            type="button"
+            title="Xem & in hóa đơn tạm tính của phòng/bàn"
+          >
+            <span className="material-symbols-outlined text-[15px]">receipt</span>
+            <span>Tạm tính</span>
+          </button>
+        </div>
       </div>
     </article>
   );
@@ -87,8 +110,57 @@ const KitchenDisplay = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [restoreModal, setRestoreModal] = useState({ isOpen: false, list: [] });
+
+  // Modal in ấn phiếu bếp & hóa đơn tạm tính (FEAT-FNB-11)
+  const [printModal, setPrintModal] = useState({
+    isOpen: false,
+    orderId: null,
+    printType: 'KitchenTicket',
+    action: 'View',
+    documentData: null,
+    isLoading: false
+  });
+
   const prevOrderCountRef = useRef(0);
   const beepSound = useRef(new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'));
+
+  // Mở phiếu in ấn hoặc hóa đơn tạm tính (FEAT-FNB-11)
+  const handleOpenPrintDoc = async (orderId, printType, action = 'View') => {
+    setPrintModal({
+      isOpen: true,
+      orderId,
+      printType,
+      action,
+      documentData: null,
+      isLoading: true
+    });
+
+    try {
+      const token = localStorage.getItem('hotel_token') || localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/${orderId}/print?printType=${printType}&action=${action}`, {
+        headers
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setErrorMsg(data.message || 'Không thể tạo phiếu order.');
+        setPrintModal(prev => ({ ...prev, isLoading: false }));
+      } else {
+        setPrintModal(prev => ({
+          ...prev,
+          documentData: data.data,
+          isLoading: false
+        }));
+      }
+    } catch (e) {
+      console.error('Lỗi in phiếu:', e);
+      setErrorMsg('Không thể gửi lệnh in. Vui lòng kiểm tra máy in.');
+      setPrintModal(prev => ({ ...prev, isLoading: false }));
+    }
+  };
 
   // Expediter & Stations State (Real DB)
   const [expediterData, setExpediterData] = useState({
@@ -395,6 +467,7 @@ const KitchenDisplay = () => {
                   order={order}
                   onCheck={handleItemCheck}
                   onReady={handleMarkReady}
+                  onPrint={handleOpenPrintDoc}
                 />
               ))
             )}
@@ -595,6 +668,14 @@ const KitchenDisplay = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL IN PHIẾU BẾP & HÓA ĐƠN TẠM TÍNH (FEAT-FNB-11) */}
+      <OrderPrintModal
+        isOpen={printModal.isOpen}
+        onClose={() => setPrintModal(prev => ({ ...prev, isOpen: false }))}
+        documentData={printModal.documentData}
+        isLoading={printModal.isLoading}
+      />
     </AdminLayout>
   );
 };

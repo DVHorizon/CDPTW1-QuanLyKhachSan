@@ -1420,3 +1420,240 @@ exports.deleteOrder = async (req, res) => {
   }
 };
 
+/**
+ * FEAT-FNB-11 (Mã truy vết: A4.11):
+ * In phiếu order chuyển nhà bếp và in hóa đơn tạm tính cho nhân viên phục vụ phòng
+ * GET /api/v1/fnb-orders/:orderId/print?printType=KitchenTicket|ProvisionalBill&action=Print|View
+ */
+exports.printOrderDocument = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { printType, action = 'View' } = req.query;
+
+    // 1. Kiểm tra xác thực (Quy tắc 3.1)
+    const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId;
+    if (!currentUserId) {
+      return res.status(401).json({
+        success: false,
+        code: 'ERROR_0009_UNAUTHENTICATED',
+        message: 'Bạn cần đăng nhập để thực hiện chức năng này'
+      });
+    }
+
+    // Kiểm tra quyền: Nhân viên / Quản lý (Role khác Guest hoặc roleId !== 5)
+    const roleId = Number(req.user?.roleId || req.user?.RoleId || 0);
+    const roleName = String(req.user?.roleName || req.user?.role?.RoleName || '').toLowerCase();
+    const isGuest = roleName === 'guest' || roleId === 5;
+    if (isGuest) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Bạn không có quyền thực hiện chức năng này'
+      });
+    }
+
+    // 2. Kiểm tra printType hợp lệ
+    const validPrintTypes = ['KitchenTicket', 'ProvisionalBill'];
+    if (!printType || !validPrintTypes.includes(printType)) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Loại phiếu không hợp lệ'
+      });
+    }
+
+    // 3. Kiểm tra đơn món ăn có tồn tại không
+    const order = await FoodOrder.findByPk(orderId, {
+      include: [
+        {
+          model: FoodOrderDetail,
+          as: 'details',
+          include: [{ model: MenuItem }]
+        },
+        {
+          model: Stay,
+          include: [{ model: Room }]
+        }
+      ]
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Đơn món ăn không tồn tại.'
+      });
+    }
+
+    // Xác định số phòng / bàn
+    const destination = order.Stay?.Room?.RoomNumber 
+      ? `Phòng ${order.Stay.Room.RoomNumber}` 
+      : (order.TableId ? `Bàn ${order.TableId}` : 'Khu vực chung / Phòng VIP');
+
+    // ── XỬ LÝ 1: PHIẾU ORDER BẾP (KitchenTicket) ─────────────────────────────
+    if (printType === 'KitchenTicket') {
+      try {
+        const items = (order.details || []).map(d => ({
+          orderDetailId: d.FoodOrderDetailId,
+          menuItemId: d.MenuItemId,
+          itemName: d.MenuItem?.ItemName || 'Món ăn',
+          quantity: d.Quantity,
+          note: d.Note || '',
+          hasSpecialNote: Boolean(d.Note && d.Note.trim().length > 0),
+          kitchenStation: d.MenuItem?.KitchenStation || 'General',
+          isCompleted: d.IsCompleted
+        }));
+
+        if (items.length === 0) {
+          return res.status(400).json({
+            success: false,
+            code: 'ERROR_0005_INVALID_VALUE',
+            message: 'Không thể tạo phiếu order.'
+          });
+        }
+
+        const ticketData = {
+          printType: 'KitchenTicket',
+          ticketId: `KT-${order.FoodOrderId}-${Date.now().toString().slice(-4)}`,
+          orderId: order.FoodOrderId,
+          orderTime: order.OrderTime,
+          printTime: new Date().toISOString(),
+          status: order.Status,
+          orderType: order.OrderType,
+          destination,
+          serverName: req.user?.fullName || req.user?.FullName || 'Nhân viên phục vụ phòng',
+          specialOrderNote: order.Note || null,
+          items,
+          printerStatus: 'ONLINE_CONNECTED'
+        };
+
+        return res.status(200).json({
+          success: true,
+          message: 'Tạo phiếu order bếp thành công.',
+          data: ticketData
+        });
+      } catch (err) {
+        console.error('Error building kitchen ticket:', err);
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0005_INVALID_VALUE',
+          message: 'Không thể tạo phiếu order.'
+        });
+      }
+    }
+
+    // ── XỬ LÝ 2: HÓA ĐƠN TẠM TÍNH (ProvisionalBill) ──────────────────────────
+    if (printType === 'ProvisionalBill') {
+      try {
+        // Gom chi phí F&B trong phiên hiện tại của phòng / bàn
+        const { Op } = require('sequelize');
+        let sessionOrders = [];
+        if (order.StayId) {
+          sessionOrders = await FoodOrder.findAll({
+            where: {
+              StayId: order.StayId,
+              Status: { [Op.ne]: 'Cancelled' }
+            },
+            include: [
+              {
+                model: FoodOrderDetail,
+                as: 'details',
+                include: [{ model: MenuItem }]
+              }
+            ]
+          });
+        } else if (order.TableId) {
+          sessionOrders = await FoodOrder.findAll({
+            where: {
+              TableId: order.TableId,
+              Status: { [Op.ne]: 'Cancelled' }
+            },
+            include: [
+              {
+                model: FoodOrderDetail,
+                as: 'details',
+                include: [{ model: MenuItem }]
+              }
+            ]
+          });
+        } else {
+          sessionOrders = [order];
+        }
+
+        let allItems = [];
+        let subTotal = 0;
+
+        sessionOrders.forEach(ord => {
+          (ord.details || []).forEach(d => {
+            const unitPrice = parseFloat(d.UnitPrice || d.MenuItem?.Price || 0);
+            const qty = d.Quantity || 1;
+            const totalPrice = parseFloat(d.TotalPrice || (unitPrice * qty));
+            subTotal += totalPrice;
+            allItems.push({
+              orderId: ord.FoodOrderId,
+              itemName: d.MenuItem?.ItemName || 'Món ăn',
+              quantity: qty,
+              unitPrice,
+              totalPrice,
+              note: d.Note || ''
+            });
+          });
+        });
+
+        if (isNaN(subTotal) || subTotal < 0) {
+          return res.status(400).json({
+            success: false,
+            code: 'ERROR_0005_INVALID_VALUE',
+            message: 'Không thể tính tổng hóa đơn tạm tính.'
+          });
+        }
+
+        const serviceCharge = Math.round(subTotal * 0.05); // Phí phục vụ 5%
+        const vat = Math.round((subTotal + serviceCharge) * 0.08); // VAT 8%
+        const grandTotal = subTotal + serviceCharge + vat;
+
+        const billData = {
+          printType: 'ProvisionalBill',
+          action: action === 'Print' ? 'Print' : 'View',
+          billNumber: `PROV-${order.FoodOrderId}-${Date.now().toString().slice(-4)}`,
+          orderId: order.FoodOrderId,
+          destination,
+          stayId: order.StayId,
+          tableId: order.TableId,
+          paymentMode: order.PaymentMode === 'RoomInvoice' ? 'Gộp hóa đơn phòng khi trả phòng' : 'Thanh toán trực tiếp',
+          printTime: new Date().toISOString(),
+          cashierName: req.user?.fullName || req.user?.FullName || 'Nhân viên phục vụ phòng',
+          items: allItems,
+          subTotal,
+          serviceCharge,
+          vat,
+          grandTotal,
+          note: 'HÓA ĐƠN TẠM TÍNH - KHÔNG PHẢI HÓA ĐƠN THANH TOÁN TÀI CHÍNH CHÍNH THỨC',
+          printerStatus: 'ONLINE_CONNECTED'
+        };
+
+        return res.status(200).json({
+          success: true,
+          message: action === 'Print' ? 'Lệnh in hóa đơn tạm tính đã sẵn sàng.' : 'Lấy thông tin hóa đơn tạm tính thành công.',
+          data: billData
+        });
+      } catch (err) {
+        console.error('Error calculating provisional bill:', err);
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0005_INVALID_VALUE',
+          message: err.message || 'Không thể tính tổng hóa đơn tạm tính.'
+        });
+      }
+    }
+
+  } catch (error) {
+    console.error('Error in printOrderDocument (FEAT-FNB-11):', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: error.message || 'Không thể tạo phiếu order.'
+    });
+  }
+};
+
