@@ -1077,6 +1077,18 @@ export default function DepositPayment() {
         {paymentSuccess && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 relative text-center space-y-4">
+              
+              {/* Nút Đóng X Close Modal */}
+              <button
+                type="button"
+                onClick={() => setPaymentSuccess(null)}
+                className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shadow-xs"
+                title="Đóng modal"
+                aria-label="Đóng"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+
               <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
                 <span className="material-symbols-outlined text-[36px]">check_circle</span>
               </div>
