@@ -197,11 +197,11 @@ export const suggestRoomsApi = async (q) => {
 
 /**
  * Tạo đơn đặt phòng chính thức (Thanh toán)
- * POST /api/v1/rooms/book
+ * POST /api/v1/guest/bookings or POST /api/v1/rooms/book
  */
 export const createBookingApi = async (payload) => {
   try {
-    let res = await fetch(`${API_BASE_URL}/v1/rooms/book`, {
+    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -210,7 +210,17 @@ export const createBookingApi = async (payload) => {
       body: JSON.stringify(payload)
     });
     if (res.status === 404) {
-      res = await fetch(`${API_BASE_URL}/rooms/book`, {
+      res = await fetch(`${API_BASE_URL}/v1/rooms/book`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -230,3 +240,83 @@ export const createBookingApi = async (payload) => {
     };
   }
 };
+
+export const createOnlineBookingEngineApi = createBookingApi;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ONLINE DEPOSIT PAYMENT INTEGRATION (FEAT-GUEST-08 / A8)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Lấy chi tiết đơn đặt phòng phục vụ Màn hình 7
+ * GET /api/v1/guest/bookings/:id
+ */
+export const getBookingDetailsApi = async (id) => {
+  try {
+    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings/${id}`);
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/bookings/${id}`);
+    }
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi getBookingDetailsApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ lấy thông tin đơn đặt phòng.'
+    };
+  }
+};
+
+/**
+ * Xử lý thanh toán tiền cọc trực tuyến
+ * POST /api/v1/guest/bookings/:bookingId/deposit
+ */
+export const processDepositPaymentApi = async (bookingId, payload) => {
+  try {
+    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings/${bookingId}/deposit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/deposit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+        },
+        body: JSON.stringify({ ...payload, bookingId })
+      });
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi processDepositPaymentApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến cổng thanh toán trực tuyến.'
+    };
+  }
+};
+

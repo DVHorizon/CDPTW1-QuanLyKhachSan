@@ -1144,8 +1144,8 @@ export default function SearchRooms() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setSelectedRoomForBooking(room)}
-                              className="px-space-xl py-3 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm flex items-center gap-space-xs"
+                              onClick={() => navigate(`/dat-phong?roomTypeId=${room.RoomTypeId}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}&units=${roomsCount}&adults=${totalGuests}`)}
+                              className="px-space-xl py-3 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm flex items-center gap-space-xs cursor-pointer"
                             >
                               <span>Chọn Phòng</span>
                               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
