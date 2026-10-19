@@ -41,8 +41,8 @@ exports.getActiveStays = async (req, res) => {
 exports.createRoomServiceOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    const { stayId, roomId, items, paymentMode } = req.body;
-    const currentUserId = req.user?.id || req.user?.UserId;
+    const { stayId, roomId, items, paymentMode, userId } = req.body;
+    const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId || userId;
 
     // 1. Kiểm tra phòng và lượt lưu trú
     if (!stayId || !roomId) {
@@ -50,8 +50,13 @@ exports.createRoomServiceOrder = async (req, res) => {
       return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Vui lòng chọn phòng hợp lệ.' });
     }
 
+    const { Op } = require('sequelize');
     const stay = await Stay.findOne({
-      where: { StayId: stayId, RoomId: roomId, Status: 'Active' },
+      where: {
+        StayId: stayId,
+        RoomId: roomId,
+        Status: { [Op.in]: ['Active', 'CheckedIn'] }
+      },
       include: [{ model: Room }],
       transaction
     });
@@ -179,7 +184,7 @@ exports.getOrderHistory = async (req, res) => {
     const currentUser = req.user;
     const roleId   = currentUser?.roleId   || currentUser?.RoleId;
     const roleName = (currentUser?.roleName || currentUser?.role || '').toLowerCase();
-    let userId     = currentUser?.id || currentUser?.UserId;
+    let userId     = currentUser?.userId || currentUser?.id || currentUser?.UserId;
 
     // ── Phân loại actor ────────────────────────────────────────────────────────
     let isStaff = false;
@@ -731,7 +736,8 @@ exports.processPayment = async (req, res) => {
     }
 
     // Kiểm tra quyền sở hữu đơn (nếu có currentUserId và đơn có UserId)
-    if (currentUserId && order.UserId && String(order.UserId) !== String(currentUserId)) {
+    const isStaffOrAdmin = req.user?.roleId === 1 || req.user?.RoleId === 1 || req.user?.roleId === 2 || req.user?.RoleId === 2;
+    if (!isStaffOrAdmin && currentUserId && order.UserId && String(order.UserId) !== String(currentUserId)) {
       await transaction.rollback();
       return res.status(403).json({
         code: 'ERROR_0010_FORBIDDEN',
@@ -776,10 +782,11 @@ exports.processPayment = async (req, res) => {
         });
       }
 
+      const { Op } = require('sequelize');
       const activeStay = await Stay.findOne({
         where: {
           StayId: order.StayId,
-          Status: 'Active'
+          Status: { [Op.in]: ['Active', 'CheckedIn'] }
         },
         transaction
       });

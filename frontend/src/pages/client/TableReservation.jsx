@@ -159,11 +159,11 @@ export default function TableReservation() {
   const fetchMyReservations = async () => {
     try {
       const token = localStorage.getItem("hotel_token");
-      let url = "http://localhost:5000/api/v1/table-reservations";
+      let url = "http://localhost:5000/api/v1/table-reservations?view=client";
       try {
         const savedUser = JSON.parse(localStorage.getItem("hotel_user") || "{}");
-        const uid = savedUser?.id || savedUser?.UserId || savedUser?.userId;
-        if (uid) url += `?userId=${uid}`;
+        const uid = currentUser?.id || currentUser?.UserId || currentUser?.userId || savedUser?.id || savedUser?.UserId || savedUser?.userId;
+        if (uid) url += `&userId=${uid}`;
       } catch {}
 
       const res = await fetch(url, {
@@ -182,7 +182,7 @@ export default function TableReservation() {
 
   useEffect(() => {
     fetchMyReservations();
-  }, []);
+  }, [currentUser]);
 
   // Hàm tính toán targetDate chuẩn ISO
   const getTargetDateTime = (dateStr, timeStr) => {

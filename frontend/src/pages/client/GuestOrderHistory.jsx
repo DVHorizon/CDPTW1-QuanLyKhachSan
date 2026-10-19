@@ -81,7 +81,7 @@ export default function GuestOrderHistory() {
 
   useEffect(() => {
     fetchGuestOrders();
-  }, []);
+  }, [user]);
 
   const totalSpent = orders.reduce((sum, o) => sum + (o.status !== "Cancelled" ? Number(o.totalAmount || 0) : 0), 0);
 
@@ -210,7 +210,9 @@ export default function GuestOrderHistory() {
                     { id: "all", label: "Tất cả" },
                     { id: "Pending", label: "Đang chờ" },
                     { id: "Preparing", label: "Đang chế biến" },
+                    { id: "Ready", label: "Món sẵn sàng" },
                     { id: "Delivering", label: "Đang giao" },
+                    { id: "Served", label: "Đã phục vụ" },
                     { id: "Delivered", label: "Đã hoàn tất" },
                   ].map((tab) => (
                     <button

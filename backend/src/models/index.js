@@ -114,6 +114,8 @@ FoodOrderDetail.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
 
 // 14. MenuItem & FoodOrderDetail
 MenuItem.hasMany(FoodOrderDetail, { foreignKey: 'MenuItemId' });
+FoodOrderDetail.belongsTo(MenuItem, { foreignKey: 'MenuItemId' });
+
 // 15. RestaurantTable & TableReservation
 const defineRestaurantTable = require('./RestaurantTable');
 const defineTableReservation = require('./TableReservation');
