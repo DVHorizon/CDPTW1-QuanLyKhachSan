@@ -26,6 +26,7 @@ import RoomStatusManagement from './pages/RoomStatusManagement';
 import BookingManagement from './pages/BookingManagement';
 import RoomAssignment from './pages/admin/RoomAssignment';
 import CheckInDesk from './pages/admin/CheckInDesk';
+import FnbReview from './pages/client/FnbReview';
 
 
 function App() {
@@ -51,6 +52,8 @@ function App() {
             <Route path="/room-service" element={<RoomService />} />
             <Route path="/fnb/history" element={<GuestOrderHistory />} />
             <Route path="/lich-su-dat-mon" element={<GuestOrderHistory />} />
+            <Route path="/fnb/danh-gia" element={<FnbReview />} />
+            <Route path="/danh-gia" element={<FnbReview />} />
             <Route path="/fnb/dat-ban" element={<TableReservation />} />
             <Route path="/dat-ban" element={<TableReservation />} />
             <Route path="/profile" element={<Profile />} />
