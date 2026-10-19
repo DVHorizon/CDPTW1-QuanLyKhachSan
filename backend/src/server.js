@@ -62,9 +62,11 @@ app.use('/api/v1/pms',        require('./modules/pms'));
 app.use('/api/v1/services',   require('./modules/services'));
 
 // 👤 Trang — F&B
-app.use('/api/v1/fnb',        require('./modules/fnb'));
-app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
-app.use('/api/fnb-orders',    require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/v1/fnb',                require('./modules/fnb'));
+app.use('/api/v1/fnb-orders',         require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/fnb-orders',            require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/v1/table-reservations', require('./routes/admin/tableReservationRoutes'));
+app.use('/api/table-reservations',    require('./routes/admin/tableReservationRoutes'));
 
 // 👤 Tuyền — Back-office Operations
 app.use('/api/v1/operations', require('./modules/operations'));
