@@ -306,41 +306,44 @@ export default function DepositPayment() {
           </div>
         </div>
 
-        {/* Stepper Progress Bar */}
-        <div className="w-full mb-8">
-          <div className="grid grid-cols-3 gap-3 relative">
-            <div className="flex flex-col gap-1">
-              <div className="h-1.5 w-full rounded-full bg-[#725b38]"></div>
-              <div className="flex items-center gap-1.5 pt-1">
-                <span className="w-5 h-5 rounded-full bg-[#725b38] text-white flex items-center justify-center text-[11px] font-bold">
-                  ✓
-                </span>
-                <span className="text-xs text-slate-800 font-semibold">1. Chọn Hạng Phòng</span>
+        {/* Stepper Progress Bar (Chuẩn 3 Bước: 1. Chọn ngày & phòng -> 2. Thanh toán cọc (Active) -> 3. Hoàn tất) */}
+        <div className="mb-8 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative">
+            {/* Step 1 - Completed */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-700 border border-slate-200">
+              <div className="w-8 h-8 rounded-full bg-[#725b38] text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                ✓
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase text-[#725b38]">Bước 1</div>
+                <div className="text-sm truncate font-semibold text-slate-800">Chọn ngày &amp; phòng</div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <div className="h-1.5 w-full rounded-full bg-[#725b38]"></div>
-              <div className="flex items-center gap-1.5 pt-1">
-                <span className="w-5 h-5 rounded-full bg-[#725b38] text-white flex items-center justify-center text-[11px] font-bold">
-                  ✓
-                </span>
-                <span className="text-xs text-slate-800 font-semibold">2. Thông Tin Khách Hàng</span>
+            {/* Step 2 - Active */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-[#eff4ff] text-[#0b1c30] border border-blue-200 shadow-xs">
+              <div className="w-8 h-8 rounded-full bg-[#131b2e] text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                2
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase text-[#725b38]">Bước 2</div>
+                <div className="text-sm truncate font-bold text-[#0b1c30]">Thanh toán cọc</div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <div className="h-1.5 w-full rounded-full bg-[#131b2e]"></div>
-              <div className="flex items-center gap-1.5 pt-1">
-                <span className="w-5 h-5 rounded-full bg-[#131b2e] text-white flex items-center justify-center text-[11px] font-bold">
-                  3
-                </span>
-                <span className="text-xs text-slate-900 font-bold">3. Đặt Cọc Giữ Chỗ</span>
+            {/* Step 3 - Pending */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-400 opacity-60 border border-transparent">
+              <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm shrink-0">
+                3
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase text-slate-400">Bước 3</div>
+                <div className="text-sm truncate font-medium">Hoàn tất kỳ nghỉ</div>
               </div>
             </div>
-          </div>
+        </div>
 
-          <div className="mt-4 p-3 bg-[#fedeb2]/40 rounded-xl flex items-center gap-2.5 text-[#78603e] border border-[#fedeb2]">
+        <div className="mt-4 p-3 bg-[#fedeb2]/40 rounded-xl flex items-center gap-2.5 text-[#78603e] border border-[#fedeb2]">
             <span className="material-symbols-outlined text-[#725b38] text-[20px] shrink-0">info</span>
             <p className="text-xs leading-relaxed">
               Phòng nghỉ của Quý khách đang được tạm giữ an toàn trong hệ thống. Vui lòng hoàn tất thanh toán khoản tiền cọc để nhận ngay mã xác thực QR và dịch vụ quản gia đưa đón.

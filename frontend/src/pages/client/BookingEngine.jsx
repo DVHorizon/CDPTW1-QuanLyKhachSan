@@ -277,9 +277,9 @@ export default function BookingEngine() {
           </div>
         </div>
 
-        {/* Stepper Progress Bar */}
+        {/* Stepper Progress Bar (Chuẩn 3 Bước: 1. Chọn ngày & phòng -> 2. Thanh toán cọc -> 3. Hoàn tất) */}
         <div className="mb-8 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 relative">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative">
             {/* Step 1 - Active */}
             <div className="flex items-center gap-3 p-3 rounded-xl bg-[#eff4ff] text-[#0b1c30] border border-blue-100">
               <div className="w-8 h-8 rounded-full bg-[#725b38] text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
@@ -292,34 +292,23 @@ export default function BookingEngine() {
             </div>
 
             {/* Step 2 */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-500 opacity-80">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-500 opacity-80 border border-transparent">
               <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm shrink-0">
                 2
               </div>
               <div className="min-w-0">
                 <div className="text-[11px] font-bold uppercase text-slate-400">Bước 2</div>
-                <div className="text-sm truncate font-medium text-slate-600">Dịch vụ bổ sung</div>
+                <div className="text-sm truncate font-medium text-slate-600">Thanh toán cọc</div>
               </div>
             </div>
 
             {/* Step 3 */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-400 opacity-60">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-400 opacity-60 border border-transparent">
               <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm shrink-0">
                 3
               </div>
               <div className="min-w-0">
                 <div className="text-[11px] font-bold uppercase text-slate-400">Bước 3</div>
-                <div className="text-sm truncate font-medium">Thanh toán cọc</div>
-              </div>
-            </div>
-
-            {/* Step 4 */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-400 opacity-60">
-              <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm shrink-0">
-                4
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase text-slate-400">Bước 4</div>
                 <div className="text-sm truncate font-medium">Hoàn tất kỳ nghỉ</div>
               </div>
             </div>
@@ -1024,9 +1013,10 @@ export default function BookingEngine() {
                   onClick={() => {
                     navigate(`/payment?bookingId=${successBooking.bookingId}&code=${successBooking.confirmationCode}`);
                   }}
-                  className="w-full py-3.5 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white font-bold text-sm uppercase tracking-wide transition-all shadow-md"
+                  className="w-full py-3.5 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white font-bold text-sm uppercase tracking-wide transition-all shadow-md flex items-center justify-center gap-2 group"
                 >
-                  Tiến Hành Thanh Toán Cọc Ngay (Màn Hình 7)
+                  <span>Thanh Toán Cọc Ngay (Bước 2)</span>
+                  <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
                 </button>
                 <button
                   type="button"
