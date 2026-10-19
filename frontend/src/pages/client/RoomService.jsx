@@ -282,6 +282,7 @@ const RoomService = () => {
             quantity: i.quantity,
             note: i.note || ''
           })),
+          userId: user?.id || user?.UserId || user?.userId || undefined,
           paymentMode
         })
       });

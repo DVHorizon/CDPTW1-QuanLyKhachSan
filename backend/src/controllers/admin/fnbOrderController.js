@@ -41,8 +41,8 @@ exports.getActiveStays = async (req, res) => {
 exports.createRoomServiceOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    const { stayId, roomId, items, paymentMode } = req.body;
-    const currentUserId = req.user?.id || req.user?.UserId;
+    const { stayId, roomId, items, paymentMode, userId } = req.body;
+    const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId || userId;
 
     // 1. Kiểm tra phòng và lượt lưu trú
     if (!stayId || !roomId) {
@@ -184,7 +184,7 @@ exports.getOrderHistory = async (req, res) => {
     const currentUser = req.user;
     const roleId   = currentUser?.roleId   || currentUser?.RoleId;
     const roleName = (currentUser?.roleName || currentUser?.role || '').toLowerCase();
-    let userId     = currentUser?.id || currentUser?.UserId;
+    let userId     = currentUser?.userId || currentUser?.id || currentUser?.UserId;
 
     // ── Phân loại actor ────────────────────────────────────────────────────────
     let isStaff = false;
