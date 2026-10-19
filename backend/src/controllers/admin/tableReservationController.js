@@ -371,12 +371,18 @@ exports.getReservations = async (req, res) => {
       ['admin', 'manager', 'staff', 'reception', 'fnb'].some(r => roleName.includes(r));
 
     const where = {};
-    if (!isStaff) {
-      const guestId = currentUser?.id || currentUser?.UserId || req.query.userId;
+    const guestId = currentUser?.id || currentUser?.UserId || req.query.userId;
+
+    // Nếu là client view hoặc tài khoản khách: CHỈ lấy lượt đặt bàn của chính client đó
+    if (!isStaff || req.query.view === 'client' || req.query.view === 'guest') {
       if (guestId) {
         where.UserId = guestId;
+      } else {
+        // Nếu client chưa đăng nhập thì không trả về danh sách của người khác
+        return res.status(200).json({ success: true, data: [] });
       }
     } else {
+      // Admin / Nhân viên: Xem toàn bộ danh sách hoặc lọc theo query
       if (req.query.status) where.Status = req.query.status;
       if (req.query.tableId) where.TableId = req.query.tableId;
       if (req.query.userId) where.UserId = req.query.userId;

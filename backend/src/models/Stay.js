@@ -27,13 +27,13 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true
     },
-    DepositAmount: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
-    },
     Status: {
       type: DataTypes.STRING(30),
       defaultValue: 'CheckedIn'
+    },
+    DepositAmount: {
+      type: DataTypes.DECIMAL(12, 2),
+      defaultValue: 0
     }
   }, {
     tableName: 'Stays',
