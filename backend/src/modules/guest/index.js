@@ -14,6 +14,7 @@ const router = express.Router();
 const roomSearchController = require('../../controllers/roomSearchController');
 const roomAvailabilityController = require('../../controllers/roomAvailabilityController');
 const bookingEngineController = require('../../controllers/bookingEngineController');
+const onlineDepositPaymentController = require('../../controllers/onlineDepositPaymentController');
 
 // ─── TÍNH NĂNG 4: REAL-TIME AVAILABILITY & LOCK (FEAT-GUEST-04) ─────────────
 router.get('/rooms/availability',    roomAvailabilityController.checkRoomAvailability);
@@ -22,6 +23,11 @@ router.delete('/rooms/lock/:sessionId', roomAvailabilityController.releaseRoomLo
 
 // ─── TÍNH NĂNG 5: ĐẶT PHÒNG TRỰC TUYẾN (FEAT-GUEST-05) ──────────────────────
 router.post('/bookings',             bookingEngineController.createOnlineBooking);
+
+// ─── TÍNH NĂNG 8: THANH TOÁN TIỀN CỌC TRỰC TUYẾN (FEAT-GUEST-08) ────────────
+router.get('/bookings/:id',          onlineDepositPaymentController.getBookingDetails);
+router.post('/bookings/:bookingId/deposit', onlineDepositPaymentController.processDepositPayment);
+router.post('/payments',             onlineDepositPaymentController.processDepositPayment);
 
 // ─── TÌM KIẾM & XEM PHÒNG ──────────────────────────────────────────────────
 router.get('/rooms/search',          roomSearchController.searchRooms);

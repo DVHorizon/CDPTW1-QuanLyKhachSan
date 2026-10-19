@@ -105,8 +105,8 @@ Invoice.hasMany(InvoiceDetail, { foreignKey: 'InvoiceId', as: 'details' });
 InvoiceDetail.belongsTo(Invoice, { foreignKey: 'InvoiceId' });
 
 // Payments
-FoodOrder.hasMany(Payment, { foreignKey: 'FoodOrderId', as: 'payments' });
-Payment.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
+Booking.hasMany(Payment, { foreignKey: 'BookingId', as: 'payments' });
+Payment.belongsTo(Booking, { foreignKey: 'BookingId', as: 'booking' });
 
 // 13. FoodOrder & FoodOrderDetail
 FoodOrder.hasMany(FoodOrderDetail, { foreignKey: 'FoodOrderId', as: 'details' });
