@@ -56,7 +56,7 @@ export default function BookingEngine() {
   const [firstName, setFirstName] = useState(user?.FullName ? user.FullName.split(' ').pop() : 'An');
   const [lastName, setLastName] = useState(user?.FullName ? user.FullName.split(' ').slice(0, -1).join(' ') || 'Nguyễn' : 'Nguyễn Văn');
   const [email, setEmail] = useState(user?.Email || 'an.nguyen@grandhorizon.vn');
-  const [phoneNumber, setPhoneNumber] = useState(user?.Phone || '+84 908 123 456');
+  const [phoneNumber, setPhoneNumber] = useState(user?.Phone || '+84908123456');
   const [specialRequests, setSpecialRequests] = useState('');
   const [isPolicyAccepted, setIsPolicyAccepted] = useState(false);
 
@@ -165,6 +165,20 @@ export default function BookingEngine() {
       return;
     }
 
+    const cleanPhone = phoneNumber.replace(/[\s.\-()]/g, '');
+    if (!cleanPhone) {
+      setErrorCode('ERROR_0001_REQUIRED');
+      setErrorMessage('Vui lòng nhập số điện thoại liên lạc');
+      return;
+    }
+
+    const phoneRegex = /^(\+?[1-9]\d{7,14}|0[1-9]\d{8})$/;
+    if (!phoneRegex.test(cleanPhone)) {
+      setErrorCode('ERROR_0004_INVALID_FORMAT');
+      setErrorMessage('Số điện thoại liên lạc không đúng định dạng chuẩn (VD: +84912345678 hoặc 0912345678)');
+      return;
+    }
+
     if (!isPolicyAccepted) {
       setErrorCode('ERROR_0025_POLICY_NOT_ACCEPTED');
       setErrorMessage('Quý khách vui lòng xác nhận đồng ý với Điều khoản và Quy định lưu trú');
@@ -191,7 +205,7 @@ export default function BookingEngine() {
         firstName: trimmedFirst,
         lastName: trimmedLast,
         email: trimmedEmail,
-        phoneNumber: phoneNumber.trim(),
+        phoneNumber: cleanPhone,
         specialRequests,
         isPolicyAccepted: true,
         bedPreference,

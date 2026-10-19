@@ -128,7 +128,8 @@ exports.createOnlineBooking = async (req, res) => {
     }
 
     // 4. Validate Phone Number
-    if (!effectivePhone) {
+    const rawPhone = effectivePhone.trim();
+    if (!rawPhone) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
@@ -138,13 +139,16 @@ exports.createOnlineBooking = async (req, res) => {
       });
     }
 
-    if (!PHONE_REGEX.test(effectivePhone)) {
+    const cleanPhone = rawPhone.replace(/[\s.\-()]/g, '');
+    // Standard E.164 (e.g. +84912345678, +15550194829) or domestic Vietnam (0912345678)
+    const E164_PHONE_REGEX = /^(\+?[1-9]\d{7,14}|0[1-9]\d{8})$/;
+    if (!E164_PHONE_REGEX.test(cleanPhone)) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
         code: 'ERROR_0004_INVALID_FORMAT',
         field: 'phoneNumber',
-        message: 'Số điện thoại liên lạc không đúng định dạng chuẩn'
+        message: 'Số điện thoại liên lạc không đúng định dạng chuẩn (VD: +84912345678 hoặc 0912345678)'
       });
     }
 
@@ -283,7 +287,7 @@ exports.createOnlineBooking = async (req, res) => {
       BookingId: booking.BookingId,
       FullName: fullGuestName,
       Email: effectiveEmail,
-      Phone: effectivePhone,
+      Phone: cleanPhone || effectivePhone,
       IsPrimaryGuest: true
     }, { transaction });
 

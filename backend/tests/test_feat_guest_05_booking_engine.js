@@ -205,13 +205,16 @@ async function runTests() {
         quantity: 1
       });
 
-      // Temporarily lock ALL available rooms with another session
-      const tempLock = await availabilityService.acquireRoomLock({
-        roomTypeId: testRoomTypeId,
-        checkInDate: '2027-07-01',
-        checkOutDate: '2027-07-03',
-        quantity: avail.availableRoomsCount
-      });
+      // Temporarily lock ALL available rooms with another session if any available
+      let tempLock = null;
+      if (avail.availableRoomsCount > 0) {
+        tempLock = await availabilityService.acquireRoomLock({
+          roomTypeId: testRoomTypeId,
+          checkInDate: '2027-07-01',
+          checkOutDate: '2027-07-03',
+          quantity: avail.availableRoomsCount
+        });
+      }
 
       // Now attempt to book without the lock
       const req = {
