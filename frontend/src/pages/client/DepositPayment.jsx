@@ -9,6 +9,14 @@ const formatVND = (num) => {
   return new Intl.NumberFormat('vi-VN').format(Math.round(num || 0)) + ' ₫';
 };
 
+// Helper format date DD/MM/YYYY
+const formatDisplayDate = (dStr) => {
+  if (!dStr) return '';
+  const parts = String(dStr).split('T')[0].split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dStr;
+};
+
 // Luhn validation check on frontend
 function isValidLuhnFrontend(cardNumber) {
   const digits = String(cardNumber).replace(/\D/g, '');
@@ -990,11 +998,11 @@ export default function DepositPayment() {
                 <div className="grid grid-cols-2 gap-3 p-3 bg-[#eff4ff] rounded-xl text-xs border border-blue-100/60">
                   <div className="flex flex-col">
                     <span className="text-slate-500">Nhận phòng</span>
-                    <span className="font-bold text-slate-900">14:00 • {booking?.checkInDate || '15/11/2024'}</span>
+                    <span className="font-bold text-slate-900">14:00 • {formatDisplayDate(booking?.checkInDate) || '15/11/2024'}</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-slate-500">Trả phòng</span>
-                    <span className="font-bold text-slate-900">12:00 • {booking?.checkOutDate || '18/11/2024'}</span>
+                    <span className="font-bold text-slate-900">12:00 • {formatDisplayDate(booking?.checkOutDate) || '18/11/2024'}</span>
                   </div>
                   <div className="flex flex-col pt-1">
                     <span className="text-slate-500">Thời gian lưu trú</span>

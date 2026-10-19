@@ -18,6 +18,14 @@ const formatDateStr = (d) => {
   return `${year}-${month}-${day}`;
 };
 
+// Helper format date DD/MM/YYYY cho người dùng Việt Nam
+const formatDisplayDate = (dStr) => {
+  if (!dStr) return '';
+  const parts = String(dStr).split('T')[0].split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dStr;
+};
+
 export default function BookingEngine() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -351,27 +359,53 @@ export default function BookingEngine() {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày nhận phòng *</label>
-                  <input 
-                    type="date" 
-                    value={checkInDate}
-                    onChange={(e) => setCheckInDate(e.target.value)}
-                    min={formatDateStr(new Date())}
-                    className="w-full px-3 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38]"
-                    required
-                  />
-                  <span className="text-[11px] text-slate-400 mt-0.5 block">Nhận phòng từ 14:00</span>
+                  <div className="relative group cursor-pointer">
+                    <div className="w-full px-3 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm flex items-center justify-between border border-blue-100 group-hover:border-[#725b38] transition-all">
+                      <span className="font-medium font-mono text-[14px]">
+                        {formatDisplayDate(checkInDate) || 'dd/mm/yyyy'}
+                      </span>
+                      <span className="material-symbols-outlined text-slate-400 group-hover:text-[#725b38] text-[20px]">
+                        calendar_today
+                      </span>
+                    </div>
+                    <input 
+                      type="date" 
+                      value={checkInDate}
+                      onChange={(e) => setCheckInDate(e.target.value)}
+                      min={formatDateStr(new Date())}
+                      onClick={(e) => {
+                        try { e.target.showPicker(); } catch (_) {}
+                      }}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      required
+                    />
+                  </div>
+                  <span className="text-[11px] text-slate-400 mt-1 block">Nhận phòng từ 14:00</span>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày trả phòng *</label>
-                  <input 
-                    type="date" 
-                    value={checkOutDate}
-                    onChange={(e) => setCheckOutDate(e.target.value)}
-                    min={checkInDate}
-                    className="w-full px-3 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38]"
-                    required
-                  />
-                  <span className="text-[11px] text-slate-400 mt-0.5 block">Trả phòng trước 12:00</span>
+                  <div className="relative group cursor-pointer">
+                    <div className="w-full px-3 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm flex items-center justify-between border border-blue-100 group-hover:border-[#725b38] transition-all">
+                      <span className="font-medium font-mono text-[14px]">
+                        {formatDisplayDate(checkOutDate) || 'dd/mm/yyyy'}
+                      </span>
+                      <span className="material-symbols-outlined text-slate-400 group-hover:text-[#725b38] text-[20px]">
+                        calendar_today
+                      </span>
+                    </div>
+                    <input 
+                      type="date" 
+                      value={checkOutDate}
+                      onChange={(e) => setCheckOutDate(e.target.value)}
+                      min={checkInDate}
+                      onClick={(e) => {
+                        try { e.target.showPicker(); } catch (_) {}
+                      }}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      required
+                    />
+                  </div>
+                  <span className="text-[11px] text-slate-400 mt-1 block">Trả phòng trước 12:00</span>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Người lớn (&gt;= 1) *</label>
@@ -832,7 +866,9 @@ export default function BookingEngine() {
                     <span className="material-symbols-outlined text-[#725b38] text-[20px]">calendar_month</span>
                     <div className="text-left">
                       <div className="text-[11px] text-slate-500 font-medium">Lưu trú ({numberOfNights} đêm)</div>
-                      <div className="text-xs font-bold text-slate-900">{checkInDate} - {checkOutDate}</div>
+                      <div className="text-xs font-bold text-slate-900">
+                        {formatDisplayDate(checkInDate)} - {formatDisplayDate(checkOutDate)}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -967,7 +1003,9 @@ export default function BookingEngine() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Số đêm:</span>
-                  <span className="text-slate-800">{successBooking.numberOfNights} đêm ({successBooking.checkInDate} đến {successBooking.checkOutDate})</span>
+                  <span className="text-slate-800">
+                    {successBooking.numberOfNights} đêm ({formatDisplayDate(successBooking.checkInDate)} đến {formatDisplayDate(successBooking.checkOutDate)})
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Tổng thanh toán:</span>
