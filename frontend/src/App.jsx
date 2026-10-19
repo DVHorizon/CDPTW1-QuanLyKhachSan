@@ -10,6 +10,8 @@ import RoomManagement from './pages/RoomManagement';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 import MarketingDashboard from './pages/admin/marketing/MarketingDashboard';
 import CampaignComposer from './pages/admin/marketing/CampaignComposer';
+import ConsumablesInventory from './pages/admin/housekeeping/ConsumablesInventory';
+import LinenManagement from './pages/admin/housekeeping/LinenManagement';
 import AuditLogs from './pages/AuditLogs';
 import RosterShifts from './pages/RosterShifts';
 
@@ -32,6 +34,9 @@ function App() {
           <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
           <Route path="/admin/marketing" element={<MarketingDashboard />} />
           <Route path="/admin/marketing/new" element={<CampaignComposer />} />
+          <Route path="/admin/housekeeping" element={<ConsumablesInventory />} />
+          <Route path="/admin/housekeeping/inventory" element={<ConsumablesInventory />} />
+          <Route path="/admin/housekeeping/linen" element={<LinenManagement />} />
           <Route path="/admin/audit-logs" element={<AuditLogs />} />
           <Route path="/admin/roster" element={<RosterShifts />} />
           <Route path="/admin/shifts" element={<RosterShifts />} />

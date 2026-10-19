@@ -39,6 +39,12 @@ app.use('/api/v1', require('./routes/admin/menuRoutes'));
 // Route Audit Logs & Fraud Prevention
 app.use('/api/audit', require('./routes/auditLogRoutes'));
 
+// Route Tiếp Thị & Chăm Sóc Khách Hàng Đa Kênh (Marketing Automation)
+app.use('/api/marketing', require('./routes/marketingAutomationRoutes'));
+
+// Route Quản Lý Kho Đồ Tiêu Hao, Minibar & Luân Chuyển Đồ Vải (Inventory & Linen)
+app.use('/api/housekeeping/inventory', require('./routes/housekeepingInventoryRoutes'));
+
 const { AuditLog } = require('./models');
 
 app.listen(PORT, async () => {

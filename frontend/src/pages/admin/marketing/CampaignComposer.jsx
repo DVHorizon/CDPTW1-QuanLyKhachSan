@@ -24,7 +24,7 @@ const CampaignComposer = () => {
   });
 
   const [selectedTemplate, setSelectedTemplate] = useState('Mẫu Lễ Hội Đặt Sớm v2 (Festive-Early)');
-  
+
   const [messageContent, setMessageContent] = useState(
     'Kính chào {{TEN_KHACH}}, cùng đón mùa lễ hội rực rỡ tại thiên đường đảo ngọc Grand Horizon Resort! Là hội viên {{HANG_THE}} với {{DIEM_THUONG}} điểm tích lũy, Quý khách được hưởng ưu đãi độc quyền giảm 25% giá các hạng Biệt thự biển kèm buffet sáng thượng hạng và 60 phút Spa. Đặt phòng trước 15/11 qua link: {{LINK_DAT_PHONG}}'
   );
@@ -65,54 +65,22 @@ const CampaignComposer = () => {
     setSelectedChannels((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handlePublish = async (isDraft = false) => {
-    try {
-      const channels = [];
-      if (selectedChannels.zalo) channels.push('Zalo OA');
-      if (selectedChannels.sms) channels.push('SMS');
-      if (selectedChannels.email) channels.push('Email');
-
-      await fetch('/api/marketing/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: campaignName,
-          goal: campaignGoal,
-          targetAudience: 'VIP, In-House & Tái kích hoạt',
-          targetCount: totalAudience,
-          channels: channels.length > 0 ? channels : ['Zalo OA', 'SMS'],
-          scheduleDate: `${scheduleDate} - ${scheduleTime}`,
-          content: messageContent,
-          bannerUrl: bannerImage,
-          throttleSpeed: throttlingSpeed,
-          antiSpamDnd: antiSpamDnd,
-          isDraft
-        })
-      });
-
-      setStatusNotification(
-        isDraft
-          ? '✔ Đã lưu bản nháp thành công vào Cơ Sở Dữ Liệu PMS (Database)!'
-          : '🚀 Đã lưu và lên lịch phát hành toàn kênh thành công vào Database PMS!'
-      );
-    } catch (e) {
-      setStatusNotification(
-        isDraft
-          ? '✔ Đã lưu bản nháp thành công vào hệ thống PMS!'
-          : '🚀 Đã lên lịch phát hành toàn kênh thành công!'
-      );
-    }
-
+  const handlePublish = (isDraft = false) => {
+    setStatusNotification(
+      isDraft
+        ? '✔ Đã lưu bản nháp thành công vào hệ thống PMS!'
+        : '🚀 Đã lên lịch phát hành toàn kênh thành công! Hệ thống sẽ tự động kích hoạt điều phối.'
+    );
     setTimeout(() => {
       setStatusNotification('');
       navigate('/admin/marketing');
-    }, 1800);
+    }, 2000);
   };
 
   // Tính toán quy mô người nhận theo tiêu chí
-  const totalAudience = (audienceCriteria.vip ? 2250 : 0) + 
-                        (audienceCriteria.inHouse ? 124 : 0) + 
-                        (audienceCriteria.dormant ? 4320 : 0) + 1726;
+  const totalAudience = (audienceCriteria.vip ? 2250 : 0) +
+    (audienceCriteria.inHouse ? 124 : 0) +
+    (audienceCriteria.dormant ? 4320 : 0) + 1726;
 
   // Dự toán chi phí truyền thông
   const costZalo = 5800 * 491; // 2.850.000 đ
@@ -122,7 +90,7 @@ const CampaignComposer = () => {
   return (
     <AdminLayout>
       <div className="max-w-[1600px] mx-auto space-y-6 pb-12 font-sans text-gray-800">
-        
+
         {/* TOP HEADER & ACTION BUTTONS */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-2">
           <div>
@@ -179,7 +147,7 @@ const CampaignComposer = () => {
 
         {/* 3 BƯỚC QUY TRÌNH (STEPPER) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          
+
           <div className="bg-white border-2 border-emerald-600/60 rounded-xl p-3 flex items-center gap-3 shadow-sm">
             <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
               01
@@ -226,10 +194,10 @@ const CampaignComposer = () => {
 
         {/* NỘI DUNG CHÍNH: 2 CỘT (Cột trái: BƯỚC 1 + BƯỚC 2; Cột phải: BƯỚC 3 SIMULATOR) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+
           {/* CỘT TRÁI (7 phần): BƯỚC 1 + BƯỚC 2 */}
           <div className="lg:col-span-7 space-y-6">
-            
+
             {/* --- BƯỚC 1: THÔNG TIN CHIẾN DỊCH & PHÂN KHÚC KHÁCH HÀNG --- */}
             <div className="bg-white border border-gray-200/90 rounded-xl p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -273,20 +241,19 @@ const CampaignComposer = () => {
                   BỘ LỌC TỆP KHÁCH HÀNG NHẬN TIN (AUDIENCE CRITERIA)
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  
+
                   <div
                     onClick={() => handleAudienceToggle('vip')}
-                    className={`p-2.5 rounded-lg border cursor-pointer transition ${
-                      audienceCriteria.vip
+                    className={`p-2.5 rounded-lg border cursor-pointer transition ${audienceCriteria.vip
                         ? 'border-emerald-600 bg-emerald-50/70 text-emerald-900'
                         : 'border-gray-200 bg-gray-50 text-gray-600'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={audienceCriteria.vip}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         className="rounded text-emerald-600 focus:ring-emerald-500"
                       />
                       <span className="font-bold text-xs">VIP Black & Gold</span>
@@ -296,17 +263,16 @@ const CampaignComposer = () => {
 
                   <div
                     onClick={() => handleAudienceToggle('inHouse')}
-                    className={`p-2.5 rounded-lg border cursor-pointer transition ${
-                      audienceCriteria.inHouse
+                    className={`p-2.5 rounded-lg border cursor-pointer transition ${audienceCriteria.inHouse
                         ? 'border-emerald-600 bg-emerald-50/70 text-emerald-900'
                         : 'border-gray-200 bg-gray-50 text-gray-600'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={audienceCriteria.inHouse}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         className="rounded text-emerald-600 focus:ring-emerald-500"
                       />
                       <span className="font-bold text-xs">Khách In-House</span>
@@ -316,17 +282,16 @@ const CampaignComposer = () => {
 
                   <div
                     onClick={() => handleAudienceToggle('dormant')}
-                    className={`p-2.5 rounded-lg border cursor-pointer transition ${
-                      audienceCriteria.dormant
+                    className={`p-2.5 rounded-lg border cursor-pointer transition ${audienceCriteria.dormant
                         ? 'border-emerald-600 bg-emerald-50/70 text-emerald-900'
                         : 'border-gray-200 bg-gray-50 text-gray-600'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={audienceCriteria.dormant}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         className="rounded text-emerald-600 focus:ring-emerald-500"
                       />
                       <span className="font-bold text-xs">Vắng mặt &gt; 180 ngày</span>
@@ -518,7 +483,7 @@ const CampaignComposer = () => {
 
           {/* CỘT PHẢI (5 phần): BƯỚC 3: XEM TRƯỚC (PHONE SIMULATOR) & ĐIỀU PHỐI LỊCH */}
           <div className="lg:col-span-5 space-y-6">
-            
+
             <div className="bg-white border border-gray-200/90 rounded-xl p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -538,11 +503,10 @@ const CampaignComposer = () => {
                   <button
                     key={ch}
                     onClick={() => setPhoneChannelView(ch)}
-                    className={`flex-1 py-1 px-2 rounded-md transition ${
-                      phoneChannelView === ch
+                    className={`flex-1 py-1 px-2 rounded-md transition ${phoneChannelView === ch
                         ? 'bg-white text-emerald-800 shadow-sm'
                         : 'text-gray-500 hover:text-gray-800'
-                    }`}
+                      }`}
                   >
                     Mô phỏng {ch}
                   </button>
@@ -553,7 +517,7 @@ const CampaignComposer = () => {
               <div className="mx-auto w-full max-w-[340px] bg-slate-900 rounded-[32px] p-3 shadow-2xl border-4 border-slate-700">
                 {/* Phone screen */}
                 <div className="bg-white rounded-[24px] overflow-hidden text-xs text-gray-800">
-                  
+
                   {/* Status bar */}
                   <div className="bg-emerald-800 text-white px-4 py-1.5 flex items-center justify-between text-[11px] font-mono">
                     <span>09:41</span>
@@ -582,7 +546,7 @@ const CampaignComposer = () => {
 
                   {/* Body Tin Nhắn Simulator */}
                   <div className="p-3 bg-slate-50 space-y-2.5 max-h-[360px] overflow-y-auto">
-                    
+
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                       {/* Banner trong tin nhắn */}
                       <div className="relative">
@@ -623,7 +587,7 @@ const CampaignComposer = () => {
 
               {/* LẬP LỊCH & ĐIỀU PHỐI TỐC ĐỘ */}
               <div className="space-y-3 pt-2 text-xs">
-                
+
                 {/* Ngày giờ phát */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>

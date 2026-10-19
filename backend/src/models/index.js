@@ -14,6 +14,10 @@ const defineMenuCategory = require('./MenuCategory');
 const defineMenuItem = require('./MenuItem');
 const defineAuditLog = require('./AuditLog');
 const defineFraudAlert = require('./FraudAlert');
+const defineInventoryItem = require('./InventoryItem');
+const defineInventoryBatch = require('./InventoryBatch');
+const defineLinenItem = require('./LinenItem');
+const defineLaundryBatch = require('./LaundryBatch');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -29,6 +33,14 @@ const MenuCategory = defineMenuCategory(sequelize);
 const MenuItem = defineMenuItem(sequelize);
 const AuditLog = defineAuditLog(sequelize);
 const FraudAlert = defineFraudAlert(sequelize);
+const InventoryItem = defineInventoryItem(sequelize);
+const InventoryBatch = defineInventoryBatch(sequelize);
+const LinenItem = defineLinenItem(sequelize);
+const LaundryBatch = defineLaundryBatch(sequelize);
+
+// Inventory Relationships
+InventoryItem.hasMany(InventoryBatch, { foreignKey: 'ItemId', as: 'batches' });
+InventoryBatch.belongsTo(InventoryItem, { foreignKey: 'ItemId', as: 'item' });
 
 // Setup Relationships / Associations
 // 1. Role & User
@@ -77,5 +89,9 @@ module.exports = {
   MenuCategory,
   MenuItem,
   AuditLog,
-  FraudAlert
+  FraudAlert,
+  InventoryItem,
+  InventoryBatch,
+  LinenItem,
+  LaundryBatch
 };

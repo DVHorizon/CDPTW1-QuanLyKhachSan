@@ -19,9 +19,14 @@ const menuItems = [
     to: '/admin/rooms',
   },
   {
-    label: 'Buồng Phòng & Kỹ Thuật',
+    label: 'Buồng Phòng & Kho Minibar',
     icon: 'cleaning_services',
-    to: '/admin/housekeeping',
+    to: '/admin/housekeeping/inventory',
+  },
+  {
+    label: 'Đồ Vải & Chu Kỳ Giặt Ủi',
+    icon: 'dry_cleaning',
+    to: '/admin/housekeeping/linen',
   },
   {
     label: 'Dịch Vụ & Spa',
@@ -60,12 +65,12 @@ const menuItems = [
     to: '/admin/settings',
   },
   {
-    label: 'Kiểm Soát Nội Bộ (Audit)',
+    label: 'Kiểm Soát Nội Bộ ',
     icon: 'security',
     to: '/admin/audit-logs',
   },
   {
-    label: 'Điều Độ Lịch Trực Ca (Roster)',
+    label: 'Điều Độ Lịch Trực Ca ',
     icon: 'event_available',
     to: '/admin/roster',
   },
