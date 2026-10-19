@@ -21,6 +21,7 @@ import RoomStatusManagement from './pages/RoomStatusManagement';
 import BookingManagement from './pages/BookingManagement';
 import RoomAssignment from './pages/admin/RoomAssignment';
 import CheckInDesk from './pages/admin/CheckInDesk';
+import ExtendStayAndMove from './pages/admin/ExtendStayAndMove';
 
 
 function App() {
@@ -53,6 +54,9 @@ function App() {
           <Route path="/admin/check-in" element={<CheckInDesk />} />
           <Route path="/admin/check-in/:bookingId" element={<CheckInDesk />} />
           <Route path="/admin/guest-check-in" element={<CheckInDesk />} />
+          <Route path="/admin/extend-stay" element={<ExtendStayAndMove />} />
+          <Route path="/admin/extend-stay/:stayId" element={<ExtendStayAndMove />} />
+          <Route path="/admin/gia-han-luu-tru" element={<ExtendStayAndMove />} />
           <Route path="/admin/room-availability" element={<RoomAvailability />} />
           <Route path="/admin/so-do-phong" element={<RoomStatusManagement />} />
           <Route path="/admin/room-status" element={<RoomStatusManagement />} />

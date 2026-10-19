@@ -47,6 +47,10 @@ app.use('/api/allocation', require('./routes/admin/roomAllocationRoutes'));
 app.use('/api/v1/check-in', require('./routes/admin/checkInRoutes'));
 app.use('/api/check-in', require('./routes/admin/checkInRoutes'));
 
+// Route Gia hạn lưu trú & Đổi phòng (Stay Extension & Room Move Terminal)
+app.use('/api/v1/stays', require('./routes/admin/stayExtensionRoutes'));
+app.use('/api/stays', require('./routes/admin/stayExtensionRoutes'));
+
 // Route Quản lý người dùng & nhân viên
 app.use('/api/users', require('./routes/users'));
 app.use('/api/v1/users', require('./routes/users'));

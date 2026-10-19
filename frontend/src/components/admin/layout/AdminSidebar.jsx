@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { icon: "receipt_long", label: "Quản Lý Đặt Phòng", to: "/admin/dat-phong" },
   { icon: "assignment_turned_in", label: "Gán Phòng (Room Allocation)", to: "/admin/room-assignment" },
   { icon: "how_to_reg", label: "Check-in Tại Quầy (Express)", to: "/admin/check-in" },
+  { icon: "more_time", label: "Gia Hạn Lưu Trú & Đổi Phòng", to: "/admin/extend-stay" },
   { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong" },
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services" },
   { icon: "restaurant", label: "Quản Lý Thực Đơn (F&B)", to: "/admin/menu" },
