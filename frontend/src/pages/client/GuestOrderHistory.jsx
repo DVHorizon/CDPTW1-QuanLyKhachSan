@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
+import { useAuth } from "../../context/AuthContext";
 
 const API = "http://localhost:5000/api/v1/fnb-orders/history?view=guest";
 
@@ -29,6 +30,7 @@ function fmtDate(d) {
 
 export default function GuestOrderHistory() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -43,14 +45,11 @@ export default function GuestOrderHistory() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      // Lấy user id từ localStorage nếu có
+      // Lấy user id từ context trực tiếp từ database
       let url = API;
-      try {
-        const savedUser = JSON.parse(localStorage.getItem("hotel_user") || "{}");
-        if (savedUser?.id || savedUser?.UserId) {
-          url += `&userId=${savedUser.id || savedUser.UserId}`;
-        }
-      } catch {}
+      if (user?.userId || user?.id || user?.UserId) {
+        url += `&userId=${user.userId || user.id || user.UserId}`;
+      }
 
       const res = await fetch(url, { headers });
       const json = await res.json();

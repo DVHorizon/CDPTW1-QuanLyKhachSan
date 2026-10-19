@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
 import AdminLayout from '../../../components/admin/layout/AdminLayout';
 
 /* RoomAvailability.jsx — MỘT giao diện duy nhất: Front Desk Operations Center
@@ -174,11 +173,30 @@ export default function RoomAvailability() {
         return () => clearInterval(t);
     }, []);
     useEffect(() => {
-        const s = io(API, { transports: ['websocket', 'polling'], reconnection: true, timeout: 4000 });
+        let ws;
         let t;
-        s.on('connect', () => setLive(true)); s.on('disconnect', () => setLive(false)); s.on('connect_error', () => setLive(false));
-        s.on('availability:changed', () => { clearTimeout(t); t = setTimeout(() => loadRef.current(), 300); });
-        return () => { clearTimeout(t); s.disconnect(); };
+        try {
+            const wsUrl = (API.replace(/^http/, 'ws')) + '/ws/rooms';
+            ws = new WebSocket(wsUrl);
+            ws.onopen = () => setLive(true);
+            ws.onclose = () => setLive(false);
+            ws.onerror = () => setLive(false);
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type?.includes('ROOM') || data.type === 'availability:changed') {
+                        clearTimeout(t);
+                        t = setTimeout(() => loadRef.current(), 300);
+                    }
+                } catch (_) {}
+            };
+        } catch (err) {
+            console.warn('WS connection fallback:', err);
+        }
+        return () => {
+            clearTimeout(t);
+            if (ws) ws.close();
+        };
     }, []);
     useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 3500); return () => clearTimeout(t); }, [notice]);
 
