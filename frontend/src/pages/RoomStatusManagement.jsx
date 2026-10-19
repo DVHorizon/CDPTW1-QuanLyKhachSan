@@ -151,7 +151,7 @@ const RoomStatusManagement = () => {
   // ─── Tải danh mục loại phòng ─────────────────────────────────────────────
   const fetchRoomTypes = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/loai-phong?limit=100');
+      const res = await fetch('http://localhost:5000/api/loai-phong');
       const data = await res.json();
       if (data.success && Array.isArray(data.data) && data.data.length > 0) {
         setRoomTypes(

@@ -495,7 +495,7 @@ exports.searchRooms = async (req, res) => {
       );
     }
 
-    // Lọc theo Tiện nghi (Amenities)
+    // Lọc theo Tiện nghi (Amenities) - Chuẩn Apache Solr / Lucene BooleanQuery MUST (+)
     if (amenitiesFilter) {
       const amenitiesList = Array.isArray(amenitiesFilter)
         ? amenitiesFilter
