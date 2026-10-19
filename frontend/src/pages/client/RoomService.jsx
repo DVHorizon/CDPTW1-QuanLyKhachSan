@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import GuestSidebar from '../../components/layout/GuestSidebar';
 import GuestHeader from '../../components/layout/GuestHeader';
+import { useAuth } from '../../context/AuthContext';
 
 const RoomService = () => {
+  const { user } = useAuth();
+
   // FEAT-FNB-04 & FEAT-FNB-07 State
-  const [stayId, setStayId] = useState(1);
-  const [roomId, setRoomId] = useState(1);
+  const [activeStays, setActiveStays] = useState([]);
+  const [selectedStay, setSelectedStay] = useState(null);
+  const [stayId, setStayId] = useState(null);
+  const [roomId, setRoomId] = useState(null);
   const [cartItems, setCartItems] = useState([]);
   const [paymentMode, setPaymentMode] = useState('RoomInvoice'); // 'RoomInvoice' | 'PayNow'
   const [paymentMethod, setPaymentMethod] = useState(''); // 'Cash' | 'VNPay' | 'MoMo' | 'VietQR'
@@ -37,6 +42,33 @@ const RoomService = () => {
   // State Modal QR Code thanh toán online
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrModalData, setQrModalData] = useState(null);
+
+  // Fetch Active Stays / Rooms from Database
+  useEffect(() => {
+    const fetchActiveStays = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/v1/fnb-orders/active-stays');
+        const json = await res.json();
+        if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setActiveStays(json.data);
+          
+          // Ưu tiên chọn phòng gắn với User đang đăng nhập nếu có
+          const uid = user?.id || user?.UserId || user?.userId;
+          let matched = null;
+          if (uid) {
+            matched = json.data.find(s => String(s.userId) === String(uid));
+          }
+          const defaultStay = matched || json.data[0];
+          setSelectedStay(defaultStay);
+          setStayId(defaultStay.stayId);
+          setRoomId(defaultStay.roomId);
+        }
+      } catch (err) {
+        console.error('Failed to fetch active stays:', err);
+      }
+    };
+    fetchActiveStays();
+  }, [user]);
 
   // Fetch Categories from Database
   useEffect(() => {
@@ -230,9 +262,9 @@ const RoomService = () => {
     setErrorMessage('');
     setSuccessMessage('');
     try {
-      // Mock Token mặc định dành cho phiên test (Khách phòng 804 Arthur Dent) nếu chưa đăng nhập
-      const MOCK_TEST_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBnaC5jb20iLCJyb2xlIjoiQWRtaW4iLCJpYXQiOjE3OTE3OTE3MjAsImV4cCI6MTgyMzMyNzcyMH0.B3AGO9GF8MAXMi9Mf3FYcnjl8CWVhHBA_4xGbONiMaI';
-      const token = localStorage.getItem('hotel_token') || MOCK_TEST_TOKEN;
+      // Token hợp lệ với JWT_SECRET 'grand_horizon_secret_key_2026_luxury_hotel'
+      const MOCK_VALID_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBob3RlbGRvbWFpbi52biIsInJvbGUiOiJBZG1pbiIsInJvbGVJZCI6MSwiaWF0IjoxNzkyMzkxMjk4LCJleHAiOjE4MjM5MjcyOTh9.Ya1QBevHhciQaMKVZ2Nhbv39Vla5AcdxIfI5Dy4vXck';
+      const token = localStorage.getItem('hotel_token') || MOCK_VALID_TOKEN;
       const authHeader = { 'Authorization': `Bearer ${token}` };
 
       // Bước 1: Tạo đơn Room Service (FEAT-FNB-04)
@@ -283,8 +315,9 @@ const RoomService = () => {
         setErrorMessage(payData.message || 'Thanh toán không thành công. Đơn được giữ lại, vui lòng thử lại.');
       } else {
         setSuccessMessage(payData.message || 'Thanh toán thành công. Đơn đã được chuyển xuống bếp!');
+        setCartItems([]);
+        setShowQrModal(false);
       }
-      setShowQrModal(false);
     } catch (error) {
       console.error('Room service submit error:', error);
       setErrorMessage('Không thể kết nối đến máy chủ.');
@@ -314,6 +347,38 @@ const RoomService = () => {
                 </h1>
               </div>
             </div>
+
+            {/* Bộ Chọn Phòng Lưu Trú */}
+            <div className="flex items-center gap-3 bg-emerald-50/80 border border-emerald-200/80 px-4 py-2.5 rounded-xl shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-emerald-700 text-[22px]">meeting_room</span>
+                <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Chọn Phòng Của Quý Khách:</span>
+              </div>
+              <select
+                value={stayId || ''}
+                onChange={(e) => {
+                  const sId = Number(e.target.value);
+                  const found = activeStays.find(s => s.stayId === sId);
+                  if (found) {
+                    setSelectedStay(found);
+                    setStayId(found.stayId);
+                    setRoomId(found.roomId);
+                    setErrorMessage('');
+                  }
+                }}
+                className="bg-white border border-emerald-300 rounded-lg px-3 py-1.5 font-bold text-emerald-800 text-xs shadow-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+              >
+                {activeStays.length === 0 ? (
+                  <option value="">Đang tải phòng lưu trú...</option>
+                ) : (
+                  activeStays.map(s => (
+                    <option key={s.stayId} value={s.stayId}>
+                      Phòng #{s.roomNumber} • {s.guestName} (Tầng {s.floor})
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
           </div>
           {/* Primary 3-Column Console Canvas */}
           <div className="w-full px-space-lg py-space-lg">
@@ -326,19 +391,27 @@ const RoomService = () => {
               <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm space-y-space-md">
                 <div className="flex items-center justify-between">
                   <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Hồ sơ khách In-House</span>
-                  <span className="px-space-xs py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">Tháp B • Tầng 8</span>
+                  <span className="px-space-xs py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
+                    Tầng {selectedStay?.floor || 8} • Tháp B
+                  </span>
                 </div>
                 <div className="flex items-start gap-space-md pt-space-xs">
                   <div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-admin-primary flex-shrink-0 shadow-inner">
-                    <span className="font-headline-lg text-headline-sm font-bold">804</span>
+                    <span className="font-headline-lg text-headline-sm font-bold">
+                      {selectedStay?.roomNumber || '804'}
+                    </span>
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="font-headline-lg text-headline-sm text-on-surface font-bold truncate">Arthur Dent</span>
+                    <span className="font-headline-lg text-headline-sm text-on-surface font-bold truncate">
+                      {selectedStay?.guestName || user?.fullName || 'Arthur Dent'}
+                    </span>
                     <div className="flex items-center gap-space-xs mt-0.5">
                       <span className="px-space-xs py-0.2 rounded-full bg-secondary/10 text-secondary font-label-sm text-label-sm font-semibold">
-                        Silver Resident
+                        {user?.tierName ? `Hạng ${user.tierName}` : 'Silver Resident'}
                       </span>
-                      <span className="font-body-sm text-body-sm text-on-surface-variant truncate">#GH-2025-88219</span>
+                      <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
+                        Stay #{selectedStay?.stayId || 1}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -909,105 +982,107 @@ const RoomService = () => {
                 </div>
 
                 {/* FEAT-FNB-07 (A4.7): Phương thức quyết toán */}
-                <div className="space-y-space-sm pt-space-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider block font-bold">Hình thức thanh toán (A4.7)</span>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-admin-primary/10 text-admin-primary font-semibold">Bắt buộc</span>
-                    {/* Lựa chọn 1: RoomInvoice */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between pb-1">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider font-bold">Hình Thức Thanh Toán (A4.7)</span>
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">Bắt buộc</span>
+                  </div>
+
+                  {/* Lựa chọn 1: RoomInvoice */}
+                  <label
+                    onClick={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
+                    className={`flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-all border ${paymentMode === 'RoomInvoice'
+                      ? 'bg-emerald-50/80 border-emerald-500 shadow-sm ring-1 ring-emerald-500/30'
+                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment_mode"
+                      checked={paymentMode === 'RoomInvoice'}
+                      onChange={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
+                      className="mt-1 text-emerald-600 focus:ring-0 accent-emerald-600 cursor-pointer"
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[18px] text-emerald-700">domain</span>
+                        Gộp vào hóa đơn phòng (RoomInvoice)
+                      </span>
+                      <span className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                        Tạo folio charge liên kết Booking lưu trú. Chi phí được tính gộp khi trả phòng (Check-out).
+                      </span>
+                    </div>
+                  </label>
+
+                  {/* Lựa chọn 2: PayNow */}
+                  <div className={`p-3.5 rounded-xl transition-all border ${paymentMode === 'PayNow'
+                    ? 'bg-emerald-50/80 border-emerald-500 shadow-sm ring-1 ring-emerald-500/30'
+                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    }`}>
                     <label
-                      onClick={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
-                      className={`flex items-start gap-space-sm p-space-sm rounded-xl cursor-pointer transition-all border ${paymentMode === 'RoomInvoice'
-                        ? 'bg-admin-primary/10 border-admin-primary shadow-sm'
-                        : 'bg-surface-container border-transparent hover:bg-surface-container-high'
-                        }`}
+                      onClick={() => setPaymentMode('PayNow')}
+                      className="flex items-start gap-3 cursor-pointer"
                     >
                       <input
                         type="radio"
                         name="payment_mode"
-                        checked={paymentMode === 'RoomInvoice'}
-                        onChange={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
-                        className="mt-1 text-admin-primary focus:ring-0"
+                        checked={paymentMode === 'PayNow'}
+                        onChange={() => setPaymentMode('PayNow')}
+                        className="mt-1 text-emerald-600 focus:ring-0 accent-emerald-600 cursor-pointer"
                       />
                       <div className="flex flex-col">
-                        <span className="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-[18px] text-admin-primary">domain</span>
-                          Gộp vào hóa đơn phòng (RoomInvoice)
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[18px] text-emerald-700">payments</span>
+                          Thanh toán ngay (PayNow)
                         </span>
-                        <span className="font-body-sm text-body-sm text-on-surface-variant text-[12px]">
-                          Tạo folio charge liên kết Booking lưu trú (#FL-88031-C). Đơn giữ Pending gửi Bếp.
+                        <span className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                          Cổng thanh toán online (MoMo, VNPAY, VietQR) hoặc trả tiền mặt trực tiếp.
                         </span>
                       </div>
                     </label>
 
-                    {/* Lựa chọn 2: PayNow */}
-                    <div className={`p-space-sm rounded-xl transition-all border ${paymentMode === 'PayNow'
-                      ? 'bg-admin-primary/10 border-admin-primary shadow-sm'
-                      : 'bg-surface-container border-transparent'
-                      }`}>
-                      <label
-                        onClick={() => setPaymentMode('PayNow')}
-                        className="flex items-start gap-space-sm cursor-pointer"
-                      >
-                        <input
-                          type="radio"
-                          name="payment_mode"
-                          checked={paymentMode === 'PayNow'}
-                          onChange={() => setPaymentMode('PayNow')}
-                          className="mt-1 text-admin-primary focus:ring-0"
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[18px] text-admin-primary">payments</span>
-                            Thanh toán ngay (PayNow)
-                          </span>
-                          <span className="font-body-sm text-body-sm text-on-surface-variant text-[12px]">
-                            Cổng thanh toán online hoặc thu tiền mặt trực tiếp trước khi chuyển đơn.
-                          </span>
+                    {/* Danh sách cổng thanh toán PayNow */}
+                    {paymentMode === 'PayNow' && (
+                      <div className="mt-3 pt-3 border-t border-slate-200/80 space-y-2">
+                        <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                          Chọn Cổng Thanh Toán:
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { id: 'MoMo', label: 'Ví MoMo', icon: 'account_balance_wallet', color: 'text-pink-600' },
+                            { id: 'VNPay', label: 'Cổng VNPAY', icon: 'qr_code_scanner', color: 'text-blue-600' },
+                            { id: 'VietQR', label: 'VietQR 24/7', icon: 'qr_code_2', color: 'text-emerald-600' },
+                            { id: 'Cash', label: 'Tiền mặt', icon: 'attach_money', color: 'text-amber-600' }
+                          ].map(pm => (
+                            <button
+                              key={pm.id}
+                              type="button"
+                              onClick={() => setPaymentMethod(pm.id)}
+                              className={`flex items-center gap-2 p-2 rounded-lg text-left transition-all text-xs font-semibold cursor-pointer ${paymentMethod === pm.id
+                                ? 'bg-white text-emerald-800 border-2 border-emerald-600 shadow-sm'
+                                : 'bg-slate-50 text-slate-700 border border-slate-200 hover:border-emerald-500/60'
+                                }`}
+                            >
+                              <span className={`material-symbols-outlined text-[18px] ${pm.color}`}>{pm.icon}</span>
+                              <span className="truncate">{pm.label}</span>
+                            </button>
+                          ))}
                         </div>
-                      </label>
 
-                      {/* Danh sách cổng thanh toán PayNow */}
-                      {paymentMode === 'PayNow' && (
-                        <div className="mt-3 pt-3 border-t border-outline-variant/30 space-y-2">
-                          <span className="font-label-sm text-[11px] text-outline font-semibold uppercase tracking-wider block">
-                            Chọn cổng thanh toán:
-                          </span>
-                          <div className="grid grid-cols-2 gap-2">
-                            {[
-                              { id: 'VNPay', label: 'Cổng VNPAY-QR', icon: 'qr_code_scanner', color: 'text-blue-600' },
-                              { id: 'MoMo', label: 'Ví MoMo', icon: 'account_balance_wallet', color: 'text-pink-600' },
-                              { id: 'VietQR', label: 'VietQR Napas247', icon: 'qr_code_2', color: 'text-emerald-600' },
-                              { id: 'Cash', label: 'Tiền mặt tại phòng', icon: 'attach_money', color: 'text-amber-600' }
-                            ].map(pm => (
-                              <button
-                                key={pm.id}
-                                type="button"
-                                onClick={() => setPaymentMethod(pm.id)}
-                                className={`flex items-center gap-2 p-2 rounded-lg text-left transition-all text-xs font-semibold ${paymentMethod === pm.id
-                                  ? 'bg-surface-container-lowest text-admin-primary border-2 border-admin-primary shadow-sm'
-                                  : 'bg-surface-container-lowest/70 text-on-surface border border-outline-variant hover:border-admin-primary/50'
-                                  }`}
-                              >
-                                <span className={`material-symbols-outlined text-[18px] ${pm.color}`}>{pm.icon}</span>
-                                <span className="truncate">{pm.label}</span>
-                              </button>
-                            ))}
-                          </div>
-
-                          {/* Mô phỏng tình huống cổng thanh toán trả về thất bại (Negative test) */}
-                          <label className="flex items-center gap-2 mt-2 pt-2 text-[11px] text-outline cursor-pointer hover:text-on-surface">
-                            <input
-                              type="checkbox"
-                              checked={simulateFailure}
-                              onChange={(e) => setSimulateFailure(e.target.checked)}
-                              className="rounded text-error focus:ring-0"
-                            />
-                            <span>Mô phỏng: Cổng thanh toán báo lỗi (Negative Case TC07)</span>
-                          </label>
-                        </div>
-                      )}
-                    </div>
+                        {/* Mô phỏng tình huống cổng thanh toán trả về thất bại (Negative test) */}
+                        <label className="flex items-center gap-2 mt-2 pt-2 text-[11px] text-slate-400 cursor-pointer hover:text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={simulateFailure}
+                            onChange={(e) => setSimulateFailure(e.target.checked)}
+                            className="rounded text-rose-600 focus:ring-0 accent-rose-600 cursor-pointer"
+                          />
+                          <span>Mô phỏng: Cổng thanh toán báo lỗi (Negative TC07)</span>
+                        </label>
+                      </div>
+                    )}
                   </div>
+                </div>
 
                   {/* Thông báo lỗi / Thành công theo SPEC */}
                   {errorMessage && (
@@ -1215,6 +1290,14 @@ const RoomService = () => {
                     {qrModalData.amount.toLocaleString('vi-VN')} đ
                   </span>
                 </div>
+
+                {/* Thông báo lỗi ngay trong Modal nếu có */}
+                {errorMessage && (
+                  <div className="w-full p-2.5 mb-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2 text-rose-700 text-xs animate-shake">
+                    <span className="material-symbols-outlined text-[18px] shrink-0 text-rose-600">error</span>
+                    <span className="font-semibold leading-relaxed">{errorMessage}</span>
+                  </div>
+                )}
 
                 {/* Chú thích kiểm thử quy trình */}
                 <div className="w-full bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 mb-4 text-[11px] text-amber-800 text-center">

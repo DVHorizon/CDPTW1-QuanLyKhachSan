@@ -50,8 +50,13 @@ exports.createRoomServiceOrder = async (req, res) => {
       return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Vui lòng chọn phòng hợp lệ.' });
     }
 
+    const { Op } = require('sequelize');
     const stay = await Stay.findOne({
-      where: { StayId: stayId, RoomId: roomId, Status: 'Active' },
+      where: {
+        StayId: stayId,
+        RoomId: roomId,
+        Status: { [Op.in]: ['Active', 'CheckedIn'] }
+      },
       include: [{ model: Room }],
       transaction
     });
@@ -731,7 +736,8 @@ exports.processPayment = async (req, res) => {
     }
 
     // Kiểm tra quyền sở hữu đơn (nếu có currentUserId và đơn có UserId)
-    if (currentUserId && order.UserId && String(order.UserId) !== String(currentUserId)) {
+    const isStaffOrAdmin = req.user?.roleId === 1 || req.user?.RoleId === 1 || req.user?.roleId === 2 || req.user?.RoleId === 2;
+    if (!isStaffOrAdmin && currentUserId && order.UserId && String(order.UserId) !== String(currentUserId)) {
       await transaction.rollback();
       return res.status(403).json({
         code: 'ERROR_0010_FORBIDDEN',
@@ -776,10 +782,11 @@ exports.processPayment = async (req, res) => {
         });
       }
 
+      const { Op } = require('sequelize');
       const activeStay = await Stay.findOne({
         where: {
           StayId: order.StayId,
-          Status: 'Active'
+          Status: { [Op.in]: ['Active', 'CheckedIn'] }
         },
         transaction
       });

@@ -19,10 +19,6 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true
     },
-    CheckInTime: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
     ExpectedCheckOut: {
       type: DataTypes.DATE,
       allowNull: true
@@ -31,13 +27,13 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true
     },
-    CheckOutTime: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
     Status: {
       type: DataTypes.STRING(30),
       defaultValue: 'CheckedIn'
+    },
+    DepositAmount: {
+      type: DataTypes.DECIMAL(12, 2),
+      defaultValue: 0
     }
   }, {
     tableName: 'Stays',
