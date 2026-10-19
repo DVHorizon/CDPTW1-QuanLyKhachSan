@@ -36,7 +36,7 @@ setInterval(() => {
 // Lấy danh sách các lượt lưu trú đang hoạt động (CheckedIn) để lễ tân thao tác
 router.get('/in-house', async (req, res) => {
   try {
-    const { query = '', limit = 30 } = req.query;
+    const { query = '', limit = 100 } = req.query;
     const cleanQ = String(query).trim().toLowerCase();
 
     let sql = `
@@ -72,7 +72,8 @@ router.get('/in-house', async (req, res) => {
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
-      WHERE s.Status = 'CheckedIn'
+      WHERE (s.Status = 'CheckedIn' OR b.Status = 'CheckedIn')
+        AND s.ActualCheckOut IS NULL
     `;
 
     const params = [];
