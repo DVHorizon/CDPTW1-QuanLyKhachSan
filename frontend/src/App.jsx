@@ -8,6 +8,8 @@ import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
 import LoyaltyManagement from './pages/LoyaltyManagement';
+import MarketingDashboard from './pages/admin/marketing/MarketingDashboard';
+import CampaignComposer from './pages/admin/marketing/CampaignComposer';
 import AuditLogs from './pages/AuditLogs';
 import RosterShifts from './pages/RosterShifts';
 
@@ -28,6 +30,8 @@ function App() {
           <Route path="/admin/room-types" element={<RoomTypeManagement />} />
           <Route path="/admin/rooms" element={<RoomManagement />} />
           <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
+          <Route path="/admin/marketing" element={<MarketingDashboard />} />
+          <Route path="/admin/marketing/new" element={<CampaignComposer />} />
           <Route path="/admin/audit-logs" element={<AuditLogs />} />
           <Route path="/admin/roster" element={<RosterShifts />} />
           <Route path="/admin/shifts" element={<RosterShifts />} />

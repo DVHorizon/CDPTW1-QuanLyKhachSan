@@ -45,8 +45,13 @@ const menuItems = [
     to: '/admin/ai-concierge',
   },
   {
-    label: 'Khách Hàng & Hội Viên',
+    label: 'Khách Hàng & CRM Loyalty',
     icon: 'loyalty',
+    to: '/admin/marketing',
+  },
+  {
+    label: 'Hội Viên & Thẻ Thành Viên',
+    icon: 'card_membership',
     to: '/admin/loyalty',
   },
   {
