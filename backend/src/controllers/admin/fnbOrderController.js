@@ -1083,7 +1083,7 @@ exports.createOrderReview = async (req, res) => {
       photos
     } = req.body;
 
-    const currentUserId = req.user?.id || req.user?.UserId;
+    const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId;
 
     // 1. Kiểm tra xác thực (Quy tắc 3.1)
     if (!currentUserId) {
@@ -1319,6 +1319,103 @@ exports.getOrderReview = async (req, res) => {
       success: false,
       code: 'ERROR_0005_INVALID_VALUE',
       message: 'Không thể lấy thông tin đánh giá.'
+    });
+  }
+};
+
+// Cập nhật trạng thái hoặc thông tin đơn hàng F&B (FEAT-FNB-06/07)
+exports.updateOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status, note, paymentMode } = req.body;
+
+    const order = await FoodOrder.findByPk(orderId, {
+      include: [
+        {
+          model: FoodOrderDetail,
+          as: 'details',
+          include: [{ model: MenuItem }]
+        },
+        {
+          model: Stay,
+          include: [{ model: Room }]
+        }
+      ]
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Đơn hàng không tồn tại.'
+      });
+    }
+
+    if (status) {
+      order.Status = status;
+    }
+    if (note !== undefined) {
+      order.Note = note;
+    }
+    if (paymentMode) {
+      order.PaymentMode = paymentMode;
+    }
+
+    await order.save();
+
+    // Phát WebSocket real-time cho các màn hình theo dõi
+    broadcastOrderStatus(order);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật trạng thái đơn thành công.',
+      data: {
+        foodOrderId: order.FoodOrderId,
+        status: order.Status,
+        orderTime: order.OrderTime,
+        totalAmount: order.TotalAmount,
+        roomNumber: order.Stay?.Room?.RoomNumber || 'N/A'
+      }
+    });
+  } catch (error) {
+    console.error('Error updating order:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: 'Không thể cập nhật đơn hàng.'
+    });
+  }
+};
+
+// Xóa hoặc hủy đơn hàng F&B
+exports.deleteOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await FoodOrder.findByPk(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Đơn hàng không tồn tại.'
+      });
+    }
+
+    order.Status = 'Cancelled';
+    await order.save();
+
+    broadcastOrderStatus(order);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Hủy đơn hàng thành công.'
+    });
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: 'Không thể hủy đơn hàng.'
     });
   }
 };

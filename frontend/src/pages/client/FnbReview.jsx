@@ -68,31 +68,31 @@ const FnbReview = () => {
         }
 
         // Fetch served orders
-        let url = 'http://localhost:5000/api/v1/fnb-orders/history';
-        if (token) {
-          url += uid ? `?view=guest&userId=${uid}` : '?view=guest';
-        } else {
-          url += uid ? `?view=guest&userId=${uid}` : '?view=guest&userId=6';
+        let url = 'http://localhost:5000/api/v1/fnb-orders/history?view=guest';
+        if (uid) {
+          url += `&userId=${uid}`;
         }
 
         const res = await fetch(url, { headers });
         const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          // Ưu tiên đơn Served, nếu chưa có thì lấy tất cả đơn để khách có thể đánh giá trải nghiệm
           const served = json.data.filter(o => o.status === 'Served');
-          setServedOrders(served);
+          const availableOrders = served.length > 0 ? served : json.data;
+          setServedOrders(availableOrders);
 
           if (paramOrderId) {
-            const target = served.find(o => String(o.foodOrderId) === String(paramOrderId));
+            const target = availableOrders.find(o => String(o.foodOrderId) === String(paramOrderId));
             if (target) {
               setSelectedOrderId(target.foodOrderId);
               setCurrentOrder(target);
-            } else if (served.length > 0) {
-              setSelectedOrderId(served[0].foodOrderId);
-              setCurrentOrder(served[0]);
+            } else {
+              setSelectedOrderId(availableOrders[0].foodOrderId);
+              setCurrentOrder(availableOrders[0]);
             }
-          } else if (served.length > 0) {
-            setSelectedOrderId(served[0].foodOrderId);
-            setCurrentOrder(served[0]);
+          } else {
+            setSelectedOrderId(availableOrders[0].foodOrderId);
+            setCurrentOrder(availableOrders[0]);
           }
         }
       } catch (err) {
