@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const { Room, RoomType, Branch } = require('../models');
 const { Op } = require('sequelize');
+const { broadcastRoomEvent } = require('../sockets/socketHandler');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // API PHÒNG VẬT LÝ  →  /api/phong
@@ -51,11 +52,13 @@ function toUIFormat(room) {
     ghi_chu:         room.Description || '',
     buong_phong:     decoded.buong_phong,
     luu_tru:         decoded.luu_tru,
-    // Thêm field để Guest search dùng
+    // Thêm field để Guest search & Optimistic locking dùng
     RoomId:          room.RoomId,
     RoomTypeId:      room.RoomTypeId,
     BranchId:        room.BranchId,
     Status:          room.Status,
+    updated_at:      room.UpdatedAt ? new Date(room.UpdatedAt).toISOString() : null,
+    is_deleted:      room.IsDeleted ? 1 : 0,
   };
 }
 
@@ -174,6 +177,26 @@ router.get('/', async (req, res) => {
   }
 });
 
+// ─── GET thùng rác (danh sách phòng đã xóa logic: IsDeleted = 1 / true) ───────
+router.get('/thung-rac', async (req, res) => {
+  try {
+    const rooms = await Room.findAll({
+      where: { IsDeleted: true },
+      include: [
+        { model: RoomType, as: 'roomType', attributes: ['RoomTypeId', 'TypeName', 'BasePrice', 'ImageUrl'] },
+        { model: Branch,   as: 'branch',   attributes: ['BranchId', 'BranchName'] },
+      ],
+      order: [['UpdatedAt', 'DESC']],
+    });
+
+    const data = rooms.map(toUIFormat);
+    res.json({ success: true, data, total: data.length });
+  } catch (err) {
+    console.error('GET /phong/thung-rac error:', err.message);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
+  }
+});
+
 // ─── POST đồng bộ 50 phòng hoặc CSDL ─────────────────────────────────────────
 router.post('/dong-bo-50', async (req, res) => {
   try {
@@ -219,10 +242,13 @@ router.patch('/:id/chuyen-trang-thai', async (req, res) => {
       ]
     });
 
+    const formatted = toUIFormat(updated);
+    broadcastRoomEvent('ROOM_STATUS_CHANGED', { roomId: room.RoomId, roomNumber: room.RoomNumber, action: targetStatus, room: formatted });
+
     res.json({
       success: true,
       message: `Đã chuyển trạng thái phòng ${room.RoomNumber} thành công!`,
-      data: toUIFormat(updated)
+      data: formatted
     });
   } catch (err) {
     console.error('PATCH /chuyen-trang-thai error:', err.message);
@@ -253,6 +279,7 @@ router.post('/hang-loat', async (req, res) => {
     if (updated.length === 0)
       return res.status(400).json({ success: false, message: MSG_INVALID });
 
+    broadcastRoomEvent('ROOMS_BATCH_UPDATED', { action, count: updated.length, updated });
     res.json({ success: true, data: { updated, ok: updated.length, skipped } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -290,6 +317,7 @@ router.post('/khoa-tang', async (req, res) => {
     if (updated.length === 0)
       return res.status(400).json({ success: false, message: MSG_INVALID });
 
+    broadcastRoomEvent('ROOMS_BATCH_UPDATED', { action: 'ooo', count: updated.length, updated, floors });
     res.json({ success: true, data: { updated, ok: updated.length, skipped, floors } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -347,19 +375,39 @@ router.post('/', async (req, res) => {
       ]
     });
 
-    res.status(201).json({ success: true, message: 'Đã thêm phòng thành công', data: toUIFormat(roomWithAssoc) });
+    const formatted = toUIFormat(roomWithAssoc);
+    broadcastRoomEvent('ROOM_CREATED', { room: formatted });
+    res.status(201).json({ success: true, message: 'Đã thêm phòng thành công', data: formatted });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ─── PUT cập nhật phòng ─────────────────────────────────────────────────────
+// ─── PUT cập nhật phòng (có Optimistic Locking) ──────────────────────────────
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
     if (!room)
-      return res.status(404).json({ success: false, message: 'Lỗi đồng bộ: Phòng này không còn tồn tại!' });
+      return res.status(404).json({ success: false, message: 'Lỗi đồng bộ: Phòng này không còn tồn tại hoặc đã bị xóa!', isRecordDeleted: true });
+
+    // ═══ OPTIMISTIC LOCKING CHECK ═══
+    // Client gửi lên thời điểm cập nhật trước đó (prev_updated_at hoặc updated_at hoặc header If-Match)
+    const clientUpdatedAt = req.body.prev_updated_at || req.body.updated_at || req.headers['if-match'];
+    if (clientUpdatedAt && room.UpdatedAt) {
+      const clientTime = new Date(clientUpdatedAt).getTime();
+      const serverTime = new Date(room.UpdatedAt).getTime();
+      if (!isNaN(clientTime) && Math.abs(serverTime - clientTime) > 1000) {
+        return res.status(409).json({
+          success: false,
+          isConflict: true,
+          error: 'OPTIMISTIC_LOCK_CONFLICT',
+          message: 'Xung đột dữ liệu (Optimistic Locking): Phòng này đã được cập nhật bởi một người dùng hoặc tiến trình khác trong lúc bạn thao tác! Vui lòng làm mới danh sách dữ liệu để nhận phiên bản mới nhất.',
+          serverUpdatedAt: room.UpdatedAt,
+          clientUpdatedAt
+        });
+      }
+    }
 
     const { so_phong, tang, khu, ma_loai, ghi_chu, buong_phong, luu_tru } = req.body;
 
@@ -392,48 +440,122 @@ router.put('/:id', async (req, res) => {
         { model: Branch,   as: 'branch' },
       ]
     });
-    res.json({ success: true, message: 'Đã cập nhật phòng thành công', data: toUIFormat(updated) });
+    const formatted = toUIFormat(updated);
+    broadcastRoomEvent('ROOM_UPDATED', { room: formatted });
+    res.json({ success: true, message: 'Đã cập nhật phòng thành công (Optimistic lock validated)', data: formatted });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ─── PATCH đổi trạng thái một phòng ─────────────────────────────────────────
-// PATCH /api/phong/:id/thao-tac  { action: "checkin" }
+// ─── PATCH đổi trạng thái một phòng (có Optimistic Locking) ─────────────────
+// PATCH /api/phong/:id/thao-tac  { action: "checkin", prev_updated_at?: "..." }
 router.patch('/:id/thao-tac', async (req, res) => {
   try {
     const { id } = req.params;
-    const { action } = req.body;
+    const { action, prev_updated_at, updated_at } = req.body;
 
     const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
     if (!room)
-      return res.status(404).json({ success: false, message: 'Lỗi đồng bộ: Phòng này không còn tồn tại!' });
+      return res.status(404).json({ success: false, message: 'Lỗi đồng bộ: Phòng này không còn tồn tại hoặc đã bị xóa!', isRecordDeleted: true });
+
+    // ═══ OPTIMISTIC LOCKING CHECK ═══
+    const clientUpdatedAt = prev_updated_at || updated_at || req.headers['if-match'];
+    if (clientUpdatedAt && room.UpdatedAt) {
+      const clientTime = new Date(clientUpdatedAt).getTime();
+      const serverTime = new Date(room.UpdatedAt).getTime();
+      if (!isNaN(clientTime) && Math.abs(serverTime - clientTime) > 1000) {
+        return res.status(409).json({
+          success: false,
+          isConflict: true,
+          error: 'OPTIMISTIC_LOCK_CONFLICT',
+          message: 'Xung đột dữ liệu (Optimistic Locking): Trạng thái phòng đã thay đổi trước đó! Vui lòng tải lại dữ liệu mới nhất.',
+          serverUpdatedAt: room.UpdatedAt,
+          clientUpdatedAt
+        });
+      }
+    }
 
     const nextStatus = ACTIONS.includes(action) ? applyAction(room, action) : null;
     if (!nextStatus)
       return res.status(400).json({ success: false, message: MSG_INVALID });
 
     await room.update({ Status: nextStatus });
-    res.json({ success: true, data: toUIFormat(room) });
+    const formatted = toUIFormat(room);
+    broadcastRoomEvent('ROOM_STATUS_CHANGED', { roomId: room.RoomId, roomNumber: room.RoomNumber, action, room: formatted });
+    res.json({ success: true, data: formatted });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ─── DELETE xóa phòng (soft delete) ─────────────────────────────────────────
+// ─── PATCH khôi phục phòng từ thùng rác (IsDeleted: 1 -> 0) ──────────────────
+router.patch('/:id/khoi-phuc', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const room = await Room.findOne({ where: { RoomId: id, IsDeleted: true } });
+    if (!room)
+      return res.status(404).json({ success: false, message: 'Không tìm thấy phòng trong thùng rác hoặc phòng đã được khôi phục!' });
+
+    // Kiểm tra xem số phòng có bị trùng với phòng đang active khác không
+    const duplicate = await Room.findOne({
+      where: {
+        RoomNumber: room.RoomNumber,
+        BranchId: room.BranchId,
+        IsDeleted: false,
+        RoomId: { [Op.ne]: id }
+      }
+    });
+    if (duplicate) {
+      return res.status(409).json({
+        success: false,
+        message: `Không thể khôi phục vì số phòng "${room.RoomNumber}" đang được sử dụng bởi phòng đang hoạt động khác!`
+      });
+    }
+
+    // Khôi phục Soft Delete: Chuyển IsDeleted từ 1 (true) về 0 (false)
+    await room.update({ IsDeleted: false, Status: 'CleanAvailable' });
+
+    const restored = await Room.findByPk(id, {
+      include: [
+        { model: RoomType, as: 'roomType' },
+        { model: Branch,   as: 'branch' },
+      ]
+    });
+    const formatted = toUIFormat(restored);
+    broadcastRoomEvent('ROOM_RESTORED', { roomId: id, roomNumber: room.RoomNumber, room: formatted });
+    res.json({
+      success: true,
+      message: `Đã khôi phục thành công phòng ${room.RoomNumber} từ thùng rác (IsDeleted: 1 -> 0)`,
+      data: formatted
+    });
+  } catch (err) {
+    console.error('PATCH /phong/:id/khoi-phuc error:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── DELETE xóa phòng (Soft delete: IsDeleted = 0 -> 1) ─────────────────────
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
     if (!room)
-      return res.status(404).json({ success: false, message: 'Lỗi đồng bộ: Phòng này không còn tồn tại hoặc đã bị xóa!' });
+      return res.status(404).json({ success: false, message: 'Lỗi đồng bộ: Phòng này không còn tồn tại hoặc đã bị xóa!', isRecordDeleted: true });
 
     const { luu_tru } = decodeStatus(room.Status);
     if (luu_tru === 'inhouse')
       return res.status(400).json({ success: false, message: 'Không thể xóa phòng đang có khách ở!' });
 
+    // Soft delete: Chuyển trường dữ liệu IsDeleted từ 0 (false) -> 1 (true)
+    // KHÔNG thực hiện DELETE vật lý trong Database để bảo toàn lịch sử và có thể khôi phục
     await room.update({ IsDeleted: true });
-    res.json({ success: true, message: `Đã xóa phòng ${room.RoomNumber} thành công` });
+    broadcastRoomEvent('ROOM_DELETED', { roomId: id, roomNumber: room.RoomNumber });
+    res.json({
+      success: true,
+      message: `Đã xóa logic phòng ${room.RoomNumber} thành công (chuyển vào thùng rác IsDeleted=1)`,
+      data: { id: room.RoomId, is_deleted: 1 }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
