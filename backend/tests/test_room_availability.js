@@ -162,7 +162,7 @@ async function runTests() {
     // TC05: Nhả phòng giữ chỗ
     // ─────────────────────────────────────────────────────────────────────────
     console.log('▶ [TC05] Nhả phòng giữ chỗ...');
-    const releaseSuccess = availabilityService.releaseRoomLock(lockA.lockSessionId);
+    const releaseSuccess = await availabilityService.releaseRoomLock(lockA.lockSessionId);
     const afterReleaseCheck = await availabilityService.checkAvailability({
       roomTypeId,
       checkInDate: '2027-02-25',

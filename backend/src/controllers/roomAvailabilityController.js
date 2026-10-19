@@ -114,7 +114,7 @@ exports.lockRoomSession = async (req, res) => {
 exports.releaseRoomLock = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const released = availabilityService.releaseRoomLock(sessionId);
+    const released = await availabilityService.releaseRoomLock(sessionId);
     return success(res, { released }, released ? 'Đã nhả phòng giữ chỗ thành công' : 'Phiên giữ phòng không tồn tại hoặc đã hết hạn');
   } catch (err) {
     return error(res, 500, err.message);

@@ -776,7 +776,7 @@ exports.createBooking = async (req, res) => {
 
     // 2. Tự động giải phóng lock session tạm thời nếu có (vì đã thành booking chính thức)
     if (lockSessionId) {
-      availabilityService.releaseRoomLock(lockSessionId);
+      await availabilityService.releaseRoomLock(lockSessionId);
     }
 
     broadcastRoomEvent('BOOKING_CREATED', {

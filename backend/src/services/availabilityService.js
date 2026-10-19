@@ -62,8 +62,10 @@ function formatDate(d) {
  */
 function getDatesInRange(startDateStr, endDateStr) {
   const dates = [];
-  const curr = new Date(startDateStr + 'T00:00:00');
-  const end = new Date(endDateStr + 'T00:00:00');
+  const sStr = String(startDateStr).substring(0, 10);
+  const eStr = String(endDateStr).substring(0, 10);
+  const curr = new Date(sStr + 'T00:00:00');
+  const end = new Date(eStr + 'T00:00:00');
 
   while (curr < end) {
     dates.push(formatDate(curr));
@@ -131,15 +133,18 @@ async function checkAvailability({ roomTypeId, checkInDate, checkOutDate, quanti
   }
 
   // 2. Validate ngày lưu trú
+  const normalizedCheckIn = String(checkInDate).substring(0, 10);
+  const normalizedCheckOut = String(checkOutDate).substring(0, 10);
   const todayStr = formatDate(new Date());
-  if (!checkInDate || checkInDate < todayStr) {
+
+  if (!normalizedCheckIn || normalizedCheckIn < todayStr) {
     const err = new Error('Ngày nhận phòng không hợp lệ hoặc trước ngày hiện tại');
     err.code = 'ERROR_0005_INVALID_VALUE';
     err.statusCode = 400;
     throw err;
   }
 
-  if (!checkOutDate || checkOutDate <= checkInDate) {
+  if (!normalizedCheckOut || normalizedCheckOut <= normalizedCheckIn) {
     const err = new Error('Ngày trả phòng phải sau ngày nhận phòng');
     err.code = 'ERROR_0005_INVALID_VALUE';
     err.statusCode = 400;
@@ -173,16 +178,28 @@ async function checkAvailability({ roomTypeId, checkInDate, checkOutDate, quanti
       Status: {
         [Op.in]: ['Confirmed', 'CheckedIn', 'Pending']
       },
-      CheckInDate: { [Op.lt]: checkOutDate },
-      CheckOutDate: { [Op.gt]: checkInDate }
+      CheckInDate: { [Op.lt]: normalizedCheckOut },
+      CheckOutDate: { [Op.gt]: normalizedCheckIn }
     },
-    attributes: ['BookingId', 'CheckInDate', 'CheckOutDate', 'RoomQuantity', 'Status', 'CreatedAt']
+    attributes: ['BookingId', 'CheckInDate', 'CheckOutDate', 'RoomQuantity', 'Status', 'CreatedAt', 'BookingSource', 'ConfirmationCode']
   });
 
-  // Lọc lại các booking Pending: chỉ tính nếu chưa quá 15 phút
+  // Lọc lại các booking:
+  // - Nếu là lock của chính excludeSessionId: bỏ qua để cho phép khách hoàn tất đặt phòng
+  // - Nếu là HoldLock đã được activeLocks quản lý trong bộ nhớ: bỏ qua để không bị đếm trùng lặp x2 (Double-count)
   const nowTime = Date.now();
   const validBookings = overlappingBookings.filter(b => {
+    if (excludeSessionId && b.ConfirmationCode === `HOLD-${excludeSessionId}`) {
+      return false;
+    }
+
     if (b.Status === 'Pending') {
+      if (b.BookingSource === 'HoldLock') {
+        const sid = b.ConfirmationCode ? b.ConfirmationCode.replace(/^HOLD-/, '') : null;
+        if (sid && activeLocks.has(sid)) {
+          return false; // activeLocks sẽ tính trong getLockedRoomsForDate
+        }
+      }
       const createdTime = new Date(b.CreatedAt).getTime();
       return (nowTime - createdTime) <= LOCK_TIMEOUT_MS;
     }
@@ -190,14 +207,16 @@ async function checkAvailability({ roomTypeId, checkInDate, checkOutDate, quanti
   });
 
   // 5. Duyệt qua từng ngày trong khoảng [CheckInDate, CheckOutDate) để tính AvailableCount
-  const stayDates = getDatesInRange(checkInDate, checkOutDate);
+  const stayDates = getDatesInRange(normalizedCheckIn, normalizedCheckOut);
   const dailyInventory = [];
 
   for (const dateStr of stayDates) {
     // Đếm số phòng đã đặt trong ngày này
     let bookedRoomsOnDate = 0;
     for (const b of validBookings) {
-      if (dateStr >= b.CheckInDate && dateStr < b.CheckOutDate) {
+      const bCheckIn = typeof b.CheckInDate === 'string' ? b.CheckInDate.substring(0, 10) : formatDate(new Date(b.CheckInDate));
+      const bCheckOut = typeof b.CheckOutDate === 'string' ? b.CheckOutDate.substring(0, 10) : formatDate(new Date(b.CheckOutDate));
+      if (dateStr >= bCheckIn && dateStr < bCheckOut) {
         bookedRoomsOnDate += Number(b.RoomQuantity) || 1;
       }
     }
@@ -368,14 +387,16 @@ async function acquireRoomLock({ roomTypeId, checkInDate, checkOutDate, quantity
 /**
  * Nhả khóa phòng thủ công (khi khách hủy hoặc hoàn tất thanh toán)
  */
-function releaseRoomLock(lockSessionId) {
+async function releaseRoomLock(lockSessionId) {
   // Cập nhật trạng thái hủy giữ chỗ trong MySQL Database
   try {
-    Booking.update(
+    await Booking.update(
       { Status: 'Cancelled' },
       { where: { ConfirmationCode: `HOLD-${lockSessionId}` } }
-    ).catch(() => {});
-  } catch (_) {}
+    );
+  } catch (err) {
+    console.warn('⚠️ Lỗi hủy hold lock trong MySQL:', err.message);
+  }
 
   if (activeLocks.has(lockSessionId)) {
     const lock = activeLocks.get(lockSessionId);
