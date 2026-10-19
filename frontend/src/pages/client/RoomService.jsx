@@ -879,11 +879,9 @@ const RoomService = () => {
               <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-md space-y-space-md">
                 {/* Header Ticket */}
                 <div className="flex items-center justify-between pb-space-xs">
-                    <div className="flex items-center gap-space-xs">
-                      <span className="font-headline-sm text-headline-sm font-bold text-on-surface">Phiếu Gọi Món</span>
-                      <span className="font-label-sm text-label-sm text-admin-primary font-semibold">#IRD-4092</span>
-                    </div>
-                    <span className="font-body-sm text-body-sm text-on-surface-variant">Phòng 804 • NV: T. Marco • Lúc: 19:12</span>
+                  <div className="flex items-center gap-space-xs">
+                    <span className="font-headline-sm text-headline-sm font-bold text-on-surface">Phiếu Gọi Món</span>
+                    <span className="font-label-sm text-label-sm text-admin-primary font-semibold">#IRD-4092</span>
                   </div>
                   <span className="px-space-sm py-1 rounded-full bg-secondary/15 text-secondary font-label-sm text-label-sm font-bold">
                     Bản Nháp Mở

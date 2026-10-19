@@ -81,7 +81,7 @@ export default function GuestOrderHistory() {
 
   useEffect(() => {
     fetchGuestOrders();
-  }, []);
+  }, [user]);
 
   const totalSpent = orders.reduce((sum, o) => sum + (o.status !== "Cancelled" ? Number(o.totalAmount || 0) : 0), 0);
 
