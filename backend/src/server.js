@@ -77,6 +77,13 @@ app.use('/api/v1/operations', require('./modules/operations'));
 // Guest search (backward compat — cũng hoạt động qua /api/v1/guest/rooms/search)
 app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
 app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
+// FEAT-GUEST-05: Direct booking endpoint
+app.post('/bookings', require('./controllers/bookingEngineController').createOnlineBooking);
+
+// FEAT-GUEST-08: Direct deposit payment & booking retrieval endpoints
+app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController').getBookingDetails);
+app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
+app.post('/payments', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 app.use(require('./shared/middlewares/errorHandler'));

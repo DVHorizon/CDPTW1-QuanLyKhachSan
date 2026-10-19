@@ -21,6 +21,7 @@ const defineInvoiceDetail = require('./InvoiceDetail');
 const definePayment = require('./Payment');
 const defineServiceCategory = require('./ServiceCategory');
 const defineService = require('./Service');
+const defineBookingGuest = require('./BookingGuest');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -31,6 +32,7 @@ const Role = defineRole(sequelize);
 const MembershipTier = defineMembershipTier(sequelize);
 const User = defineUser(sequelize);
 const Booking = defineBooking(sequelize);
+const BookingGuest = defineBookingGuest(sequelize);
 const Review = defineReview(sequelize);
 const MenuCategory = defineMenuCategory(sequelize);
 const MenuItem = defineMenuItem(sequelize);
@@ -69,6 +71,10 @@ Booking.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 RoomType.hasMany(Booking, { foreignKey: 'RoomTypeId', as: 'bookings' });
 Booking.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
 
+// 6b. Booking & BookingGuest
+Booking.hasMany(BookingGuest, { foreignKey: 'BookingId', as: 'guests' });
+BookingGuest.belongsTo(Booking, { foreignKey: 'BookingId', as: 'booking' });
+
 // 7. User & Review
 User.hasMany(Review, { foreignKey: 'UserId', as: 'reviews' });
 Review.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
@@ -99,8 +105,8 @@ Invoice.hasMany(InvoiceDetail, { foreignKey: 'InvoiceId', as: 'details' });
 InvoiceDetail.belongsTo(Invoice, { foreignKey: 'InvoiceId' });
 
 // Payments
-FoodOrder.hasMany(Payment, { foreignKey: 'FoodOrderId', as: 'payments' });
-Payment.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
+Booking.hasMany(Payment, { foreignKey: 'BookingId', as: 'payments' });
+Payment.belongsTo(Booking, { foreignKey: 'BookingId', as: 'booking' });
 
 // 13. FoodOrder & FoodOrderDetail
 FoodOrder.hasMany(FoodOrderDetail, { foreignKey: 'FoodOrderId', as: 'details' });
@@ -136,6 +142,7 @@ module.exports = {
   MembershipTier,
   User,
   Booking,
+  BookingGuest,
   Review,
   MenuCategory,
   MenuItem,
