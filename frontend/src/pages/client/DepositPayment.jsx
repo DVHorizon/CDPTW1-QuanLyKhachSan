@@ -501,11 +501,15 @@ export default function DepositPayment() {
                 <div className="flex flex-col gap-4 pt-1 animate-fade-in">
                   <div className="bg-[#eff4ff] p-5 rounded-2xl flex flex-col sm:flex-row gap-6 items-center border border-blue-100">
                     <div className="bg-white p-3 rounded-xl shadow-xs flex flex-col items-center shrink-0 border border-slate-200">
-                      <div className="w-40 h-40 bg-white flex flex-col items-center justify-center relative p-1">
+                      <div className="w-44 h-44 bg-white flex flex-col items-center justify-center relative p-1 rounded-lg">
                         <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=2|99|0071000998899|CONG%20TY%20CP%20RESORT%20GRAND%20HORIZON|${finalPayable}|${bookingCodeStr}`}
+                          src={`https://img.vietqr.io/image/VCB-0071000998899-compact2.png?amount=${finalPayable}&addInfo=${encodeURIComponent(bookingCodeStr)}&accountName=${encodeURIComponent('CONG TY CP RESORT GRAND HORIZON')}`}
                           alt="VietQR code"
                           className="w-full h-full object-contain"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=2|99|0071000998899|CONG%20TY%20CP%20RESORT%20GRAND%20HORIZON|${finalPayable}|${bookingCodeStr}`;
+                          }}
                         />
                       </div>
                       <span className="text-[11px] text-slate-500 mt-1 font-semibold">
@@ -659,16 +663,20 @@ export default function DepositPayment() {
               {paymentMethod === 'DIGITAL_WALLET' && (
                 <div className="flex flex-col gap-4 pt-1 animate-fade-in">
                   <p className="text-xs text-slate-600">Lựa chọn cổng thanh toán hoặc ví điện tử bạn muốn sử dụng:</p>
+                  
+                  {/* Selector Radio buttons */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
-                      { id: 'VNPAY', name: 'VNPAY-QR', desc: 'Cổng thanh toán quốc gia' },
                       { id: 'MOMO', name: 'Ví MoMo', desc: 'Ứng dụng MoMo E-Wallet' },
+                      { id: 'VNPAY', name: 'VNPAY-QR', desc: 'Cổng thanh toán quốc gia' },
                       { id: 'ZALOPAY', name: 'ZaloPay', desc: 'Ví ZaloPay hoặc Zalo App' }
                     ].map(w => (
                       <label 
                         key={w.id} 
-                        className={`p-4 rounded-xl cursor-pointer flex flex-col items-center text-center gap-1.5 transition-all border ${
-                          walletProvider === w.id ? 'bg-[#eff4ff] border-[#725b38] shadow-xs' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                        className={`p-3.5 rounded-xl cursor-pointer flex flex-col items-center text-center gap-1.5 transition-all border ${
+                          walletProvider === w.id 
+                            ? 'bg-[#eff4ff] border-[#725b38] shadow-sm ring-1 ring-[#725b38]' 
+                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
                         <input 
@@ -683,6 +691,165 @@ export default function DepositPayment() {
                       </label>
                     ))}
                   </div>
+
+                  {/* Chi Tiết Cổng & Mã QR Quét Tức Thì Cho Từng Ví */}
+                  {walletProvider === 'MOMO' && (
+                    <div className="bg-pink-50/50 p-5 rounded-2xl flex flex-col sm:flex-row gap-6 items-center border border-pink-200">
+                      <div className="p-2.5 bg-gradient-to-b from-[#fce4ec] to-[#f8bbd0] rounded-2xl border-2 border-[#d82d8b] shadow-md flex flex-col items-center shrink-0 max-w-[200px]">
+                        <img 
+                          src="/momo-qr.png" 
+                          alt="MoMo QR Code" 
+                          className="w-44 h-auto rounded-xl object-contain shadow-xs"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=2|99|0901234567|MoMo%20Gateway|${finalPayable}|${bookingCodeStr}`;
+                          }}
+                        />
+                        <span className="mt-1.5 text-[10px] font-bold text-[#a50064] uppercase tracking-wide">
+                          Quét Bằng Ví MoMo
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5 w-full text-xs">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-pink-100 text-[#a50064] font-bold text-xs self-start">
+                          <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+                          CỔNG THANH TOÁN VÍ ĐIỆN TỬ MOMO GATEWAY
+                        </div>
+                        <div className="flex justify-between items-center pb-1.5 border-b border-pink-200/60">
+                          <span className="text-slate-500 font-medium">Chủ tài khoản thụ hưởng:</span>
+                          <span className="font-bold text-slate-900 uppercase">NGUYEN XUAN THU TRANG</span>
+                        </div>
+                        <div className="flex justify-between items-center pb-1.5 border-b border-pink-200/60">
+                          <span className="text-slate-500 font-medium">Số tiền cọc MoMo:</span>
+                          <span className="font-bold text-sm text-[#a50064]">{formatVND(finalPayable)}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-0.5">
+                          <span className="text-slate-500 font-medium">Lời nhắn / Mã đơn:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-xs bg-pink-100 px-2.5 py-1 rounded text-[#a50064] tracking-wider">
+                              {bookingCodeStr}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(bookingCodeStr, 'code')}
+                              className="text-[#a50064] hover:text-pink-900 p-1 rounded transition-colors"
+                              title="Sao chép mã đơn"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                            </button>
+                            {copyFeedback.code && <span className="text-[10px] text-pink-700 font-bold">Đã chép!</span>}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-500 pt-1">
+                          Mở App MoMo quét mã QR trên để chuyển cọc trực tiếp, sau đó bấm <strong>"XÁC NHẬN &amp; ĐÃ THANH TOÁN TIỀN CỌC"</strong> bên dưới.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {walletProvider === 'VNPAY' && (
+                    <div className="bg-blue-50/50 p-5 rounded-2xl flex flex-col sm:flex-row gap-6 items-center border border-blue-200">
+                      <div className="bg-white p-2.5 rounded-2xl border-2 border-blue-600 shadow-md flex flex-col items-center shrink-0">
+                        <img 
+                          src={`https://img.vietqr.io/image/VCB-999908048888-compact2.png?amount=${finalPayable}&addInfo=${encodeURIComponent(bookingCodeStr)}&accountName=${encodeURIComponent('VNPAY - GRAND HORIZON')}`}
+                          alt="VNPAY QR Gateway" 
+                          className="w-40 h-40 rounded-xl object-contain shadow-xs"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=VNPAY|${finalPayable}|${bookingCodeStr}`;
+                          }}
+                        />
+                        <span className="mt-1.5 text-[10px] font-bold text-blue-700 uppercase tracking-wide">
+                          VNPAY-QR 30+ Ứng Dụng
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5 w-full text-xs">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-100 text-blue-700 font-bold text-xs self-start">
+                          <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
+                          CỔNG THANH TOÁN QUỐC GIA VNPAY-QR
+                        </div>
+                        <div className="flex justify-between items-center pb-1.5 border-b border-blue-200/60">
+                          <span className="text-slate-500 font-medium">Đơn vị chấp nhận VNPAY:</span>
+                          <span className="font-bold text-slate-900">GRAND HORIZON RESORT &amp; SUITES</span>
+                        </div>
+                        <div className="flex justify-between items-center pb-1.5 border-b border-blue-200/60">
+                          <span className="text-slate-500 font-medium">Số tiền cọc thanh toán:</span>
+                          <span className="font-bold text-sm text-blue-700">{formatVND(finalPayable)}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-0.5">
+                          <span className="text-slate-500 font-medium">Mã giao dịch / Cú pháp:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-xs bg-blue-100 px-2.5 py-1 rounded text-blue-700 tracking-wider">
+                              {bookingCodeStr}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(bookingCodeStr, 'code')}
+                              className="text-blue-700 hover:text-blue-900 p-1 rounded transition-colors"
+                              title="Sao chép mã"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                            </button>
+                            {copyFeedback.code && <span className="text-[10px] text-blue-700 font-bold">Đã chép!</span>}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-500 pt-1">
+                          Hỗ trợ quét qua ứng dụng VNPAY, Viettel Money hoặc hơn 30 ứng dụng Mobile Banking trên toàn quốc.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {walletProvider === 'ZALOPAY' && (
+                    <div className="bg-cyan-50/50 p-5 rounded-2xl flex flex-col sm:flex-row gap-6 items-center border border-cyan-200">
+                      <div className="bg-white p-2.5 rounded-2xl border-2 border-cyan-600 shadow-md flex flex-col items-center shrink-0">
+                        <img 
+                          src={`https://img.vietqr.io/image/MB-090123456789-compact2.png?amount=${finalPayable}&addInfo=${encodeURIComponent(bookingCodeStr)}&accountName=${encodeURIComponent('ZALOPAY GRAND HORIZON')}`}
+                          alt="ZaloPay QR" 
+                          className="w-40 h-40 rounded-xl object-contain shadow-xs"
+                        />
+                        <span className="mt-1.5 text-[10px] font-bold text-cyan-800 uppercase tracking-wide">
+                          Quét Bằng Ví ZaloPay
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5 w-full text-xs">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-100 text-cyan-800 font-bold text-xs self-start">
+                          <span className="material-symbols-outlined text-[16px]">phone_iphone</span>
+                          CỔNG THANH TOÁN TRỰC TUYẾN ZALOPAY
+                        </div>
+                        <div className="flex justify-between items-center pb-1.5 border-b border-cyan-200/60">
+                          <span className="text-slate-500 font-medium">Đối tác tiếp nhận:</span>
+                          <span className="font-bold text-slate-900">ZALOPAY - GRAND HORIZON</span>
+                        </div>
+                        <div className="flex justify-between items-center pb-1.5 border-b border-cyan-200/60">
+                          <span className="text-slate-500 font-medium">Số tiền cọc:</span>
+                          <span className="font-bold text-sm text-cyan-800">{formatVND(finalPayable)}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-0.5">
+                          <span className="text-slate-500 font-medium">Cú pháp thanh toán:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-xs bg-cyan-100 px-2.5 py-1 rounded text-cyan-800 tracking-wider">
+                              {bookingCodeStr}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(bookingCodeStr, 'code')}
+                              className="text-cyan-800 hover:text-cyan-900 p-1 rounded transition-colors"
+                              title="Sao chép cú pháp"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                            </button>
+                            {copyFeedback.code && <span className="text-[10px] text-cyan-800 font-bold">Đã chép!</span>}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-500 pt-1">
+                          Mở Zalo hoặc ứng dụng ZaloPay để thực hiện giao dịch trong vòng 15 phút giữ phòng.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
