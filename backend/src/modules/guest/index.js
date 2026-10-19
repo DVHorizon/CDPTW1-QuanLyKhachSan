@@ -13,11 +13,15 @@ const router = express.Router();
 
 const roomSearchController = require('../../controllers/roomSearchController');
 const roomAvailabilityController = require('../../controllers/roomAvailabilityController');
+const bookingEngineController = require('../../controllers/bookingEngineController');
 
 // ─── TÍNH NĂNG 4: REAL-TIME AVAILABILITY & LOCK (FEAT-GUEST-04) ─────────────
 router.get('/rooms/availability',    roomAvailabilityController.checkRoomAvailability);
 router.post('/rooms/lock',           roomAvailabilityController.lockRoomSession);
 router.delete('/rooms/lock/:sessionId', roomAvailabilityController.releaseRoomLock);
+
+// ─── TÍNH NĂNG 5: ĐẶT PHÒNG TRỰC TUYẾN (FEAT-GUEST-05) ──────────────────────
+router.post('/bookings',             bookingEngineController.createOnlineBooking);
 
 // ─── TÌM KIẾM & XEM PHÒNG ──────────────────────────────────────────────────
 router.get('/rooms/search',          roomSearchController.searchRooms);

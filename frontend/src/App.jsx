@@ -5,6 +5,7 @@ import { SocketProvider } from './context/SocketContext';
 import Home from './pages/client/Home';
 import SearchRooms from './pages/SearchRooms';
 import RoomDetail from './pages/client/RoomDetail';
+import BookingEngine from './pages/client/BookingEngine';
 import Auth from './pages/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomTypeManagement from './pages/RoomTypeManagement';
@@ -38,6 +39,9 @@ function App() {
             <Route path="/tim-kiem" element={<SearchRooms />} />
             <Route path="/rooms/:id" element={<RoomDetail />} />
             <Route path="/room/:id" element={<RoomDetail />} />
+            <Route path="/dat-phong" element={<BookingEngine />} />
+            <Route path="/booking" element={<BookingEngine />} />
+            <Route path="/checkout" element={<BookingEngine />} />
             <Route path="/room-service" element={<RoomService />} />
             <Route path="/fnb/history" element={<GuestOrderHistory />} />
             <Route path="/lich-su-dat-mon" element={<GuestOrderHistory />} />

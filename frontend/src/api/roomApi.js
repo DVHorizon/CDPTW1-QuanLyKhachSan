@@ -197,11 +197,11 @@ export const suggestRoomsApi = async (q) => {
 
 /**
  * Tạo đơn đặt phòng chính thức (Thanh toán)
- * POST /api/v1/rooms/book
+ * POST /api/v1/guest/bookings or POST /api/v1/rooms/book
  */
 export const createBookingApi = async (payload) => {
   try {
-    let res = await fetch(`${API_BASE_URL}/v1/rooms/book`, {
+    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -210,7 +210,17 @@ export const createBookingApi = async (payload) => {
       body: JSON.stringify(payload)
     });
     if (res.status === 404) {
-      res = await fetch(`${API_BASE_URL}/rooms/book`, {
+      res = await fetch(`${API_BASE_URL}/v1/rooms/book`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -230,3 +240,5 @@ export const createBookingApi = async (payload) => {
     };
   }
 };
+
+export const createOnlineBookingEngineApi = createBookingApi;
