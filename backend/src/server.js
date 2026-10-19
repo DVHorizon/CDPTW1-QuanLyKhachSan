@@ -1,8 +1,11 @@
 'use strict';
 
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 require('dotenv').config();
+
+const { initSocket } = require('./sockets/socketHandler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -62,9 +65,11 @@ app.use('/api/v1/pms',        require('./modules/pms'));
 app.use('/api/v1/services',   require('./modules/services'));
 
 // 👤 Trang — F&B
-app.use('/api/v1/fnb',        require('./modules/fnb'));
-app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
-app.use('/api/fnb-orders',    require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/v1/fnb',                require('./modules/fnb'));
+app.use('/api/v1/fnb-orders',         require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/fnb-orders',            require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/v1/table-reservations', require('./routes/admin/tableReservationRoutes'));
+app.use('/api/table-reservations',    require('./routes/admin/tableReservationRoutes'));
 
 // 👤 Tuyền — Back-office Operations
 app.use('/api/v1/operations', require('./modules/operations'));
@@ -72,17 +77,26 @@ app.use('/api/v1/operations', require('./modules/operations'));
 // Guest search (backward compat — cũng hoạt động qua /api/v1/guest/rooms/search)
 app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
 app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
+// FEAT-GUEST-05: Direct booking endpoint
+app.post('/bookings', require('./controllers/bookingEngineController').createOnlineBooking);
+
+// FEAT-GUEST-08: Direct deposit payment & booking retrieval endpoints
+app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController').getBookingDetails);
+app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
+app.post('/payments', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 app.use(require('./shared/middlewares/errorHandler'));
 
-// ─── Start server with WebSocket ───────────────────────────────────────────
-const http = require('http');
-const { initWebSocket } = require('./services/websocketService');
-
+// ─── HTTP Server & WebSocket ───────────────────────────────────────────────
 const server = http.createServer(app);
-initWebSocket(server);
+try {
+  initSocket(server);
+} catch (wsErr) {
+  console.warn('⚠️ WebSocket init warning:', wsErr.message);
+}
 
+// ─── Start server ──────────────────────────────────────────────────────────
 server.listen(PORT, () => {
   console.log(`✅ Backend server with WebSocket running on port ${PORT}`);
   console.log(`   Modules: /api/v1/{guest|pms|services|fnb|operations}`);

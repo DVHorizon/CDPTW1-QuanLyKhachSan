@@ -9,8 +9,10 @@ const router = express.Router();
 // Dùng lại routes F&B hiện có
 const menuRoutes     = require('../../routes/admin/menuRoutes');
 const fnbOrderRoutes = require('../../routes/admin/fnbOrderRoutes');
-router.use('/',       menuRoutes);          // /api/v1/fnb/menu, /api/v1/fnb/categories
-router.use('/orders', fnbOrderRoutes);      // /api/v1/fnb/orders
+const tableReservationRoutes = require('../../routes/admin/tableReservationRoutes');
+router.use('/',             menuRoutes);          // /api/v1/fnb/menu, /api/v1/fnb/categories
+router.use('/orders',       fnbOrderRoutes);      // /api/v1/fnb/orders
+router.use('/reservations', tableReservationRoutes); // /api/v1/fnb/reservations
 // router.use('/tables',       require('./routes/tableRoutes'));
 // router.use('/reservations', require('./routes/reservationRoutes'));
 // router.use('/kitchen',      require('./routes/kitchenRoutes'));

@@ -10,6 +10,7 @@ const defineMembershipTier = require('./MembershipTier');
 const defineUser = require('./User');
 const defineBooking = require('./Booking');
 const defineReview = require('./Review');
+const defineReviewPhoto = require('./ReviewPhoto');
 const defineMenuCategory = require('./MenuCategory');
 const defineMenuItem = require('./MenuItem');
 
@@ -21,6 +22,7 @@ const defineInvoiceDetail = require('./InvoiceDetail');
 const definePayment = require('./Payment');
 const defineServiceCategory = require('./ServiceCategory');
 const defineService = require('./Service');
+const defineBookingGuest = require('./BookingGuest');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -31,7 +33,9 @@ const Role = defineRole(sequelize);
 const MembershipTier = defineMembershipTier(sequelize);
 const User = defineUser(sequelize);
 const Booking = defineBooking(sequelize);
+const BookingGuest = defineBookingGuest(sequelize);
 const Review = defineReview(sequelize);
+const ReviewPhoto = defineReviewPhoto(sequelize);
 const MenuCategory = defineMenuCategory(sequelize);
 const MenuItem = defineMenuItem(sequelize);
 const Stay = defineStay(sequelize);
@@ -69,9 +73,18 @@ Booking.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 RoomType.hasMany(Booking, { foreignKey: 'RoomTypeId', as: 'bookings' });
 Booking.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
 
+// 6b. Booking & BookingGuest
+Booking.hasMany(BookingGuest, { foreignKey: 'BookingId', as: 'guests' });
+BookingGuest.belongsTo(Booking, { foreignKey: 'BookingId', as: 'booking' });
+
 // 7. User & Review
 User.hasMany(Review, { foreignKey: 'UserId', as: 'reviews' });
 Review.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+
+// 7b. Review & ReviewPhoto
+Review.hasMany(ReviewPhoto, { foreignKey: 'ReviewId', as: 'photos' });
+ReviewPhoto.belongsTo(Review, { foreignKey: 'ReviewId', as: 'review' });
+
 
 // 8. MenuCategory & MenuItem
 MenuCategory.hasMany(MenuItem, { foreignKey: 'CategoryId' });
@@ -99,8 +112,8 @@ Invoice.hasMany(InvoiceDetail, { foreignKey: 'InvoiceId', as: 'details' });
 InvoiceDetail.belongsTo(Invoice, { foreignKey: 'InvoiceId' });
 
 // Payments
-FoodOrder.hasMany(Payment, { foreignKey: 'FoodOrderId', as: 'payments' });
-Payment.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
+Booking.hasMany(Payment, { foreignKey: 'BookingId', as: 'payments' });
+Payment.belongsTo(Booking, { foreignKey: 'BookingId', as: 'booking' });
 
 // 13. FoodOrder & FoodOrderDetail
 FoodOrder.hasMany(FoodOrderDetail, { foreignKey: 'FoodOrderId', as: 'details' });
@@ -110,7 +123,23 @@ FoodOrderDetail.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
 MenuItem.hasMany(FoodOrderDetail, { foreignKey: 'MenuItemId' });
 FoodOrderDetail.belongsTo(MenuItem, { foreignKey: 'MenuItemId' });
 
-// 15. ServiceCategory & Service
+// 14b. FoodOrder & Review (FEAT-FNB-10)
+FoodOrder.hasOne(Review, { foreignKey: 'FoodOrderId', as: 'review' });
+Review.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId', as: 'foodOrder' });
+
+// 15. RestaurantTable & TableReservation
+const defineRestaurantTable = require('./RestaurantTable');
+const defineTableReservation = require('./TableReservation');
+const RestaurantTable = defineRestaurantTable(sequelize);
+const TableReservation = defineTableReservation(sequelize);
+
+RestaurantTable.hasMany(TableReservation, { foreignKey: 'TableId', as: 'reservations' });
+TableReservation.belongsTo(RestaurantTable, { foreignKey: 'TableId', as: 'table' });
+
+User.hasMany(TableReservation, { foreignKey: 'UserId', as: 'tableReservations' });
+TableReservation.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+
+// 16. ServiceCategory & Service
 ServiceCategory.hasMany(Service, { foreignKey: 'CategoryId', as: 'services' });
 Service.belongsTo(ServiceCategory, { foreignKey: 'CategoryId', as: 'category' });
 
@@ -124,7 +153,9 @@ module.exports = {
   MembershipTier,
   User,
   Booking,
+  BookingGuest,
   Review,
+  ReviewPhoto,
   MenuCategory,
   MenuItem,
   Stay,
@@ -133,6 +164,8 @@ module.exports = {
   Invoice,
   InvoiceDetail,
   Payment,
+  RestaurantTable,
+  TableReservation,
   ServiceCategory,
   Service
 };

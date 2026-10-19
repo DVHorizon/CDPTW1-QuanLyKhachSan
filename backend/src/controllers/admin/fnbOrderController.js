@@ -1,13 +1,21 @@
-const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room, Booking, Invoice, InvoiceDetail, Payment } = require('../../models');
+const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room, Booking, User, Invoice, InvoiceDetail, Payment, Review, ReviewPhoto } = require('../../models');
 const { broadcastOrderStatus } = require('../../services/websocketService');
 
 
-// Lấy danh sách lượt lưu trú đang Active để chọn phòng đặt món
+// Lấy danh sách lượt lưu trú đang hoạt động (CheckedIn / Active) để chọn phòng đặt món / đặt bàn
 exports.getActiveStays = async (req, res) => {
   try {
     const stays = await Stay.findAll({
-      where: { Status: 'Active' },
-      include: [{ model: Room }],
+      where: { 
+        Status: { [require('sequelize').Op.in]: ['CheckedIn', 'Active'] } 
+      },
+      include: [
+        { model: Room },
+        { 
+          model: Booking, 
+          include: [{ model: User, as: 'user', attributes: ['UserId', 'FullName', 'Email', 'Phone'] }] 
+        }
+      ],
       order: [['StayId', 'ASC']]
     });
     return res.status(200).json({
@@ -17,7 +25,10 @@ exports.getActiveStays = async (req, res) => {
         roomId: s.RoomId,
         roomNumber: s.Room?.RoomNumber || `Phòng ${s.RoomId}`,
         floor: s.Room?.Floor || 1,
-        guestName: 'Khách lưu trú P.' + (s.Room?.RoomNumber || s.RoomId)
+        guestName: s.Booking?.user?.FullName || ('Khách lưu trú P.' + (s.Room?.RoomNumber || s.RoomId)),
+        userId: s.Booking?.user?.UserId || null,
+        phone: s.Booking?.user?.Phone || null,
+        expectedCheckOut: s.ExpectedCheckOut
       }))
     });
   } catch (error) {
@@ -30,8 +41,8 @@ exports.getActiveStays = async (req, res) => {
 exports.createRoomServiceOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    const { stayId, roomId, items, paymentMode } = req.body;
-    const currentUserId = req.user?.id || req.user?.UserId;
+    const { stayId, roomId, items, paymentMode, userId } = req.body;
+    const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId || userId;
 
     // 1. Kiểm tra phòng và lượt lưu trú
     if (!stayId || !roomId) {
@@ -39,8 +50,13 @@ exports.createRoomServiceOrder = async (req, res) => {
       return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Vui lòng chọn phòng hợp lệ.' });
     }
 
+    const { Op } = require('sequelize');
     const stay = await Stay.findOne({
-      where: { StayId: stayId, RoomId: roomId, Status: 'Active' },
+      where: {
+        StayId: stayId,
+        RoomId: roomId,
+        Status: { [Op.in]: ['Active', 'CheckedIn'] }
+      },
       include: [{ model: Room }],
       transaction
     });
@@ -168,7 +184,7 @@ exports.getOrderHistory = async (req, res) => {
     const currentUser = req.user;
     const roleId   = currentUser?.roleId   || currentUser?.RoleId;
     const roleName = (currentUser?.roleName || currentUser?.role || '').toLowerCase();
-    let userId     = currentUser?.id || currentUser?.UserId;
+    let userId     = currentUser?.userId || currentUser?.id || currentUser?.UserId;
 
     // ── Phân loại actor ────────────────────────────────────────────────────────
     let isStaff = false;
@@ -251,6 +267,11 @@ exports.getOrderHistory = async (req, res) => {
           required: roomId ? true : false,
           include: [{ model: Room, attributes: ['RoomId', 'RoomNumber', 'Floor'] }],
           ...(roomId ? { where: { RoomId: roomId } } : {})
+        },
+        {
+          model: Review,
+          as: 'review',
+          required: false
         }
       ]
     });
@@ -281,6 +302,13 @@ exports.getOrderHistory = async (req, res) => {
         paymentMode : order.PaymentMode,
         note        : order.Note,
         roomNumber  : order.Stay?.Room?.RoomNumber || (order.TableId ? `Bàn ${order.TableId}` : null),
+        hasReviewed : !!order.review,
+        review      : order.review ? {
+          reviewId: order.review.ReviewId,
+          rating: Number(order.review.Rating || order.review.OverallRating || 5),
+          comment: order.review.Comment || order.review.ReviewBody,
+          createdAt: order.review.CreatedAt
+        } : null,
         items       : (order.details || []).map(d => ({
           orderDetailId : d.FoodOrderDetailId,
           menuItemId    : d.MenuItemId,
@@ -720,7 +748,8 @@ exports.processPayment = async (req, res) => {
     }
 
     // Kiểm tra quyền sở hữu đơn (nếu có currentUserId và đơn có UserId)
-    if (currentUserId && order.UserId && String(order.UserId) !== String(currentUserId)) {
+    const isStaffOrAdmin = req.user?.roleId === 1 || req.user?.RoleId === 1 || req.user?.roleId === 2 || req.user?.RoleId === 2;
+    if (!isStaffOrAdmin && currentUserId && order.UserId && String(order.UserId) !== String(currentUserId)) {
       await transaction.rollback();
       return res.status(403).json({
         code: 'ERROR_0010_FORBIDDEN',
@@ -765,10 +794,11 @@ exports.processPayment = async (req, res) => {
         });
       }
 
+      const { Op } = require('sequelize');
       const activeStay = await Stay.findOne({
         where: {
           StayId: order.StayId,
-          Status: 'Active'
+          Status: { [Op.in]: ['Active', 'CheckedIn'] }
         },
         transaction
       });
@@ -1031,3 +1061,362 @@ exports.deleteOrder = async (req, res) => {
     res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Lỗi khi xóa.' });
   }
 };
+
+/**
+ * FEAT-FNB-10 (Mã truy vết: A4.10)
+ * Đánh giá món ăn và chất lượng phục vụ F&B sau khi khách dùng bữa
+ * POST /api/v1/fnb-orders/:orderId/reviews
+ */
+exports.createOrderReview = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const { orderId } = req.params;
+    let {
+      rating,
+      comment,
+      cleanlinessScore,
+      staffServiceScore,
+      roomComfortScore,
+      diningScore,
+      valueForMoneyScore,
+      isAnonymous,
+      photos
+    } = req.body;
+
+    const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId;
+
+    // 1. Kiểm tra xác thực (Quy tắc 3.1)
+    if (!currentUserId) {
+      await transaction.rollback();
+      return res.status(401).json({
+        success: false,
+        code: 'ERROR_0009_UNAUTHENTICATED',
+        message: 'Bạn cần đăng nhập để thực hiện chức năng này'
+      });
+    }
+
+    // 2. Kiểm tra tồn tại đơn
+    const order = await FoodOrder.findOne({
+      where: { FoodOrderId: orderId },
+      include: [
+        {
+          model: FoodOrderDetail,
+          as: 'details',
+          include: [{ model: MenuItem }]
+        },
+        {
+          model: Stay,
+          include: [{ model: Room }]
+        }
+      ],
+      transaction
+    });
+
+    if (!order) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Đơn món ăn không tồn tại.'
+      });
+    }
+
+    // 3. Kiểm tra quyền sở hữu đơn (Đơn phải thuộc khách đang đăng nhập - Luồng 4.1 bước 5)
+    const isStaffOrAdmin = req.user?.roleId === 1 || req.user?.RoleId === 1 || req.user?.roleId === 2 || req.user?.RoleId === 2;
+    if (!isStaffOrAdmin && String(order.UserId) !== String(currentUserId)) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Bạn không có quyền thực hiện chức năng này'
+      });
+    }
+
+    // 4. Kiểm tra trạng thái đơn: Chỉ đơn có Status = Served mới được đánh giá (Luồng 4.1 bước 4)
+    if (order.Status !== 'Served') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Chỉ có thể đánh giá đơn đã được phục vụ.'
+      });
+    }
+
+    // 5. Kiểm tra thời hạn cho phép đánh giá (Ví dụ: trong vòng 30 ngày kể từ lúc đặt)
+    if (order.OrderTime) {
+      const orderDate = new Date(order.OrderTime);
+      const diffDays = (Date.now() - orderDate.getTime()) / (1000 * 3600 * 24);
+      if (diffDays > 30) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0005_INVALID_VALUE',
+          message: 'Đã quá thời hạn cho phép đánh giá đơn này.'
+        });
+      }
+    }
+
+    // 6. Kiểm tra xem đơn đã được đánh giá chưa (Luồng 4.1 bước 6)
+    const existingReview = await Review.findOne({
+      where: { FoodOrderId: orderId },
+      transaction
+    });
+
+    if (existingReview) {
+      await transaction.rollback();
+      return res.status(409).json({
+        success: false,
+        code: 'ERROR_0007_DUPLICATE',
+        message: 'Đơn này đã được đánh giá.'
+      });
+    }
+
+    // 7. Kiểm tra số sao (rating) bắt buộc (Luồng 4.1 bước 8 & 9)
+    if (rating === undefined || rating === null || rating === '') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        message: 'Vui lòng chọn số sao đánh giá.'
+      });
+    }
+
+    const numRating = Number(rating);
+    if (isNaN(numRating) || numRating < 1 || numRating > 5 || !Number.isInteger(numRating)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Số sao đánh giá phải từ 1 đến 5.'
+      });
+    }
+
+    // 8. Kiểm tra nhận xét (comment) tối đa 2000 ký tự (Luồng 4.1 bước 10)
+    const commentStr = comment !== undefined && comment !== null ? String(comment).trim() : '';
+    if (commentStr.length > 2000) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0003_MAX_LENGTH',
+        message: 'Nhận xét không được vượt quá 2000 ký tự'
+      });
+    }
+
+    // 9. Lưu bản ghi Reviews liên kết UserId và FoodOrderId
+    const newReview = await Review.create({
+      UserId: currentUserId,
+      StayId: order.StayId || null,
+      FoodOrderId: order.FoodOrderId,
+      Rating: numRating,
+      OverallRating: numRating,
+      CleanlinessScore: cleanlinessScore ? Math.min(10, Math.max(1, Number(cleanlinessScore))) : 5,
+      StaffServiceScore: staffServiceScore ? Math.min(10, Math.max(1, Number(staffServiceScore))) : 5,
+      RoomComfortScore: roomComfortScore ? Math.min(10, Math.max(1, Number(roomComfortScore))) : 5,
+      DiningScore: diningScore ? Math.min(10, Math.max(1, Number(diningScore))) : 5,
+      ValueForMoneyScore: valueForMoneyScore ? Math.min(10, Math.max(1, Number(valueForMoneyScore))) : 5,
+      WouldRecommend: numRating >= 4 ? 'YES' : 'NO',
+      ReviewTitle: `Đánh giá đơn F&B #${order.FoodOrderId}`,
+      ReviewBody: commentStr || `Khách đánh giá ${numRating} sao cho đơn #${order.FoodOrderId}`,
+      Comment: commentStr,
+      IsAnonymous: !!isAnonymous
+    }, { transaction });
+
+    // 10. Lưu ảnh đính kèm (nếu có photos)
+    if (Array.isArray(photos) && photos.length > 0) {
+      for (const photoUrl of photos.slice(0, 5)) {
+        if (photoUrl && typeof photoUrl === 'string') {
+          await ReviewPhoto.create({
+            ReviewId: newReview.ReviewId,
+            PhotoUrl: photoUrl.trim()
+          }, { transaction });
+        }
+      }
+    }
+
+    // 11. Tính toán điểm trung bình toàn hệ thống / món ăn
+    const [avgStats] = await Review.findAll({
+      attributes: [
+        [sequelize.fn('AVG', sequelize.col('Rating')), 'avgRating'],
+        [sequelize.fn('COUNT', sequelize.col('ReviewId')), 'totalReviews']
+      ],
+      where: {
+        FoodOrderId: { [require('sequelize').Op.ne]: null }
+      },
+      raw: true,
+      transaction
+    });
+
+    const averageRating = parseFloat(avgStats?.avgRating || numRating).toFixed(1);
+    const totalReviews = parseInt(avgStats?.totalReviews || 1, 10);
+
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      code: 'SUCCESS_0001_CREATED',
+      message: 'Thêm mới đánh giá thành công',
+      data: {
+        reviewId: newReview.ReviewId,
+        foodOrderId: order.FoodOrderId,
+        rating: numRating,
+        comment: commentStr,
+        averageRating: parseFloat(averageRating),
+        totalReviews
+      }
+    });
+
+  } catch (error) {
+    if (transaction) await transaction.rollback();
+    console.error('Error in createOrderReview (FEAT-FNB-10):', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: error.message || 'Lỗi xử lý đánh giá.'
+    });
+  }
+};
+
+/**
+ * Lấy chi tiết đánh giá của đơn hoặc lấy danh sách đánh giá F&B công khai
+ * GET /api/v1/fnb-orders/:orderId/reviews
+ */
+exports.getOrderReview = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const review = await Review.findOne({
+      where: { FoodOrderId: orderId },
+      include: [
+        { model: User, as: 'user', attributes: ['UserId', 'FullName', 'Email'] },
+        { model: ReviewPhoto, as: 'photos', required: false }
+      ]
+    });
+
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Đơn này chưa có đánh giá.'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        reviewId: review.ReviewId,
+        foodOrderId: review.FoodOrderId,
+        rating: review.Rating,
+        comment: review.Comment || review.ReviewBody,
+        isAnonymous: review.IsAnonymous,
+        createdAt: review.CreatedAt,
+        user: review.IsAnonymous ? { FullName: 'Khách lưu trú ẩn danh' } : review.user,
+        photos: (review.photos || []).map(p => p.PhotoUrl)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching order review:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: 'Không thể lấy thông tin đánh giá.'
+    });
+  }
+};
+
+// Cập nhật trạng thái hoặc thông tin đơn hàng F&B (FEAT-FNB-06/07)
+exports.updateOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status, note, paymentMode } = req.body;
+
+    const order = await FoodOrder.findByPk(orderId, {
+      include: [
+        {
+          model: FoodOrderDetail,
+          as: 'details',
+          include: [{ model: MenuItem }]
+        },
+        {
+          model: Stay,
+          include: [{ model: Room }]
+        }
+      ]
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Đơn hàng không tồn tại.'
+      });
+    }
+
+    if (status) {
+      order.Status = status;
+    }
+    if (note !== undefined) {
+      order.Note = note;
+    }
+    if (paymentMode) {
+      order.PaymentMode = paymentMode;
+    }
+
+    await order.save();
+
+    // Phát WebSocket real-time cho các màn hình theo dõi
+    broadcastOrderStatus(order);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật trạng thái đơn thành công.',
+      data: {
+        foodOrderId: order.FoodOrderId,
+        status: order.Status,
+        orderTime: order.OrderTime,
+        totalAmount: order.TotalAmount,
+        roomNumber: order.Stay?.Room?.RoomNumber || 'N/A'
+      }
+    });
+  } catch (error) {
+    console.error('Error updating order:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: 'Không thể cập nhật đơn hàng.'
+    });
+  }
+};
+
+// Xóa hoặc hủy đơn hàng F&B
+exports.deleteOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await FoodOrder.findByPk(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Đơn hàng không tồn tại.'
+      });
+    }
+
+    order.Status = 'Cancelled';
+    await order.save();
+
+    broadcastOrderStatus(order);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Hủy đơn hàng thành công.'
+    });
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: 'Không thể hủy đơn hàng.'
+    });
+  }
+};
+
