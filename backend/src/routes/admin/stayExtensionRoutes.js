@@ -52,7 +52,7 @@ router.get('/in-house', async (req, res) => {
         r.Floor,
         r.Status                         AS RoomStatus,
         rt.RoomTypeId,
-        COALESCE(rt.TypeName, 'Deluxe Room') AS RoomTypeName,
+        COALESCE(rt.TypeName, 'Phòng Cao Cấp') AS RoomTypeName,
         COALESCE(rt.BasePrice, 1500000)      AS BasePrice,
         b.ConfirmationCode,
         CAST(b.CheckInDate AS CHAR)      AS CheckInDate,
@@ -60,11 +60,11 @@ router.get('/in-house', async (req, res) => {
         b.NumberOfNights,
         b.TotalAmount,
         b.DepositAmount,
-        COALESCE(bg.FullName, u.FullName, 'Alexander Morgan') AS GuestName,
+        COALESCE(bg.FullName, u.FullName, 'Khách Lưu Trú') AS GuestName,
         COALESCE(bg.Phone, u.Phone, '+84 901 234 567')        AS GuestPhone,
-        COALESCE(bg.Email, u.Email, 'guest@example.com')      AS GuestEmail,
+        COALESCE(bg.Email, u.Email, 'khach@grandhorizon.vn')  AS GuestEmail,
         COALESCE(bg.IdNumber, u.IdNumber, '079203001234')     AS IdNumber,
-        COALESCE(mt.TierName, 'Silver Resident')             AS VipTier
+        COALESCE(mt.TierName, 'Hội Viên Bạc')                 AS VipTier
       FROM Stays s
       JOIN Bookings b ON s.BookingId = b.BookingId
       JOIN Rooms r ON s.RoomId = r.RoomId
@@ -123,7 +123,7 @@ router.get('/:stayId', async (req, res) => {
         r.Floor,
         r.Status                         AS RoomStatus,
         rt.RoomTypeId,
-        COALESCE(rt.TypeName, 'Deluxe Room') AS RoomTypeName,
+        COALESCE(rt.TypeName, 'Phòng Cao Cấp') AS RoomTypeName,
         COALESCE(rt.BasePrice, 1500000)      AS BasePrice,
         b.ConfirmationCode,
         CAST(b.CheckInDate AS CHAR)      AS CheckInDate,
@@ -132,11 +132,11 @@ router.get('/:stayId', async (req, res) => {
         b.TotalAmount,
         b.DepositAmount,
         b.Note,
-        COALESCE(bg.FullName, u.FullName, 'Alexander Morgan') AS GuestName,
+        COALESCE(bg.FullName, u.FullName, 'Khách Lưu Trú') AS GuestName,
         COALESCE(bg.Phone, u.Phone, '+84 901 234 567')        AS GuestPhone,
-        COALESCE(bg.Email, u.Email, 'guest@example.com')      AS GuestEmail,
+        COALESCE(bg.Email, u.Email, 'khach@grandhorizon.vn')  AS GuestEmail,
         COALESCE(bg.IdNumber, u.IdNumber, '079203001234')     AS IdNumber,
-        COALESCE(mt.TierName, 'Silver Resident')             AS VipTier
+        COALESCE(mt.TierName, 'Hội Viên Bạc')                 AS VipTier
       FROM Stays s
       JOIN Bookings b ON s.BookingId = b.BookingId
       JOIN Rooms r ON s.RoomId = r.RoomId
@@ -337,9 +337,9 @@ router.post('/:stayId/extensions/preview', async (req, res) => {
       taxRate: 12,
       taxAmount,
       netFolioAdjustment,
-      targetRateTier: 'RACK-STANDARD-FLR' + String(stay.Floor).padStart(2, '0'),
-      guaranteeMethod: 'Visa Ending 9021 (Pre-auth chargeable)',
-      billingRouting: 'Primary Guest Folio #01',
+      targetRateTier: 'BIỂU PHÍ TIÊU CHUẨN TẦNG ' + String(stay.Floor).padStart(2, '0'),
+      guaranteeMethod: 'Thẻ Visa Đuôi 9021 (Đã xác thực bảo lãnh)',
+      billingRouting: 'Hóa đơn khách hàng chính #01',
       expiresAt: quoteExpiresAt,
       expiresAtIso: new Date(quoteExpiresAt).toISOString(),
     };
@@ -633,11 +633,11 @@ router.get('/:stayId/replacement-rooms', async (req, res) => {
     const [rooms] = await pool.query(sql, params);
 
     const formattedRooms = rooms.map((rm) => {
-      let classification = 'DIRECT LATERAL SWAP';
+      let classification = 'Đổi ngang cùng hạng';
       const diff = Number(rm.TariffDiff) || 0;
-      if (diff > 0) classification = 'UPGRADE RECOVERY';
-      else if (diff < 0) classification = 'DOWNGRADE COURTESY';
-      else if (rm.Floor === current.Floor) classification = 'SAME-FLOOR RELOC';
+      if (diff > 0) classification = 'Nâng hạng phòng';
+      else if (diff < 0) classification = 'Hạ hạng phòng';
+      else if (rm.Floor === current.Floor) classification = 'Đổi cùng tầng';
 
       return {
         ...rm,

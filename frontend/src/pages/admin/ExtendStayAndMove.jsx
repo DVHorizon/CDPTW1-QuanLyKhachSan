@@ -17,7 +17,7 @@ const fmtMoney = (n) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n));
 };
 
-// Tiện ích format ngày hiển thị (VD: 24/10/2026 hoặc 24 Thg 10, 2026)
+// Tiện ích format ngày hiển thị (VD: 24/10/2026)
 const fmtDateDisplay = (d) => {
   if (!d) return '---';
   const dt = new Date(d);
@@ -35,7 +35,7 @@ export default function ExtendStayAndMove() {
 
   // ─── Trạng thái hệ thống ──────────────────────────────────────────────────
   const [systemTime, setSystemTime] = useState(new Date());
-  const [activeMode, setActiveMode] = useState('EXTEND'); // 'EXTEND' (Mode 01) | 'RELOCATE' (Mode 02)
+  const [activeMode, setActiveMode] = useState('EXTEND'); // 'EXTEND' (Chế độ 01) | 'RELOCATE' (Chế độ 02)
 
   // ─── Danh sách khách đang lưu trú (In-house) ───────────────────────────────
   const [inHouseGuests, setInHouseGuests] = useState([]);
@@ -47,17 +47,17 @@ export default function ExtendStayAndMove() {
   const [stayDossier, setStayDossier] = useState(null);
   const [loadingDossier, setLoadingDossier] = useState(false);
 
-  // ─── MODE 01: Gia hạn lưu trú (Stay Extension) ───────────────────────────
+  // ─── CHẾ ĐỘ 01: Gia hạn lưu trú (Stay Extension) ──────────────────────────
   const [additionalNights, setAdditionalNights] = useState(1);
   const [customCheckoutDate, setCustomCheckoutDate] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState(null);
   const [conflictError, setConflictError] = useState(null);
 
-  // ─── MODE 02: Đổi phòng (Room Relocation) ─────────────────────────────────
-  const [relocateReason, setRelocateReason] = useState('HVAC / Climate Control Noise Complaint');
+  // ─── CHẾ ĐỘ 02: Đổi phòng (Room Relocation) ────────────────────────────────
+  const [relocateReason, setRelocateReason] = useState('Sự cố máy lạnh / Tiếng ồn điều hòa');
   const [workOrderMemo, setWorkOrderMemo] = useState(
-    'Khách phản ánh máy lạnh kêu ồn vào buổi sáng. Kỹ thuật đã kiểm tra và yêu cầu đổi phòng để bảo trì motor.'
+    'Khách phản ánh hệ thống máy lạnh phát ra tiếng ồn vào buổi sáng. Bộ phận Kỹ thuật đã xác nhận cần đổi phòng để thay motor.'
   );
   const [bellhopDispatched, setBellhopDispatched] = useState(true);
   const [guestSelfTransfer, setGuestSelfTransfer] = useState(false);
@@ -74,7 +74,7 @@ export default function ExtendStayAndMove() {
   // ─── Thao tác thực thi (Execution & Key Encoder) ──────────────────────────
   const [submitting, setSubmitting] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
-  const [keyEncodingStep, setKeyEncodingStep] = useState(0); // 0: Idle, 1: Connecting, 2: Writing, 3: Done
+  const [keyEncodingStep, setKeyEncodingStep] = useState(0); // 0: Chờ, 1: Đang kết nối, 2: Đang ghi chip, 3: Hoàn tất
   const [toastMessage, setToastMessage] = useState(null);
 
   // Cập nhật đồng hồ thời gian thực
@@ -131,7 +131,7 @@ export default function ExtendStayAndMove() {
     }
   }, [selectedStayId, loadDossier]);
 
-  // Chạy kiểm tra xung đột lịch & tính phụ thu (Mode 01)
+  // Chạy kiểm tra xung đột lịch & tính phụ thu (Chế độ 01)
   const runExtensionPreview = useCallback(async (nights, targetDate) => {
     if (!selectedStayId || !stayDossier) return;
     setPreviewLoading(true);
@@ -164,7 +164,7 @@ export default function ExtendStayAndMove() {
     }
   }, [activeMode, additionalNights, customCheckoutDate, stayDossier, runExtensionPreview]);
 
-  // Tải danh sách phòng thay thế khi ở Mode 02
+  // Tải danh sách phòng thay thế khi ở Chế độ 02
   const loadReplacementRooms = useCallback(async () => {
     if (!selectedStayId) return;
     setLoadingRooms(true);
@@ -294,7 +294,7 @@ export default function ExtendStayAndMove() {
     >
       <div className="space-y-6 pb-12 text-[#203044]">
 
-        {/* ─── TOAST NOTIFICATION ────────────────────────────────────────────── */}
+        {/* ─── THÔNG BÁO HỆ THỐNG (TOAST NOTIFICATION) ───────────────────────── */}
         {toastMessage && (
           <div
             className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${
@@ -316,7 +316,7 @@ export default function ExtendStayAndMove() {
           </div>
         )}
 
-        {/* ─── GRAND HORIZON HERO HEADER ───────────────────────────────────── */}
+        {/* ─── BANNER TIÊU ĐỀ GRAND HORIZON (HERO BANNER) ───────────────────── */}
         <div className="bg-gradient-to-r from-[#131b2e] via-[#203044] to-[#131b2e] rounded-3xl p-6 text-white shadow-xl border border-white/10 relative overflow-hidden">
           <div className="absolute -right-16 -top-16 w-64 h-64 bg-admin-primary/10 rounded-full blur-3xl pointer-events-none"></div>
           <div className="absolute right-32 -bottom-20 w-80 h-80 bg-[#b9a277]/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -325,10 +325,10 @@ export default function ExtendStayAndMove() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-admin-primary/20 text-emerald-300 border border-admin-primary/40">
-                  GRAND HORIZON PMS • FRONT DESK TERMINAL
+                  HỆ THỐNG PMS GRAND HORIZON • QUẦY LỄ TÂN
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-[#b9a277]/20 text-[#ffd985] border border-[#b9a277]/30">
-                  REF #GH-2026
+                  MÃ HỆ THỐNG #GH-2026
                 </span>
               </div>
               <h1 className="text-2xl md:text-3xl font-serif font-bold text-white tracking-tight">
@@ -339,29 +339,29 @@ export default function ExtendStayAndMove() {
               </p>
             </div>
 
-            {/* Badges thông tin hệ thống */}
+            {/* Thẻ trạng thái hệ thống */}
             <div className="flex flex-wrap items-center gap-3 text-xs">
               <div className="bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/15 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                <span className="text-slate-300">HỆ THỐNG:</span>
+                <span className="text-slate-300">GIỜ HỆ THỐNG:</span>
                 <strong className="font-mono text-emerald-300 font-bold">{systemTimeStr}</strong>
               </div>
 
               <div className="bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/15 flex items-center gap-2">
                 <span className="material-symbols-outlined text-base text-[#ffd985]">hotel</span>
                 <span className="text-slate-300">CÔNG SUẤT:</span>
-                <strong className="text-white font-bold">86.4% (124/144)</strong>
+                <strong className="text-white font-bold">86.4% (124/144 Phòng)</strong>
               </div>
 
               <div className="bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/15 flex items-center gap-2">
                 <span className="material-symbols-outlined text-base text-admin-primary">badge</span>
-                <span className="text-slate-300">LỄ TÂN:</span>
-                <strong className="text-white font-bold">{user?.fullName || 'Sarah Jenkins (#4092)'}</strong>
+                <span className="text-slate-300">LỄ TÂN CA TRỰC:</span>
+                <strong className="text-white font-bold">{user?.fullName || 'Nguyễn Văn Thực (#4092)'}</strong>
               </div>
             </div>
           </div>
 
-          {/* Dải điều hướng chế độ Mode Tabs */}
+          {/* Dải chuyển đổi Chế độ (Mode Tabs) */}
           <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-4">
             <div className="flex bg-black/30 p-1.5 rounded-2xl border border-white/10 backdrop-blur-sm">
               <button
@@ -374,7 +374,7 @@ export default function ExtendStayAndMove() {
                 }`}
               >
                 <span className="material-symbols-outlined text-base">more_time</span>
-                <span>MODE 01: GIA HẠN LƯU TRÚ (EXTEND STAY)</span>
+                <span>CHẾ ĐỘ 01: GIA HẠN LƯU TRÚ</span>
               </button>
 
               <button
@@ -387,18 +387,18 @@ export default function ExtendStayAndMove() {
                 }`}
               >
                 <span className="material-symbols-outlined text-base">swap_horiz</span>
-                <span>MODE 02: ĐIỀU CHUYỂN PHÒNG (ROOM RELOCATION)</span>
+                <span>CHẾ ĐỘ 02: ĐIỀU CHUYỂN PHÒNG</span>
               </button>
             </div>
 
             <div className="text-xs text-slate-300 font-sans flex items-center gap-2">
-              <span className="text-emerald-400 font-bold">● PMS Real-Time Sync</span>
+              <span className="text-emerald-400 font-bold">● Đồng bộ CSDL trực tiếp</span>
               <span>• Khóa giao dịch nguyên tử chống trùng lịch</span>
             </div>
           </div>
         </div>
 
-        {/* ─── THANH CHỌN NHANH KHÁCH ĐANG Ở (IN-HOUSE GUEST CAROUSEL) ─────── */}
+        {/* ─── BĂNG CHỌN NHANH KHÁCH ĐANG Ở TRONG KHÁCH SẠN ───────────────── */}
         <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -422,7 +422,7 @@ export default function ExtendStayAndMove() {
               </span>
               <input
                 type="text"
-                placeholder="Tìm số phòng, tên khách, mã REF..."
+                placeholder="Tìm số phòng, tên khách, mã đặt phòng..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs font-semibold text-[#203044] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:bg-white transition-all"
@@ -464,7 +464,7 @@ export default function ExtendStayAndMove() {
 
                     <div className="flex items-center justify-between text-[11px] pt-2 border-t border-slate-200/70">
                       <span className="text-slate-600 font-medium">
-                        Trả: <strong className="text-[#203044]">{fmtDateDisplay(g.ExpectedCheckOut || g.CheckOutDate)}</strong>
+                        Trả phòng: <strong className="text-[#203044]">{fmtDateDisplay(g.ExpectedCheckOut || g.CheckOutDate)}</strong>
                       </span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#b9a277]/20 text-[#a68e64]">
                         {g.VipTier}
@@ -477,15 +477,15 @@ export default function ExtendStayAndMove() {
           )}
         </div>
 
-        {/* ─── GRID NỘI DUNG CHÍNH (HAI CỘT CHUẨN THIẾT KẾ GRAND HORIZON) ───── */}
+        {/* ─── GRID NỘI DUNG CHÍNH (HAI CỘT) ─────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
           {/* ══════════════════════════════════════════════════════════════════════
-              CỘT TRÁI (5 COLS): HỒ SƠ LƯU TRÚ HIỆN TẠI (CURRENT OCCUPANCY DOSSIER)
+              CỘT TRÁI (5 CỘT): HỒ SƠ LƯU TRÚ HIỆN TẠI (CURRENT OCCUPANCY DOSSIER)
               ══════════════════════════════════════════════════════════════════════ */}
           <div className="lg:col-span-5 space-y-6">
 
-            {/* Box 1: Current Occupancy Dossier */}
+            {/* Khung 1: Hồ sơ lưu trú */}
             <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
               <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                 <div className="flex items-center gap-3">
@@ -494,7 +494,7 @@ export default function ExtendStayAndMove() {
                   </div>
                   <div>
                     <h3 className="font-bold text-base text-[#203044]">Hồ Sơ Lưu Trú Hiện Tại</h3>
-                    <p className="text-xs text-slate-500">Current Occupancy Dossier</p>
+                    <p className="text-xs text-slate-500">Thông tin phòng và khách hàng đang ở</p>
                   </div>
                 </div>
 
@@ -511,12 +511,12 @@ export default function ExtendStayAndMove() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Schematic / Room Visual Card */}
+                  {/* Khung trực quan phòng vật lý */}
                   <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-500 font-bold uppercase tracking-wider text-[11px]">Sơ Đồ Phòng Vật Lý</span>
                       <span className="font-mono text-xs font-extrabold text-admin-primary">
-                        FL_{String(stayDossier?.Floor || '04').padStart(2, '0')}_WING [P.{stayDossier?.RoomNumber || '---'}]
+                        TẦNG_{String(stayDossier?.Floor || '04').padStart(2, '0')}_TÒA BIỂN [P.{stayDossier?.RoomNumber || '---'}]
                       </span>
                     </div>
                     <div className="flex items-baseline gap-2">
@@ -528,7 +528,7 @@ export default function ExtendStayAndMove() {
                       </span>
                     </div>
                     <p className="text-xs text-[#b9a277] font-bold">
-                      {stayDossier?.RoomTypeName || 'Deluxe Room'}
+                      {stayDossier?.RoomTypeName || 'Hạng Phòng Cao Cấp'}
                     </p>
                   </div>
 
@@ -540,7 +540,7 @@ export default function ExtendStayAndMove() {
                     </div>
 
                     <div className="flex justify-between items-center pt-2">
-                      <span className="text-slate-500 font-medium">Thời Gian Lưu Trú:</span>
+                      <span className="text-slate-500 font-medium">Khoảng Thời Gian Lưu Trú:</span>
                       <strong className="text-[#203044] font-semibold">
                         {fmtDateDisplay(stayDossier?.ActualCheckIn || stayDossier?.CheckInDate)} ➔{' '}
                         <span className="text-admin-primary font-bold">{fmtDateDisplay(stayDossier?.currentCheckout || stayDossier?.CheckOutDate)}</span>
@@ -555,25 +555,25 @@ export default function ExtendStayAndMove() {
                     </div>
 
                     <div className="flex justify-between items-center pt-2">
-                      <span className="text-slate-500 font-medium">Số Dư Hóa Đơn (Folio Balance):</span>
+                      <span className="text-slate-500 font-medium">Số Dư Hóa Đơn Chưa Thanh Toán:</span>
                       <strong className="text-rose-600 font-bold text-sm">
                         {fmtMoney(stayDossier?.outstandingBalance || 0)}
                       </strong>
                     </div>
 
                     <div className="flex justify-between items-center pt-2">
-                      <span className="text-slate-500 font-medium">Hạng Hội Viên (Loyalty Tier):</span>
+                      <span className="text-slate-500 font-medium">Hạng Hội Viên Tích Lũy:</span>
                       <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#b9a277]/20 text-[#a68e64]">
-                        {stayDossier?.VipTier || 'Silver Resident'}
+                        {stayDossier?.VipTier || 'Hội Viên Bạc'}
                       </span>
                     </div>
                   </div>
 
-                  {/* Active Charge Stream Indicator */}
+                  {/* Dòng hạch toán tài khoản Folio */}
                   <div className="pt-2">
                     <div className="flex justify-between text-[11px] text-slate-500 font-medium mb-1.5">
-                      <span>Dòng hạch toán tài khoản Folio</span>
-                      <span className="text-emerald-600 font-bold">100% Hoạt động</span>
+                      <span>Dòng hạch toán chi phí tài khoản Folio</span>
+                      <span className="text-emerald-600 font-bold">100% Hoạt Động</span>
                     </div>
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                       <div className="h-full bg-admin-primary w-4/5 rounded-full animate-pulse"></div>
@@ -583,7 +583,7 @@ export default function ExtendStayAndMove() {
               )}
             </div>
 
-            {/* Box 2: Dispatch Form (Hiện khi ở Mode 02) */}
+            {/* Khung 2: Biên bản điều chuyển phòng (Chế độ 02) */}
             {activeMode === 'RELOCATE' && (
               <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
                 <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
@@ -591,8 +591,8 @@ export default function ExtendStayAndMove() {
                     <span className="material-symbols-outlined text-lg">sync_problem</span>
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-[#203044]">Lý Do &amp; Biên Bản Điều Chuyển Phòng</h3>
-                    <p className="text-[11px] text-slate-500">Relocation Dispatch Form (Section 02-B)</p>
+                    <h3 className="font-bold text-sm text-[#203044]">Biên Bản Ca Trực &amp; Lý Do Đổi Phòng</h3>
+                    <p className="text-[11px] text-slate-500">Phiếu lệnh điều phối buồng phòng (Mục 02-B)</p>
                   </div>
                 </div>
 
@@ -604,31 +604,31 @@ export default function ExtendStayAndMove() {
                       onChange={(e) => setRelocateReason(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold text-[#203044] focus:outline-none focus:ring-2 focus:ring-admin-primary"
                     >
-                      <option value="HVAC / Climate Control Noise Complaint">Sự cố máy lạnh / Tiếng ồn điều hòa (HVAC Defect)</option>
-                      <option value="Plumbing / Water Pressure Defect">Sự cố áp lực nước / Ống nước (Plumbing Issue)</option>
-                      <option value="Stay Extension Schedule Conflict">Trùng lịch đặt phòng kế tiếp (Extension Conflict Swap)</option>
-                      <option value="VIP Guest Upgrade Courtesy">Nâng cấp phòng thiện chí cho khách VIP (Upgrade Courtesy)</option>
-                      <option value="Housekeeping Deep Clean Required">Yêu cầu dọn sâu buồng phòng (Deep Clean Required)</option>
+                      <option value="Sự cố máy lạnh / Tiếng ồn điều hòa">Sự cố máy lạnh / Tiếng ồn hệ thống điều hòa</option>
+                      <option value="Sự cố áp lực nước / Ống nước">Sự cố áp lực nước / Đường ống dẫn nước</option>
+                      <option value="Trùng lịch đặt phòng kế tiếp">Trùng lịch đặt phòng kế tiếp khi gia hạn</option>
+                      <option value="Nâng cấp phòng thiện chí cho khách VIP">Nâng cấp phòng thiện chí cho khách VIP</option>
+                      <option value="Yêu cầu dọn dẹp buồng phòng chuyên sâu">Yêu cầu dọn dẹp buồng phòng chuyên sâu</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="font-bold text-[#203044] block mb-1.5">Biên Bản Ca Trực &amp; Ghi Chú Kỹ Thuật:</label>
+                    <label className="font-bold text-[#203044] block mb-1.5">Ghi Chú Ca Trực &amp; Bộ Phận Kỹ Thuật:</label>
                     <textarea
                       rows={3}
                       value={workOrderMemo}
                       onChange={(e) => setWorkOrderMemo(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-[#203044] focus:outline-none focus:ring-2 focus:ring-admin-primary placeholder:text-slate-400"
-                      placeholder="Ghi rõ tình trạng phòng và xác nhận từ đội kỹ thuật..."
+                      placeholder="Ghi rõ chi tiết sự cố và thỏa thuận với khách..."
                     />
                     <div className="text-[10px] text-slate-400 font-medium mt-1">
-                      * Tự động lưu vào Ticket Sự cố #TCK-88102
+                      * Tự động lưu trữ vào Phiếu Sự Cố #TCK-88102
                     </div>
                   </div>
 
                   {/* Hành lý & Vận chuyển */}
                   <div className="pt-2 border-t border-slate-100 space-y-2">
-                    <span className="font-bold text-[#203044] text-xs block">Chỉ thị Vận chuyển Hành lý (Porter/Bellhop):</span>
+                    <span className="font-bold text-[#203044] text-xs block">Chỉ Thị Vận Chuyển Hành Lý:</span>
                     <label className="flex items-center gap-2.5 cursor-pointer">
                       <input
                         type="checkbox"
@@ -639,7 +639,7 @@ export default function ExtendStayAndMove() {
                         }}
                         className="rounded border-slate-300 text-admin-primary focus:ring-admin-primary"
                       />
-                      <span className="font-semibold text-slate-700">Điều động nhân viên Bellhop hỗ trợ chuyển hành lý</span>
+                      <span className="font-semibold text-slate-700">Điều động nhân viên hành lý hỗ trợ chuyển đồ</span>
                     </label>
 
                     <label className="flex items-center gap-2.5 cursor-pointer">
@@ -652,13 +652,13 @@ export default function ExtendStayAndMove() {
                         }}
                         className="rounded border-slate-300 text-admin-primary focus:ring-admin-primary"
                       />
-                      <span className="text-slate-600">Khách tự chuyển phòng (chỉ bàn giao thẻ khóa mới)</span>
+                      <span className="text-slate-600">Khách tự chuyển phòng (chỉ bàn giao thẻ khóa mới tại quầy)</span>
                     </label>
                   </div>
 
-                  {/* Ràng buộc thẻ & Kho phòng */}
+                  {/* Ràng buộc thẻ khóa & Kho phòng */}
                   <div className="pt-2 border-t border-slate-100 space-y-2">
-                    <span className="font-bold text-[#203044] text-xs block">Ràng buộc Thẻ Khóa &amp; Kho Phòng:</span>
+                    <span className="font-bold text-[#203044] text-xs block">Ràng Buộc Thẻ Khóa &amp; Trạng Thái Phòng:</span>
                     <label className="flex items-center gap-2.5 cursor-pointer">
                       <input
                         type="checkbox"
@@ -666,7 +666,7 @@ export default function ExtendStayAndMove() {
                         onChange={(e) => setVoidCurrentKeys(e.target.checked)}
                         className="rounded border-slate-300 text-admin-primary focus:ring-admin-primary"
                       />
-                      <span className="font-semibold text-slate-700">Vô hiệu hóa thẻ phòng cũ ngay sau khi phát thẻ mới</span>
+                      <span className="font-semibold text-slate-700">Vô hiệu hóa thẻ phòng cũ ngay sau khi phát thẻ phòng mới</span>
                     </label>
 
                     <label className="flex items-center gap-2.5 cursor-pointer">
@@ -676,7 +676,17 @@ export default function ExtendStayAndMove() {
                         onChange={(e) => setFlagRoomDirtyMaintenance(e.target.checked)}
                         className="rounded border-slate-300 text-admin-primary focus:ring-admin-primary"
                       />
-                      <span className="font-semibold text-slate-700">Đánh dấu phòng cũ là Cần Dọn Dẹp / Bảo Trì (Dirty/OOO)</span>
+                      <span className="font-semibold text-slate-700">Đánh dấu phòng cũ là Cần Dọn Dẹp / Bảo Trì</span>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={suppressMinibar}
+                        onChange={(e) => setSuppressMinibar(e.target.checked)}
+                        className="rounded border-slate-300 text-admin-primary focus:ring-admin-primary"
+                      />
+                      <span className="text-slate-600">Tạm hoãn kiểm kê quầy bar mini cho đến khi bàn giao chìa khóa cũ</span>
                     </label>
                   </div>
                 </div>
@@ -686,12 +696,12 @@ export default function ExtendStayAndMove() {
           </div>
 
           {/* ══════════════════════════════════════════════════════════════════════
-              CỘT PHẢI (7 COLS): TÙY THEO CHẾ ĐỘ MODE ĐANG CHỌN
+              CỘT PHẢI (7 CỘT): THEO CHẾ ĐỘ ĐANG CHỌN
               ══════════════════════════════════════════════════════════════════════ */}
           <div className="lg:col-span-7 space-y-6">
 
             {/* ─────────────────────────────────────────────────────────────────
-                MODE 01: GIA HẠN LƯU TRÚ & KIỂM TRA XUNG ĐỘT
+                CHẾ ĐỘ 01: GIA HẠN LƯU TRÚ & KIỂM TRA XUNG ĐỘT
                 ───────────────────────────────────────────────────────────────── */}
             {activeMode === 'EXTEND' && (
               <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-6">
@@ -701,8 +711,8 @@ export default function ExtendStayAndMove() {
                       <span className="material-symbols-outlined text-xl">event_upcoming</span>
                     </div>
                     <div>
-                      <h3 className="font-bold text-base text-[#203044]">Tham Số Gia Hạn Lưu Trú</h3>
-                      <p className="text-xs text-slate-500">Stay Duration Extension &amp; Tariff Engine</p>
+                      <h3 className="font-bold text-base text-[#203044]">Thông Số Gia Hạn Lưu Trú</h3>
+                      <p className="text-xs text-slate-500">Kiểm tra xung đột phòng và tính biểu phí tự động</p>
                     </div>
                   </div>
 
@@ -727,11 +737,11 @@ export default function ExtendStayAndMove() {
                         {fmtDateDisplay(customCheckoutDate)}
                       </span>
                       <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-[#203044] text-white">
-                        +{additionalNights} {additionalNights > 1 ? 'Đêm' : 'Đêm'}
+                        +{additionalNights} Đêm
                       </span>
                     </div>
 
-                    {/* Nút bấm nhanh */}
+                    {/* Bộ nút bấm thêm ngày nhanh */}
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
@@ -761,7 +771,7 @@ export default function ExtendStayAndMove() {
                             : 'border border-slate-200 bg-white hover:bg-slate-100'
                         }`}
                       >
-                        +2 Ngày
+                        +2 Ngày {additionalNights === 2 ? '{Đã Chọn}' : ''}
                       </button>
                       <button
                         type="button"
@@ -777,10 +787,10 @@ export default function ExtendStayAndMove() {
                     </div>
                   </div>
 
-                  {/* Date picker tùy chỉnh */}
+                  {/* Bộ chọn ngày trên lịch */}
                   <div className="pt-3 border-t border-slate-200/70 flex items-center gap-3">
                     <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
-                      Hoặc chọn ngày cụ thể:
+                      Hoặc chọn ngày cụ thể trên lịch:
                     </span>
                     <input
                       type="date"
@@ -792,7 +802,7 @@ export default function ExtendStayAndMove() {
                   </div>
                 </div>
 
-                {/* ─── REAL-TIME AVAILABILITY / CONFLICT CHECK CARD ─────────── */}
+                {/* ─── KẾT QUẢ KIỂM TRA XUNG ĐỘT LỊCH THỜI GIAN THỰC ─────────── */}
                 <div>
                   {previewLoading ? (
                     <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500 font-semibold flex items-center justify-center gap-2">
@@ -803,17 +813,17 @@ export default function ExtendStayAndMove() {
                     <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200 space-y-3">
                       <div className="flex items-center gap-2.5 text-rose-800 font-bold text-sm">
                         <span className="material-symbols-outlined text-rose-600 text-xl">warning</span>
-                        <span>PHÁT HIỆN XUNG ĐỘT LỊCH PHÒNG // KHÔNG THỂ GIA HẠN PHÒNG HIỆN TẠI</span>
+                        <span>PHÁT HIỆN XUNG ĐỘT LỊCH PHÒNG // KHÔNG THỂ GIA HẠN TRÊN PHÒNG HIỆN TẠI</span>
                       </div>
 
                       <p className="text-xs text-rose-700 leading-relaxed font-medium">
                         {conflictError.message}
                       </p>
 
-                      {/* Thông tin booking xung đột */}
+                      {/* Danh sách các booking kế tiếp xung đột */}
                       {conflictError.data?.conflicts?.length > 0 && (
                         <div className="bg-white/80 rounded-xl p-3 border border-rose-200 space-y-1.5 text-xs text-rose-950 font-sans">
-                          <span className="font-bold text-rose-900 block">Lượt khách kế tiếp đã đặt trước:</span>
+                          <span className="font-bold text-rose-900 block">Lượt khách kế tiếp đã đặt trước trên phòng này:</span>
                           {conflictError.data.conflicts.map((c, idx) => (
                             <div key={idx} className="flex justify-between border-b border-rose-100 last:border-none pb-1">
                               <span>Mã đơn: <strong className="font-mono">#{c.confirmationCode}</strong> ({c.maskedGuestName})</span>
@@ -825,11 +835,11 @@ export default function ExtendStayAndMove() {
 
                       {conflictError.data?.maxSafeCheckoutAt && (
                         <div className="text-xs text-slate-700 font-medium">
-                          Thời điểm gia hạn an toàn tối đa trên phòng này: <strong className="text-rose-700">{fmtDateDisplay(conflictError.data.maxSafeCheckoutAt)}</strong>
+                          Thời điểm gia hạn an toàn tối đa có thể giữ trên phòng này: <strong className="text-rose-700">{fmtDateDisplay(conflictError.data.maxSafeCheckoutAt)}</strong>
                         </div>
                       )}
 
-                      {/* Nút hành động giải quyết xung đột */}
+                      {/* Nút hành động giải quyết xung đột bằng chuyển phòng */}
                       <div className="pt-2">
                         <button
                           type="button"
@@ -837,7 +847,7 @@ export default function ExtendStayAndMove() {
                           className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-base">swap_horiz</span>
-                          <span>CHUYỂN SANG MODE 02: ĐỔI SANG PHÒNG KHÁC CHO KHÁCH</span>
+                          <span>CHUYỂN SANG CHẾ ĐỘ 02: ĐỔI SANG PHÒNG KHÁC CHO KHÁCH</span>
                         </button>
                       </div>
                     </div>
@@ -849,10 +859,10 @@ export default function ExtendStayAndMove() {
                         </div>
                         <div>
                           <div className="text-xs font-bold text-emerald-950 uppercase tracking-wide">
-                            AVAILABILITY CONFIRMED: PHÒNG KHẢ DỤNG
+                            XÁC NHẬN KHẢ DỤNG: PHÒNG ĐỦ ĐIỀU KIỆN GIA HẠN
                           </div>
                           <div className="text-[11px] text-emerald-700">
-                            Phòng trống và đảm bảo đủ thời gian dọn phòng cho lượt khách tiếp theo.
+                            Phòng trống và đảm bảo đủ thời gian dọn phòng cho lượt khách kế tiếp theo quy định.
                           </div>
                         </div>
                       </div>
@@ -864,34 +874,34 @@ export default function ExtendStayAndMove() {
                   )}
                 </div>
 
-                {/* ─── TỰ ĐỘNG TÍNH PHỤ THU (CALCULATED TARIFF MODEL) ─────────── */}
+                {/* ─── BẢNG TÍNH PHỤ THU TỰ ĐỘNG (CALCULATED TARIFF MODEL) ─────── */}
                 <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-[#fafaf8] border border-slate-200 space-y-3.5 text-xs">
                   <div className="flex justify-between items-center text-slate-600 pb-2 border-b border-slate-200/70">
-                    <span className="font-medium">Tiền phòng gia hạn:</span>
+                    <span className="font-medium">Tiền phòng gia hạn thêm:</span>
                     <strong className="text-[#203044] font-mono text-sm">
                       {additionalNights} Đêm × {fmtMoney(previewData?.nightlyRate || stayDossier?.BasePrice || 1500000)} = {fmtMoney(previewData?.additionalRoomCharge || 0)}
                     </strong>
                   </div>
 
                   <div className="flex justify-between items-center text-slate-600 pb-2 border-b border-slate-200/70">
-                    <span className="font-medium">Thuế &amp; Phí quản lý khu nghỉ dưỡng (12%):</span>
+                    <span className="font-medium">Thuế GTGT &amp; Phí quản lý khu nghỉ dưỡng (12%):</span>
                     <strong className="text-[#203044] font-mono">
                       {fmtMoney(previewData?.taxAmount || 0)}
                     </strong>
                   </div>
 
                   <div className="flex justify-between items-center text-slate-600 pb-2 border-b border-slate-200/70">
-                    <span className="font-medium">Mã bảng giá áp dụng (Rate Plan):</span>
+                    <span className="font-medium">Mã biểu phí áp dụng:</span>
                     <strong className="text-slate-700 font-mono">
-                      {previewData?.targetRateTier || 'RACK-STANDARD-FLR08'}
+                      {previewData?.targetRateTier || 'BIỂU PHÍ TIÊU CHUẨN'}
                     </strong>
                   </div>
 
-                  {/* Net Folio Adjustment */}
+                  {/* Tổng phụ thu hạch toán */}
                   <div className="flex justify-between items-center p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[#203044]">
                     <div>
-                      <span className="font-black text-sm block">TỔNG PHỤ THU GIA HẠN (NET FOLIO ADJUSTMENT):</span>
-                      <span className="text-[11px] text-slate-500">Tự động hạch toán vào hóa đơn chính Folio #01</span>
+                      <span className="font-black text-sm block">TỔNG PHỤ THU GIA HẠN (HẠCH TOÁN HÓA ĐƠN):</span>
+                      <span className="text-[11px] text-slate-500">Tự động hạch toán vào hóa đơn chính #01 của khách</span>
                     </div>
                     <strong className="text-xl font-serif font-black text-emerald-700 font-mono">
                       +{fmtMoney(previewData?.netFolioAdjustment || 0)}
@@ -899,8 +909,8 @@ export default function ExtendStayAndMove() {
                   </div>
 
                   <div className="text-[11px] text-slate-400 font-medium flex justify-between pt-1">
-                    <span>* Thẻ đảm bảo lưu hồ sơ: Visa Ending •••• 9021</span>
-                    <span>Hóa đơn tự động đồng bộ theo chuẩn thuế GTGT</span>
+                    <span>* Thẻ bảo lãnh thanh toán lưu trong hồ sơ: Visa Đuôi •••• 9021</span>
+                    <span>Hóa đơn điện tử tự động đồng bộ theo chuẩn thuế GTGT</span>
                   </div>
                 </div>
 
@@ -908,7 +918,7 @@ export default function ExtendStayAndMove() {
             )}
 
             {/* ─────────────────────────────────────────────────────────────────
-                MODE 02: MA TRẬN PHÒNG THAY THẾ (REPLACEMENT MATRIX)
+                CHẾ ĐỘ 02: MA TRẬN PHÒNG THAY THẾ ĐỂ ĐỔI
                 ───────────────────────────────────────────────────────────────── */}
             {activeMode === 'RELOCATE' && (
               <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
@@ -919,7 +929,7 @@ export default function ExtendStayAndMove() {
                     </div>
                     <div>
                       <h3 className="font-bold text-base text-[#203044]">Ma Trận Phòng Khả Dụng Để Đổi</h3>
-                      <p className="text-xs text-slate-500">Replacement Destination Matrix (Real-time Inventory)</p>
+                      <p className="text-xs text-slate-500">Kho phòng thời gian thực kết nối buồng phòng</p>
                     </div>
                   </div>
 
@@ -932,21 +942,21 @@ export default function ExtendStayAndMove() {
                 {/* Bộ lọc phòng thay thế */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Hạng Phòng</label>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Lọc Hạng Phòng</label>
                     <select
                       value={roomClassFilter}
                       onChange={(e) => setRoomClassFilter(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-semibold text-[#203044]"
                     >
                       <option value="ALL">Tất Cả Hạng Phòng Khả Dụng</option>
-                      <option value="1">Standard King</option>
-                      <option value="2">Deluxe Ocean View</option>
-                      <option value="3">Executive Suite</option>
+                      <option value="1">Phòng Tiêu Chuẩn (Standard King)</option>
+                      <option value="2">Phòng Cao Cấp Hướng Biển (Deluxe)</option>
+                      <option value="3">Phòng Suite Thượng Hạng (Executive)</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Tầng Khách Sạn</label>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Lọc Theo Tầng</label>
                     <select
                       value={floorFilter}
                       onChange={(e) => setFloorFilter(e.target.value)}
@@ -961,9 +971,9 @@ export default function ExtendStayAndMove() {
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Trạng Thái Buồng Phòng</label>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Tình Trạng Buồng Phòng</label>
                     <div className="p-2 rounded-xl bg-slate-100 text-slate-700 font-bold border border-slate-200 text-xs text-center">
-                      Đã Dọn &amp; Đã Kiểm Tra (Inspected)
+                      Đã Dọn Sạch &amp; Đã Kiểm Tra
                     </div>
                   </div>
                 </div>
@@ -972,7 +982,7 @@ export default function ExtendStayAndMove() {
                 {loadingRooms ? (
                   <div className="py-12 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
                     <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
-                    Đang quét kho phòng khả dụng...
+                    Đang quét kho phòng trống sạch khả dụng...
                   </div>
                 ) : replacementRooms.length === 0 ? (
                   <div className="p-8 border border-dashed border-slate-300 rounded-2xl text-center text-xs text-slate-500 font-semibold">
@@ -1009,7 +1019,7 @@ export default function ExtendStayAndMove() {
                                 </span>
                               )}
                               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                SẠCH // SẴN SÀNG
+                                ĐÃ KIỂM TRA // SẴN SÀNG
                               </span>
                             </div>
                           </div>
@@ -1042,7 +1052,7 @@ export default function ExtendStayAndMove() {
 
         </div>
 
-        {/* ─── THANH THỰC THI CHÍNH (EXECUTION ACTION FOOTER) ────────────────── */}
+        {/* ─── THANH THỰC THI CHÍNH Ở ĐÁY TRANG ──────────────────────────────── */}
         <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-lg sticky bottom-4 z-40">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 
@@ -1062,7 +1072,7 @@ export default function ExtendStayAndMove() {
                 ) : (
                   <>
                     Chuyển khách từ Phòng <strong>{stayDossier?.RoomNumber || '---'}</strong> sang Phòng{' '}
-                    <strong className="text-admin-primary">{selectedTargetRoom?.RoomNumber || '---'}</strong> • Chênh lệch giá:{' '}
+                    <strong className="text-admin-primary">{selectedTargetRoom?.RoomNumber || '---'}</strong> • Chênh lệch đơn giá:{' '}
                     <strong className="text-emerald-700 font-mono">{fmtMoney(selectedTargetRoom?.tariffDifferential || 0)}</strong>
                   </>
                 )}
@@ -1072,14 +1082,14 @@ export default function ExtendStayAndMove() {
               </div>
             </div>
 
-            {/* Nút bấm hành động */}
+            {/* Bộ nút bấm hành động */}
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => navigate('/admin/le-tan')}
                 className="px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-[#203044] text-xs font-bold transition-all cursor-pointer"
               >
-                Hủy Bỏ
+                Hủy Thao Tác
               </button>
 
               <button
@@ -1117,7 +1127,7 @@ export default function ExtendStayAndMove() {
           </div>
         </div>
 
-        {/* ─── MODAL MÃ HÓA THẺ TỪ RFID / KEY ENCODER ────────────────────────── */}
+        {/* ─── CỬA SỔ MÃ HÓA THẺ TỪ RFID / KEY ENCODER ───────────────────────── */}
         {showKeyModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 border border-slate-200 animate-in zoom-in-95">
@@ -1152,7 +1162,11 @@ export default function ExtendStayAndMove() {
                 </div>
                 <div className="flex justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
                   <span className="text-slate-500">Cổng Kết Nối Đầu Ghi:</span>
-                  <strong className="text-slate-700 font-mono">COM-3 (ASSA ABLOY ENCODER)</strong>
+                  <strong className="text-slate-700 font-mono">COM-3 (ĐẦU GHI THẺ ASSA ABLOY)</strong>
+                </div>
+                <div className="flex justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="text-slate-500">Số Lượng Thẻ:</span>
+                  <strong className="text-[#203044]">2 Thẻ Từ Vật Lý</strong>
                 </div>
               </div>
 
