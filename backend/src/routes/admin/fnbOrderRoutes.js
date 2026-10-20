@@ -37,7 +37,7 @@ router.post('/:orderId/reviews', verifyToken, fnbOrderController.createOrderRevi
 router.get('/:orderId/reviews', fnbOrderController.getOrderReview);
 
 // FEAT-FNB-11 (Mã truy vết: A4.11): In phiếu order chuyển bếp và hóa đơn tạm tính
-router.get('/:orderId/print', verifyToken, fnbOrderController.printOrderDocument);
+router.get('/:orderId/print', optionalVerifyToken, fnbOrderController.printOrderDocument);
 
 
 

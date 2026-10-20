@@ -4,15 +4,90 @@ import React from 'react';
  * FEAT-FNB-11 (Mã truy vết: A4.11)
  * Modal in phiếu order chuyển bếp (KitchenTicket) hoặc hóa đơn tạm tính (ProvisionalBill)
  */
-const OrderPrintModal = ({ isOpen, onClose, documentData, isLoading, onPrint, onReFetch }) => {
+const OrderPrintModal = ({ isOpen, onClose, documentData, isLoading, errorMessage, onPrint, onReFetch }) => {
   if (!isOpen) return null;
 
   const isKitchen = documentData?.printType === 'KitchenTicket';
   const isProvisional = documentData?.printType === 'ProvisionalBill';
 
   const handleBrowserPrint = () => {
-    window.print();
-    if (onPrint) onPrint();
+    try {
+      const printableElement = document.getElementById('printable-order-content');
+      if (!printableElement) {
+        window.print();
+        if (onPrint) onPrint();
+        return;
+      }
+
+      // Tạo một iframe ẩn độc lập để in — không làm đơ/treo modal hay toàn bộ trang web
+      let iframe = document.getElementById('receipt-print-iframe');
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'receipt-print-iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+      }
+
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>${isKitchen ? 'Phieu_Chuyen_Bep_KOT' : 'Hoa_Don_Tam_Tinh'}</title>
+            <style>
+              @page {
+                size: 80mm auto;
+                margin: 4mm;
+              }
+              body {
+                font-family: 'Courier New', Courier, monospace, -apple-system, sans-serif;
+                margin: 0;
+                padding: 4px;
+                color: #000;
+                background: #fff;
+                font-size: 11px;
+                line-height: 1.35;
+              }
+              h2, h3, p { margin: 2px 0; }
+              .text-center { text-align: center; }
+              .text-right { text-align: right; }
+              .font-bold { font-weight: bold; }
+              .uppercase { text-transform: uppercase; }
+              .border-b { border-bottom: 1px dashed #444; }
+              .border-t { border-top: 1px dashed #444; }
+              .border-b-double { border-bottom: 2px solid #000; }
+              .my-2 { margin: 6px 0; }
+              .py-1 { padding: 3px 0; }
+              table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+              th { text-align: left; font-size: 10px; border-bottom: 1px solid #000; padding: 2px 0; }
+              td { padding: 3px 0; vertical-align: top; }
+              .note { font-size: 10px; font-style: italic; color: #222; }
+            </style>
+          </head>
+          <body>
+            ${printableElement.innerHTML}
+          </body>
+        </html>
+      `);
+      doc.close();
+
+      setTimeout(() => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        if (onPrint) onPrint();
+      }, 250);
+    } catch (err) {
+      console.warn('Iframe print error, falling back to window.print():', err);
+      window.print();
+      if (onPrint) onPrint();
+    }
   };
 
   return (
@@ -45,15 +120,24 @@ const OrderPrintModal = ({ isOpen, onClose, documentData, isLoading, onPrint, on
         </div>
 
         {/* Nội dung phiếu in - Tối ưu cho Máy in nhiệt 80mm & Giấy in A4/A5 */}
-        <div className="p-6 overflow-y-auto max-h-[75vh] font-mono text-slate-800 text-xs">
+        <div id="printable-order-content" className="p-6 overflow-y-auto max-h-[75vh] font-mono text-slate-800 text-xs">
           {isLoading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
               <span className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></span>
               <p className="text-sm font-sans">Đang xử lý dữ liệu phiếu in...</p>
             </div>
           ) : !documentData ? (
-            <div className="py-12 text-center text-red-500 font-sans">
-              Không thể tạo phiếu order.
+            <div className="py-12 text-center text-red-500 font-sans flex flex-col items-center gap-2">
+              <span className="material-symbols-outlined text-[36px] text-red-400">error_outline</span>
+              <p className="font-semibold">{errorMessage || 'Không thể tạo phiếu order.'}</p>
+              {onReFetch && (
+                <button
+                  onClick={onReFetch}
+                  className="mt-2 px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Thử lại
+                </button>
+              )}
             </div>
           ) : isKitchen ? (
             /* ========================================================================= */
