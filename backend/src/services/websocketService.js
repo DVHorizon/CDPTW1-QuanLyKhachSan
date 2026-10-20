@@ -39,5 +39,6 @@ module.exports = {
   broadcastOrderStatus: socketHandler.broadcastOrderStatus,
   broadcastRoomEvent: socketHandler.broadcastRoomEvent,
   broadcastTableReservation,
+  broadcastNewKitchenOrder: socketHandler.broadcastNewKitchenOrder,
   getWss: socketHandler.getWss
 };
