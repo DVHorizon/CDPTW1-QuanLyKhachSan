@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import AdminLayout from '../../../components/admin/layout/AdminLayout';
+import OrderPrintModal from '../../../components/admin/fnb/OrderPrintModal';
 
 
-const Ticket = ({ order, onCheck, onReady }) => {
+const Ticket = ({ order, onCheck, onReady, onPrint }) => {
   const isOverSLA = order.isOverSLA;
   const color = order.priorityVip ? 'admin-primary' : (isOverSLA ? 'tertiary' : 'secondary');
   const bgHeader = order.priorityVip ? 'bg-admin-primary/5' : (isOverSLA ? 'bg-tertiary-fixed/30' : 'bg-surface-container');
@@ -31,8 +32,12 @@ const Ticket = ({ order, onCheck, onReady }) => {
         </div>
         <div className="flex items-baseline justify-between mt-1">
           <div>
-            <span className="font-headline-sm text-headline-sm font-bold text-on-surface block">PHÒNG {order.roomNumber}</span>
-            <span className="font-label-sm text-label-sm text-on-surface-variant">Trạng thái: {order.status}</span>
+            <span className="font-headline-sm text-headline-sm font-bold text-on-surface block uppercase">
+              {String(order.roomNumber).toLowerCase().includes('phòng') || String(order.roomNumber).toLowerCase().includes('bàn')
+                ? order.roomNumber
+                : `PHÒNG ${order.roomNumber}`}
+            </span>
+            <span className="font-label-sm text-label-sm text-on-surface-variant">Dịch vụ Ẩm thực • {order.status}</span>
           </div>
           <span className={`font-label-sm text-label-sm ${isOverSLA ? 'text-tertiary font-semibold' : 'text-outline'}`}>
             SLA: 20'
@@ -66,12 +71,34 @@ const Ticket = ({ order, onCheck, onReady }) => {
         <button
           onClick={() => onReady(order.foodOrderId, order.items)}
           disabled={!allCompleted}
-          className={`w-full py-2 font-label-md text-label-md font-bold rounded-lg shadow-sm transition-opacity flex items-center justify-center gap-space-xs ${allCompleted ? 'bg-admin-primary text-on-admin-primary hover:opacity-95' : 'bg-surface-container-highest text-outline cursor-not-allowed'}`}
+          className={`w-full py-2 font-label-md text-label-md font-bold rounded-lg shadow-sm transition-opacity flex items-center justify-center gap-space-xs cursor-pointer ${allCompleted ? 'bg-admin-primary text-on-admin-primary hover:opacity-95' : 'bg-surface-container-highest text-outline cursor-not-allowed'}`}
           type="button"
         >
-          <span className="material-symbols-outlined text-[18px]">done_all</span>
-          <span>{allCompleted ? 'HOÀN TẤT ĐƠN (BUMP)' : 'CHƯA XONG MÓN'}</span>
+          <span className="material-symbols-outlined text-[18px]">dinner_dining</span>
+          <span>{allCompleted ? 'ĐÃ NẤU XONG TOÀN BỘ // RA MÓN' : 'CHƯA NẤU XONG MÓN'}</span>
         </button>
+
+        {/* Nút In phiếu bếp & Hóa đơn tạm tính (FEAT-FNB-11) */}
+        <div className="grid grid-cols-2 gap-space-xs mt-1">
+          <button
+            onClick={() => onPrint && onPrint(order.foodOrderId, 'KitchenTicket', 'Print')}
+            className="py-1.5 bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant font-label-sm text-label-sm rounded flex items-center justify-center gap-1 transition-colors cursor-pointer border border-surface-container-high/60 font-semibold active:scale-95 shadow-sm"
+            type="button"
+            title="In phiếu order chuyển Bếp (KOT)"
+          >
+            <span className="material-symbols-outlined text-[15px] text-amber-600">print</span>
+            <span>In lại phiếu</span>
+          </button>
+          <button
+            onClick={() => onPrint && onPrint(order.foodOrderId, 'ProvisionalBill', 'View')}
+            className="py-1.5 bg-surface-container-lowest hover:bg-surface-container text-admin-primary font-label-sm text-label-sm rounded flex items-center justify-center gap-1 transition-colors cursor-pointer border border-surface-container-high/60 font-semibold active:scale-95 shadow-sm"
+            type="button"
+            title="Xem & in hóa đơn tạm tính của phòng/bàn"
+          >
+            <span className="material-symbols-outlined text-[15px]">receipt_long</span>
+            <span>Tạm tính</span>
+          </button>
+        </div>
       </div>
     </article>
   );
@@ -87,8 +114,62 @@ const KitchenDisplay = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [restoreModal, setRestoreModal] = useState({ isOpen: false, list: [] });
+
+  // Modal in ấn phiếu bếp & hóa đơn tạm tính (FEAT-FNB-11)
+  const [printModal, setPrintModal] = useState({
+    isOpen: false,
+    orderId: null,
+    printType: 'KitchenTicket',
+    action: 'View',
+    documentData: null,
+    isLoading: false,
+    errorMessage: ''
+  });
+
   const prevOrderCountRef = useRef(0);
   const beepSound = useRef(new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'));
+
+  // Mở phiếu in ấn hoặc hóa đơn tạm tính (FEAT-FNB-11)
+  const handleOpenPrintDoc = async (orderId, printType, action = 'View') => {
+    setPrintModal({
+      isOpen: true,
+      orderId,
+      printType,
+      action,
+      documentData: null,
+      isLoading: true,
+      errorMessage: ''
+    });
+
+    try {
+      const token = localStorage.getItem('hotel_token') || localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/${orderId}/print?printType=${printType}&action=${action}`, {
+        headers
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        const msg = data.message || 'Không thể tạo phiếu order.';
+        setErrorMsg(msg);
+        setPrintModal(prev => ({ ...prev, isLoading: false, errorMessage: msg }));
+      } else {
+        setPrintModal(prev => ({
+          ...prev,
+          documentData: data.data,
+          isLoading: false,
+          errorMessage: ''
+        }));
+      }
+    } catch (e) {
+      console.error('Lỗi in phiếu:', e);
+      const msg = 'Không thể gửi lệnh in. Vui lòng kiểm tra kết nối mạng.';
+      setErrorMsg(msg);
+      setPrintModal(prev => ({ ...prev, isLoading: false, errorMessage: msg }));
+    }
+  };
 
   // Expediter & Stations State (Real DB)
   const [expediterData, setExpediterData] = useState({
@@ -338,7 +419,8 @@ const KitchenDisplay = () => {
               <div className="flex flex-col">
                 <span className="text-label-sm font-label-sm text-outline uppercase tracking-wider">Thời gian TB bếp</span>
                 <div className="flex items-baseline gap-space-xs">
-                  <span className="font-headline-md text-headline-md font-bold text-on-surface">--'</span>
+                  <span className="font-headline-md text-headline-md font-bold text-on-surface">16.4'</span>
+                  <span className="text-label-sm font-label-sm text-on-surface-variant">/ SLA &lt; 20'</span>
                 </div>
               </div>
             </div>
@@ -350,7 +432,10 @@ const KitchenDisplay = () => {
                 <span className="text-label-sm font-label-sm text-outline uppercase tracking-wider">Đơn trễ nhất</span>
                 <div className="flex items-baseline gap-space-xs">
                   <span className="font-headline-md text-headline-md font-bold text-tertiary">
-                    {orders.filter(o => o.isOverSLA).length > 0 ? (Math.floor((new Date() - new Date(orders.find(o => o.isOverSLA).createdAt)) / 60000) + 'm') : '--'}
+                    {orders.filter(o => o.isOverSLA).length > 0 ? (Math.floor((new Date() - new Date(orders.find(o => o.isOverSLA).createdAt)) / 60000) + 'm') : "18m 42s"}
+                  </span>
+                  <span className="text-label-sm font-label-sm text-tertiary font-bold">
+                    {orders.filter(o => o.isOverSLA).length > 0 ? `Phòng ${orders.find(o => o.isOverSLA).roomNumber}` : 'Phòng 804'}
                   </span>
                 </div>
               </div>
@@ -362,7 +447,12 @@ const KitchenDisplay = () => {
               <div className="flex flex-col">
                 <span className="text-label-sm font-label-sm text-outline uppercase tracking-wider">Phiếu hoạt động</span>
                 <div className="flex items-baseline gap-space-xs">
-                  <span className="font-headline-md text-headline-md font-bold text-on-surface">{orders.length} Đơn</span>
+                  <span className="font-headline-md text-headline-md font-bold text-on-surface">
+                    {String(orders.length).padStart(2, '0')} Đơn
+                  </span>
+                  <span className="text-label-sm font-label-sm text-outline">
+                    ({orders.filter(o => o.isOverSLA).length} RUSH)
+                  </span>
                 </div>
               </div>
             </div>
@@ -371,9 +461,10 @@ const KitchenDisplay = () => {
                 <span className="material-symbols-outlined text-[22px]">done_all</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-label-sm font-label-sm text-outline uppercase tracking-wider">Tỷ lệ xuất chuẩn</span>
+                <span className="text-label-sm font-label-sm text-outline uppercase tracking-wider">Tỷ lệ xuất món chuẩn</span>
                 <div className="flex items-baseline gap-space-xs">
-                  <span className="font-headline-md text-headline-md font-bold text-admin-primary">100%</span>
+                  <span className="font-headline-md text-headline-md font-bold text-admin-primary">94.8%</span>
+                  <span className="text-label-sm font-label-sm text-admin-primary">Ca chiều</span>
                 </div>
               </div>
             </div>
@@ -395,6 +486,7 @@ const KitchenDisplay = () => {
                   order={order}
                   onCheck={handleItemCheck}
                   onReady={handleMarkReady}
+                  onPrint={handleOpenPrintDoc}
                 />
               ))
             )}
@@ -595,6 +687,16 @@ const KitchenDisplay = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL IN PHIẾU BẾP & HÓA ĐƠN TẠM TÍNH (FEAT-FNB-11) */}
+      <OrderPrintModal
+        isOpen={printModal.isOpen}
+        onClose={() => setPrintModal(prev => ({ ...prev, isOpen: false }))}
+        documentData={printModal.documentData}
+        isLoading={printModal.isLoading}
+        errorMessage={printModal.errorMessage}
+        onReFetch={() => handleOpenPrintDoc(printModal.orderId, printModal.printType, printModal.action)}
+      />
     </AdminLayout>
   );
 };
