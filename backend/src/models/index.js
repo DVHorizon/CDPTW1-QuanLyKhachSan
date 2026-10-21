@@ -22,6 +22,7 @@ const defineInvoiceDetail = require('./InvoiceDetail');
 const definePayment = require('./Payment');
 const defineServiceCategory = require('./ServiceCategory');
 const defineService = require('./Service');
+const defineServiceOrder = require('./ServiceOrder');
 const defineBookingGuest = require('./BookingGuest');
 
 // Initialize models
@@ -46,6 +47,7 @@ const InvoiceDetail = defineInvoiceDetail(sequelize);
 const Payment = definePayment(sequelize);
 const ServiceCategory = defineServiceCategory(sequelize);
 const Service = defineService(sequelize);
+const ServiceOrder = defineServiceOrder(sequelize);
 
 // Setup Relationships / Associations
 // 1. Role & User
@@ -143,6 +145,16 @@ TableReservation.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 ServiceCategory.hasMany(Service, { foreignKey: 'CategoryId', as: 'services' });
 Service.belongsTo(ServiceCategory, { foreignKey: 'CategoryId', as: 'category' });
 
+// 16. ServiceOrder associations
+Stay.hasMany(ServiceOrder, { foreignKey: 'StayId', as: 'serviceOrders' });
+ServiceOrder.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
+
+Service.hasMany(ServiceOrder, { foreignKey: 'ServiceId', as: 'orders' });
+ServiceOrder.belongsTo(Service, { foreignKey: 'ServiceId', as: 'service' });
+
+User.hasMany(ServiceOrder, { foreignKey: 'CreatedBy', as: 'createdServiceOrders' });
+ServiceOrder.belongsTo(User, { foreignKey: 'CreatedBy', as: 'creator' });
+
 module.exports = {
   sequelize,
   Branch,
@@ -167,7 +179,8 @@ module.exports = {
   RestaurantTable,
   TableReservation,
   ServiceCategory,
-  Service
+  Service,
+  ServiceOrder,
 };
 
 
