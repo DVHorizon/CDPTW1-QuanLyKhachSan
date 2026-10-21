@@ -34,10 +34,33 @@ function initSocket(server) {
         const urlObj = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
         const pathname = urlObj.pathname;
 
-        // Chấp nhận các path hợp lệ: /ws, /ws/rooms, /ws/fnb-orders
-        if (pathname === '/ws' || pathname === '/ws/rooms' || pathname === '/ws/fnb-orders') {
+        // Chấp nhận các path hợp lệ: /ws, /ws/rooms, /ws/fnb-orders, /ws/v1/kitchen-notifications
+        if (
+          pathname === '/ws' ||
+          pathname === '/ws/rooms' ||
+          pathname === '/ws/fnb-orders' ||
+          pathname === '/ws/v1/kitchen-notifications'
+        ) {
+          // FEAT-FNB-12: Kiểm tra xác thực token cho /ws/v1/kitchen-notifications nếu có truyền token
+          // FEAT-FNB-12: Kiểm tra xác thực token cho /ws/v1/kitchen-notifications
+          if (pathname === '/ws/v1/kitchen-notifications') {
+            const token = urlObj.searchParams.get('token');
+            if (token) {
+              const jwt = require('jsonwebtoken');
+              const JWT_SECRET = process.env.JWT_SECRET || 'grand_horizon_secret_key_2026_luxury_hotel';
+              try {
+                const decoded = jwt.verify(token, JWT_SECRET);
+                request.user = decoded;
+              } catch (jwtErr) {
+                // Token lỗi hoặc hết hạn thì bỏ qua, cho phép kết nối ở chế độ Terminal Bếp
+                request.user = null;
+              }
+            }
+          }
+
           wss.handleUpgrade(request, socket, head, (ws) => {
             ws.pathname = pathname;
+            ws.user = request.user || null;
             wss.emit('connection', ws, request);
           });
         } else {
@@ -174,6 +197,47 @@ function broadcastOrderStatus(order) {
   });
 }
 
+/**
+ * FEAT-FNB-12 (A4.12): Phát sự kiện new_fnb_order khi có đơn đặt món mới gửi tới Bếp
+ * @param {Object} orderData Dữ liệu đơn hàng F&B
+ */
+function broadcastNewKitchenOrder(orderData) {
+  if (!wss) return;
+
+  const payload = JSON.stringify({
+    event: 'new_fnb_order',
+    data: {
+      event: 'new_fnb_order',
+      foodOrderId: orderData.foodOrderId,
+      orderType: orderData.orderType || 'RoomService', // 'RoomService' hoặc 'DineIn'
+      location: orderData.location || 'N/A', // Số phòng hoặc số bàn
+      orderTime: orderData.orderTime || new Date().toISOString(),
+      totalAmount: orderData.totalAmount || 0,
+      note: orderData.note || '',
+      items: orderData.items || []
+    },
+    timestamp: new Date().toISOString()
+  });
+
+  let sentCount = 0;
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      // Gửi cho client kết nối tới /ws/v1/kitchen-notifications, /ws/fnb-orders hoặc /ws
+      if (
+        !client.pathname ||
+        client.pathname === '/ws/v1/kitchen-notifications' ||
+        client.pathname === '/ws/fnb-orders' ||
+        client.pathname === '/ws'
+      ) {
+        client.send(payload);
+        sentCount++;
+      }
+    }
+  });
+
+  console.log(`📢 [WebSocket] Broadcast new_fnb_order (#${orderData.foodOrderId} - ${orderData.location}) tới ${sentCount} clients.`);
+}
+
 function getWss() {
   return wss;
 }
@@ -182,5 +246,7 @@ module.exports = {
   initSocket,
   broadcastRoomEvent,
   broadcastOrderStatus,
+  broadcastNewKitchenOrder,
   getWss
 };
+

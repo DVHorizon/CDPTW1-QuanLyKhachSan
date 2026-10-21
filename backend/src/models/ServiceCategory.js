@@ -20,6 +20,10 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    Status: {
+      type: DataTypes.ENUM('Active', 'Inactive'),
+      defaultValue: 'Active',
+    },
   }, {
     tableName: 'ServiceCategories',
     timestamps: true,

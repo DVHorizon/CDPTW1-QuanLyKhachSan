@@ -23,8 +23,12 @@ export const fetchServicesApi = async (params = {}) => {
   if (params.page) query.append('page', params.page);
   if (params.pageSize) query.append('pageSize', params.pageSize);
   if (params.search) query.append('search', params.search);
-  if (params.categoryId && params.categoryId !== 'All') query.append('categoryId', params.categoryId);
+  const targetGroup = params.group !== undefined ? params.group : params.categoryId;
+  if (targetGroup && targetGroup !== 'All') query.append('group', targetGroup);
   if (params.status && params.status !== 'All') query.append('status', params.status);
+  if (params.minPrice !== undefined && params.minPrice !== '') query.append('minPrice', params.minPrice);
+  if (params.maxPrice !== undefined && params.maxPrice !== '') query.append('maxPrice', params.maxPrice);
+  if (params.sortBy) query.append('sortBy', params.sortBy);
 
   const url = `${BASE_URL}${query.toString() ? '?' + query.toString() : ''}`;
   const res = await fetch(url, { headers: getAuthHeaders() });
