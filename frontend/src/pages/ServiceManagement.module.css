@@ -422,6 +422,88 @@
   background-color: #ffffff;
 }
 
+/* Dòng bộ lọc mở rộng: Khoảng giá (minPrice/maxPrice) & Sắp xếp (sortBy) */
+.filterRowAdvanced {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .filterRowAdvanced {
+    grid-template-columns: 1.2fr 2fr auto;
+    align-items: center;
+  }
+}
+
+.priceRangeGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+}
+
+.priceRangeInput {
+  flex: 1;
+  width: 100%;
+  padding: 0.4375rem 0.625rem;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.priceRangeInput:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 1px #10b981;
+}
+
+.priceRangeSeparator {
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.resetFilterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4375rem 0.75rem;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.resetFilterBtn:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.filterErrorText {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+  color: #ef4444;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: -0.25rem;
+}
+
 /* ─── SERVICE ITEM CARDS ─── */
 .serviceList {
   display: flex;
