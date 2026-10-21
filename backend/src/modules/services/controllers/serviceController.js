@@ -57,38 +57,109 @@ const generateServiceCode = async (categoryId, categoryName) => {
 };
 
 // ─── 1. LẤY DANH SÁCH DỊCH VỤ (GET /api/v1/services) ──────────────────────────
+// Tuân thủ đặc tả FEAT-SERVICE-02: Xem danh sách, tìm kiếm và phân loại dịch vụ
 exports.getAllServices = async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 20, 1), 100);
-    const { search, categoryId, status } = req.query;
+    const { search, group, categoryId, status, minPrice, maxPrice, sortBy } = req.query;
 
+    // 1. Validate search query (Tối đa 100 ký tự theo mục 2.2)
+    if (search && typeof search === 'string' && search.length > 100) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0003_MAX_LENGTH',
+        message: 'Từ khoá tìm kiếm không được vượt quá 100 ký tự',
+      });
+    }
+
+    // 2. Validate khoảng giá minPrice / maxPrice (Mục 2.2 & Test case 3)
+    let minP = null;
+    let maxP = null;
+    if (minPrice !== undefined && minPrice !== '') {
+      minP = Number(minPrice);
+      if (isNaN(minP) || minP < 0) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0004_INVALID_FORMAT',
+          message: 'Khoảng giá không hợp lệ',
+        });
+      }
+    }
+    if (maxPrice !== undefined && maxPrice !== '') {
+      maxP = Number(maxPrice);
+      if (isNaN(maxP) || maxP < 0) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0004_INVALID_FORMAT',
+          message: 'Khoảng giá không hợp lệ',
+        });
+      }
+    }
+    if (minP !== null && maxP !== null && minP > maxP) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0004_INVALID_FORMAT',
+        message: 'Khoảng giá không hợp lệ',
+      });
+    }
+
+    // 3. Xây dựng điều kiện lọc cơ bản (WHERE)
     const where = {};
+
+    // Group / CategoryId: Nếu CategoryId không tồn tại -> trả mảng rỗng 200 OK (Mục 2.2 Test case 2)
+    const targetGroup = group !== undefined ? group : categoryId;
+    if (targetGroup && targetGroup !== 'All') {
+      const parsedCatId = parseInt(targetGroup, 10);
+      if (!isNaN(parsedCatId)) {
+        where.CategoryId = parsedCatId;
+      }
+    }
+
+    // Quy tắc nghiệp vụ 2.3:
+    // Nếu request công khai (không truyền status hoặc status === 'Active'), chỉ lấy Service có Status = 'Active'
+    // Nếu màn quản trị truyền status = 'All' hoặc 'Inactive' thì tôn trọng bộ lọc quản trị
+    const isPublicLookup = !status || status === 'Active';
     if (status && status !== 'All') {
       where.Status = status;
-    }
-    if (categoryId) {
-      where.CategoryId = categoryId;
+    } else if (!status) {
+      where.Status = 'Active';
     }
 
-    // Lấy toàn bộ bản ghi theo điều kiện cơ bản
+    // Lấy toàn bộ bản ghi theo điều kiện cơ bản kèm Category
     const allServices = await Service.findAll({
       where,
       include: [
         {
           model: ServiceCategory,
           as: 'category',
-          attributes: ['CategoryId', 'CategoryName', 'Description', 'IsDeleted'],
+          attributes: ['CategoryId', 'CategoryName', 'Description', 'IsDeleted', 'Status'],
         },
       ],
-      order: [['ServiceId', 'DESC']],
     });
 
-    // Lọc tìm kiếm theo chuẩn Unicode NFD không dấu (mục 0.2)
-    let filtered = allServices;
+    // 4. Lọc dữ liệu theo Quy tắc nghiệp vụ 2.3
+    let filtered = allServices.filter((svc) => {
+      // Test case 4: Category cha phải có Status = 'Active' và không bị xóa (IsDeleted = false)
+      if (isPublicLookup) {
+        const cat = svc.category;
+        if (!cat || cat.IsDeleted || cat.Status === 'Inactive') {
+          return false;
+        }
+      }
+
+      // Lọc khoảng giá minPrice / maxPrice
+      const priceNum = Number(svc.Price);
+      if (minP !== null && priceNum < minP) return false;
+      if (maxP !== null && priceNum > maxP) return false;
+
+      return true;
+    });
+
+    // 5. Lọc tìm kiếm theo chuẩn Unicode NFD không dấu (Mục 0.2 & Test case 1)
     if (search && search.trim()) {
-      const searchNorm = normalizeVietnamese(search);
-      filtered = allServices.filter((svc) => {
+      const searchNorm = normalizeVietnamese(search.trim());
+      filtered = filtered.filter((svc) => {
         const nameNorm = normalizeVietnamese(svc.ServiceName);
         const codeNorm = normalizeVietnamese(svc.ServiceCode);
         const catNorm = normalizeVietnamese(svc.category?.CategoryName || '');
@@ -101,6 +172,33 @@ exports.getAllServices = async (req, res) => {
         );
       });
     }
+
+    // 6. Sắp xếp (Sort) theo Mục 2.2 & 2.3
+    // sortBy nhận: 'name_asc' (mặc định), 'price_asc', 'price_desc'. Giá trị khác -> dùng mặc định name_asc, KHÔNG báo lỗi (Test case 5)
+    const validSorts = ['name_asc', 'price_asc', 'price_desc'];
+    const activeSort = validSorts.includes(sortBy) ? sortBy : 'name_asc';
+
+    filtered.sort((a, b) => {
+      if (activeSort === 'price_asc') {
+        const diff = Number(a.Price) - Number(b.Price);
+        if (diff !== 0) return diff;
+        return (a.ServiceName || '').localeCompare(b.ServiceName || '', 'vi');
+      }
+
+      if (activeSort === 'price_desc') {
+        const diff = Number(b.Price) - Number(a.Price);
+        if (diff !== 0) return diff;
+        return (a.ServiceName || '').localeCompare(b.ServiceName || '', 'vi');
+      }
+
+      // Mặc định (name_asc): theo CategoryName A→Z, trong cùng nhóm sắp theo ServiceName A→Z
+      const catA = a.category?.CategoryName || '';
+      const catB = b.category?.CategoryName || '';
+      const catComp = catA.localeCompare(catB, 'vi');
+      if (catComp !== 0) return catComp;
+
+      return (a.ServiceName || '').localeCompare(b.ServiceName || '', 'vi');
+    });
 
     const total = filtered.length;
     // Phân trang

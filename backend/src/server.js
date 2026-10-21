@@ -62,7 +62,8 @@ app.use('/api/v1/guest',      require('./modules/guest'));
 app.use('/api/v1/pms',        require('./modules/pms'));
 
 // 👤 Hà   — Services / Payment / AI
-app.use('/api/v1/services',   require('./modules/services'));
+app.use('/api/v1/services',       require('./modules/services'));
+app.use('/api/v1/service-orders', require('./modules/services/routes/serviceOrderRoutes'));
 
 // 👤 Trang — F&B
 app.use('/api/v1/fnb',                require('./modules/fnb'));

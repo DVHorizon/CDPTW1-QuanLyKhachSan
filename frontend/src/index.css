@@ -66,3 +66,21 @@
   background: #b9a277;
   border-radius: 9999px;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-order-content, #printable-order-content * {
+    visibility: visible;
+  }
+  #printable-order-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}
+

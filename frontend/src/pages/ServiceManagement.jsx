@@ -257,14 +257,54 @@ const ServiceListSection = ({
   setCategoryFilter,
   statusFilter,
   setStatusFilter,
+  minPrice,
+  setMinPrice,
+  maxPrice,
+  setMaxPrice,
+  sortBy,
+  setSortBy,
   viewMode,
   setViewMode,
   currentPage,
   setCurrentPage,
   itemsPerPage,
 }) => {
+  // Kiểm tra lỗi khoảng giá hợp lệ (FEAT-SERVICE-02)
+  const isPriceRangeInvalid = useMemo(() => {
+    if (minPrice !== "" && maxPrice !== "") {
+      const minP = Number(minPrice);
+      const maxP = Number(maxPrice);
+      if (!isNaN(minP) && !isNaN(maxP) && minP > maxP) {
+        return true;
+      }
+    }
+    return false;
+  }, [minPrice, maxPrice]);
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      Boolean(searchTerm.trim()) ||
+      categoryFilter !== "All" ||
+      statusFilter !== "All" ||
+      minPrice !== "" ||
+      maxPrice !== "" ||
+      sortBy !== "name_asc"
+    );
+  }, [searchTerm, categoryFilter, statusFilter, minPrice, maxPrice, sortBy]);
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setCategoryFilter("All");
+    setStatusFilter("All");
+    setMinPrice("");
+    setMaxPrice("");
+    setSortBy("name_asc");
+    setCurrentPage(1);
+  };
+
   const filteredServices = useMemo(() => {
-    return services.filter((svc) => {
+    let result = services.filter((svc) => {
+      // 1. Tìm kiếm không dấu trên tên, mã SKU, tên nhóm và mô tả
       const matchSearch =
         !searchTerm.trim() ||
         normalizeSearch(svc.ServiceName).includes(
@@ -277,15 +317,48 @@ const ServiceListSection = ({
           normalizeSearch(searchTerm),
         );
 
+      // 2. Lọc theo nhóm dịch vụ
       const matchCategory =
         categoryFilter === "All" ||
         String(svc.CategoryId) === String(categoryFilter);
 
+      // 3. Lọc theo trạng thái
       const matchStatus = statusFilter === "All" || svc.Status === statusFilter;
 
-      return matchSearch && matchCategory && matchStatus;
+      // 4. Lọc theo khoảng giá minPrice - maxPrice
+      const priceNum = Number(svc.Price);
+      const minP = minPrice !== "" && !isNaN(Number(minPrice)) ? Number(minPrice) : null;
+      const maxP = maxPrice !== "" && !isNaN(Number(maxPrice)) ? Number(maxPrice) : null;
+
+      const matchMinPrice = minP === null || priceNum >= minP;
+      const matchMaxPrice = maxP === null || priceNum <= maxP;
+
+      return matchSearch && matchCategory && matchStatus && matchMinPrice && matchMaxPrice;
     });
-  }, [services, searchTerm, categoryFilter, statusFilter]);
+
+    // 5. Sắp xếp theo sortBy (FEAT-SERVICE-02: name_asc, price_asc, price_desc)
+    result.sort((a, b) => {
+      if (sortBy === "price_asc") {
+        const diff = Number(a.Price) - Number(b.Price);
+        if (diff !== 0) return diff;
+        return (a.ServiceName || "").localeCompare(b.ServiceName || "", "vi");
+      }
+      if (sortBy === "price_desc") {
+        const diff = Number(b.Price) - Number(a.Price);
+        if (diff !== 0) return diff;
+        return (a.ServiceName || "").localeCompare(b.ServiceName || "", "vi");
+      }
+      // Mặc định (name_asc): theo CategoryName A→Z, trong cùng nhóm sắp theo ServiceName A→Z
+      const catA = a.category?.CategoryName || "";
+      const catB = b.category?.CategoryName || "";
+      const catComp = catA.localeCompare(catB, "vi");
+      if (catComp !== 0) return catComp;
+
+      return (a.ServiceName || "").localeCompare(b.ServiceName || "", "vi");
+    });
+
+    return result;
+  }, [services, searchTerm, categoryFilter, statusFilter, minPrice, maxPrice, sortBy]);
 
   const totalPages = Math.ceil(filteredServices.length / itemsPerPage) || 1;
   const paginatedServices = useMemo(() => {
@@ -424,6 +497,78 @@ const ServiceListSection = ({
             <option value="Inactive">Ngừng cung cấp (Inactive)</option>
           </select>
         </div>
+      </div>
+
+      {/* Hàng bộ lọc nâng cao: Sắp xếp (sortBy) & Khoảng giá (minPrice - maxPrice) */}
+      <div className={styles.filterRowAdvanced}>
+        {/* Sắp xếp */}
+        <div>
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              setCurrentPage(1);
+            }}
+            className={styles.selectControl}
+            title="Sắp xếp danh sách dịch vụ"
+          >
+            <option value="name_asc">Sắp xếp: Tên A→Z (Mặc định)</option>
+            <option value="price_asc">Giá: Thấp đến Cao</option>
+            <option value="price_desc">Giá: Cao đến Thấp</option>
+          </select>
+        </div>
+
+        {/* Khoảng giá */}
+        <div className={styles.priceRangeGroup}>
+          <input
+            type="number"
+            min="0"
+            step="10000"
+            placeholder="Giá từ (VND)..."
+            value={minPrice}
+            onChange={(e) => {
+              setMinPrice(e.target.value);
+              setCurrentPage(1);
+            }}
+            className={styles.priceRangeInput}
+            title="Đơn giá tối thiểu"
+          />
+          <span className={styles.priceRangeSeparator}>-</span>
+          <input
+            type="number"
+            min="0"
+            step="10000"
+            placeholder="Đến (VND)..."
+            value={maxPrice}
+            onChange={(e) => {
+              setMaxPrice(e.target.value);
+              setCurrentPage(1);
+            }}
+            className={styles.priceRangeInput}
+            title="Đơn giá tối đa"
+          />
+        </div>
+
+        {/* Nút đặt lại bộ lọc */}
+        {hasActiveFilters && (
+          <button
+            onClick={handleResetFilters}
+            className={styles.resetFilterBtn}
+            type="button"
+            title="Đặt lại toàn bộ tiêu chí lọc"
+          >
+            <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+            <span>Đặt lại</span>
+          </button>
+        )}
+
+        {/* Thông báo lỗi khi minPrice > maxPrice (ERROR_0004_INVALID_FORMAT) */}
+        {isPriceRangeInvalid && (
+          <div className={styles.filterErrorText}>
+            <span className="material-symbols-outlined text-[16px]">error</span>
+            <span>Khoảng giá không hợp lệ: Giá tối thiểu không được lớn hơn giá tối đa (ERROR_0004)</span>
+          </div>
+        )}
       </div>
 
       {/* Danh sách dịch vụ hoặc Empty state */}
@@ -828,10 +973,13 @@ const ServiceManagement = () => {
   const [selectedCode, setSelectedCode] = useState("SVC-SPA-001");
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
-  // Bộ lọc & phân trang
+  // Bộ lọc & phân trang (FEAT-SERVICE-02)
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [sortBy, setSortBy] = useState("name_asc");
   const [viewMode, setViewMode] = useState("list");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -1189,6 +1337,12 @@ const ServiceManagement = () => {
             setCategoryFilter={setCategoryFilter}
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}
+            minPrice={minPrice}
+            setMinPrice={setMinPrice}
+            maxPrice={maxPrice}
+            setMaxPrice={setMaxPrice}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
             viewMode={viewMode}
             setViewMode={setViewMode}
             currentPage={currentPage}
