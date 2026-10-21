@@ -93,7 +93,6 @@ const MenuForm = ({
               <span className="text-body-sm font-body-sm text-on-surface-variant">Giá Bán Niêm Yết (VNĐ) *</span>
               <input 
                 type="number" 
-                 
                 min="0" 
                 value={formData.Price} 
                 onChange={e => setFormData({...formData, Price: Number(e.target.value)})}
@@ -107,10 +106,44 @@ const MenuForm = ({
                 onChange={e => setFormData({...formData, CategoryId: Number(e.target.value)})}
                 className="font-bold text-body-sm text-on-surface bg-surface border border-outline-variant rounded-lg px-3 py-2.5 focus:border-admin-primary outline-none w-full shadow-inner cursor-pointer"
               >
-                <option value={1}>Món Khai Vị</option>
-                <option value={2}>Món Chính</option>
-                <option value={3}>Tráng Miệng</option>
-                <option value={4}>Đồ Uống / Bar</option>
+                <option value={1}>Khai Vị Nóng</option>
+                <option value={2}>Khai Vị Lạnh</option>
+                <option value={5}>Bếp Nóng (Món Chính)</option>
+                <option value={6}>Bếp Lạnh</option>
+                <option value={7}>Tráng Miệng</option>
+                <option value={8}>Đồ Uống / Bar</option>
+                <option value={14}>Bánh Mì Artisan</option>
+                <option value={19}>Trà & Cà Phê</option>
+                <option value={20}>Rượu Vang & Cocktail</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-space-md pt-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-body-sm font-body-sm text-on-surface-variant">Khung Giờ Phục Vụ</span>
+              <select
+                value={formData.ServingTime || 'Cả Ngày'}
+                onChange={e => setFormData({...formData, ServingTime: e.target.value})}
+                className="font-semibold text-body-sm text-on-surface bg-surface border border-outline-variant rounded-lg px-3 py-2.5 focus:border-admin-primary outline-none w-full shadow-inner cursor-pointer"
+              >
+                <option value="Cả Ngày">Cả Ngày</option>
+                <option value="Ăn Sáng">Ăn Sáng (06:00 - 10:00)</option>
+                <option value="Tối">Tối / In-Room Đêm</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-body-sm font-body-sm text-on-surface-variant">Trạm Bếp Xử Lý</span>
+              <select
+                value={formData.KitchenStation || 'Bếp Nóng 01'}
+                onChange={e => setFormData({...formData, KitchenStation: e.target.value})}
+                className="font-semibold text-body-sm text-on-surface bg-surface border border-outline-variant rounded-lg px-3 py-2.5 focus:border-admin-primary outline-none w-full shadow-inner cursor-pointer"
+              >
+                <option value="Bếp Nóng 01">Bếp Nóng 01</option>
+                <option value="Bếp Nóng 02">Bếp Nóng 02</option>
+                <option value="Bếp Lạnh & Salad">Bếp Lạnh & Salad</option>
+                <option value="Bếp Bánh & Tráng Miệng">Bếp Bánh & Tráng Miệng</option>
+                <option value="Quầy Bar Sommelier">Quầy Bar Sommelier</option>
               </select>
             </div>
           </div>
@@ -120,20 +153,7 @@ const MenuForm = ({
             <span>Thuế &amp; Phí: <strong className="text-on-surface">VAT 8% + Phí PV 5%</strong></span>
           </div>
         </div>
-        
-        {/*  Recipe BOM (Bill of Materials) Mini Table (MOCKUP) */}
-        <div className="flex flex-col gap-space-xs">
-          <div className="flex items-center justify-between">
-            <span className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider">Định Lượng Nguyên Liệu Bếp (BOM)</span>
-            <button className="text-admin-primary font-label-sm text-label-sm font-semibold hover:underline" type="button">Chỉnh Định Lượng</button>
-          </div>
-          <div className="bg-surface-container rounded-lg p-2 font-body-sm text-body-sm flex flex-col gap-1.5">
-            <div className="flex items-center justify-between font-mono text-label-sm">
-              <span className="text-on-surface font-sans">1. {formData.ItemName || 'Chưa nhập tên món'} tiêu chuẩn</span>
-              <span className="text-on-surface font-bold">1 Lô định mức</span>
-            </div>
-          </div>
-        </div>
+
 
       </div>
 

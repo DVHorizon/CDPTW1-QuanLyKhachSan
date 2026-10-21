@@ -74,7 +74,16 @@ const MenuManagement = () => {
 
   const openAddModal = () => {
     setEditingItem(null);
-    setFormData({ ItemName: '', CategoryId: 1, Price: 0, Status: 'Available', Description: '', ImageUrl: '' });
+    setFormData({ 
+      ItemName: '', 
+      CategoryId: 5, 
+      Price: 0, 
+      Status: 'Available', 
+      ServingTime: 'Cả Ngày', 
+      KitchenStation: 'Bếp Nóng 01', 
+      Description: '', 
+      ImageUrl: '' 
+    });
     setIsModalOpen(true);
   };
 
@@ -185,20 +194,7 @@ const MenuManagement = () => {
           </div>
           {/*  Terminal Utility Command Bar  */}
           <div className="flex flex-wrap items-center gap-space-xs">
-            <button className="flex items-center gap-space-xs px-space-md py-space-sm bg-surface-container rounded-lg text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-container-high transition-colors shadow-sm" type="button">
-              <span className="material-symbols-outlined text-[18px] text-tertiary">block</span>
-              <span>Hết Hàng Nhanh (86'd)</span>
-              <span className="bg-tertiary text-on-tertiary rounded-full px-1.5 py-0.2 text-[10px] font-mono">3</span>
-            </button>
-            <button className="flex items-center gap-space-xs px-space-md py-space-sm bg-surface-container rounded-lg text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-container-high transition-colors shadow-sm" type="button">
-              <span className="material-symbols-outlined text-[18px] text-secondary">file_upload</span>
-              <span>Nhập CSV Công Thức</span>
-            </button>
-            <button className="flex items-center gap-space-xs px-space-md py-space-sm bg-surface-container rounded-lg text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-container-high transition-colors shadow-sm" type="button">
-              <span className="material-symbols-outlined text-[18px] text-admin-primary">nutrition</span>
-              <span>Xuất Dinh Dưỡng</span>
-            </button>
-            <button onClick={openAddModal} className="flex items-center gap-space-xs px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-semibold rounded-lg hover:brightness-105 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all" type="button">
+            <button onClick={openAddModal} className="flex items-center gap-space-xs px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-semibold rounded-lg hover:brightness-105 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all cursor-pointer" type="button">
               <span className="material-symbols-outlined text-[18px]">add_circle</span>
               <span>+ Thêm Món / SKU Mới</span>
             </button>
@@ -409,11 +405,14 @@ const MenuManagement = () => {
                             <span className="material-symbols-outlined text-[32px] text-outline">search_off</span>
                             <span className="font-semibold text-body-md">
                               {keyword 
-                                ? `Không tìm thấy món nào khớp với từ khóa "${keyword}"` 
-                                : 'Không tìm thấy món ăn nào theo bộ lọc'}
-                            </span>
-                            <span className="text-body-sm text-outline">
-                              Gợi ý: Thử tìm theo tên không dấu, mã SKU hoặc viết tắt chữ cái đầu (VD: bwth, thnb, sbn).
+                                ? 'Không tìm thấy món ăn phù hợp với từ khóa.' 
+                                : selectedCategory
+                                  ? 'Không tìm thấy món ăn trong danh mục đã chọn.'
+                                  : servingTime
+                                    ? 'Không có món ăn thuộc khung giờ đã chọn.'
+                                    : stockStatus
+                                      ? 'Không có món ăn phù hợp với tình trạng đã chọn.'
+                                      : 'Không thể tải danh sách món ăn.'}
                             </span>
                             {(keyword || selectedCategory || servingTime || stockStatus) && (
                               <button
@@ -523,22 +522,6 @@ const MenuManagement = () => {
                     <span className="material-symbols-outlined text-[16px]">chevron_right</span>
                   </button>
                 </div>
-              </div>
-            </div>
-            {/*  Station Workload Micro-Telemetry Banner  */}
-            <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-space-md">
-              <div className="flex items-center gap-space-sm">
-                <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-admin-primary">
-                  <span className="material-symbols-outlined text-[24px]">kitchen</span>
-                </div>
-                <div>
-                  <span className="font-label-md text-label-md font-bold text-on-surface">Quy Trình Chuẩn Bị Bếp (Mise en Place)</span>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">Kiểm định lô nguyên liệu hải sản tươi Phú Quốc giao lúc 11:30 sáng.</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-space-sm">
-                <span className="font-label-sm text-label-sm bg-admin-primary/10 text-admin-primary font-bold px-2 py-1 rounded">100% Đạt Tiêu Chuẩn HACCP</span>
-                <button className="text-admin-primary font-label-md text-label-md font-semibold hover:underline" type="button">Xem Báo Cáo Ca</button>
               </div>
             </div>
           </div>
