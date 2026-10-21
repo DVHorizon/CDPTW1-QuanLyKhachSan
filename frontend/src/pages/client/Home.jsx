@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import RoomDetailModal from '../../components/modals/RoomDetailModal';
-import QuickBookingModal from '../../components/modals/QuickBookingModal';
 import { fetchHomeData } from '../../api/hotelApi';
 import {
   mockBranches,
@@ -50,6 +50,7 @@ const cleanAmenityDesc = (desc, fallbackDesc) => {
 };
 
 function Home() {
+  const navigate = useNavigate();
   const [homeData, setHomeData] = useState({
     branches: mockBranches,
     featuredRoomTypes: mockRoomTypes,
@@ -70,7 +71,6 @@ function Home() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [wishlist, setWishlist] = useState([]);
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
-  const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [openFaqId, setOpenFaqId] = useState(1);
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterName, setNewsletterName] = useState('');
@@ -137,34 +137,38 @@ function Home() {
     loadData();
   }, []);
 
-  // Xử lý Tìm Phòng
+  // Xử lý Tìm Phòng (FEAT-GUEST-02)
   const handleSearch = (e) => {
     e.preventDefault();
-    const branchObj = homeData.branches.find(b => String(b.BranchId) === String(selectedBranch));
-    const branchName = branchObj ? branchObj.BranchName : 'Chi nhánh đã chọn';
 
-    let nights = 0;
-    if (checkInDate && checkOutDate) {
-      const d1 = new Date(checkInDate);
-      const d2 = new Date(checkOutDate);
-      nights = Math.max(1, Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)));
+    if (!checkInDate) {
+      setSearchNotification('Vui lòng chọn ngày nhận phòng.');
+      return;
     }
 
-    const formatDisplayDate = (d) => (d && typeof d === 'string' && d.includes('-') ? d.split('-').reverse().join('/') : (d || ''));
-    const datesText = (checkInDate && checkOutDate)
-      ? `${nights} đêm (${formatDisplayDate(checkInDate)} đến ${formatDisplayDate(checkOutDate)})`
-      : 'thời gian linh hoạt';
-
-    setSearchNotification(`Đã tìm thấy phòng trống sẵn sàng tại "${branchName}" cho ${datesText}. Vui lòng chọn hạng phòng bên dưới!`);
-
-    const roomSection = document.getElementById('room-collection');
-    if (roomSection) {
-      roomSection.scrollIntoView({ behavior: 'smooth' });
+    // TC01: Ngày quá khứ
+    if (checkInDate < todayStr) {
+      setSearchNotification('Ngày nhận phòng không được ở trong quá khứ');
+      return;
     }
 
-    setTimeout(() => {
-      setSearchNotification('');
-    }, 8000);
+    // TC02: Ngày trả cùng ngày nhận hoặc quá khứ
+    if (!checkOutDate || checkOutDate <= checkInDate) {
+      setSearchNotification('Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm');
+      return;
+    }
+
+    // TC03: Lưu trú quá 30 đêm
+    const d1 = new Date(checkInDate + 'T00:00:00');
+    const d2 = new Date(checkOutDate + 'T00:00:00');
+    const nights = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    if (nights > 30) {
+      setSearchNotification('Hệ thống chỉ hỗ trợ đặt phòng tối đa 30 đêm trực tuyến');
+      return;
+    }
+
+    const guests = parseInt(guestOption.split('-')[0], 10) || 2;
+    navigate(`/rooms?branchId=${selectedBranch}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}&totalGuests=${guests}`);
   };
 
   // Toggle Wishlist
@@ -172,6 +176,24 @@ function Home() {
     setWishlist(prev =>
       prev.includes(roomId) ? prev.filter(id => id !== roomId) : [...prev, roomId]
     );
+  };
+
+  // Chuyển hướng trực tiếp tới màn hình Đặt Phòng (Booking Engine)
+  const handleBookNow = (rt) => {
+    const guests = guestOption ? guestOption.split('-') : ['2', '0', '1'];
+    const adults = guests[0] || '2';
+    const children = guests[1] || '0';
+    const units = guests[2] || '1';
+
+    const params = new URLSearchParams();
+    params.set('roomTypeId', rt.RoomTypeId || rt.id || '1');
+    if (checkInDate) params.set('checkInDate', checkInDate);
+    if (checkOutDate) params.set('checkOutDate', checkOutDate);
+    params.set('adults', adults);
+    if (children && children !== '0') params.set('children', children);
+    params.set('units', units);
+
+    navigate(`/dat-phong?${params.toString()}`);
   };
 
   // Lọc phòng theo danh mục
@@ -279,27 +301,41 @@ function Home() {
                   <div className="lg:col-span-3 flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-[#8a8782] uppercase tracking-wider flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-[#b9a277]">calendar_today</span>
-                      Thời Gian Lưu Trú
+                      Thời Gian Lưu Trú (dd/mm/yyyy)
                     </label>
                     <div className="grid grid-cols-2 gap-2 bg-[#fbf8f2] rounded-xl border border-[#dedad0] px-3 py-1.5">
-                      <div className="flex flex-col">
+                      <div className="relative flex flex-col cursor-pointer group">
                         <span className="text-[10px] text-[#8a8782] font-semibold">Nhận phòng</span>
+                        <span className="text-[12px] font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors select-none py-0.5">
+                          {checkInDate ? checkInDate.split('-').reverse().join('/') : 'dd/mm/yyyy'}
+                        </span>
                         <input
                           type="date"
                           value={checkInDate}
                           min={todayStr}
                           onChange={(e) => setCheckInDate(e.target.value)}
-                          className="bg-transparent text-[12px] font-bold text-[#203044] focus:outline-none cursor-pointer"
+                          onClick={(e) => {
+                            try { e.target.showPicker(); } catch (_) {}
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          title="Chọn ngày nhận phòng (dd/mm/yyyy)"
                         />
                       </div>
-                      <div className="flex flex-col pl-2 border-l border-[#dedad0]">
+                      <div className="relative flex flex-col pl-2 border-l border-[#dedad0] cursor-pointer group">
                         <span className="text-[10px] text-[#8a8782] font-semibold">Trả phòng</span>
+                        <span className="text-[12px] font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors select-none py-0.5">
+                          {checkOutDate ? checkOutDate.split('-').reverse().join('/') : 'dd/mm/yyyy'}
+                        </span>
                         <input
                           type="date"
                           value={checkOutDate}
                           min={checkInDate || todayStr}
                           onChange={(e) => setCheckOutDate(e.target.value)}
-                          className="bg-transparent text-[12px] font-bold text-[#203044] focus:outline-none cursor-pointer"
+                          onClick={(e) => {
+                            try { e.target.showPicker(); } catch (_) {}
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          title="Chọn ngày trả phòng (dd/mm/yyyy)"
                         />
                       </div>
                     </div>
@@ -448,7 +484,8 @@ function Home() {
                 return (
                   <div
                     key={rt.RoomTypeId}
-                    className="group bg-white rounded-2xl overflow-hidden shadow-[0_8px_30px_-15px_rgba(32,48,68,0.25)] hover:shadow-[0_20px_45px_-20px_rgba(32,48,68,0.45)] transition-all duration-300 flex flex-col justify-between border border-[#dedad0] hover:-translate-y-1 relative"
+                    onClick={() => navigate(`/rooms/${rt.RoomTypeId}`)}
+                    className="group bg-white rounded-2xl overflow-hidden shadow-[0_8px_30px_-15px_rgba(32,48,68,0.25)] hover:shadow-[0_20px_45px_-20px_rgba(32,48,68,0.45)] transition-all duration-300 flex flex-col justify-between border border-[#dedad0] hover:-translate-y-1 relative cursor-pointer"
                   >
                     {/* Image Thumbnail */}
                     <div className="relative w-full aspect-[16/10] overflow-hidden bg-[#203044]">
@@ -464,7 +501,10 @@ function Home() {
 
                       {/* Wishlist Heart Button */}
                       <button
-                        onClick={() => toggleWishlist(rt.RoomTypeId)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleWishlist(rt.RoomTypeId);
+                        }}
                         className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-[#203044] flex items-center justify-center transition-all shadow-md active:scale-90"
                         type="button"
                         aria-label="Yêu thích phòng"
@@ -542,18 +582,15 @@ function Home() {
 
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => setSelectedRoomForDetail(rt)}
-                            className="px-3 py-2 rounded-xl bg-[#fbf8f2] hover:bg-[#eae8df] text-[#203044] text-[12.5px] font-bold border border-[#dedad0] transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleBookNow(rt);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[12.5px] font-bold shadow-sm transition-all flex items-center gap-1 group-hover:shadow-md"
                             type="button"
                           >
-                            Chi Tiết
-                          </button>
-                          <button
-                            onClick={() => setSelectedRoomForBooking(rt)}
-                            className="px-4 py-2 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[12.5px] font-bold shadow-sm transition-all"
-                            type="button"
-                          >
-                            Đặt Ngay
+                            <span>Đặt Ngay</span>
+                            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                           </button>
                         </div>
                       </div>
@@ -929,17 +966,8 @@ function Home() {
         onClose={() => setSelectedRoomForDetail(null)}
         onBookNow={(room) => {
           setSelectedRoomForDetail(null);
-          setSelectedRoomForBooking(room);
+          handleBookNow(room);
         }}
-      />
-
-      <QuickBookingModal
-        room={selectedRoomForBooking}
-        branch={currentBranchName}
-        checkIn={checkInDate}
-        checkOut={checkOutDate}
-        isOpen={Boolean(selectedRoomForBooking)}
-        onClose={() => setSelectedRoomForBooking(null)}
       />
     </MainLayout>
   );
