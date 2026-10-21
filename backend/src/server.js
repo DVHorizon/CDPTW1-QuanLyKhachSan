@@ -50,6 +50,13 @@ app.use('/api/allocation', require('./routes/admin/roomAllocationRoutes'));
 app.use('/api/v1/check-in', require('./routes/admin/checkInRoutes'));
 app.use('/api/check-in', require('./routes/admin/checkInRoutes'));
 
+// Route Nghiệp vụ Check-out & Kiểm phòng (FEAT-CHECKOUT-INSPECT-01)
+const checkOutRoutes = require('./routes/admin/checkOutRoutes');
+app.use('/api/v1/check-out', checkOutRoutes);
+app.use('/api/check-out', checkOutRoutes);
+app.use('/api/v1/stays', checkOutRoutes);
+app.use('/api/v1/folio', checkOutRoutes);
+
 // Route Quản lý người dùng & nhân viên
 app.use('/api/users', require('./routes/users'));
 app.use('/api/v1/users', require('./routes/users'));
