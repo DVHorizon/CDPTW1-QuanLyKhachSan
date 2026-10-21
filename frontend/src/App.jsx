@@ -26,6 +26,7 @@ import RoomStatusManagement from './pages/RoomStatusManagement';
 import BookingManagement from './pages/BookingManagement';
 import RoomAssignment from './pages/admin/RoomAssignment';
 import CheckInDesk from './pages/admin/CheckInDesk';
+import CheckOutDesk from './pages/admin/CheckOutDesk';
 import FnbReview from './pages/client/FnbReview';
 
 
@@ -74,6 +75,11 @@ function App() {
             <Route path="/admin/check-in" element={<CheckInDesk />} />
             <Route path="/admin/check-in/:bookingId" element={<CheckInDesk />} />
             <Route path="/admin/guest-check-in" element={<CheckInDesk />} />
+            <Route path="/admin/check-out" element={<CheckOutDesk />} />
+            <Route path="/admin/check-out/:stayId" element={<CheckOutDesk />} />
+            <Route path="/admin/guest-check-out" element={<CheckOutDesk />} />
+            <Route path="/admin/kiem-phong" element={<CheckOutDesk />} />
+            <Route path="/admin/tra-phong" element={<CheckOutDesk />} />
             <Route path="/admin/room-availability" element={<RoomAvailability />} />
             <Route path="/admin/so-do-phong" element={<RoomStatusManagement />} />
             <Route path="/admin/room-status" element={<RoomStatusManagement />} />

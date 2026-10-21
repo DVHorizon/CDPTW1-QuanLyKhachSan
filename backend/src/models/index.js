@@ -25,6 +25,9 @@ const defineService = require('./Service');
 const defineServiceOrder = require('./ServiceOrder');
 const defineBookingGuest = require('./BookingGuest');
 const defineRoomSearchIndex = require('./RoomSearchIndex');
+const defineLateFeePolicy = require('./LateFeePolicy');
+const defineRoomInspectionReport = require('./RoomInspectionReport');
+const defineDamageItem = require('./DamageItem');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -50,6 +53,9 @@ const Payment = definePayment(sequelize);
 const ServiceCategory = defineServiceCategory(sequelize);
 const Service = defineService(sequelize);
 const ServiceOrder = defineServiceOrder(sequelize);
+const LateFeePolicy = defineLateFeePolicy(sequelize);
+const RoomInspectionReport = defineRoomInspectionReport(sequelize);
+const DamageItem = defineDamageItem(sequelize);
 
 // Setup Relationships / Associations
 // 1. Role & User
@@ -157,6 +163,16 @@ ServiceOrder.belongsTo(Service, { foreignKey: 'ServiceId', as: 'service' });
 RoomType.hasMany(RoomSearchIndex, { foreignKey: 'RoomTypeId', as: 'searchIndices' });
 RoomSearchIndex.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
 
+// 17. Inspection & Damage Associations
+Stay.hasOne(RoomInspectionReport, { foreignKey: 'StayId', as: 'inspectionReport' });
+RoomInspectionReport.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
+
+Stay.hasMany(DamageItem, { foreignKey: 'StayId', as: 'damageItems' });
+DamageItem.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
+
+RoomInspectionReport.hasMany(DamageItem, { foreignKey: 'InspectionId', as: 'damageItems' });
+DamageItem.belongsTo(RoomInspectionReport, { foreignKey: 'InspectionId', as: 'inspection' });
+
 module.exports = {
   sequelize,
   Branch,
@@ -184,6 +200,9 @@ module.exports = {
   ServiceCategory,
   Service,
   ServiceOrder,
+  LateFeePolicy,
+  RoomInspectionReport,
+  DamageItem,
 };
 
 
