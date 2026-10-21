@@ -147,3 +147,27 @@ export const loginWithFacebook = async (payload) => {
     };
   }
 };
+
+/**
+ * Cập nhật thông tin tài khoản hiện tại
+ * PUT /api/v1/auth/me
+ */
+export const updateCurrentUser = async (token, userData) => {
+  try {
+    if (!token) return { success: false, message: 'Chưa xác thực' };
+    const res = await safeFetch('/v1/auth/me', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(userData)
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (error) {
+    console.error('Lỗi API updateCurrentUser:', error);
+    return { success: false, message: 'Lỗi mạng khi cập nhật hồ sơ' };
+  }
+};

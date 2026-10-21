@@ -99,6 +99,29 @@ const MenuManagement = () => {
     setConfirmModal({ isOpen: true, itemId: id });
   };
 
+  const handleStatusToggle = async (item, e) => {
+    e.stopPropagation();
+    const newStatus = item.Status === 'Available' ? 'OutOfStock' : 'Available';
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/menu-items/${item.MenuItemId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const result = await response.json();
+      
+      if (response.ok) {
+        // Show success briefly if needed, or just refresh
+        fetchMenu();
+      } else {
+        setMessageModal({ isOpen: true, type: 'error', title: 'LỖI', message: result.message });
+      }
+    } catch (err) {
+      setMessageModal({ isOpen: true, type: 'error', title: 'LỖI HỆ THỐNG', message: 'Không thể cập nhật trạng thái món.' });
+    }
+  };
+
   const executeArchive = async () => {
     const id = confirmModal.itemId;
     setConfirmModal({ isOpen: false, itemId: null });
@@ -318,16 +341,22 @@ const MenuManagement = () => {
                       <tr><td colSpan="7" className="text-center py-4">Chưa có món ăn nào trong CSDL</td></tr>
                     ) : (
                       currentItems.map(item => (
-                        <tr key={item.MenuItemId} onClick={() => { setActiveRow(item.MenuItemId); setEditingItem(item); setFormData({ ...item }); setIsModalOpen(true); }} className={`hover:bg-surface-container transition-colors cursor-pointer ${item.Status === 'Inactive' ? 'bg-error-container/20' : ''}`}>
+                        <tr key={item.MenuItemId} onClick={() => { setActiveRow(item.MenuItemId); setEditingItem(item); setFormData({ ...item }); setIsModalOpen(true); }} 
+                          className={`hover:bg-surface-container transition-all cursor-pointer ${
+                            activeRow === item.MenuItemId 
+                              ? (item.Status === 'Available' ? 'bg-[#10B981]/10' : 'bg-[#EF4444]/10') 
+                              : (item.Status === 'Available' ? 'bg-transparent' : 'bg-[#EF4444]/5')
+                          }`}
+                        >
                           <td className="py-3 px-3">
                             <div className="flex items-center gap-2">
-                              <div className={`w-1.5 h-8 rounded ${item.Status === 'Available' ? 'bg-admin-primary' : 'bg-transparent'}`}></div>
+                              <div className={`w-1.5 h-8 rounded ${activeRow === item.MenuItemId ? (item.Status === 'Available' ? 'bg-[#10B981]' : 'bg-[#EF4444]') : 'bg-transparent'}`}></div>
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-1.5">
-                                  <span className={`font-headline-sm text-body-md font-semibold text-on-surface ${item.Status === 'Inactive' ? 'line-through opacity-75' : ''}`}>
+                                  <span className={`font-headline-sm text-body-md font-semibold text-on-surface ${item.Status !== 'Available' ? 'line-through opacity-80' : ''}`}>
                                     {item.ItemName}
                                   </span>
-                                  {item.Status === 'Inactive' && <span className="bg-tertiary text-on-tertiary font-label-sm text-[9px] px-1 rounded font-bold uppercase">86'D</span>}
+                                  {item.Status !== 'Available' && <span className="bg-[#EF4444] text-white font-label-sm text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shadow-sm">86'D</span>}
                                 </div>
                                 <span className="font-mono text-label-sm text-on-surface-variant">{item.MenuItemId}</span>
                               </div>
@@ -345,11 +374,15 @@ const MenuManagement = () => {
                             <span className="font-mono font-bold text-admin-primary bg-admin-primary/10 px-2 py-0.5 rounded text-label-sm">70.0%</span>
                           </td>
                           <td className="py-3 px-3 text-center">
-                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${item.Status === 'Available' ? 'bg-admin-primary/15 text-admin-primary' : 'bg-tertiary/15 text-tertiary'}`}>
+                            <button 
+                              onClick={(e) => handleStatusToggle(item, e)}
+                              className={`inline-flex items-center justify-center w-6 h-6 rounded-full transition-colors ${item.Status === 'Available' ? 'bg-[#10B981]/15 text-[#10B981] hover:bg-[#10B981]/30' : 'bg-[#EF4444]/15 text-[#EF4444] hover:bg-[#EF4444]/30'}`}
+                              title={item.Status === 'Available' ? 'Đang Bán - Bấm để báo Hết Hàng' : 'Hết Hàng - Bấm để báo Đang Bán'}
+                            >
                               <span className="material-symbols-outlined text-[16px]">
                                 {item.Status === 'Available' ? 'check_circle' : 'cancel'}
                               </span>
-                            </span>
+                            </button>
                             <button onClick={(e) => handleArchiveClick(item.MenuItemId, e)} className="ml-2 w-6 h-6 rounded-full bg-error-container/50 text-error flex items-center justify-center hover:bg-error-container transition-colors" title="Xóa Món">
                               <span className="material-symbols-outlined text-[14px]">delete</span>
                             </button>
