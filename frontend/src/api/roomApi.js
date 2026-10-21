@@ -188,7 +188,7 @@ export const suggestRoomsApi = async (q) => {
     const res = await fetch(`${API_BASE_URL}/v1/rooms/suggest?q=${encodeURIComponent(q.trim())}`);
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const json = await res.json();
-    return json;
+    return json.data || json;
   } catch (err) {
     console.error('Lỗi khi fetch suggester:', err);
     return { data: null };
