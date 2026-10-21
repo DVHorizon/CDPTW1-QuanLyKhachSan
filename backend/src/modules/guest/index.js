@@ -24,6 +24,9 @@ router.delete('/rooms/lock/:sessionId', roomAvailabilityController.releaseRoomLo
 // ─── TÍNH NĂNG 5: ĐẶT PHÒNG TRỰC TUYẾN (FEAT-GUEST-05) ──────────────────────
 router.post('/bookings',             bookingEngineController.createOnlineBooking);
 
+// ─── TÍNH NĂNG 6: TỰ ĐỘNG TÍNH SỐ ĐÊM, PHỤ THU & TỔNG TIỀN PHÒNG (FEAT-GUEST-06 / A6) ───
+router.post('/bookings/calculate-pricing', bookingEngineController.calculatePricing);
+
 // ─── TÍNH NĂNG 8: THANH TOÁN TIỀN CỌC TRỰC TUYẾN (FEAT-GUEST-08) ────────────
 router.get('/bookings/:id',          onlineDepositPaymentController.getBookingDetails);
 router.post('/bookings/:bookingId/deposit', onlineDepositPaymentController.processDepositPayment);

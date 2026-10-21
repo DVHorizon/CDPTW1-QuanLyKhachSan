@@ -49,7 +49,7 @@ export default function DepositPayment() {
   const [timerSeconds, setTimerSeconds] = useState(15 * 60);
 
   // Payment configuration
-  const [depositOption, setDepositOption] = useState('DEPOSIT_50'); // 'DEPOSIT_20' | 'DEPOSIT_50' | 'FULL_PAYMENT'
+  const [depositOption, setDepositOption] = useState('DEPOSIT_20'); // 'DEPOSIT_20' (20% minimum) | 'DEPOSIT_50' | 'FULL_PAYMENT'
   const [paymentMethod, setPaymentMethod] = useState('BANK_TRANSFER'); // 'BANK_TRANSFER' | 'CREDIT_CARD' | 'DIGITAL_WALLET' | 'POINTS'
   const [walletProvider, setWalletProvider] = useState('VNPAY');
   

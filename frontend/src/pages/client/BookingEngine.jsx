@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import Header from '../../components/layout/Header';
-import { getRoomDetailApi, createBookingApi, releaseRoomLockApi } from '../../api/roomApi';
+import { getRoomDetailApi, createBookingApi, releaseRoomLockApi, calculatePricingApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
 
 // Helper format VND currency
 const formatVND = (num) => {
   return new Intl.NumberFormat('vi-VN').format(Math.round(num || 0)) + 'đ';
+};
+
+// Helper format generic currency (supports VND and USD)
+const formatMoney = (num, currency = 'VND') => {
+  if (currency === 'USD' || currency === '$') {
+    return `$${Number(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return formatVND(num);
 };
 
 // Helper format date YYYY-MM-DD
@@ -68,11 +76,14 @@ export default function BookingEngine() {
   const [specialRequests, setSpecialRequests] = useState('');
   const [isPolicyAccepted, setIsPolicyAccepted] = useState(false);
 
-  // Add-on experiences
+  // Add-on experiences (FEAT-GUEST-06)
+  const [addonBuffet, setAddonBuffet] = useState(false);
   const [addonLimo, setAddonLimo] = useState(false);
   const [addonFloating, setAddonFloating] = useState(false);
-  const [addonSpa, setAddonSpa] = useState(true);
+  const [addonSpa, setAddonSpa] = useState(false);
   const [addonBbq, setAddonBbq] = useState(false);
+  const [addonEarlyCI, setAddonEarlyCI] = useState(false);
+  const [addonLateCO, setAddonLateCO] = useState(false);
 
   // Room Type data from API
   const [roomType, setRoomType] = useState(null);
@@ -83,6 +94,11 @@ export default function BookingEngine() {
   const [errorMessage, setErrorMessage] = useState('');
   const [errorCode, setErrorCode] = useState('');
   const [successBooking, setSuccessBooking] = useState(null);
+
+  // Automated Real-Time Pricing Engine State (FEAT-GUEST-06)
+  const [pricingData, setPricingData] = useState(null);
+  const [isCalculatingPricing, setIsCalculatingPricing] = useState(false);
+  const [pricingError, setPricingError] = useState('');
 
   // Fetch room type details
   useEffect(() => {
@@ -104,7 +120,7 @@ export default function BookingEngine() {
     return () => { isMounted = false; };
   }, [roomTypeId]);
 
-  // Calculate nights
+  // Calculate nights fallback
   const numberOfNights = useMemo(() => {
     const d1 = new Date(checkInDate);
     const d2 = new Date(checkOutDate);
@@ -112,36 +128,100 @@ export default function BookingEngine() {
     return diff > 0 ? diff : 1;
   }, [checkInDate, checkOutDate]);
 
-  // Pricing calculations
+  // Pricing calculations fallback
   const basePricePerNight = useMemo(() => {
     if (roomType?.BasePrice) return parseFloat(roomType.BasePrice);
     return 8500000; // fallback standard villa
   }, [roomType]);
 
+  // Automated Realtime Pricing Engine API Call (FEAT-GUEST-06 / POST /bookings/calculate-pricing)
+  useEffect(() => {
+    let isMounted = true;
+    async function calculateStayPrice() {
+      if (!checkInDate || !checkOutDate) return;
+
+      setIsCalculatingPricing(true);
+      setPricingError('');
+
+      const selectedAddonsList = [];
+      if (addonBuffet) selectedAddonsList.push('ADDON_BUFFET');
+      if (addonLimo) selectedAddonsList.push('ADDON_SHUTTLE');
+      if (addonFloating) selectedAddonsList.push('ADDON_FLOATING');
+      if (addonSpa) selectedAddonsList.push('ADDON_SPA');
+      if (addonBbq) selectedAddonsList.push('ADDON_BBQ');
+      if (addonEarlyCI) selectedAddonsList.push('ADDON_EARLY_CI');
+      if (addonLateCO) selectedAddonsList.push('ADDON_LATE_CO');
+
+      const currentBaseRate = roomType?.BasePrice ? parseFloat(roomType.BasePrice) : 8500000;
+
+      try {
+        const res = await calculatePricingApi({
+          checkInDate,
+          checkOutDate,
+          baseRate: currentBaseRate,
+          roomTypeId: parseInt(roomTypeId, 10),
+          adults: adultsCount,
+          children: childrenCount,
+          roomQuantity: unitsAllocated,
+          selectedAddOns: selectedAddonsList,
+          taxesAndFeesRate: 0.12,
+          depositRate: 0.20,
+          isGoldMember: user?.MembershipTier?.TierName === 'Gold' || user?.TierId === 3
+        });
+
+        if (isMounted) {
+          if (res?.success && res?.data) {
+            setPricingData(res.data);
+            setPricingError('');
+          } else {
+            setPricingError(res?.message || 'Dữ liệu ngày hoặc số lượng khách không hợp lệ để tính giá');
+          }
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.error('Pricing calculation error:', err);
+          setPricingError('Lỗi tính giá phòng');
+        }
+      } finally {
+        if (isMounted) setIsCalculatingPricing(false);
+      }
+    }
+
+    calculateStayPrice();
+    return () => { isMounted = false; };
+  }, [checkInDate, checkOutDate, roomType, roomTypeId, adultsCount, childrenCount, unitsAllocated, addonBuffet, addonLimo, addonFloating, addonSpa, addonBbq, addonEarlyCI, addonLateCO, user]);
+
   const roomSubtotal = useMemo(() => {
+    if (pricingData?.roomSubtotal) return pricingData.roomSubtotal;
     return basePricePerNight * numberOfNights * unitsAllocated;
-  }, [basePricePerNight, numberOfNights, unitsAllocated]);
+  }, [pricingData, basePricePerNight, numberOfNights, unitsAllocated]);
 
   const goldDiscount = useMemo(() => {
-    return Math.round(roomSubtotal * 0.1); // 10% Gold tier discount
-  }, [roomSubtotal]);
+    if (pricingData?.discountAmount !== undefined) return pricingData.discountAmount;
+    return Math.round(roomSubtotal * 0.1);
+  }, [pricingData, roomSubtotal]);
 
   const addonsTotal = useMemo(() => {
+    if (pricingData?.addOnsTotal !== undefined) return pricingData.addOnsTotal;
     let total = 0;
+    if (addonBuffet) total += (basePricePerNight < 100000 ? 25 : 250000) * numberOfNights;
     if (addonLimo) total += 800000;
     if (addonFloating) total += 900000;
     if (addonSpa) total += 1800000;
     if (addonBbq) total += 2200000;
     return total;
-  }, [addonLimo, addonFloating, addonSpa, addonBbq]);
+  }, [pricingData, addonBuffet, addonLimo, addonFloating, addonSpa, addonBbq, basePricePerNight, numberOfNights]);
 
   const finalTotalAmount = useMemo(() => {
-    return Math.max(0, roomSubtotal - goldDiscount + addonsTotal);
-  }, [roomSubtotal, goldDiscount, addonsTotal]);
+    if (pricingData?.totalAmount !== undefined) return pricingData.totalAmount;
+    const preTax = Math.max(0, roomSubtotal - goldDiscount + addonsTotal);
+    return Math.round(preTax * 1.12);
+  }, [pricingData, roomSubtotal, goldDiscount, addonsTotal]);
 
   const depositRequired = useMemo(() => {
-    return Math.round(finalTotalAmount / 2);
-  }, [finalTotalAmount]);
+    if (pricingData?.depositAmount !== undefined) return pricingData.depositAmount;
+    return Math.round(finalTotalAmount * 0.20); // 20% minimum deposit per specification
+  }, [pricingData, finalTotalAmount]);
 
   // Handle Form Submission (Checkout Step 1 -> Booking Creation)
   const handleSubmitBooking = async (e) => {
@@ -194,10 +274,13 @@ export default function BookingEngine() {
     }
 
     const selectedAddonsList = [];
-    if (addonLimo) selectedAddonsList.push('limousine');
-    if (addonFloating) selectedAddonsList.push('floating_breakfast');
-    if (addonSpa) selectedAddonsList.push('couple_spa');
-    if (addonBbq) selectedAddonsList.push('seafood_bbq');
+    if (addonBuffet) selectedAddonsList.push('ADDON_BUFFET');
+    if (addonLimo) selectedAddonsList.push('ADDON_SHUTTLE');
+    if (addonFloating) selectedAddonsList.push('ADDON_FLOATING');
+    if (addonSpa) selectedAddonsList.push('ADDON_SPA');
+    if (addonBbq) selectedAddonsList.push('ADDON_BBQ');
+    if (addonEarlyCI) selectedAddonsList.push('ADDON_EARLY_CI');
+    if (addonLateCO) selectedAddonsList.push('ADDON_LATE_CO');
 
     setIsSubmitting(true);
 
@@ -218,7 +301,9 @@ export default function BookingEngine() {
         isPolicyAccepted: true,
         bedPreference,
         selectedAddons: selectedAddonsList,
-        isGoldMember: true,
+        isGoldMember: user?.MembershipTier?.TierName === 'Gold' || user?.TierId === 3,
+        totalAmount: pricingData?.totalAmount || finalTotalAmount,
+        depositAmount: pricingData?.depositAmount || depositRequired,
         lockSessionId: paramLockSessionId || undefined
       };
 
@@ -345,7 +430,7 @@ export default function BookingEngine() {
                 <span className="w-2 h-6 bg-[#725b38] rounded-full inline-block"></span>
                 <h2 className="font-serif text-xl font-bold text-slate-900">Lịch Trình Lưu Trú &amp; Quy Mô</h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày nhận phòng *</label>
                   <div className="relative group cursor-pointer">
@@ -398,7 +483,7 @@ export default function BookingEngine() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Người lớn (&gt;= 1) *</label>
-                  <div className="flex items-center rounded-lg bg-[#eff4ff] overflow-hidden">
+                  <div className="flex items-center rounded-lg bg-[#eff4ff] overflow-hidden border border-blue-100">
                     <button 
                       type="button"
                       onClick={() => setAdultsCount(Math.max(1, adultsCount - 1))}
@@ -411,10 +496,28 @@ export default function BookingEngine() {
                       className="px-3 py-2 text-slate-700 hover:bg-slate-200"
                     >+</button>
                   </div>
+                  <span className="text-[11px] text-slate-400 mt-1 block">Tiêu chuẩn: {roomType?.AdultCapacity || 2} khách</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Trẻ em (0 - 11t)</label>
+                  <div className="flex items-center rounded-lg bg-[#eff4ff] overflow-hidden border border-blue-100">
+                    <button 
+                      type="button"
+                      onClick={() => setChildrenCount(Math.max(0, childrenCount - 1))}
+                      className="px-3 py-2 text-slate-700 hover:bg-slate-200"
+                    >-</button>
+                    <span className="flex-1 text-center font-bold text-sm">{childrenCount}</span>
+                    <button 
+                      type="button"
+                      onClick={() => setChildrenCount(childrenCount + 1)}
+                      className="px-3 py-2 text-slate-700 hover:bg-slate-200"
+                    >+</button>
+                  </div>
+                  <span className="text-[11px] text-slate-400 mt-1 block">Tiêu chuẩn: {roomType?.ChildCapacity || 1} trẻ</span>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Số phòng đặt (1 - 5) *</label>
-                  <div className="flex items-center rounded-lg bg-[#eff4ff] overflow-hidden">
+                  <div className="flex items-center rounded-lg bg-[#eff4ff] overflow-hidden border border-blue-100">
                     <button 
                       type="button"
                       onClick={() => setUnitsAllocated(Math.max(1, unitsAllocated - 1))}
@@ -427,8 +530,17 @@ export default function BookingEngine() {
                       className="px-3 py-2 text-slate-700 hover:bg-slate-200"
                     >+</button>
                   </div>
+                  <span className="text-[11px] text-slate-400 mt-1 block">Tối đa 5 phòng</span>
                 </div>
               </div>
+              {pricingData && (pricingData.extraAdults > 0 || pricingData.extraChildren > 0) && (
+                <div className="mt-3 p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-amber-800 text-xs">
+                  <span className="material-symbols-outlined text-[18px] text-amber-600">info</span>
+                  <span>
+                    Số lượng khách vượt tiêu chuẩn phòng ({pricingData.extraAdults > 0 ? `+${pricingData.extraAdults} người lớn` : ''}{pricingData.extraAdults > 0 && pricingData.extraChildren > 0 ? ', ' : ''}{pricingData.extraChildren > 0 ? `+${pricingData.extraChildren} trẻ em` : ''}). Phụ thu sẽ được tính tự động vào bảng chi phí bên phải.
+                  </span>
+                </div>
+              )}
             </section>
 
             {/* Section 1: Guest Information */}
@@ -654,6 +766,40 @@ export default function BookingEngine() {
               </div>
 
               <div className="space-y-3">
+                {/* Addon 0: Daily Buffet Breakfast (FEAT-GUEST-06 / TC02) */}
+                <label className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
+                  addonBuffet ? 'bg-[#eff4ff] border-[#725b38]/40 shadow-sm' : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100/80'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox"
+                      checked={addonBuffet}
+                      onChange={(e) => setAddonBuffet(e.target.checked)}
+                      className="w-5 h-5 accent-[#725b38] rounded shrink-0 cursor-pointer"
+                    />
+                    <img 
+                      src="https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=200&auto=format&fit=crop&q=80" 
+                      alt="Buffet Sáng Hàng Ngày"
+                      className="w-16 h-14 rounded-lg object-cover shadow-xs shrink-0"
+                    />
+                    <div>
+                      <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                        <span>Bữa Sáng Buffet Hàng Ngày (Daily Buffet)</span>
+                        <span className="text-[11px] font-semibold text-[#725b38] bg-[#fedeb2] px-2 py-0.5 rounded-full">Phổ biến</span>
+                      </div>
+                      <div className="text-xs text-slate-500">Buffet ẩm thực Á-Âu thượng hạng không giới hạn tại nhà hàng Horizon Seafood</div>
+                    </div>
+                  </div>
+                  <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
+                    <div className="font-bold text-sm text-slate-900">
+                      +{pricingData?.currency === 'USD' ? '$25.00' : '250.000đ'}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      / đêm ({numberOfNights} đêm: {pricingData?.currency === 'USD' ? `$${(25 * numberOfNights).toFixed(2)}` : formatVND(250000 * numberOfNights)})
+                    </div>
+                  </div>
+                </label>
+
                 {/* Addon 1: Limousine Transfer */}
                 <label className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
                   addonLimo ? 'bg-[#eff4ff] border-[#725b38]/40 shadow-sm' : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100/80'
@@ -676,8 +822,64 @@ export default function BookingEngine() {
                     </div>
                   </div>
                   <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
-                    <div className="font-bold text-sm text-slate-900">+800.000đ</div>
+                    <div className="font-bold text-sm text-slate-900">
+                      +{pricingData?.currency === 'USD' ? '$35.00' : '800.000đ'}
+                    </div>
                     <div className="text-[11px] text-slate-400">/ chuyến khứ hồi</div>
+                  </div>
+                </label>
+
+                {/* Addon: Early Check-in */}
+                <label className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
+                  addonEarlyCI ? 'bg-[#eff4ff] border-[#725b38]/40 shadow-sm' : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100/80'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox"
+                      checked={addonEarlyCI}
+                      onChange={(e) => setAddonEarlyCI(e.target.checked)}
+                      className="w-5 h-5 accent-[#725b38] rounded shrink-0 cursor-pointer"
+                    />
+                    <div className="w-16 h-14 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center shadow-xs shrink-0">
+                      <span className="material-symbols-outlined text-[28px]">login</span>
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-slate-900">Nhận Phòng Sớm (Early Check-In từ 09:00)</div>
+                      <div className="text-xs text-slate-500">Ưu tiên nhận phòng sớm khi đến resort, đảm bảo phòng sạch sẽ sẵn sàng</div>
+                    </div>
+                  </div>
+                  <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
+                    <div className="font-bold text-sm text-slate-900">
+                      +{pricingData?.currency === 'USD' ? `$${(pricingData.baseRate * 0.5).toFixed(2)}` : formatVND(basePricePerNight * 0.5)}
+                    </div>
+                    <div className="text-[11px] text-slate-400">/ 50% giá đêm</div>
+                  </div>
+                </label>
+
+                {/* Addon: Late Check-out */}
+                <label className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
+                  addonLateCO ? 'bg-[#eff4ff] border-[#725b38]/40 shadow-sm' : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100/80'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox"
+                      checked={addonLateCO}
+                      onChange={(e) => setAddonLateCO(e.target.checked)}
+                      className="w-5 h-5 accent-[#725b38] rounded shrink-0 cursor-pointer"
+                    />
+                    <div className="w-16 h-14 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shadow-xs shrink-0">
+                      <span className="material-symbols-outlined text-[28px]">logout</span>
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-slate-900">Trả Phòng Trễ (Late Check-Out đến 18:00)</div>
+                      <div className="text-xs text-slate-500">Thư thả nghỉ ngơi, sử dụng hồ bơi và tiện ích resort trọn vẹn đến chiều tối</div>
+                    </div>
+                  </div>
+                  <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
+                    <div className="font-bold text-sm text-slate-900">
+                      +{pricingData?.currency === 'USD' ? `$${(pricingData.baseRate * 0.5).toFixed(2)}` : formatVND(basePricePerNight * 0.5)}
+                    </div>
+                    <div className="text-[11px] text-slate-400">/ 50% giá đêm</div>
                   </div>
                 </label>
 
@@ -703,7 +905,9 @@ export default function BookingEngine() {
                     </div>
                   </div>
                   <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
-                    <div className="font-bold text-sm text-slate-900">+900.000đ</div>
+                    <div className="font-bold text-sm text-slate-900">
+                      +{pricingData?.currency === 'USD' ? '$40.00' : '900.000đ'}
+                    </div>
                     <div className="text-[11px] text-slate-400">/ 2 người / sáng</div>
                   </div>
                 </label>
@@ -730,7 +934,9 @@ export default function BookingEngine() {
                     </div>
                   </div>
                   <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
-                    <div className="font-bold text-sm text-slate-900">+1.800.000đ</div>
+                    <div className="font-bold text-sm text-slate-900">
+                      +{pricingData?.currency === 'USD' ? '$80.00' : '1.800.000đ'}
+                    </div>
                     <div className="text-[11px] text-slate-400">/ 2 khách</div>
                   </div>
                 </label>
@@ -757,7 +963,9 @@ export default function BookingEngine() {
                     </div>
                   </div>
                   <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
-                    <div className="font-bold text-sm text-slate-900">+2.200.000đ</div>
+                    <div className="font-bold text-sm text-slate-900">
+                      +{pricingData?.currency === 'USD' ? '$100.00' : '2.200.000đ'}
+                    </div>
                     <div className="text-[11px] text-slate-400">/ 2 người</div>
                   </div>
                 </label>
@@ -854,7 +1062,7 @@ export default function BookingEngine() {
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-[#725b38] text-[20px]">calendar_month</span>
                     <div className="text-left">
-                      <div className="text-[11px] text-slate-500 font-medium">Lưu trú ({numberOfNights} đêm)</div>
+                      <div className="text-[11px] text-slate-500 font-medium">Lưu trú ({pricingData?.numberOfNights || numberOfNights} đêm)</div>
                       <div className="text-xs font-bold text-slate-900">
                         {formatDisplayDate(checkInDate)} - {formatDisplayDate(checkOutDate)}
                       </div>
@@ -864,34 +1072,100 @@ export default function BookingEngine() {
                     <span className="material-symbols-outlined text-[#725b38] text-[20px]">group</span>
                     <div className="text-right">
                       <div className="text-[11px] text-slate-500 font-medium">Khách &amp; Phòng</div>
-                      <div className="text-xs font-bold text-slate-900">{adultsCount} lớn • {unitsAllocated} phòng</div>
+                      <div className="text-xs font-bold text-slate-900">
+                        {adultsCount} lớn{childrenCount > 0 ? ` • ${childrenCount} trẻ` : ''} • {unitsAllocated} phòng
+                      </div>
                     </div>
                   </div>
                 </div>
 
+                {isCalculatingPricing && (
+                  <div className="flex items-center justify-center gap-2 py-1 text-xs text-[#725b38] bg-[#fedeb2]/40 rounded-lg animate-pulse">
+                    <span className="w-3.5 h-3.5 border-2 border-[#725b38] border-t-transparent rounded-full animate-spin"></span>
+                    <span>Đang cập nhật tính toán chi phí...</span>
+                  </div>
+                )}
+
                 {/* Calculation List */}
                 <div className="space-y-2.5 text-xs sm:text-sm text-slate-600 border-b border-slate-100 pb-4">
+                  {/* Tiền phòng gốc */}
                   <div className="flex justify-between items-center">
-                    <span>Giá biệt thự ({formatVND(basePricePerNight)} × {numberOfNights} đêm × {unitsAllocated} phòng)</span>
-                    <span className="font-semibold text-slate-900">{formatVND(roomSubtotal)}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center text-emerald-700">
-                    <span className="flex items-center gap-1 font-medium">
-                      <span className="material-symbols-outlined text-[16px]">stars</span>
-                      Ưu đãi Hội viên Gold (-10%)
+                    <div>
+                      <div className="font-medium text-slate-800">Tiền phòng gốc</div>
+                      <div className="text-[11px] text-slate-400">
+                        {pricingData?.numberOfNights || numberOfNights} đêm × {formatMoney(pricingData?.baseRate || basePricePerNight, pricingData?.currency)} × {unitsAllocated} phòng
+                      </div>
+                    </div>
+                    <span className="font-semibold text-slate-900">
+                      {formatMoney(pricingData?.roomSubtotal || roomSubtotal, pricingData?.currency)}
                     </span>
-                    <span className="font-bold">-{formatVND(goldDiscount)}</span>
                   </div>
 
-                  <div className="flex justify-between items-center">
-                    <span>Dịch vụ thêm đã chọn ({[addonLimo, addonFloating, addonSpa, addonBbq].filter(Boolean).length} món):</span>
-                    <span className="font-semibold text-slate-900">+{formatVND(addonsTotal)}</span>
+                  {/* Phụ thu khách phát sinh vượt chuẩn */}
+                  {pricingData && pricingData.extraGuestSurcharge > 0 && (
+                    <div className="p-2.5 rounded-lg bg-amber-50/80 border border-amber-200/60">
+                      <div className="flex justify-between items-center text-amber-900">
+                        <span className="flex items-center gap-1 font-semibold text-xs">
+                          <span className="material-symbols-outlined text-[16px] text-amber-600">person_add</span>
+                          Phụ thu khách vượt chuẩn:
+                        </span>
+                        <span className="font-bold text-amber-800">
+                          +{formatMoney(pricingData.extraGuestSurcharge, pricingData.currency)}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-amber-700 mt-0.5">
+                        {pricingData.extraAdults > 0 && `+${pricingData.extraAdults} người lớn vượt chuẩn (${formatMoney(pricingData.currency === 'USD' ? 30 : 500000, pricingData.currency)}/đêm)`}
+                        {pricingData.extraAdults > 0 && pricingData.extraChildren > 0 && ' • '}
+                        {pricingData.extraChildren > 0 && `+${pricingData.extraChildren} trẻ em vượt chuẩn (${formatMoney(pricingData.currency === 'USD' ? 15 : 250000, pricingData.currency)}/đêm)`}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Phụ thu tiện ích Add-on */}
+                  {pricingData?.addOnsBreakdown && pricingData.addOnsBreakdown.length > 0 && (
+                    <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                      <div className="flex justify-between items-center font-medium text-slate-800">
+                        <span>Tiện ích chọn thêm ({pricingData.addOnsBreakdown.length} món):</span>
+                        <span className="font-semibold text-slate-900">
+                          +{formatMoney(pricingData.addOnsTotal, pricingData.currency)}
+                        </span>
+                      </div>
+                      {pricingData.addOnsBreakdown.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-[11px] text-slate-500 pl-2">
+                          <span className="truncate pr-2">• {item.name} {item.quantity > 1 ? `(${item.quantity} đêm)` : ''}:</span>
+                          <span className="shrink-0 font-medium text-slate-700">+{formatMoney(item.total, pricingData.currency)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Ưu đãi hội viên Gold */}
+                  {pricingData && pricingData.discountAmount > 0 && (
+                    <div className="flex justify-between items-center text-emerald-700">
+                      <span className="flex items-center gap-1 font-medium">
+                        <span className="material-symbols-outlined text-[16px]">stars</span>
+                        Ưu đãi Hội viên Gold (-10%)
+                      </span>
+                      <span className="font-bold">-{formatMoney(pricingData.discountAmount, pricingData.currency)}</span>
+                    </div>
+                  )}
+
+                  {/* Chi phí trước thuế */}
+                  <div className="flex justify-between items-center text-slate-500 pt-1 border-t border-dashed border-slate-200">
+                    <span>Tổng chi phí trước thuế</span>
+                    <span className="font-medium text-slate-700">
+                      {formatMoney(pricingData?.subtotalBeforeTax || (roomSubtotal - goldDiscount + addonsTotal), pricingData?.currency)}
+                    </span>
                   </div>
 
-                  <div className="flex justify-between items-center text-slate-500 text-xs">
-                    <span>Thuế GTGT (8%) &amp; Phí phục vụ (5%)</span>
-                    <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-medium">Đã bao gồm</span>
+                  {/* Thuế GTGT & Phí dịch vụ 12% */}
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span className="flex items-center gap-1">
+                      <span>Thuế VAT &amp; Phí địa phương ({pricingData?.taxesAndFeesRate ? `${pricingData.taxesAndFeesRate * 100}%` : '12%'})</span>
+                    </span>
+                    <span className="font-medium text-slate-800">
+                      +{formatMoney(pricingData?.taxesAndFees || Math.round((roomSubtotal - goldDiscount + addonsTotal) * 0.12), pricingData?.currency)}
+                    </span>
                   </div>
                 </div>
 
@@ -900,14 +1174,14 @@ export default function BookingEngine() {
                   <div className="flex items-baseline justify-between">
                     <div>
                       <span className="text-xs uppercase font-bold text-slate-500 tracking-wider">Tổng thanh toán dự tính</span>
-                      <p className="text-xs text-slate-400">Cần cọc trước 50% để hoàn tất giữ chỗ</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Bao gồm trọn gói thuế &amp; phí dịch vụ</p>
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-serif font-bold text-[#725b38]">
-                        {formatVND(finalTotalAmount)}
+                        {formatMoney(pricingData?.totalAmount || finalTotalAmount, pricingData?.currency)}
                       </div>
-                      <div className="text-xs text-slate-600 font-medium">
-                        Cọc ngay: <strong className="text-slate-900 font-bold">{formatVND(depositRequired)}</strong>
+                      <div className="text-xs text-slate-600 font-medium mt-1">
+                        Cọc tối thiểu (20%): <strong className="text-slate-900 font-bold text-[13px]">{formatMoney(pricingData?.depositAmount || depositRequired, pricingData?.currency)}</strong>
                       </div>
                     </div>
                   </div>
@@ -1013,7 +1287,7 @@ export default function BookingEngine() {
                   <span className="font-bold text-slate-900">{formatVND(successBooking.totalAmount)}</span>
                 </div>
                 <div className="flex justify-between border-t border-blue-200/60 pt-2 text-[#725b38]">
-                  <span className="font-bold">Số tiền cọc cần thanh toán (50%):</span>
+                  <span className="font-bold">Số tiền cọc cần thanh toán (20%):</span>
                   <span className="font-bold text-base">{formatVND(successBooking.depositAmount)}</span>
                 </div>
               </div>
