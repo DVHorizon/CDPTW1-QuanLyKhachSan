@@ -49,3 +49,23 @@ CREATE TABLE IF NOT EXISTS `Users` (
   CONSTRAINT `fk_users_roles` FOREIGN KEY (`RoleId`) REFERENCES `Roles` (`RoleId`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_users_membership_tiers` FOREIGN KEY (`TierId`) REFERENCES `MembershipTiers` (`TierId`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Bảng RoomSearchIndex: Chỉ mục tìm kiếm Cây Nhị Phân (B-Tree Index) phục vụ Search Engine
+CREATE TABLE IF NOT EXISTS `RoomSearchIndex` (
+  `SearchIndexId` INT AUTO_INCREMENT PRIMARY KEY,
+  `RoomTypeId` INT NOT NULL,
+  `BranchId` INT NULL DEFAULT NULL,
+  `Keyword` VARCHAR(150) NOT NULL,
+  `KeywordUnaccent` VARCHAR(150) NOT NULL,
+  `Category` VARCHAR(100) NULL,
+  `BasePrice` DECIMAL(18, 2) NOT NULL,
+  `MaxOccupancy` INT NOT NULL DEFAULT 2,
+  `SearchVector` TEXT NULL,
+  `CreatedAt` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `UpdatedAt` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_search_keyword_btree` (`Keyword`) USING BTREE,
+  INDEX `idx_search_unaccent_btree` (`KeywordUnaccent`) USING BTREE,
+  INDEX `idx_search_filter_btree` (`BranchId`, `MaxOccupancy`, `BasePrice`) USING BTREE,
+  FULLTEXT KEY `ft_search_vector` (`SearchVector`),
+  CONSTRAINT `fk_searchindex_roomtypes` FOREIGN KEY (`RoomTypeId`) REFERENCES `RoomTypes` (`RoomTypeId`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
