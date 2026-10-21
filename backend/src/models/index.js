@@ -10,6 +10,7 @@ const defineMembershipTier = require('./MembershipTier');
 const defineUser = require('./User');
 const defineBooking = require('./Booking');
 const defineReview = require('./Review');
+const defineReviewPhoto = require('./ReviewPhoto');
 const defineMenuCategory = require('./MenuCategory');
 const defineMenuItem = require('./MenuItem');
 
@@ -21,6 +22,7 @@ const defineInvoiceDetail = require('./InvoiceDetail');
 const definePayment = require('./Payment');
 const defineServiceCategory = require('./ServiceCategory');
 const defineService = require('./Service');
+const defineServiceOrder = require('./ServiceOrder');
 const defineBookingGuest = require('./BookingGuest');
 
 // Initialize models
@@ -34,6 +36,7 @@ const User = defineUser(sequelize);
 const Booking = defineBooking(sequelize);
 const BookingGuest = defineBookingGuest(sequelize);
 const Review = defineReview(sequelize);
+const ReviewPhoto = defineReviewPhoto(sequelize);
 const MenuCategory = defineMenuCategory(sequelize);
 const MenuItem = defineMenuItem(sequelize);
 const Stay = defineStay(sequelize);
@@ -44,6 +47,7 @@ const InvoiceDetail = defineInvoiceDetail(sequelize);
 const Payment = definePayment(sequelize);
 const ServiceCategory = defineServiceCategory(sequelize);
 const Service = defineService(sequelize);
+const ServiceOrder = defineServiceOrder(sequelize);
 
 // Setup Relationships / Associations
 // 1. Role & User
@@ -79,6 +83,11 @@ BookingGuest.belongsTo(Booking, { foreignKey: 'BookingId', as: 'booking' });
 User.hasMany(Review, { foreignKey: 'UserId', as: 'reviews' });
 Review.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 
+// 7b. Review & ReviewPhoto
+Review.hasMany(ReviewPhoto, { foreignKey: 'ReviewId', as: 'photos' });
+ReviewPhoto.belongsTo(Review, { foreignKey: 'ReviewId', as: 'review' });
+
+
 // 8. MenuCategory & MenuItem
 MenuCategory.hasMany(MenuItem, { foreignKey: 'CategoryId' });
 MenuItem.belongsTo(MenuCategory, { foreignKey: 'CategoryId' });
@@ -105,8 +114,8 @@ Invoice.hasMany(InvoiceDetail, { foreignKey: 'InvoiceId', as: 'details' });
 InvoiceDetail.belongsTo(Invoice, { foreignKey: 'InvoiceId' });
 
 // Payments
-FoodOrder.hasMany(Payment, { foreignKey: 'FoodOrderId', as: 'payments' });
-Payment.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
+Booking.hasMany(Payment, { foreignKey: 'BookingId', as: 'payments' });
+Payment.belongsTo(Booking, { foreignKey: 'BookingId', as: 'booking' });
 
 // 13. FoodOrder & FoodOrderDetail
 FoodOrder.hasMany(FoodOrderDetail, { foreignKey: 'FoodOrderId', as: 'details' });
@@ -114,6 +123,12 @@ FoodOrderDetail.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId' });
 
 // 14. MenuItem & FoodOrderDetail
 MenuItem.hasMany(FoodOrderDetail, { foreignKey: 'MenuItemId' });
+FoodOrderDetail.belongsTo(MenuItem, { foreignKey: 'MenuItemId' });
+
+// 14b. FoodOrder & Review (FEAT-FNB-10)
+FoodOrder.hasOne(Review, { foreignKey: 'FoodOrderId', as: 'review' });
+Review.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId', as: 'foodOrder' });
+
 // 15. RestaurantTable & TableReservation
 const defineRestaurantTable = require('./RestaurantTable');
 const defineTableReservation = require('./TableReservation');
@@ -130,6 +145,16 @@ TableReservation.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 ServiceCategory.hasMany(Service, { foreignKey: 'CategoryId', as: 'services' });
 Service.belongsTo(ServiceCategory, { foreignKey: 'CategoryId', as: 'category' });
 
+// 16. ServiceOrder associations
+Stay.hasMany(ServiceOrder, { foreignKey: 'StayId', as: 'serviceOrders' });
+ServiceOrder.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
+
+Service.hasMany(ServiceOrder, { foreignKey: 'ServiceId', as: 'orders' });
+ServiceOrder.belongsTo(Service, { foreignKey: 'ServiceId', as: 'service' });
+
+User.hasMany(ServiceOrder, { foreignKey: 'CreatedBy', as: 'createdServiceOrders' });
+ServiceOrder.belongsTo(User, { foreignKey: 'CreatedBy', as: 'creator' });
+
 module.exports = {
   sequelize,
   Branch,
@@ -142,6 +167,7 @@ module.exports = {
   Booking,
   BookingGuest,
   Review,
+  ReviewPhoto,
   MenuCategory,
   MenuItem,
   Stay,
@@ -153,7 +179,8 @@ module.exports = {
   RestaurantTable,
   TableReservation,
   ServiceCategory,
-  Service
+  Service,
+  ServiceOrder,
 };
 
 

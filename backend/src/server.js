@@ -62,7 +62,8 @@ app.use('/api/v1/guest',      require('./modules/guest'));
 app.use('/api/v1/pms',        require('./modules/pms'));
 
 // 👤 Hà   — Services / Payment / AI
-app.use('/api/v1/services',   require('./modules/services'));
+app.use('/api/v1/services',       require('./modules/services'));
+app.use('/api/v1/service-orders', require('./modules/services/routes/serviceOrderRoutes'));
 
 // 👤 Trang — F&B
 app.use('/api/v1/fnb',                require('./modules/fnb'));
@@ -79,6 +80,11 @@ app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
 app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
 // FEAT-GUEST-05: Direct booking endpoint
 app.post('/bookings', require('./controllers/bookingEngineController').createOnlineBooking);
+
+// FEAT-GUEST-08: Direct deposit payment & booking retrieval endpoints
+app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController').getBookingDetails);
+app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
+app.post('/payments', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 app.use(require('./shared/middlewares/errorHandler'));
