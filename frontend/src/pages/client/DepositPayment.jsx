@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import Header from '../../components/layout/Header';
+import DepositInvoiceModal from '../../components/modals/DepositInvoiceModal';
 import { getBookingDetailsApi, processDepositPaymentApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
 
@@ -69,6 +70,7 @@ export default function DepositPayment() {
   const [errorMessage, setErrorMessage] = useState('');
   const [errorCode, setErrorCode] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   // Fetch Booking Details
   useEffect(() => {
@@ -1141,15 +1143,26 @@ export default function DepositPayment() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs uppercase transition-colors"
+                  onClick={() => setShowInvoiceModal(true)}
+                  className="px-5 py-3 bg-[#eff4ff] hover:bg-blue-100 text-[#725b38] hover:text-[#584323] font-bold rounded-xl text-xs uppercase tracking-wider transition-all border border-blue-200 flex items-center justify-center gap-1.5 shadow-xs"
                 >
-                  In Hóa Đơn Cọc
+                  <span className="material-symbols-outlined text-[18px]">print</span>
+                  <span>In Hóa Đơn Cọc</span>
                 </button>
               </div>
             </div>
           </div>
         )}
+
+        {/* Modal Xem & In Hóa Đơn Tiền Cọc A4 / PDF Chuẩn 5 Sao */}
+        <DepositInvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          booking={booking}
+          paymentSuccess={paymentSuccess}
+          paymentMethod={paymentMethod}
+          user={user}
+        />
 
       </main>
 

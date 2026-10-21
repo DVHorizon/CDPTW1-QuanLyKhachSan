@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import Header from '../../components/layout/Header';
+import DepositInvoiceModal from '../../components/modals/DepositInvoiceModal';
 import { getRoomDetailApi, createBookingApi, releaseRoomLockApi, calculatePricingApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
 
@@ -94,6 +95,7 @@ export default function BookingEngine() {
   const [errorMessage, setErrorMessage] = useState('');
   const [errorCode, setErrorCode] = useState('');
   const [successBooking, setSuccessBooking] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   // Automated Real-Time Pricing Engine State (FEAT-GUEST-06)
   const [pricingData, setPricingData] = useState(null);
@@ -1304,17 +1306,50 @@ export default function BookingEngine() {
                   <span>Thanh Toán Cọc Ngay (Bước 2)</span>
                   <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setSuccessBooking(null)}
-                  className="w-full py-2.5 text-xs text-slate-500 hover:text-slate-800 font-semibold transition-colors"
-                >
-                  Xem lại thông tin đơn
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowInvoiceModal(true)}
+                    className="flex-1 py-2.5 rounded-xl bg-[#eff4ff] hover:bg-blue-100 text-[#725b38] hover:text-[#584323] text-xs font-bold transition-all border border-blue-200 flex items-center justify-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">print</span>
+                    <span>In Phiếu Đặt Phòng / Hóa Đơn</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSuccessBooking(null)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs text-slate-600 hover:text-slate-900 font-semibold transition-colors"
+                  >
+                    Xem lại
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* Modal Xem & In Hóa Đơn / Phiếu Đặt Phòng Chuẩn A4 */}
+        <DepositInvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          booking={{
+            ...successBooking,
+            roomType,
+            adults: adultsCount,
+            children: childrenCount,
+            roomQuantity: unitsAllocated
+          }}
+          paymentSuccess={successBooking ? {
+            transactionCode: 'TXN-' + successBooking.bookingId + '-' + Date.now().toString().slice(-4),
+            confirmationCode: successBooking.confirmationCode,
+            amountPaid: successBooking.depositAmount,
+            remainingBalance: Math.max(0, (successBooking.totalAmount || 0) - (successBooking.depositAmount || 0)),
+            qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${successBooking.confirmationCode}`,
+            paymentDate: new Date()
+          } : null}
+          paymentMethod="BANK_TRANSFER"
+          user={user}
+        />
 
       </main>
 
