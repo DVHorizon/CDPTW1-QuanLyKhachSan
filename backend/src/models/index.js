@@ -24,11 +24,13 @@ const defineServiceCategory = require('./ServiceCategory');
 const defineService = require('./Service');
 const defineServiceOrder = require('./ServiceOrder');
 const defineBookingGuest = require('./BookingGuest');
+const defineRoomSearchIndex = require('./RoomSearchIndex');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
 const RoomType = defineRoomType(sequelize);
 const Room = defineRoom(sequelize);
+const RoomSearchIndex = defineRoomSearchIndex(sequelize);
 const Amenity = defineAmenity(sequelize);
 const Role = defineRole(sequelize);
 const MembershipTier = defineMembershipTier(sequelize);
@@ -152,14 +154,15 @@ ServiceOrder.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
 Service.hasMany(ServiceOrder, { foreignKey: 'ServiceId', as: 'orders' });
 ServiceOrder.belongsTo(Service, { foreignKey: 'ServiceId', as: 'service' });
 
-User.hasMany(ServiceOrder, { foreignKey: 'CreatedBy', as: 'createdServiceOrders' });
-ServiceOrder.belongsTo(User, { foreignKey: 'CreatedBy', as: 'creator' });
+RoomType.hasMany(RoomSearchIndex, { foreignKey: 'RoomTypeId', as: 'searchIndices' });
+RoomSearchIndex.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
 
 module.exports = {
   sequelize,
   Branch,
   RoomType,
   Room,
+  RoomSearchIndex,
   Amenity,
   Role,
   MembershipTier,
@@ -182,5 +185,6 @@ module.exports = {
   Service,
   ServiceOrder,
 };
+
 
 
