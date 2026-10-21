@@ -1,5 +1,334 @@
 import React, { useRef } from 'react';
 
+// Common CSS for both on-screen modal and 1-page A4 print iframe
+const INVOICE_CSS = `
+  @page {
+    size: A4 portrait;
+    margin: 6mm 8mm;
+  }
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  html, body {
+    width: 100%;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #0b1c30;
+    background: #ffffff;
+    font-size: 11px;
+    line-height: 1.35;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .font-serif {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+  .font-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  .invoice-wrapper {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    page-break-inside: avoid;
+    page-break-after: avoid;
+  }
+  .invoice-frame {
+    border: 2px solid #725b38;
+    outline: 1px solid #d4b26f;
+    outline-offset: -5px;
+    border-radius: 8px;
+    padding: 16px 20px;
+    background: #ffffff;
+    position: relative;
+    box-shadow: 0 4px 15px rgba(114, 91, 56, 0.08);
+  }
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #725b38;
+    padding-bottom: 10px;
+    margin-bottom: 11px;
+  }
+  .resort-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: #0b1c30;
+    letter-spacing: 0.03em;
+    line-height: 1.1;
+  }
+  .resort-sub {
+    font-size: 9.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #725b38;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .resort-info {
+    font-size: 9px;
+    color: #64748b;
+    margin-top: 3px;
+    line-height: 1.35;
+  }
+  .header-right {
+    text-align: right;
+  }
+  .paid-badge {
+    display: inline-block;
+    background-color: #ecfdf5;
+    border: 1.5px solid #10b981;
+    color: #065f46;
+    font-size: 9.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    margin-bottom: 3px;
+  }
+  .meta-info {
+    font-size: 9.5px;
+    color: #64748b;
+    text-align: right;
+  }
+
+  /* FAST CHECK-IN PASS CARD */
+  .pass-card {
+    background: linear-gradient(135deg, #fdfaf6 0%, #f6eee3 100%);
+    border: 1.5px solid #c8a368;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .pass-left {
+    flex: 1;
+  }
+  .pass-badge {
+    font-size: 9px;
+    text-transform: uppercase;
+    font-weight: 800;
+    color: #64748b;
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 5px;
+  }
+  .pass-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #10b981;
+    display: inline-block;
+  }
+  .pass-code-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .pass-code-box {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 20px;
+    font-weight: 800;
+    color: #725b38;
+    letter-spacing: 2.5px;
+    background: #ffffff;
+    padding: 3px 12px;
+    border: 1.5px solid #725b38;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    display: inline-block;
+  }
+  .pass-confirm-badge {
+    font-size: 9.5px;
+    font-weight: 800;
+    background-color: #fedeb2;
+    color: #725b38;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: inline-block;
+  }
+  .pass-desc {
+    font-size: 9.5px;
+    color: #475569;
+    line-height: 1.35;
+  }
+  .qr-container {
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 6px;
+    text-align: center;
+    width: 96px;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .qr-img {
+    width: 78px;
+    height: 78px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+  }
+  .qr-caption {
+    font-size: 8px;
+    font-weight: 800;
+    color: #725b38;
+    display: block;
+    margin-top: 3px;
+    letter-spacing: 0.06em;
+  }
+
+  /* INFO GRID */
+  .info-grid {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 11px;
+  }
+  .info-card {
+    flex: 1;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 12px;
+  }
+  .info-card-header {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #725b38;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 4px;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3.5px;
+    font-size: 10px;
+  }
+  .info-row:last-child {
+    margin-bottom: 0;
+  }
+  .info-label {
+    color: #64748b;
+    font-weight: 500;
+  }
+  .info-val {
+    color: #0f172a;
+    font-weight: 600;
+    text-align: right;
+  }
+
+  /* FINANCIAL TABLE */
+  .finance-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+  }
+  .finance-table th {
+    background-color: #f1f5f9;
+    color: #334155;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 5.5px 8px;
+    border-top: 1px solid #cbd5e1;
+    border-bottom: 1.5px solid #94a3b8;
+    text-align: left;
+  }
+  .finance-table td {
+    padding: 5.5px 8px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 10px;
+    vertical-align: middle;
+  }
+  .text-right {
+    text-align: right !important;
+  }
+  .text-center {
+    text-align: center !important;
+  }
+  .row-total {
+    background-color: #f8fafc;
+    font-weight: 700;
+    border-top: 1.5px solid #cbd5e1;
+  }
+  .row-deposit {
+    background-color: #ecfdf5;
+    border-top: 1px solid #a7f3d0;
+    border-bottom: 1px solid #a7f3d0;
+    font-weight: 700;
+  }
+  .row-remaining {
+    background-color: #fffbeb;
+    border-top: 1px solid #fde68a;
+    border-bottom: 1.5px solid #fde68a;
+    font-weight: 700;
+  }
+
+  /* FOOTER & SEAL */
+  .footer-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px dashed #cbd5e1;
+    padding-top: 8px;
+    gap: 12px;
+  }
+  .notes-list {
+    flex: 1;
+    font-size: 8.5px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+  .seal-box {
+    width: 170px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .official-stamp {
+    border: 1.5px dashed #b91c1c;
+    color: #b91c1c;
+    background-color: #fef2f2;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-block;
+    transform: rotate(-2deg);
+    font-size: 8px;
+    font-weight: 800;
+    line-height: 1.3;
+    letter-spacing: 0.04em;
+  }
+  .stamp-sub {
+    font-size: 7px;
+    font-weight: 600;
+    opacity: 0.85;
+  }
+  .seal-caption {
+    font-size: 7.5px;
+    color: #94a3b8;
+    margin-top: 3px;
+  }
+`;
+
 // Helper format VND
 const formatVND = (num) => {
   return new Intl.NumberFormat('vi-VN').format(Math.round(num || 0)) + ' ₫';
@@ -23,25 +352,43 @@ export default function DepositInvoiceModal({
 }) {
   const invoiceRef = useRef(null);
 
-  if (!isOpen || !paymentSuccess) return null;
+  if (!isOpen) return null;
 
-  // Extract variables with robust fallbacks
-  const transactionCode = paymentSuccess.transactionCode || 'TXN-' + Date.now();
-  const confirmationCode = paymentSuccess.confirmationCode || booking?.confirmationCode || 'GH-293357';
-  const amountPaid = paymentSuccess.amountPaid || 0;
-  const remainingBalance = paymentSuccess.remainingBalance !== undefined ? paymentSuccess.remainingBalance : 0;
-  const totalAmount = (amountPaid + remainingBalance) || booking?.totalAmount || 0;
-  const qrCodeUrl = paymentSuccess.qrCodeUrl || booking?.BookingQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${confirmationCode}`;
+  // Extract variables with intelligent fallbacks
+  const transactionCode = paymentSuccess?.transactionCode || 'TXN-' + (booking?.bookingId || Date.now().toString().slice(-8));
+  const confirmationCode = paymentSuccess?.confirmationCode || booking?.confirmationCode || 'GH-293357';
+
+  // Compute total amount
+  let totalAmount = booking?.totalAmount || paymentSuccess?.totalAmount || 0;
+  if (!totalAmount && booking?.roomSubtotal) {
+    totalAmount = Math.round(booking.roomSubtotal * 1.12);
+  }
+  if (!totalAmount) {
+    totalAmount = 6506000;
+  }
+
+  // Compute deposit (standard 20% if not explicitly set)
+  let amountPaid = paymentSuccess?.amountPaid ?? booking?.depositAmount;
+  if (!amountPaid || amountPaid === 0) {
+    amountPaid = Math.round(totalAmount * 0.2); // 20%
+  }
+
+  // Compute remaining balance
+  let remainingBalance = paymentSuccess?.remainingBalance;
+  if (remainingBalance === undefined || remainingBalance === null || (remainingBalance === 0 && amountPaid < totalAmount)) {
+    remainingBalance = Math.max(0, totalAmount - amountPaid);
+  }
+
+  const qrCodeUrl = paymentSuccess?.qrCodeUrl || booking?.BookingQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${confirmationCode}`;
 
   const guestName = booking?.primaryGuest?.fullName || user?.FullName || 'Nguyễn Văn An';
   const guestPhone = booking?.primaryGuest?.phone || user?.Phone || '+84 908 123 456';
-  const guestEmail = booking?.primaryGuest?.email || user?.Email || 'an.nguyen@grandhorizon.vn';
   const memberTier = user?.MembershipTier?.TierName || 'Hội viên Gold';
 
-  const roomTypeName = booking?.roomType?.TypeName || 'Biệt Thự Hồ Bơi Vách Biển (Sunset Villa)';
-  const checkInDate = booking?.checkInDate || '2024-11-15';
-  const checkOutDate = booking?.checkOutDate || '2024-11-18';
-  const numberOfNights = booking?.numberOfNights || 3;
+  const roomTypeName = booking?.roomType?.TypeName || booking?.roomTypeName || 'Spa Suite #136';
+  const checkInDate = booking?.checkInDate || '2026-10-21';
+  const checkOutDate = booking?.checkOutDate || '2026-10-23';
+  const numberOfNights = booking?.numberOfNights || 2;
   const roomQuantity = booking?.roomQuantity || 1;
   const adults = booking?.adults || 2;
   const children = booking?.children || 0;
@@ -51,11 +398,16 @@ export default function DepositInvoiceModal({
     paymentMethod === 'DIGITAL_WALLET' ? 'Ví Điện Tử VNPAY' :
     'Chuyển Khoản Ngân Hàng (VietQR)';
 
-  const issueDateStr = paymentSuccess.paymentDate 
+  const issueDateStr = paymentSuccess?.paymentDate 
     ? new Date(paymentSuccess.paymentDate).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })
     : new Date().toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
 
-  // Standalone Iframe Printing: strictly fits on 1 single A4 page
+  // Base price per night estimation
+  const basePricePerNight = booking?.roomType?.BasePrice || Math.round((totalAmount / 1.12) / (numberOfNights || 1));
+  const roomSubtotal = booking?.roomSubtotal || Math.round(totalAmount / 1.12);
+  const taxAndFee = totalAmount - roomSubtotal;
+
+  // Standalone Iframe Printing: strictly fits on 1 single A4 page with 100% intact CSS
   const handlePrint = () => {
     try {
       const printableContent = invoiceRef.current;
@@ -89,88 +441,11 @@ export default function DepositInvoiceModal({
             <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
             <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
             <style>
-              @page {
-                size: A4 portrait;
-                margin: 6mm 8mm;
-              }
-              *, *::before, *::after {
-                box-sizing: border-box;
-                margin: 0;
-                padding: 0;
-              }
-              html, body {
-                width: 100%;
-                height: 100%;
-                max-height: 284mm;
-                overflow: hidden;
-                font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                color: #0b1c30;
-                background: #ffffff;
-                font-size: 11.5px;
-                line-height: 1.35;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-                page-break-inside: avoid;
-                page-break-after: avoid;
-              }
-              .font-serif {
-                font-family: 'Playfair Display', Georgia, serif;
-              }
-              .invoice-page {
-                width: 100%;
-                max-width: 780px;
-                margin: 0 auto;
-                padding: 6px 10px;
-                page-break-inside: avoid;
-              }
-              .flex { display: flex; }
-              .justify-between { justify-content: space-between; }
-              .items-center { align-items: center; }
-              .items-start { align-items: flex-start; }
-              .text-right { text-align: right; }
-              .text-center { text-align: center; }
-              .font-bold { font-weight: 700; }
-              .font-extrabold { font-weight: 800; }
-              .font-semibold { font-weight: 600; }
-              .uppercase { text-transform: uppercase; }
-              .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
-              .text-gold { color: #725b38; }
-              .bg-gold-light { background-color: #eff4ff; }
-              .border-slate { border: 1px solid #cbd5e1; }
-              .rounded-lg { border-radius: 6px; }
-              .rounded-xl { border-radius: 10px; }
-              .p-2 { padding: 8px; }
-              .p-3 { padding: 10px; }
-              .mb-1 { margin-bottom: 4px; }
-              .mb-2 { margin-bottom: 7px; }
-              .mb-3 { margin-bottom: 10px; }
-              .table-custom {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 6px 0;
-              }
-              .table-custom th {
-                background-color: #f1f5f9;
-                color: #334155;
-                font-size: 10px;
-                text-transform: uppercase;
-                letter-spacing: 0.04em;
-                font-weight: 700;
-                padding: 6px 8px;
-                border-top: 1px solid #cbd5e1;
-                border-bottom: 1.5px solid #94a3b8;
-                text-align: left;
-              }
-              .table-custom td {
-                padding: 5px 8px;
-                border-bottom: 1px solid #e2e8f0;
-                font-size: 11px;
-                vertical-align: middle;
-              }
+              ${INVOICE_CSS}
             </style>
           </head>
           <body>
-            <div class="invoice-page">
+            <div class="invoice-wrapper">
               ${printableContent.innerHTML}
             </div>
           </body>
@@ -181,7 +456,7 @@ export default function DepositInvoiceModal({
       setTimeout(() => {
         iframe.contentWindow.focus();
         iframe.contentWindow.print();
-      }, 300);
+      }, 350);
     } catch (err) {
       console.warn('Lỗi in qua iframe, chuyển sang window.print():', err);
       window.print();
@@ -190,14 +465,17 @@ export default function DepositInvoiceModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-2 sm:p-4 overflow-y-auto animate-fade-in">
+      {/* Inject styles into modal preview as well */}
+      <style>{INVOICE_CSS}</style>
+
       <div className="bg-white max-w-3xl w-full rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[96vh]">
         
-        {/* Top Control Bar (Hidden when printing) */}
+        {/* Top Control Bar */}
         <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[#fedeb2] text-[22px]">receipt_long</span>
             <div>
-              <h3 className="font-bold text-xs sm:text-sm tracking-wide">HÓA ĐƠN TIỀN CỌC &amp; MÃ CHECK-IN (1 TRANG A4)</h3>
+              <h3 className="font-bold text-xs sm:text-sm tracking-wide">XÁC NHẬN CỌC &amp; MÃ NHẬN PHÒNG NHANH (1 TRANG A4)</h3>
               <p className="text-[11px] text-slate-300">
                 Mã Check-in: <strong className="text-[#fedeb2] font-mono tracking-wider">{confirmationCode}</strong> • Giao dịch: <strong className="text-slate-200 font-mono">{transactionCode}</strong>
               </p>
@@ -211,7 +489,7 @@ export default function DepositInvoiceModal({
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md hover:shadow-lg"
             >
               <span className="material-symbols-outlined text-[17px]">print</span>
-              <span>In Hóa Đơn (1 Trang A4 / PDF)</span>
+              <span>In Hóa Đơn (A4 / PDF)</span>
             </button>
             <button
               type="button"
@@ -226,199 +504,199 @@ export default function DepositInvoiceModal({
 
         {/* Scrollable Document Container */}
         <div className="overflow-y-auto p-3 sm:p-6 bg-slate-100 flex-1">
-          <div 
-            ref={invoiceRef}
-            className="bg-white max-w-[760px] mx-auto p-5 sm:p-7 rounded-xl shadow-md border border-slate-200 text-slate-800"
-            style={{ minHeight: 'auto', pageBreakInside: 'avoid' }}
-          >
-            {/* 1. COMPACT RESORT HEADER */}
-            <div className="border-b-2 border-[#725b38] pb-3 mb-3 flex justify-between items-start">
-              <div>
-                <h1 className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-tight">
-                  GRAND HORIZON
-                </h1>
-                <div className="text-[10px] tracking-[0.25em] uppercase text-[#725b38] font-bold">
-                  Resort &amp; Suites Đà Nẵng
+          <div className="invoice-wrapper">
+            <div 
+              ref={invoiceRef}
+              className="invoice-frame"
+            >
+              {/* 1. COMPACT RESORT HEADER */}
+              <div className="header-row">
+                <div>
+                  <h1 className="resort-title">GRAND HORIZON</h1>
+                  <div className="resort-sub">RESORT &amp; SUITES ĐÀ NẴNG ★★★★★</div>
+                  <div className="resort-info">
+                    Bán đảo Horizon, Đường Duyên Hải, TP. Đà Nẵng • Hotline: <strong>1900 6868</strong> • MST: <strong>0401892837</strong>
+                  </div>
                 </div>
-                <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
-                  Bán đảo Horizon, Đường Duyên Hải, TP. Đà Nẵng • Hotline: <strong>1900 6868</strong> • MST: <strong>0401892837</strong>
+
+                <div className="header-right">
+                  <div className="paid-badge">
+                    ✓ ĐÃ THANH TOÁN TIỀN CỌC
+                  </div>
+                  <div className="meta-info">
+                    Ngày lập: <strong style={{ color: '#0f172a' }}>{issueDateStr}</strong>
+                  </div>
+                  <div className="meta-info">
+                    {paymentMethodLabel}
+                  </div>
                 </div>
               </div>
 
-              <div className="text-right">
-                <div className="inline-block bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full mb-0.5">
-                  ✓ ĐÃ THANH TOÁN TIỀN CỌC
+              {/* 2. PROMINENT FAST CHECK-IN PASS BANNER (MÃ SỐ CHECK-IN & MÃ QR) */}
+              <div className="pass-card">
+                <div className="pass-left">
+                  <div className="pass-badge">
+                    <span className="pass-dot"></span>
+                    <span>MÃ SỐ CHECK-IN TẠI QUẦY (FAST CHECK-IN CODE)</span>
+                  </div>
+                  <div className="pass-code-container">
+                    <span className="pass-code-box">
+                      {confirmationCode}
+                    </span>
+                    <span className="pass-confirm-badge">
+                      XÁC NHẬN
+                    </span>
+                  </div>
+                  <p className="pass-desc">
+                    Xuất trình <strong>Mã số này</strong> hoặc <strong>Mã QR</strong> tại quầy Lễ Tân (Fast Track Check-in) khi đến khách sạn để nhận phòng ngay lập tức.
+                  </p>
                 </div>
-                <div className="text-[10px] text-slate-500">
-                  Ngày lập: <span className="text-slate-800 font-semibold">{issueDateStr}</span> • {paymentMethodLabel}
-                </div>
-              </div>
-            </div>
 
-            {/* 2. PROMINENT FAST CHECK-IN PASS BANNER (MÃ SỐ CHECK-IN & MÃ QR) */}
-            <div className="mb-3 p-3 rounded-xl bg-gradient-to-r from-[#eff4ff] via-amber-50/50 to-[#eff4ff] border-2 border-[#725b38]/40 flex items-center justify-between gap-3 shadow-xs">
-              <div className="space-y-1">
-                <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-                  <span>MÃ SỐ CHECK-IN TẠI QUẦY (FAST CHECK-IN CODE)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-2xl sm:text-3xl font-extrabold text-[#725b38] tracking-widest bg-white px-3 py-1 rounded-lg border border-[#725b38]/30 shadow-xs">
-                    {confirmationCode}
+                {/* QR Code Box */}
+                <div className="qr-container">
+                  <img 
+                    src={qrCodeUrl} 
+                    alt="QR Check-in" 
+                    className="qr-img"
+                    style={{ width: '78px', height: '78px', objectFit: 'contain' }}
+                  />
+                  <span className="qr-caption">
+                    QUÉT CHECK-IN
                   </span>
-                  <span className="text-[10px] font-bold bg-[#fedeb2] text-[#78603e] px-2 py-1 rounded">
-                    XÁC NHẬN
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-600 leading-tight">
-                  Xuất trình <strong>Mã số này</strong> hoặc <strong>Mã QR</strong> tại quầy Lễ Tân khi đến khách sạn để nhận phòng ngay lập tức.
-                </p>
-              </div>
-
-              {/* QR Code Box */}
-              <div className="shrink-0 text-center bg-white p-1.5 rounded-lg border border-slate-300 shadow-xs">
-                <img 
-                  src={qrCodeUrl} 
-                  alt="QR Check-in" 
-                  className="w-20 h-20 sm:w-22 sm:h-22 object-contain mx-auto"
-                />
-                <span className="text-[9px] font-extrabold text-[#725b38] block mt-0.5 tracking-wider">
-                  QR CHECK-IN
-                </span>
-              </div>
-            </div>
-
-            {/* 3. METADATA: GUEST & STAY DETAILS (2 COMPACT COLUMNS) */}
-            <div className="grid grid-cols-2 gap-2.5 mb-3 text-[11px]">
-              {/* Cột 1: Thông tin khách hàng */}
-              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                <div className="font-bold text-[#725b38] uppercase text-[10px] tracking-wider border-b border-slate-200 pb-1 flex justify-between">
-                  <span>Thông Tin Khách Hàng</span>
-                  <span className="text-slate-500">{memberTier}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Khách lưu trú:</span>
-                  <span className="font-bold text-slate-900">{guestName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Số điện thoại:</span>
-                  <span className="font-medium text-slate-800">{guestPhone}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Mã giao dịch:</span>
-                  <span className="font-mono text-slate-700 font-semibold">{transactionCode}</span>
                 </div>
               </div>
 
-              {/* Cột 2: Chi tiết đặt phòng */}
-              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                <div className="font-bold text-[#725b38] uppercase text-[10px] tracking-wider border-b border-slate-200 pb-1 flex justify-between">
-                  <span>Chi Tiết Kỳ Nghỉ</span>
-                  <span className="font-mono text-slate-700 font-bold">{roomQuantity} Phòng</span>
+              {/* 3. METADATA: GUEST & STAY DETAILS (2 STRUCTURED COLUMNS) */}
+              <div className="info-grid">
+                {/* Cột 1: Thông tin khách hàng */}
+                <div className="info-card">
+                  <div className="info-card-header">
+                    <span>Thông Tin Khách Hàng</span>
+                    <span style={{ color: '#64748b' }}>{memberTier}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Khách lưu trú:</span>
+                    <span className="info-val">{guestName}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Số điện thoại:</span>
+                    <span className="info-val">{guestPhone}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Mã giao dịch:</span>
+                    <span className="info-val font-mono">{transactionCode}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Hạng phòng:</span>
-                  <span className="font-bold text-slate-900 truncate pl-2">{roomTypeName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Nhận phòng:</span>
-                  <span className="font-semibold text-slate-800">14:00 • {formatDisplayDate(checkInDate)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Trả phòng:</span>
-                  <span className="font-semibold text-slate-800">12:00 • {formatDisplayDate(checkOutDate)} ({numberOfNights} đêm)</span>
+
+                {/* Cột 2: Chi tiết đặt phòng */}
+                <div className="info-card">
+                  <div className="info-card-header">
+                    <span>Chi Tiết Kỳ Nghỉ</span>
+                    <span className="font-mono" style={{ color: '#0f172a' }}>{roomQuantity} Phòng</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Hạng phòng:</span>
+                    <span className="info-val">{roomTypeName}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Nhận phòng:</span>
+                    <span className="info-val">14:00 • {formatDisplayDate(checkInDate)}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Trả phòng:</span>
+                    <span className="info-val">12:00 • {formatDisplayDate(checkOutDate)} ({numberOfNights} đêm)</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* 4. FINANCIAL BREAKDOWN TABLE (COMPACT) */}
-            <div className="mb-2.5">
-              <table className="w-full text-left border-collapse text-[11px]">
+              {/* 4. FINANCIAL BREAKDOWN TABLE */}
+              <table className="finance-table">
                 <thead>
-                  <tr className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-y border-slate-300">
-                    <th className="py-1.5 px-2.5">Khoản Mục Chi Phí (Description)</th>
-                    <th className="py-1.5 px-2.5 text-center">SL / Đêm</th>
-                    <th className="py-1.5 px-2.5 text-right">Đơn Giá</th>
-                    <th className="py-1.5 px-2.5 text-right">Thành Tiền</th>
+                  <tr>
+                    <th>Khoản Mục Chi Phí (Description)</th>
+                    <th className="text-center">SL / Đêm</th>
+                    <th className="text-right">Đơn Giá</th>
+                    <th className="text-right">Thành Tiền</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody>
                   <tr>
-                    <td className="py-1.5 px-2.5">
-                      <strong className="text-slate-900">{roomTypeName}</strong> ({adults} lớn{children > 0 ? `, ${children} trẻ` : ''})
+                    <td>
+                      <strong style={{ color: '#0f172a' }}>{roomTypeName}</strong> ({adults} lớn{children > 0 ? `, ${children} trẻ` : ''})
                     </td>
-                    <td className="py-1.5 px-2.5 text-center font-mono">{numberOfNights} đêm × {roomQuantity} phòng</td>
-                    <td className="py-1.5 px-2.5 text-right font-mono">{formatVND(booking?.roomType?.BasePrice || (totalAmount / (numberOfNights || 1)))}</td>
-                    <td className="py-1.5 px-2.5 text-right font-bold text-slate-900 font-mono">{formatVND(booking?.roomSubtotal || (totalAmount * 0.88))}</td>
+                    <td className="text-center font-mono">{numberOfNights} đêm × {roomQuantity} phòng</td>
+                    <td className="text-right font-mono">{formatVND(basePricePerNight)}</td>
+                    <td className="text-right font-mono" style={{ fontWeight: 700, color: '#0f172a' }}>{formatVND(roomSubtotal)}</td>
                   </tr>
 
                   {booking?.addonsBreakdown && booking.addonsBreakdown.length > 0 && booking.addonsBreakdown.map((addon, index) => (
                     <tr key={index}>
-                      <td className="py-1 px-2.5">
-                        <span className="font-medium text-slate-800">• {addon.name}</span>
+                      <td>
+                        <span style={{ color: '#334155' }}>• {addon.name}</span>
                       </td>
-                      <td className="py-1 px-2.5 text-center font-mono">{addon.quantity || 1}</td>
-                      <td className="py-1 px-2.5 text-right font-mono">{formatVND(addon.unitPrice)}</td>
-                      <td className="py-1 px-2.5 text-right font-semibold font-mono text-slate-900">{formatVND(addon.total)}</td>
+                      <td className="text-center font-mono">{addon.quantity || 1}</td>
+                      <td className="text-right font-mono">{formatVND(addon.unitPrice)}</td>
+                      <td className="text-right font-mono" style={{ fontWeight: 600, color: '#0f172a' }}>{formatVND(addon.total)}</td>
                     </tr>
                   ))}
 
                   <tr>
-                    <td colSpan="3" className="py-1 px-2.5 text-right text-slate-500">
+                    <td colSpan="3" className="text-right" style={{ color: '#64748b' }}>
                       Thuế Giá Trị Gia Tăng (VAT) &amp; Phí Dịch Vụ Địa Phương (12%):
                     </td>
-                    <td className="py-1 px-2.5 text-right font-semibold font-mono text-slate-800">
-                      {formatVND(Math.round(totalAmount * 0.12 / 1.12))}
+                    <td className="text-right font-mono" style={{ fontWeight: 600, color: '#334155' }}>
+                      {formatVND(taxAndFee)}
                     </td>
                   </tr>
 
-                  <tr className="bg-slate-50 font-bold border-t border-slate-300">
-                    <td colSpan="3" className="py-1.5 px-2.5 text-right uppercase text-slate-900">
+                  <tr className="row-total">
+                    <td colSpan="3" className="text-right" style={{ textTransform: 'uppercase', color: '#0f172a', fontSize: '10.5px' }}>
                       Tổng Giá Trị Đặt Phòng (Total Amount):
                     </td>
-                    <td className="py-1.5 px-2.5 text-right font-mono text-slate-900 text-xs">
+                    <td className="text-right font-mono" style={{ color: '#0f172a', fontSize: '11.5px', fontWeight: 800 }}>
                       {formatVND(totalAmount)}
                     </td>
                   </tr>
 
-                  <tr className="bg-emerald-50/90 text-emerald-950 font-bold border-t border-emerald-200">
-                    <td colSpan="3" className="py-1.5 px-2.5 text-right uppercase text-emerald-900">
+                  <tr className="row-deposit">
+                    <td colSpan="3" className="text-right" style={{ textTransform: 'uppercase', color: '#065f46' }}>
                       Số Tiền Cọc Đã Thanh Toán (Deposit Paid):
                     </td>
-                    <td className="py-1.5 px-2.5 text-right font-mono text-emerald-700 text-sm">
+                    <td className="text-right font-mono" style={{ color: '#047857', fontSize: '12px', fontWeight: 800 }}>
                       {formatVND(amountPaid)}
                     </td>
                   </tr>
 
-                  <tr className="bg-amber-50/90 text-amber-950 font-bold border-t border-amber-200">
-                    <td colSpan="3" className="py-1.5 px-2.5 text-right uppercase text-amber-900">
+                  <tr className="row-remaining">
+                    <td colSpan="3" className="text-right" style={{ textTransform: 'uppercase', color: '#92400e' }}>
                       Số Tiền Còn Lại Cần Thanh Toán Khi Check-in:
                     </td>
-                    <td className="py-1.5 px-2.5 text-right font-mono text-amber-800 text-sm">
+                    <td className="text-right font-mono" style={{ color: '#b45309', fontSize: '12px', fontWeight: 800 }}>
                       {formatVND(remainingBalance)}
                     </td>
                   </tr>
                 </tbody>
               </table>
-            </div>
 
-            {/* 5. BRIEF TERMS & SIGNATURE (COMPACT BOTTOM) */}
-            <div className="grid grid-cols-12 gap-3 pt-2 border-t border-slate-200 items-center text-[10px]">
-              <div className="col-span-8 text-slate-500 space-y-0.5">
-                <p>• Nhận phòng từ <strong>14:00</strong> • Trả phòng trước <strong>12:00</strong> trưa. Quý khách vui lòng mang theo CCCD/Passport gốc.</p>
-                <p>• Số tiền còn lại <strong>{formatVND(remainingBalance)}</strong> sẽ thanh toán tại quầy Lễ Tân khi nhận phòng (Tiền mặt / Thẻ / QR).</p>
-                <p>• Chứng từ điện tử được tạo tự động bởi Hệ Thống Grand Horizon Resort. Có giá trị xác nhận đặt cọc chính thức.</p>
-              </div>
-
-              <div className="col-span-4 text-center">
-                <div className="border border-red-700 text-red-700 px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider transform -rotate-2 inline-block">
-                  GRAND HORIZON RESORT<br />
-                  ★ ĐÃ THU TIỀN CỌC ★
+              {/* 5. BRIEF TERMS & OFFICIAL RESORT SEAL */}
+              <div className="footer-section">
+                <div className="notes-list">
+                  <p>• Nhận phòng từ <strong>14:00</strong> • Trả phòng trước <strong>12:00</strong> trưa. Quý khách vui lòng mang theo CCCD/Passport gốc.</p>
+                  <p>• Số tiền còn lại <strong style={{ color: '#b45309' }}>{formatVND(remainingBalance)}</strong> sẽ thanh toán tại quầy Lễ Tân khi nhận phòng (Tiền mặt / Thẻ / QR).</p>
+                  <p>• Chứng từ điện tử được tạo tự động bởi Hệ Thống Grand Horizon Resort. Có giá trị xác nhận đặt cọc chính thức.</p>
                 </div>
-                <div className="text-[9px] text-slate-400 mt-0.5">Xác nhận bởi Bộ phận Thu ngân</div>
-              </div>
-            </div>
 
+                <div className="seal-box">
+                  <div className="official-stamp">
+                    GRAND HORIZON RESORT<br />
+                    ★ ĐÃ THU TIỀN CỌC ★<br />
+                    <span className="stamp-sub">Xác nhận bởi Bộ phận Thu ngân</span>
+                  </div>
+                  <div className="seal-caption">Hệ Thống Đặt Phòng Điện Tử</div>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
 

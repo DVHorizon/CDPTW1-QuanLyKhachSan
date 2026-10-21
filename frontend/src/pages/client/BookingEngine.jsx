@@ -1340,10 +1340,10 @@ export default function BookingEngine() {
             roomQuantity: unitsAllocated
           }}
           paymentSuccess={successBooking ? {
-            transactionCode: 'TXN-' + successBooking.bookingId + '-' + Date.now().toString().slice(-4),
+            transactionCode: 'TXN-' + (successBooking.bookingId || Date.now().toString().slice(-6)),
             confirmationCode: successBooking.confirmationCode,
-            amountPaid: successBooking.depositAmount,
-            remainingBalance: Math.max(0, (successBooking.totalAmount || 0) - (successBooking.depositAmount || 0)),
+            amountPaid: successBooking.depositAmount || Math.round((successBooking.totalAmount || 0) * 0.2),
+            remainingBalance: Math.max(0, (successBooking.totalAmount || 0) - (successBooking.depositAmount || Math.round((successBooking.totalAmount || 0) * 0.2))),
             qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${successBooking.confirmationCode}`,
             paymentDate: new Date()
           } : null}

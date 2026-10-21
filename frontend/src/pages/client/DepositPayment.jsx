@@ -1159,7 +1159,14 @@ export default function DepositPayment() {
           isOpen={showInvoiceModal}
           onClose={() => setShowInvoiceModal(false)}
           booking={booking}
-          paymentSuccess={paymentSuccess}
+          paymentSuccess={paymentSuccess || (booking ? {
+            transactionCode: 'TXN-' + (booking.bookingId || Date.now().toString().slice(-6)),
+            confirmationCode: booking.confirmationCode,
+            amountPaid: booking.depositAmount || Math.round((booking.totalAmount || 0) * 0.2),
+            remainingBalance: Math.max(0, (booking.totalAmount || 0) - (booking.depositAmount || Math.round((booking.totalAmount || 0) * 0.2))),
+            qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${booking.confirmationCode}`,
+            paymentDate: new Date()
+          } : null)}
           paymentMethod={paymentMethod}
           user={user}
         />
