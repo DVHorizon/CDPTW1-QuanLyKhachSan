@@ -54,6 +54,14 @@ export default function SearchRooms() {
   const [totalGuests, setTotalGuests] = useState(parseInt(searchParams.get('totalGuests'), 10) || 2);
   const [roomsCount, setRoomsCount] = useState(parseInt(searchParams.get('roomsCount'), 10) || 1);
   const [keyword, setKeyword] = useState(searchParams.get('keyword') || '');
+  const [debouncedKeyword, setDebouncedKeyword] = useState(keyword);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedKeyword(keyword);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [keyword]);
 
   // Filter states
   const [priceMax, setPriceMax] = useState(25000000);
@@ -66,17 +74,9 @@ export default function SearchRooms() {
     return () => clearTimeout(timer);
   }, [priceMax]);
 
-  const [selectedRoomTypes, setSelectedRoomTypes] = useState([
-    'Villa Riêng Tư',
-    'Suite Cao Cấp',
-    'Deluxe Hướng Biển'
-  ]);
+  const [selectedRoomTypes, setSelectedRoomTypes] = useState([]);
   const [selectedView, setSelectedView] = useState('all');
-  const [selectedAmenities, setSelectedAmenities] = useState([
-    'Hồ bơi riêng (Private Pool)',
-    'Ban công ngắm hoàng hôn',
-    'Bữa sáng Buffet kèm theo'
-  ]);
+  const [selectedAmenities, setSelectedAmenities] = useState([]);
   const [selectedRating, setSelectedRating] = useState('all');
   const [sortBy, setSortBy] = useState('price_asc');
 
@@ -127,7 +127,8 @@ export default function SearchRooms() {
 
     const timer = setTimeout(async () => {
       try {
-        const data = await suggestRoomsApi(keyword);
+        const res = await suggestRoomsApi(keyword);
+        const data = res?.data || res;
         if (data && data.totalCount > 0) {
           setSuggestions(data);
           setShowSuggestions(true);
@@ -276,10 +277,10 @@ export default function SearchRooms() {
     }
   };
 
-  // Tự động tìm kiếm lần đầu khi mount
+  // Tự động tìm kiếm lần đầu khi mount và khi bộ lọc / từ khóa thay đổi
   useEffect(() => {
     executeSearch();
-  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, debouncedPriceMax]);
+  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, debouncedPriceMax, debouncedKeyword]);
 
   // Lắng nghe sự kiện WebSocket Realtime để đồng bộ kho phòng trống tức thì
   useEffect(() => {
@@ -516,7 +517,10 @@ export default function SearchRooms() {
               <div className="lg:col-span-2">
                 <button
                   type="button"
-                  onClick={() => executeSearch()}
+                  onClick={() => {
+                    setShowSuggestions(false);
+                    executeSearch({ keyword });
+                  }}
                   disabled={loading}
                   className="w-full h-12 flex items-center justify-center gap-space-xs bg-primary text-on-primary rounded-xl font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm active:scale-98 disabled:opacity-50"
                 >
@@ -529,31 +533,41 @@ export default function SearchRooms() {
             </div>
 
             {/* Keyword Input & Search Engine indicator strip */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-space-sm pt-1 border-t border-dashed border-[#dedad0]/60">
+            <div className="flex flex-col gap-2.5 pt-3 mt-1 border-t border-[#dedad0]/80">
               <div
                 ref={searchInputContainerRef}
-                className="relative w-full sm:w-auto flex-1"
+                className="relative w-full"
               >
-                <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-lg border border-transparent focus-within:border-secondary/40">
-                  <span className="material-symbols-outlined text-[18px] text-secondary">manage_search</span>
-                  <input
-                    type="text"
-                    placeholder="Tìm theo từ khóa (Deluxe, Villa, Hồ bơi, Bãi biển, Jacuzzi, Buffet...)"
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    onFocus={() => {
-                      if (suggestions && suggestions.totalCount > 0) setShowSuggestions(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        setShowSuggestions(false);
-                        executeSearch();
-                      } else if (e.key === 'Escape') {
-                        setShowSuggestions(false);
-                      }
-                    }}
-                    className="bg-transparent text-xs w-full text-on-surface focus:outline-none placeholder:text-outline"
-                  />
+                <div className="group flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-secondary/35 hover:border-secondary shadow-xs hover:shadow-md focus-within:ring-2 focus-within:ring-secondary/20 focus-within:border-secondary transition-all">
+                  <div className="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary shrink-0 group-focus-within:bg-secondary group-focus-within:text-white transition-colors">
+                    <span className="material-symbols-outlined text-[20px]">manage_search</span>
+                  </div>
+                  
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="text-[10px] uppercase font-bold text-secondary/80 tracking-wider">
+                      Tìm kiếm theo từ khóa thông minh
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Nhập tên phòng, tiện ích (Deluxe, Villa, Hồ bơi, Jacuzzi, Buffet, Bãi biển...)"
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      onFocus={() => {
+                        if (suggestions && suggestions.totalCount > 0) setShowSuggestions(true);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          setShowSuggestions(false);
+                          executeSearch({ keyword });
+                        } else if (e.key === 'Escape') {
+                          setShowSuggestions(false);
+                        }
+                      }}
+                      className="bg-transparent text-sm w-full text-on-surface font-semibold focus:outline-none placeholder:text-outline/60 placeholder:font-normal"
+                    />
+                  </div>
+
                   {keyword && (
                     <button
                       type="button"
@@ -563,11 +577,24 @@ export default function SearchRooms() {
                         setShowSuggestions(false);
                         executeSearch({ keyword: '' });
                       }}
-                      className="text-outline hover:text-on-surface"
+                      className="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high text-outline hover:text-on-surface flex items-center justify-center transition-colors shrink-0"
+                      title="Xóa từ khóa"
                     >
                       <span className="material-symbols-outlined text-[16px]">close</span>
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSuggestions(false);
+                      executeSearch({ keyword });
+                    }}
+                    className="px-4 py-2 bg-secondary text-white rounded-lg text-xs font-bold hover:bg-primary transition-all flex items-center gap-1.5 shrink-0 shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">search</span>
+                    <span>Tìm</span>
+                  </button>
                 </div>
 
                 {/* Autocomplete Suggestions Dropdown (Hiển thị ngay khi gõ từ 1-2 ký tự) */}
@@ -676,7 +703,50 @@ export default function SearchRooms() {
                 )}
               </div>
 
-
+              {/* Quick Keyword Pills (Gợi ý tìm nhanh một chạm) */}
+              <div className="flex items-center gap-2 pt-0.5 flex-wrap text-xs">
+                <span className="font-semibold text-outline text-[11px] uppercase tracking-wider flex items-center gap-1 shrink-0">
+                  <span className="material-symbols-outlined text-[15px] text-secondary">local_fire_department</span>
+                  Gợi ý tìm nhanh:
+                </span>
+                {[
+                  { label: 'Deluxe', kw: 'Deluxe' },
+                  { label: 'Villa Biệt Thự', kw: 'Villa' },
+                  { label: 'Hồ Bơi Riêng', kw: 'Hồ bơi' },
+                  { label: 'Bồn Tắm Jacuzzi', kw: 'Jacuzzi' },
+                  { label: 'Kèm Buffet Sáng', kw: 'Buffet' },
+                  { label: 'Trực Diện Biển', kw: 'Biển' }
+                ].map((tag) => (
+                  <button
+                    key={tag.kw}
+                    type="button"
+                    onClick={() => {
+                      setKeyword(tag.kw);
+                      executeSearch({ keyword: tag.kw });
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer shadow-2xs ${
+                      keyword.toLowerCase() === tag.kw.toLowerCase()
+                        ? 'bg-secondary text-white border-secondary shadow-sm scale-105'
+                        : 'bg-white hover:bg-secondary/10 hover:border-secondary/40 text-on-surface border-[#dedad0]/80'
+                    }`}
+                  >
+                    {tag.label}
+                  </button>
+                ))}
+                {keyword && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKeyword('');
+                      executeSearch({ keyword: '' });
+                    }}
+                    className="text-[11px] text-error hover:underline font-semibold ml-1 cursor-pointer flex items-center gap-0.5"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">refresh</span>
+                    <span>Xóa bộ lọc</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Thông báo lỗi validation nguyên văn */}
@@ -1144,8 +1214,8 @@ export default function SearchRooms() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setSelectedRoomForBooking(room)}
-                              className="px-space-xl py-3 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm flex items-center gap-space-xs"
+                              onClick={() => navigate(`/dat-phong?roomTypeId=${room.RoomTypeId}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}&units=${roomsCount}&adults=${totalGuests}`)}
+                              className="px-space-xl py-3 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm flex items-center gap-space-xs cursor-pointer"
                             >
                               <span>Chọn Phòng</span>
                               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>

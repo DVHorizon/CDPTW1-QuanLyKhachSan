@@ -564,10 +564,10 @@ export default function RoomDetail() {
                   Hủy giữ chỗ
                 </button>
                 <button
-                  onClick={() => alert(`Chuyển sang Cổng thanh toán với mã giữ phòng #${lockSession.lockSessionId}`)}
-                  className="px-4 py-1.5 bg-[#725b38] hover:bg-[#584323] text-white rounded-lg text-xs font-semibold shadow-md transition-all"
+                  onClick={() => navigate(`/dat-phong?roomTypeId=${roomType?.RoomTypeId || id || 1}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}&units=${quantity}&adults=${adults}&lockSessionId=${lockSession?.lockSessionId}`)}
+                  className="px-4 py-1.5 bg-[#725b38] hover:bg-[#584323] text-white rounded-lg text-xs font-semibold shadow-md transition-all cursor-pointer"
                 >
-                  Thanh Toán Ngay
+                  Thanh Toán Ngay (Màn Hình 6)
                 </button>
               </div>
             </div>
