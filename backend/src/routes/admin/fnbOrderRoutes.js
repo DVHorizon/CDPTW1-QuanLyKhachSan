@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const fnbOrderController = require('../../controllers/admin/fnbOrderController');
-const { verifyToken } = require('../../middlewares/authMiddleware');
+const { verifyToken, optionalVerifyToken } = require('../../middlewares/authMiddleware');
 
 // Lấy danh sách phòng đang lưu trú phục vụ Room Service
 router.get('/active-stays', fnbOrderController.getActiveStays);
@@ -11,8 +11,9 @@ router.post('/', verifyToken, fnbOrderController.createRoomServiceOrder);
 
 
 
-// Lịch sử gọi món
-router.get('/', fnbOrderController.getOrderHistory);
+// FEAT-FNB-08: Lịch sử gọi món (Xác thực user nếu có token)
+router.get('/', optionalVerifyToken, fnbOrderController.getOrderHistory);
+router.get('/history', optionalVerifyToken, fnbOrderController.getOrderHistory);
 
 // FEAT-FNB-06 (A4.6): Theo dõi trạng thái đơn món real-time bằng WebSocket
 router.get('/track/hub', fnbOrderController.getAllOrdersForHub);
@@ -30,6 +31,10 @@ router.patch('/kitchen/:orderId/restore', fnbOrderController.restoreOrder);
 
 // Xử lý thanh toán F&B (FEAT-FNB-07: A4.7)
 router.patch('/:orderId/payment', verifyToken, fnbOrderController.processPayment);
+
+// FEAT-FNB-10 (Mã truy vết: A4.10): Đánh giá món ăn và chất lượng phục vụ F&B
+router.post('/:orderId/reviews', verifyToken, fnbOrderController.createOrderReview);
+router.get('/:orderId/reviews', fnbOrderController.getOrderReview);
 
 
 

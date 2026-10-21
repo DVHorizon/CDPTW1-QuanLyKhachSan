@@ -1,8 +1,11 @@
 'use strict';
 
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 require('dotenv').config();
+
+const { initSocket } = require('./sockets/socketHandler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,6 +29,26 @@ app.use('/api/loai-phong', require('./routes/roomTypes'));
 app.use('/api/phong',      require('./routes/rooms'));
 app.use('/api/so-do-phong', require('./routes/rooms'));
 app.use('/api/room-status', require('./routes/rooms'));
+// Route Quản lý danh sách booking toàn hệ thống (Master Bookings)
+app.use('/api/bookings', require('./routes/bookings'));
+app.use('/api/v1/bookings', require('./routes/bookings'));
+
+// Routes F&B Quản lý Menu
+app.use('/api/v1', require('./routes/admin/menuRoutes'));
+
+// Route F&B Orders (Room Service, KDS, History)
+app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
+
+// Route Quản lý tình trạng phòng trống (Room Availability)
+app.use('/api/admin/room-availability', require('./routes/admin/roomAvailability'));
+
+// Route Phân bổ phòng & xác nhận (Room Allocation & Confirmation Engine)
+app.use('/api/v1/allocation', require('./routes/admin/roomAllocationRoutes'));
+app.use('/api/allocation', require('./routes/admin/roomAllocationRoutes'));
+
+// Route Nghiệp vụ Check-in tại quầy (Front Desk Express Check-In Workflow)
+app.use('/api/v1/check-in', require('./routes/admin/checkInRoutes'));
+app.use('/api/check-in', require('./routes/admin/checkInRoutes'));
 
 // Route Quản lý người dùng & nhân viên
 app.use('/api/users', require('./routes/users'));
@@ -42,7 +65,11 @@ app.use('/api/v1/pms',        require('./modules/pms'));
 app.use('/api/v1/services',   require('./modules/services'));
 
 // 👤 Trang — F&B
-app.use('/api/v1/fnb',        require('./modules/fnb'));
+app.use('/api/v1/fnb',                require('./modules/fnb'));
+app.use('/api/v1/fnb-orders',         require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/fnb-orders',            require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/v1/table-reservations', require('./routes/admin/tableReservationRoutes'));
+app.use('/api/table-reservations',    require('./routes/admin/tableReservationRoutes'));
 
 // 👤 Tuyền — Back-office Operations
 app.use('/api/v1/operations', require('./modules/operations'));
@@ -50,17 +77,26 @@ app.use('/api/v1/operations', require('./modules/operations'));
 // Guest search (backward compat — cũng hoạt động qua /api/v1/guest/rooms/search)
 app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
 app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
+// FEAT-GUEST-05: Direct booking endpoint
+app.post('/bookings', require('./controllers/bookingEngineController').createOnlineBooking);
+
+// FEAT-GUEST-08: Direct deposit payment & booking retrieval endpoints
+app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController').getBookingDetails);
+app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
+app.post('/payments', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 app.use(require('./shared/middlewares/errorHandler'));
 
-// ─── Start server with WebSocket ───────────────────────────────────────────
-const http = require('http');
-const { initWebSocket } = require('./services/websocketService');
-
+// ─── HTTP Server & WebSocket ───────────────────────────────────────────────
 const server = http.createServer(app);
-initWebSocket(server);
+try {
+  initSocket(server);
+} catch (wsErr) {
+  console.warn('⚠️ WebSocket init warning:', wsErr.message);
+}
 
+// ─── Start server ──────────────────────────────────────────────────────────
 server.listen(PORT, () => {
   console.log(`✅ Backend server with WebSocket running on port ${PORT}`);
   console.log(`   Modules: /api/v1/{guest|pms|services|fnb|operations}`);
