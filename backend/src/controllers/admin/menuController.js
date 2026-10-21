@@ -231,3 +231,17 @@ exports.updateMenuItemStatus = async (req, res) => {
     return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể cập nhật trạng thái món.' });
   }
 };
+
+exports.getMenuCategories = async (req, res) => {
+  try {
+    const categories = await MenuCategory.findAll({
+      where: { IsDeleted: false },
+      order: [['CategoryId', 'ASC']]
+    });
+    return res.status(200).json({ success: true, data: categories });
+  } catch (error) {
+    console.error('Error fetching menu categories:', error);
+    return res.status(500).json({ code: 'ERROR_0500_INTERNAL', message: 'Không thể tải danh mục thực đơn.' });
+  }
+};
+

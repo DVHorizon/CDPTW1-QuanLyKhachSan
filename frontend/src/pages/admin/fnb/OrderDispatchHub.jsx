@@ -162,6 +162,18 @@ const OrderDispatchHub = () => {
       if (!data.success) {
         setErrorMessage("Không thể cập nhật trạng thái đơn.");
       } else {
+        // Cập nhật danh sách đơn ở ngoài
+        setOrders((prev) =>
+          prev.map((o) => (o.foodOrderId === orderId ? { ...o, status: newStatus } : o))
+        );
+        // Cập nhật danh sách đơn trong modal đang mở
+        setAllOrdersModal((prev) => {
+          if (!prev.isOpen) return prev;
+          const nextOrders = prev.orders.map((o) =>
+            o.foodOrderId === orderId ? { ...o, status: newStatus } : o
+          );
+          return { ...prev, orders: nextOrders };
+        });
         showNotice(`Đã chuyển đơn #${orderId} sang trạng thái: ${newStatus}`);
       }
     } catch (e) {
