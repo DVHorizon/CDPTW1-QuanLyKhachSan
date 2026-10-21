@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import AdminLayout from '../components/admin/layout/AdminLayout';
 
 const API_BASE = 'http://localhost:5000/api/bookings';
@@ -1427,6 +1428,14 @@ const BookingDetailDrawer = ({ bookingId, onClose, showToast, onRefresh, onEdit,
                   </button>
                 )}
 
+                <Link
+                  to={`/admin/room-assignment?bookingId=${data.BookingId}`}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:brightness-110 active:scale-95 transition-all cursor-pointer no-underline"
+                >
+                  <span className="material-symbols-outlined text-[15px]">hub</span>
+                  Gán Phòng (Room Allocation)
+                </Link>
+
                 <button
                   onClick={() => onEdit(data.BookingId)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-outline-variant/40 text-on-surface text-xs font-semibold hover:bg-surface-container transition-all cursor-pointer"
@@ -2064,6 +2073,14 @@ export default function BookingManagement() {
                             >
                               <span className="material-symbols-outlined text-[17px]">open_in_new</span>
                             </button>
+                            <Link
+                              to={`/admin/room-assignment?bookingId=${b.BookingId}`}
+                              title="Gán phòng & Điều phối (Room Allocation)"
+                              aria-label="Gán phòng"
+                              className="w-7 h-7 rounded-lg hover:bg-sky-500/15 flex items-center justify-center text-on-surface-variant hover:text-sky-600 transition-all cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[17px]">hub</span>
+                            </Link>
                             <button
                               onClick={() => setEditBookingId(b.BookingId)}
                               title="Chỉnh sửa đặt phòng"
