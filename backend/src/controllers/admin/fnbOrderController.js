@@ -1,5 +1,5 @@
 const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room, Booking, User, Invoice, InvoiceDetail, Payment, Review, ReviewPhoto } = require('../../models');
-const { broadcastOrderStatus } = require('../../services/websocketService');
+const { broadcastOrderStatus, broadcastNewKitchenOrder } = require('../../services/websocketService');
 
 
 // Lấy danh sách lượt lưu trú đang hoạt động (CheckedIn / Active) để chọn phòng đặt món / đặt bàn
@@ -99,6 +99,7 @@ exports.createRoomServiceOrder = async (req, res) => {
 
       orderDetails.push({
         MenuItemId: item.menuItemId,
+        itemName: menuItem.ItemName,
         Quantity: item.quantity,
         UnitPrice: unitPrice,
         TotalPrice: totalPrice,
@@ -141,15 +142,35 @@ exports.createRoomServiceOrder = async (req, res) => {
 
     await transaction.commit();
 
-    // 7. Gửi đơn xuống quy trình KDS / Bếp qua WebSocket
+    // 7. Gửi đơn xuống quy trình KDS / Bếp qua WebSocket (FEAT-FNB-06 & FEAT-FNB-12)
     try {
+      const roomNum = stay.Room?.RoomNumber || 'N/A';
+      const itemsList = orderDetails.map(d => ({
+        menuItemId: d.MenuItemId,
+        itemName: d.itemName || `Món ăn #${d.MenuItemId}`,
+        quantity: d.Quantity,
+        note: d.Note
+      }));
+
+      // Broadcast sự kiện new_fnb_order theo chuẩn SPEC FEAT-FNB-12
+      broadcastNewKitchenOrder({
+        foodOrderId: order.FoodOrderId,
+        orderType: 'RoomService',
+        location: `Phòng ${roomNum}`,
+        orderTime: order.createdAt || new Date().toISOString(),
+        totalAmount: order.TotalAmount,
+        note: req.body?.note || '',
+        items: itemsList
+      });
+
+      // Broadcast thay đổi trạng thái đơn
       broadcastOrderStatus({
         orderId: order.FoodOrderId,
         status: 'Pending',
         orderType: 'RoomService',
         paymentMode: order.PaymentMode,
         totalAmount: order.TotalAmount,
-        roomNumber: stay.Room?.RoomNumber || 'N/A',
+        roomNumber: roomNum,
         updatedAt: new Date().toISOString()
       });
     } catch (wsErr) {
@@ -362,9 +383,13 @@ exports.getKitchenOrders = async (req, res) => {
       // Calculate SLA (e.g., 30 mins)
       const isOverSLA = (new Date() - new Date(order.OrderTime)) > 30 * 60 * 1000;
       
+      // Lấy danh sách trạm bếp từ các món trong order
+      const itemStations = order.details.map(d => d.MenuItem?.KitchenStation || '').filter(Boolean);
+      const primaryStation = itemStations[0] || 'hot';
+
       results.push({
         foodOrderId: order.FoodOrderId,
-        kitchenStation: 'Chung',
+        kitchenStation: primaryStation,
         priorityVip: priorityVip,
         status: order.Status,
         createdAt: order.OrderTime,
@@ -376,7 +401,8 @@ exports.getKitchenOrders = async (req, res) => {
           itemName: d.MenuItem?.ItemName || 'N/A',
           quantity: d.Quantity,
           isCompleted: d.IsCompleted || false,
-          note: d.Note
+          note: d.Note,
+          kitchenStation: d.MenuItem?.KitchenStation || 'hot'
         }))
       });
     }
