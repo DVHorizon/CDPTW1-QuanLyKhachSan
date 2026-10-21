@@ -57,9 +57,11 @@ app.use('/api/check-out', checkOutRoutes);
 app.use('/api/v1/stays', checkOutRoutes);
 app.use('/api/v1/folio', checkOutRoutes);
 
-// Route Quản lý người dùng & nhân viên
+// Route Quản lý người dùng & nhân viên (Spec 3 - FEAT-USER-01)
 app.use('/api/users', require('./routes/users'));
 app.use('/api/v1/users', require('./routes/users'));
+app.use('/api/roles', require('./routes/roleRoutes'));
+app.use('/api/v1/roles', require('./routes/roleRoutes'));
 
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
