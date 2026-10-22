@@ -5,6 +5,7 @@ const defineBranch = require('./Branch');
 const defineRoomType = require('./RoomType');
 const defineRoom = require('./Room');
 const defineAmenity = require('./Amenity');
+const defineRoomTypeAmenity = require('./RoomTypeAmenity');
 const defineRole = require('./Role');
 const defineMembershipTier = require('./MembershipTier');
 const defineUser = require('./User');
@@ -35,6 +36,7 @@ const RoomType = defineRoomType(sequelize);
 const Room = defineRoom(sequelize);
 const RoomSearchIndex = defineRoomSearchIndex(sequelize);
 const Amenity = defineAmenity(sequelize);
+const RoomTypeAmenity = defineRoomTypeAmenity(sequelize);
 const Role = defineRole(sequelize);
 const MembershipTier = defineMembershipTier(sequelize);
 const User = defineUser(sequelize);
@@ -74,6 +76,10 @@ Room.belongsTo(Branch, { foreignKey: 'BranchId', as: 'branch' });
 // 4. RoomType & Room
 RoomType.hasMany(Room, { foreignKey: 'RoomTypeId', as: 'rooms' });
 Room.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
+
+// 4b. RoomType & Amenity (N-N through RoomTypeAmenities)
+RoomType.belongsToMany(Amenity, { through: RoomTypeAmenity, foreignKey: 'RoomTypeId', otherKey: 'AmenityId', as: 'amenityList' });
+Amenity.belongsToMany(RoomType, { through: RoomTypeAmenity, foreignKey: 'AmenityId', otherKey: 'RoomTypeId', as: 'roomTypes' });
 
 // 5. User & Booking
 User.hasMany(Booking, { foreignKey: 'UserId', as: 'bookings' });
@@ -180,6 +186,7 @@ module.exports = {
   Room,
   RoomSearchIndex,
   Amenity,
+  RoomTypeAmenity,
   Role,
   MembershipTier,
   User,

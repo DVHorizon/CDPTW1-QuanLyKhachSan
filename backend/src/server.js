@@ -24,7 +24,8 @@ app.use('/api/auth',     require('./routes/authRoutes'));   // backward compat
 
 // ─── LEGACY routes (backward compat — giữ để frontend cũ không bị break) ──
 // Admin Room & RoomType pages vẫn dùng /api/phong và /api/loai-phong
-// Nhưng giờ chúng đã được rewrite để dùng Sequelize model (bảng Rooms/RoomTypes)
+// Spec 1 Room Types API
+app.use('/api/v1/room-types', require('./routes/roomTypes'));
 app.use('/api/loai-phong', require('./routes/roomTypes'));
 app.use('/api/phong',      require('./routes/rooms'));
 app.use('/api/so-do-phong', require('./routes/rooms'));
