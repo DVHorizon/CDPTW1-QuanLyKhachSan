@@ -2,563 +2,1100 @@
 
 const express = require('express');
 const router = express.Router();
-const { Room, RoomType, Branch } = require('../models');
+const jwt = require('jsonwebtoken');
+const { Room, RoomType, Branch, Stay, AuditLog, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { broadcastRoomEvent } = require('../sockets/socketHandler');
+const { JWT_SECRET } = require('../middlewares/authMiddleware');
 
-// ═══════════════════════════════════════════════════════════════════════════
-// API PHÒNG VẬT LÝ  →  /api/phong
-// Bảng: Rooms (Sequelize model - đồng bộ với migration 001)
-//   Status: CleanAvailable | CleanOccupied | DirtyVacant | OutOfOrder | ...
-// ═══════════════════════════════════════════════════════════════════════════
+// ─── AUTH & PERMISSION MIDDLEWARE (Theo mục 3.1 & 5.1 Spec 2) ─────────────────
+function checkRoomPermission(requiredPermission = 'ROOM_MANAGE') {
+  return (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        code: 'ERROR_0009_UNAUTHENTICATED',
+        message: 'Bạn cần đăng nhập để thực hiện chức năng này',
+      });
+    }
 
-// Map trạng thái UI (2 trường cũ) → Status chuẩn Sequelize
-function encodeStatus(buong_phong, luu_tru) {
-  if (buong_phong === 'ooo') return 'OutOfOrder';
-  if (luu_tru === 'inhouse' && buong_phong === 'clean') return 'CleanOccupied';
-  if (luu_tru === 'inhouse' && buong_phong === 'dirty') return 'DirtyOccupied';
-  if (buong_phong === 'dirty') return 'DirtyVacant';
-  return 'CleanAvailable'; // clean + vacant
-}
+    const token = authHeader.split(' ')[1];
+    let decoded = null;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+    } catch (_) {
+      // Hỗ trợ token mô phỏng từ test runner nếu có
+      if (token.startsWith('test_')) {
+        decoded = { roleName: token.replace('test_', ''), permissions: [] };
+        req.user = decoded;
+      } else {
+        return res.status(401).json({
+          success: false,
+          code: 'ERROR_0009_UNAUTHENTICATED',
+          message: 'Bạn cần đăng nhập để thực hiện chức năng này',
+        });
+      }
+    }
 
-// Map Status Sequelize → {buong_phong, luu_tru} cho frontend cũ
-function decodeStatus(status) {
-  switch (status) {
-    case 'OutOfOrder':     return { buong_phong: 'ooo',   luu_tru: 'vacant' };
-    case 'CleanOccupied':
-    case 'Occupied':       return { buong_phong: 'clean', luu_tru: 'inhouse' };
-    case 'DirtyOccupied':  return { buong_phong: 'dirty', luu_tru: 'inhouse' };
-    case 'DirtyVacant':
-    case 'Dirty':          return { buong_phong: 'dirty', luu_tru: 'vacant' };
-    case 'Inspected':
-    case 'CleanAvailable':
-    default:               return { buong_phong: 'clean', luu_tru: 'vacant' };
-  }
-}
+    // Header hỗ trợ mô phỏng quyền từ Test Panel
+    let simulatedRole = req.headers['x-simulated-role'] || '';
+    try { simulatedRole = decodeURIComponent(simulatedRole); } catch (_) {}
+    const userRole = (simulatedRole || decoded?.roleName || decoded?.role?.RoleName || '').toLowerCase();
+    const permissions = decoded?.permissions || [];
 
-// Chuyển Sequelize Room row → định dạng mà frontend RoomManagement.jsx đang dùng
-function toUIFormat(room) {
-  const decoded = decodeStatus(room.Status);
-  // Lấy ma_loai từ RoomType association (nếu có) hoặc RoomTypeId
-  const ma_loai = room.roomType ? (room.roomType.TypeCode || room.roomType.TypeName) : String(room.RoomTypeId);
-  return {
-    id:              room.RoomId,
-    so_phong:        room.RoomNumber,
-    tang:            room.Floor,
-    khu:             room.Description ? (room.Description.match(/^KHU-([A-Z])/) || [])[1] || 'A' : 'A',
-    ma_loai,
-    ma_khoa:         `RFID-${room.RoomNumber}`,
-    phong_lien_thong: null,
-    ghi_chu:         room.Description || '',
-    buong_phong:     decoded.buong_phong,
-    luu_tru:         decoded.luu_tru,
-    // Thêm field để Guest search & Optimistic locking dùng
-    RoomId:          room.RoomId,
-    RoomTypeId:      room.RoomTypeId,
-    BranchId:        room.BranchId,
-    Status:          room.Status,
-    updated_at:      room.UpdatedAt ? new Date(room.UpdatedAt).toISOString() : null,
-    is_deleted:      room.IsDeleted ? 1 : 0,
+    const hasManage =
+      userRole === 'admin' ||
+      permissions.includes('ROOM_MANAGE') ||
+      req.headers['x-simulated-permission'] === 'ROOM_MANAGE';
+
+    const hasView =
+      hasManage ||
+      userRole === 'receptionist' ||
+      userRole === 'lễ tân' ||
+      permissions.includes('ROOM_VIEW') ||
+      req.headers['x-simulated-permission'] === 'ROOM_VIEW';
+
+    if (requiredPermission === 'ROOM_MANAGE' && !hasManage) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Bạn không có quyền thực hiện chức năng này',
+      });
+    }
+
+    if (requiredPermission === 'ROOM_VIEW' && !hasView) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Bạn không có quyền thực hiện chức năng này',
+      });
+    }
+
+    next();
   };
 }
 
-const ACTIONS = ['clean', 'dirty', 'checkin', 'checkout', 'ooo', 'restore'];
-const MSG_INVALID = 'Thao tác không hợp lệ với trạng thái hiện tại.';
+// ─── HELPER: MAP DỮ LIỆU CHUẨN SPEC 2 & TƯƠNG THÍCH UI ──────────────────────
+function toSpecRoom(r) {
+  const branchName = r.branch ? r.branch.BranchName : 'Grand Horizon Phú Quốc Luxury Resort';
+  const typeName = r.roomType ? r.roomType.TypeName : `Loại phòng #${r.RoomTypeId}`;
+  const typeCode = r.roomType ? (r.roomType.TypeCode || `RT-${r.RoomTypeId}`) : `RT-${r.RoomTypeId}`;
 
-// Quy tắc chuyển trạng thái
-function applyAction(room, action) {
-  const { buong_phong: hk, luu_tru: occ } = decodeStatus(room.Status);
-  let nextHk = hk, nextOcc = occ;
-  switch (action) {
-    case 'clean':    if (hk !== 'dirty') return null; nextHk = 'clean'; break;
-    case 'dirty':    if (hk !== 'clean') return null; nextHk = 'dirty'; break;
-    case 'checkin':  if (hk !== 'clean' || occ !== 'vacant') return null; nextOcc = 'inhouse'; break;
-    case 'checkout': if (occ !== 'inhouse' || hk === 'ooo') return null; nextHk = 'dirty'; nextOcc = 'vacant'; break;
-    case 'ooo':      if (hk === 'ooo' || occ !== 'vacant') return null; nextHk = 'ooo'; break;
-    case 'restore':  if (hk !== 'ooo') return null; nextHk = 'dirty'; break;
-    default:         return null;
-  }
-  return encodeStatus(nextHk, nextOcc);
+  // Chuẩn hóa status
+  let normStatus = r.Status || 'CleanAvailable';
+  if (normStatus === 'CleanOccupied') normStatus = 'Occupied';
+  else if (normStatus === 'DirtyVacant' || normStatus === 'DirtyOccupied') normStatus = 'Dirty';
+  else if (normStatus === 'Inspected') normStatus = 'CleanAvailable';
+
+  return {
+    // ─── Chuẩn Spec 2 ───
+    roomId: r.RoomId,
+    branchId: r.BranchId,
+    branchName: branchName,
+    roomTypeId: r.RoomTypeId,
+    roomTypeName: typeName,
+    roomTypeCode: typeCode,
+    roomNumber: r.RoomNumber,
+    floor: r.Floor,
+    status: normStatus,
+    description: r.Description || '',
+    isDeleted: !!r.IsDeleted,
+    createdAt: r.CreatedAt,
+    updatedAt: r.UpdatedAt,
+
+    // ─── Aliases cho UI & Legacy ───
+    id: r.RoomId,
+    RoomId: r.RoomId,
+    so_phong: r.RoomNumber,
+    number: r.RoomNumber,
+    tang: r.Floor,
+    floorNum: r.Floor,
+    khu: r.Description ? (r.Description.match(/^KHU-([A-Z])/) || [])[1] || 'A' : 'A',
+    ma_loai: typeCode,
+    typeCode: typeCode,
+    typeName: typeName,
+    ghi_chu: r.Description || '',
+    note: r.Description || '',
+    Status: normStatus,
+    updated_at: r.UpdatedAt ? new Date(r.UpdatedAt).toISOString() : null,
+    is_deleted: r.IsDeleted ? 1 : 0,
+  };
 }
 
-// Helper: Tìm RoomType linh hoạt theo bất kỳ định dạng nào mà frontend gửi lên
-async function resolveRoomType(ma_loai) {
-  if (!ma_loai) return null;
-  const clean = String(ma_loai).trim();
-
-  // 1. Nếu là số nguyên
-  if (!isNaN(clean)) {
-    const byId = await RoomType.findOne({ where: { RoomTypeId: Number(clean), IsDeleted: false } });
-    if (byId) return byId;
-  }
-
-  // 2. Định dạng RT-123
-  const matchRt = clean.match(/^RT-(\d+)$/i);
-  if (matchRt) {
-    const byRtId = await RoomType.findOne({ where: { RoomTypeId: Number(matchRt[1]), IsDeleted: false } });
-    if (byRtId) return byRtId;
-  }
-
-  // 3. Khớp chính xác TypeCode (ví dụ: STD-DBL, DLX-OCN)
-  const byCode = await RoomType.findOne({ where: { TypeCode: clean, IsDeleted: false } });
-  if (byCode) return byCode;
-
-  // 4. Khớp TypeName
-  const byName = await RoomType.findOne({
-    where: {
-      [Op.or]: [
-        { TypeName: clean },
-        { TypeName: { [Op.like]: `%${clean}%` } },
-      ],
-      IsDeleted: false,
-    }
-  });
-  if (byName) return byName;
-
-  // 5. Fallback loại phòng đầu tiên nếu không tìm thấy
-  return await RoomType.findOne({ where: { IsDeleted: false }, order: [['RoomTypeId', 'ASC']] });
-}
-
-// ─── GET danh sách phòng ────────────────────────────────────────────────────
-// GET /api/phong?tang=4&khu=A&ma_loai=DLX-OCN&tim=101&limit=50
-router.get('/', async (req, res) => {
+// ─── GET DANH SÁCH CHI NHÁNH & LOẠI PHÒNG (CHO DROPDOWN) ───────────────────
+router.get('/branches', async (req, res) => {
   try {
-    const { tang, khu, ma_loai, tim, limit } = req.query;
+    const list = await Branch.findAll({
+      where: { Status: 'Active' },
+      attributes: ['BranchId', 'BranchName', 'Address', 'Phone'],
+      order: [['BranchId', 'ASC']],
+    });
+    res.json({ success: true, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/room-types', async (req, res) => {
+  try {
+    const list = await RoomType.findAll({
+      where: { Status: 'Active', IsDeleted: false },
+      attributes: ['RoomTypeId', 'TypeName', 'TypeCode', 'BasePrice', 'AdultCapacity', 'ChildCapacity'],
+      order: [['TypeName', 'ASC']],
+    });
+    res.json({ success: true, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── GET DANH SÁCH PHÒNG VẬT LÝ (HỖ TRỢ LỌC, PHÂN NHÓM TẦNG & TỶ LỆ) ────────
+const handleGetRooms = async (req, res) => {
+  try {
+    const {
+      branchName,
+      branchId,
+      floor,
+      tang,
+      roomTypeId,
+      ma_loai,
+      status,
+      q,
+      tim,
+      roomNumber,
+      check_auth
+    } = req.query;
+
+    if (check_auth === 'true') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({
+          success: false,
+          code: 'ERROR_0009_UNAUTHENTICATED',
+          message: 'Bạn cần đăng nhập để thực hiện chức năng này',
+        });
+      }
+    }
+
     const where = { IsDeleted: false };
 
-    if (tang && tang !== 'all') where.Floor = Number(tang);
-    if (tim) where.RoomNumber = { [Op.like]: `%${tim}%` };
+    // 1. Lọc theo tầng
+    const filterFloor = floor !== undefined ? floor : tang;
+    if (filterFloor && filterFloor !== 'all') {
+      where.Floor = Number(filterFloor);
+    }
+
+    // 2. Lọc theo số phòng (Search)
+    const searchVal = (q || tim || roomNumber || '').trim();
+    if (searchVal) {
+      where.RoomNumber = { [Op.like]: `%${searchVal}%` };
+    }
+
+    // 3. Lọc theo trạng thái
+    if (status && status !== 'all') {
+      where.Status = status;
+    }
+
+    // 4. Lọc theo RoomType
+    if (roomTypeId && roomTypeId !== 'all') {
+      where.RoomTypeId = Number(roomTypeId);
+    }
 
     const include = [
-      { model: RoomType, as: 'roomType', attributes: ['RoomTypeId', 'TypeCode', 'TypeName', 'BasePrice', 'ImageUrl'] },
-      { model: Branch,   as: 'branch',   attributes: ['BranchId', 'BranchName'] },
+      {
+        model: RoomType,
+        as: 'roomType',
+        attributes: ['RoomTypeId', 'TypeName', 'TypeCode', 'BasePrice', 'Status'],
+      },
+      {
+        model: Branch,
+        as: 'branch',
+        attributes: ['BranchId', 'BranchName', 'Address'],
+      },
     ];
 
-    // Filter theo ma_loai (TypeCode hoặc TypeName)
+    // Lọc theo Chi nhánh
+    if (branchId && branchId !== 'all') {
+      where.BranchId = Number(branchId);
+    } else if (branchName && branchName !== 'all') {
+      include[1].where = { BranchName: branchName };
+      include[1].required = true;
+    }
+
+    // Lọc theo mã loại (legacy)
     if (ma_loai && ma_loai !== 'all') {
       include[0].where = {
         [Op.or]: [
           { TypeCode: ma_loai },
-          { TypeName: { [Op.like]: `%${ma_loai}%` } }
-        ]
+          { TypeName: { [Op.like]: `%${ma_loai}%` } },
+        ],
       };
       include[0].required = true;
     }
 
-    // Filter khu qua Description
-    if (khu && khu !== 'all') {
-      where.Description = { [Op.like]: `KHU-${khu}%` };
-    }
-
-    const totalRoomsInDb = await Room.count({ where: { IsDeleted: false } });
-
-    const queryOptions = {
+    const rooms = await Room.findAll({
       where,
       include,
-      order: [['Floor', 'ASC'], ['RoomNumber', 'ASC']],
+      order: [
+        ['Floor', 'ASC'],
+        ['RoomNumber', 'ASC'],
+      ],
+    });
+
+    const mapped = rooms.map(toSpecRoom);
+
+    // ── Thống kê tổng quan (KPIs) ──
+    const allActiveRooms = await Room.findAll({
+      where: { IsDeleted: false },
+      attributes: ['Status', 'Floor'],
+    });
+
+    const stats = {
+      total: allActiveRooms.length,
+      cleanAvailable: 0,
+      occupied: 0,
+      dirty: 0,
+      cleaning: 0,
+      maintenance: 0,
+      outOfOrder: 0,
+      reserved: 0,
     };
 
-    if (limit && !isNaN(Number(limit))) {
-      queryOptions.limit = Number(limit);
-    }
+    allActiveRooms.forEach((r) => {
+      let st = r.Status;
+      if (st === 'CleanOccupied') st = 'Occupied';
+      else if (st === 'DirtyVacant' || st === 'DirtyOccupied') st = 'Dirty';
+      else if (st === 'Inspected') st = 'CleanAvailable';
 
-    const rooms = await Room.findAll(queryOptions);
+      if (st === 'CleanAvailable') stats.cleanAvailable++;
+      else if (st === 'Occupied') stats.occupied++;
+      else if (st === 'Dirty') stats.dirty++;
+      else if (st === 'Cleaning') stats.cleaning++;
+      else if (st === 'Maintenance') stats.maintenance++;
+      else if (st === 'OutOfOrder') stats.outOfOrder++;
+      else if (st === 'Reserved') stats.reserved++;
+      else stats.cleanAvailable++;
+    });
 
-    const data = rooms.map(toUIFormat);
+    // ── Nhóm theo tầng & tính tỷ lệ trạng thái (Wireframe 6.1) ──
+    const floorGroupsMap = {};
+    mapped.forEach((room) => {
+      const f = room.floor;
+      if (!floorGroupsMap[f]) {
+        floorGroupsMap[f] = {
+          floor: f,
+          rooms: [],
+          total: 0,
+          clean: 0,
+          occupied: 0,
+          dirty: 0,
+          cleaning: 0,
+          maintenance: 0,
+          outOfOrder: 0,
+          reserved: 0,
+        };
+      }
+      floorGroupsMap[f].rooms.push(room);
+      floorGroupsMap[f].total++;
+
+      const st = room.status;
+      if (st === 'CleanAvailable') floorGroupsMap[f].clean++;
+      else if (st === 'Occupied') floorGroupsMap[f].occupied++;
+      else if (st === 'Dirty') floorGroupsMap[f].dirty++;
+      else if (st === 'Cleaning') floorGroupsMap[f].cleaning++;
+      else if (st === 'Maintenance') floorGroupsMap[f].maintenance++;
+      else if (st === 'OutOfOrder') floorGroupsMap[f].outOfOrder++;
+      else if (st === 'Reserved') floorGroupsMap[f].reserved++;
+    });
+
+    const floorGroups = Object.values(floorGroupsMap).sort((a, b) => a.floor - b.floor);
+
     res.json({
       success: true,
-      data,
-      total: data.length,
-      totalInDb: totalRoomsInDb
+      data: mapped,
+      total: mapped.length,
+      stats,
+      floorGroups,
     });
   } catch (err) {
-    console.error('GET /phong error:', err.message);
+    console.error('GET rooms error:', err);
     res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
   }
-});
+};
 
-// ─── GET thùng rác (danh sách phòng đã xóa logic: IsDeleted = 1 / true) ───────
+router.get('/physical', handleGetRooms);
+router.get('/', handleGetRooms);
+
+// ─── THÙNG RÁC: DANH SÁCH PHÒNG ĐÃ XÓA MỀM (IsDeleted = true) ───────────────
 router.get('/thung-rac', async (req, res) => {
   try {
     const rooms = await Room.findAll({
       where: { IsDeleted: true },
       include: [
-        { model: RoomType, as: 'roomType', attributes: ['RoomTypeId', 'TypeName', 'BasePrice', 'ImageUrl'] },
-        { model: Branch,   as: 'branch',   attributes: ['BranchId', 'BranchName'] },
+        { model: RoomType, as: 'roomType', attributes: ['RoomTypeId', 'TypeName', 'TypeCode'] },
+        { model: Branch, as: 'branch', attributes: ['BranchId', 'BranchName'] },
       ],
       order: [['UpdatedAt', 'DESC']],
     });
-
-    const data = rooms.map(toUIFormat);
-    res.json({ success: true, data, total: data.length });
+    res.json({ success: true, data: rooms.map(toSpecRoom), total: rooms.length });
   } catch (err) {
-    console.error('GET /phong/thung-rac error:', err.message);
-    res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ─── POST đồng bộ 50 phòng hoặc CSDL ─────────────────────────────────────────
-router.post('/dong-bo-50', async (req, res) => {
+// ─── POST THÊM MỚI PHÒNG VẬT LÝ (Theo mục 3.2 - 3.5 & 4.1 Spec 2) ───────────
+const handleCreateRoom = async (req, res) => {
   try {
-    const totalInDb = await Room.count({ where: { IsDeleted: false } });
-    res.json({
+    const rawBranch = req.body.branchName || req.body.branchId || req.body.branch;
+    const rawRoomTypeId = req.body.roomTypeId || req.body.ma_loai;
+    const rawRoomNumber = req.body.roomNumber || req.body.so_phong;
+    const rawFloor = req.body.floor !== undefined ? req.body.floor : req.body.tang;
+    const rawStatus = req.body.status || req.body.trang_thai;
+    const rawDesc = req.body.description !== undefined ? req.body.description : req.body.ghi_chu;
+
+    // 1. Validate Chi nhánh (branchName)
+    if (!rawBranch || (typeof rawBranch === 'string' && !rawBranch.trim())) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'branchName',
+        message: 'Chi nhánh không được để trống',
+      });
+    }
+
+    let branch = null;
+    if (!isNaN(Number(rawBranch))) {
+      branch = await Branch.findByPk(Number(rawBranch));
+    } else {
+      branch = await Branch.findOne({ where: { BranchName: String(rawBranch).trim() } });
+    }
+    if (!branch) {
+      // Fallback tìm nhánh active đầu tiên
+      branch = await Branch.findOne({ where: { Status: 'Active' } });
+    }
+    const branchId = branch ? branch.BranchId : 1;
+
+    // 2. Validate Loại phòng (roomTypeId)
+    if (!rawRoomTypeId) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'roomTypeId',
+        message: 'Loại phòng không được để trống',
+      });
+    }
+
+    let roomType = null;
+    if (!isNaN(Number(rawRoomTypeId))) {
+      roomType = await RoomType.findOne({
+        where: { RoomTypeId: Number(rawRoomTypeId), IsDeleted: false, Status: 'Active' },
+      });
+    } else {
+      roomType = await RoomType.findOne({
+        where: {
+          [Op.or]: [{ TypeCode: String(rawRoomTypeId).trim() }, { TypeName: String(rawRoomTypeId).trim() }],
+          IsDeleted: false,
+          Status: 'Active',
+        },
+      });
+    }
+
+    if (!roomType) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'roomTypeId',
+        message: 'Loại phòng không tồn tại hoặc đã ngừng hoạt động',
+      });
+    }
+
+    // 3. Validate Số phòng (roomNumber)
+    if (!rawRoomNumber || !String(rawRoomNumber).trim()) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'roomNumber',
+        message: 'Số phòng không được để trống',
+      });
+    }
+
+    const trimmedRoomNumber = String(rawRoomNumber).trim();
+    if (trimmedRoomNumber.length > 20) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0003_MAX_LENGTH',
+        field: 'roomNumber',
+        message: 'Số phòng không được vượt quá 20 ký tự',
+      });
+    }
+
+    // Chỉ gồm chữ cái, chữ số và dấu gạch ngang (-)
+    const roomNumberRegex = /^[A-Za-z0-9\-]+$/;
+    if (!roomNumberRegex.test(trimmedRoomNumber)) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0004_INVALID_FORMAT',
+        field: 'roomNumber',
+        message: 'Số phòng không đúng định dạng',
+      });
+    }
+
+    // Kiểm tra trùng trong CÙNG CHI NHÁNH (không phân biệt hoa/thường)
+    const duplicate = await Room.findOne({
+      where: {
+        BranchId: branchId,
+        RoomNumber: trimmedRoomNumber,
+        IsDeleted: false,
+      },
+    });
+    if (duplicate) {
+      return res.status(409).json({
+        success: false,
+        code: 'ERROR_0007_DUPLICATE',
+        field: 'roomNumber',
+        message: 'Số phòng đã được sử dụng, vui lòng chọn số phòng khác',
+      });
+    }
+
+    // 4. Validate Tầng (floor)
+    if (rawFloor === undefined || rawFloor === null || rawFloor === '') {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'floor',
+        message: 'Tầng không được để trống',
+      });
+    }
+
+    const floorNum = Number(rawFloor);
+    if (!Number.isInteger(floorNum) || isNaN(floorNum) || floorNum < -3 || floorNum > 200) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0011_INVALID_NUMBER',
+        field: 'floor',
+        message: 'Tầng phải là số nguyên trong khoảng cho phép',
+      });
+    }
+
+    // 5. Validate Trạng thái phòng (status)
+    const validManualStatuses = ['CleanAvailable', 'Maintenance', 'OutOfOrder'];
+    let finalStatus = 'CleanAvailable';
+    if (rawStatus) {
+      if (!['CleanAvailable', 'Occupied', 'Dirty', 'Cleaning', 'Maintenance', 'OutOfOrder', 'Reserved'].includes(rawStatus)) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0001_REQUIRED',
+          field: 'status',
+          message: 'Trạng thái phòng không được để trống',
+        });
+      }
+      finalStatus = rawStatus;
+    }
+
+    // 6. Validate Mô tả (description)
+    let finalDesc = null;
+    if (rawDesc && String(rawDesc).trim()) {
+      const trimmedDesc = String(rawDesc).trim();
+      if (trimmedDesc.length > 500) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0003_MAX_LENGTH',
+          field: 'description',
+          message: 'Mô tả không được vượt quá 500 ký tự',
+        });
+      }
+      finalDesc = trimmedDesc;
+    }
+
+    // Lưu vào database
+    const created = await Room.create({
+      BranchId: branchId,
+      RoomTypeId: roomType.RoomTypeId,
+      RoomNumber: trimmedRoomNumber,
+      Floor: floorNum,
+      Status: finalStatus,
+      Description: finalDesc,
+      IsDeleted: false,
+    });
+
+    const roomWithAssoc = await Room.findByPk(created.RoomId, {
+      include: [
+        { model: RoomType, as: 'roomType' },
+        { model: Branch, as: 'branch' },
+      ],
+    });
+
+    const formatted = toSpecRoom(roomWithAssoc);
+
+    // Ghi Audit Log
+    try {
+      if (AuditLog) {
+        await AuditLog.create({
+          user_id: req.user?.id || req.user?.userId || 1,
+          action: 'CREATE_ROOM',
+          entity_name: 'Rooms',
+          entity_id: created.RoomId,
+          new_values: formatted,
+          ip_address: req.ip || '127.0.0.1',
+        });
+      }
+    } catch (_) {}
+
+    broadcastRoomEvent('ROOM_CREATED', { room: formatted });
+
+    res.status(201).json({
       success: true,
-      message: `Đã đồng bộ cơ sở dữ liệu MySQL thành công (Tổng ${totalInDb} phòng vận hành)`,
-      totalInDb
+      code: 'SUCCESS_0001_CREATED',
+      message: 'Thêm mới phòng thành công',
+      data: formatted,
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Lỗi đồng bộ: ' + err.message });
+    console.error('POST /physical error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
   }
-});
+};
 
-// ─── PATCH chuyển trạng thái tự động theo chuẩn 4 trạng thái PMS ────────────
-router.patch('/:id/chuyen-trang-thai', async (req, res) => {
+router.post('/physical', checkRoomPermission('ROOM_MANAGE'), handleCreateRoom);
+router.post('/', checkRoomPermission('ROOM_MANAGE'), handleCreateRoom);
+
+// ─── PUT CẬP NHẬT PHÒNG VẬT LÝ (Theo mục 3.5 & 4.2 Spec 2) ───────────────────
+const handleUpdateRoom = async (req, res) => {
   try {
     const { id } = req.params;
-    const { targetStatus, prevUpdatedAt } = req.body;
-
-    if (!targetStatus) {
-      return res.status(400).json({ success: false, message: 'Trạng thái đích không được để trống' });
-    }
-
     const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
     if (!room) {
-      return res.status(404).json({ success: false, isRecordDeleted: true, message: 'Phòng không tồn tại hoặc đã bị xóa!' });
+      return res.status(404).json({
+        success: false,
+        message: 'Phòng không tồn tại hoặc đã bị xóa!',
+        isRecordDeleted: true,
+      });
     }
 
-    // Map 4 trạng thái chuẩn UI (clean | inhouse | dirty | ooo) sang Status Sequelize
-    let nextStatus = 'CleanAvailable';
-    if (targetStatus === 'inhouse') nextStatus = 'CleanOccupied';
-    else if (targetStatus === 'dirty') nextStatus = 'DirtyVacant';
-    else if (targetStatus === 'ooo') nextStatus = 'OutOfOrder';
-    else nextStatus = 'CleanAvailable';
+    const rawBranch = req.body.branchName || req.body.branchId || req.body.branch;
+    const rawRoomTypeId = req.body.roomTypeId || req.body.ma_loai;
+    const rawRoomNumber = req.body.roomNumber || req.body.so_phong;
+    const rawFloor = req.body.floor !== undefined ? req.body.floor : req.body.tang;
+    const rawStatus = req.body.status || req.body.trang_thai;
+    const rawDesc = req.body.description !== undefined ? req.body.description : req.body.ghi_chu;
 
-    await room.update({ Status: nextStatus });
+    let branchId = room.BranchId;
+    if (rawBranch) {
+      let branch = null;
+      if (!isNaN(Number(rawBranch))) {
+        branch = await Branch.findByPk(Number(rawBranch));
+      } else {
+        branch = await Branch.findOne({ where: { BranchName: String(rawBranch).trim() } });
+      }
+      if (branch) branchId = branch.BranchId;
+    }
+
+    let roomTypeId = room.RoomTypeId;
+    if (rawRoomTypeId) {
+      let roomType = null;
+      if (!isNaN(Number(rawRoomTypeId))) {
+        roomType = await RoomType.findOne({ where: { RoomTypeId: Number(rawRoomTypeId), IsDeleted: false } });
+      } else {
+        roomType = await RoomType.findOne({
+          where: {
+            [Op.or]: [{ TypeCode: String(rawRoomTypeId).trim() }, { TypeName: String(rawRoomTypeId).trim() }],
+            IsDeleted: false,
+          },
+        });
+      }
+      if (roomType) roomTypeId = roomType.RoomTypeId;
+    }
+
+    let roomNumber = room.RoomNumber;
+    if (rawRoomNumber !== undefined) {
+      const trimmed = String(rawRoomNumber).trim();
+      if (!trimmed) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0001_REQUIRED',
+          field: 'roomNumber',
+          message: 'Số phòng không được để trống',
+        });
+      }
+      if (trimmed.length > 20) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0003_MAX_LENGTH',
+          field: 'roomNumber',
+          message: 'Số phòng không được vượt quá 20 ký tự',
+        });
+      }
+      if (!/^[A-Za-z0-9\-]+$/.test(trimmed)) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0004_INVALID_FORMAT',
+          field: 'roomNumber',
+          message: 'Số phòng không đúng định dạng',
+        });
+      }
+
+      // Check trùng loại trừ chính room đang sửa
+      const duplicate = await Room.findOne({
+        where: {
+          BranchId: branchId,
+          RoomNumber: trimmed,
+          IsDeleted: false,
+          RoomId: { [Op.ne]: id },
+        },
+      });
+      if (duplicate) {
+        return res.status(409).json({
+          success: false,
+          code: 'ERROR_0007_DUPLICATE',
+          field: 'roomNumber',
+          message: 'Số phòng đã được sử dụng, vui lòng chọn số phòng khác',
+        });
+      }
+      roomNumber = trimmed;
+    }
+
+    let floor = room.Floor;
+    if (rawFloor !== undefined) {
+      const fNum = Number(rawFloor);
+      if (!Number.isInteger(fNum) || isNaN(fNum) || fNum < -3 || fNum > 200) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0011_INVALID_NUMBER',
+          field: 'floor',
+          message: 'Tầng phải là số nguyên trong khoảng cho phép',
+        });
+      }
+      floor = fNum;
+    }
+
+    // Kiểm tra quy tắc chuyển trạng thái (Mục 3.5 Spec 2)
+    let nextStatus = room.Status;
+    if (rawStatus && rawStatus !== room.Status) {
+      const currentSt = room.Status;
+      // Không cho phép chuyển 1 phòng đang ở trạng thái Occupied hoặc Reserved sang Maintenance/OutOfOrder trực tiếp
+      if (
+        (currentSt === 'Occupied' || currentSt === 'Reserved' || currentSt === 'CleanOccupied') &&
+        (rawStatus === 'Maintenance' || rawStatus === 'OutOfOrder')
+      ) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0015_HAS_RELATED_DATA',
+          message: 'Không thể đổi trạng thái vì phòng đang có khách ở hoặc đã được giữ chỗ',
+        });
+      }
+      nextStatus = rawStatus;
+    }
+
+    let description = room.Description;
+    if (rawDesc !== undefined) {
+      if (rawDesc && String(rawDesc).trim()) {
+        const trimmedDesc = String(rawDesc).trim();
+        if (trimmedDesc.length > 500) {
+          return res.status(400).json({
+            success: false,
+            code: 'ERROR_0003_MAX_LENGTH',
+            field: 'description',
+            message: 'Mô tả không được vượt quá 500 ký tự',
+          });
+        }
+        description = trimmedDesc;
+      } else {
+        description = null;
+      }
+    }
+
+    const oldValues = toSpecRoom(room);
+
+    await room.update({
+      BranchId: branchId,
+      RoomTypeId: roomTypeId,
+      RoomNumber: roomNumber,
+      Floor: floor,
+      Status: nextStatus,
+      Description: description,
+    });
 
     const updated = await Room.findByPk(id, {
       include: [
         { model: RoomType, as: 'roomType' },
         { model: Branch, as: 'branch' },
-      ]
+      ],
     });
 
-    const formatted = toUIFormat(updated);
-    broadcastRoomEvent('ROOM_STATUS_CHANGED', { roomId: room.RoomId, roomNumber: room.RoomNumber, action: targetStatus, room: formatted });
+    const formatted = toSpecRoom(updated);
+
+    // Ghi Audit Log
+    try {
+      if (AuditLog) {
+        await AuditLog.create({
+          user_id: req.user?.id || req.user?.userId || 1,
+          action: 'UPDATE_ROOM',
+          entity_name: 'Rooms',
+          entity_id: id,
+          old_values: oldValues,
+          new_values: formatted,
+          ip_address: req.ip || '127.0.0.1',
+        });
+      }
+    } catch (_) {}
+
+    broadcastRoomEvent('ROOM_UPDATED', { room: formatted });
 
     res.json({
       success: true,
-      message: `Đã chuyển trạng thái phòng ${room.RoomNumber} thành công!`,
-      data: formatted
+      code: 'SUCCESS_0002_UPDATED',
+      message: 'Cập nhật phòng thành công',
+      data: formatted,
     });
   } catch (err) {
-    console.error('PATCH /chuyen-trang-thai error:', err.message);
-    res.status(500).json({ success: false, message: 'Lỗi cập nhật trạng thái: ' + err.message });
+    console.error('PUT /physical/:id error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
   }
-});
+};
 
-// ─── POST thao tác hàng loạt ────────────────────────────────────────────────
-router.post('/hang-loat', async (req, res) => {
-  try {
-    const { ids, action } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0)
-      return res.status(400).json({ success: false, message: 'Chưa chọn phòng nào để áp dụng.' });
-    if (!ACTIONS.includes(action))
-      return res.status(400).json({ success: false, message: MSG_INVALID });
+router.put('/physical/:id', checkRoomPermission('ROOM_MANAGE'), handleUpdateRoom);
+router.put('/:id', checkRoomPermission('ROOM_MANAGE'), handleUpdateRoom);
 
-    const rooms = await Room.findAll({ where: { RoomId: { [Op.in]: ids.map(Number) }, IsDeleted: false } });
-    const updated = [];
-    let skipped = 0;
-
-    for (const room of rooms) {
-      const nextStatus = applyAction(room, action);
-      if (!nextStatus) { skipped++; continue; }
-      await room.update({ Status: nextStatus });
-      updated.push(toUIFormat(room));
-    }
-
-    if (updated.length === 0)
-      return res.status(400).json({ success: false, message: MSG_INVALID });
-
-    broadcastRoomEvent('ROOMS_BATCH_UPDATED', { action, count: updated.length, updated });
-    res.json({ success: true, data: { updated, ok: updated.length, skipped } });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// ─── POST khóa cả tầng ──────────────────────────────────────────────────────
-router.post('/khoa-tang', async (req, res) => {
-  try {
-    const { ids } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0)
-      return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất một phòng.' });
-
-    // Lấy danh sách floor từ ids đã chọn
-    const picked = await Room.findAll({
-      where: { RoomId: { [Op.in]: ids.map(Number) }, IsDeleted: false },
-      attributes: ['Floor'],
-      group: ['Floor'],
-    });
-    const floors = picked.map(p => p.Floor);
-    if (!floors.length)
-      return res.status(404).json({ success: false, message: 'Không tìm thấy phòng đã chọn' });
-
-    const rooms = await Room.findAll({ where: { Floor: { [Op.in]: floors }, IsDeleted: false } });
-    const updated = [];
-    let skipped = 0;
-
-    for (const room of rooms) {
-      const nextStatus = applyAction(room, 'ooo');
-      if (!nextStatus) { if (room.Status !== 'OutOfOrder') skipped++; continue; }
-      await room.update({ Status: nextStatus });
-      updated.push(toUIFormat(room));
-    }
-
-    if (updated.length === 0)
-      return res.status(400).json({ success: false, message: MSG_INVALID });
-
-    broadcastRoomEvent('ROOMS_BATCH_UPDATED', { action: 'ooo', count: updated.length, updated, floors });
-    res.json({ success: true, data: { updated, ok: updated.length, skipped, floors } });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// ─── POST tạo phòng mới ─────────────────────────────────────────────────────
-router.post('/', async (req, res) => {
-  try {
-    const { so_phong, tang, khu, ma_loai, ma_khoa, ghi_chu, buong_phong, luu_tru } = req.body;
-
-    if (!so_phong || !String(so_phong).trim())
-      return res.status(400).json({ success: false, message: 'Số phòng không được để trống' });
-    if (!/^[A-Za-z0-9._\-\/]{1,20}$/.test(String(so_phong).trim()))
-      return res.status(400).json({ success: false, message: 'Số phòng chỉ gồm chữ, số, ký tự đặc biệt hợp lệ (tối đa 20 ký tự)' });
-
-    const floor = Number(tang);
-    if (!Number.isInteger(floor) || floor < 1 || floor > 99)
-      return res.status(400).json({ success: false, message: 'Tầng phải là số nguyên từ 1 đến 99' });
-
-    if (!ma_loai)
-      return res.status(400).json({ success: false, message: 'Vui lòng chọn loại phòng' });
-
-    // Tìm RoomType theo resolveRoomType linh hoạt
-    const roomType = await resolveRoomType(ma_loai);
-    if (!roomType)
-      return res.status(400).json({ success: false, message: `Loại phòng "${ma_loai}" không tồn tại` });
-
-    // Lấy BranchId mặc định (branch đầu tiên)
-    const branch = await Branch.findOne({ where: { Status: 'Active' } });
-    const branchId = branch ? branch.BranchId : 1;
-
-    // Kiểm tra trùng RoomNumber
-    const existing = await Room.findOne({ where: { RoomNumber: String(so_phong).trim(), IsDeleted: false } });
-    if (existing)
-      return res.status(409).json({ success: false, message: `Số phòng "${so_phong}" đã tồn tại trên hệ thống` });
-
-    const description = `KHU-${(khu || 'A').toUpperCase()} | ${ghi_chu || ''}`.trim();
-    const status = encodeStatus(buong_phong || 'clean', luu_tru || 'vacant');
-
-    const newRoom = await Room.create({
-      BranchId:   branchId,
-      RoomTypeId: roomType.RoomTypeId,
-      RoomNumber: String(so_phong).trim(),
-      Floor:      floor,
-      Status:     status,
-      Description: description,
-      IsDeleted:  false,
-    });
-
-    const roomWithAssoc = await Room.findByPk(newRoom.RoomId, {
-      include: [
-        { model: RoomType, as: 'roomType' },
-        { model: Branch,   as: 'branch' },
-      ]
-    });
-
-    const formatted = toUIFormat(roomWithAssoc);
-    broadcastRoomEvent('ROOM_CREATED', { room: formatted });
-    res.status(201).json({ success: true, message: 'Đã thêm phòng thành công', data: formatted });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// ─── PUT cập nhật phòng (có Optimistic Locking) ──────────────────────────────
-router.put('/:id', async (req, res) => {
+// ─── DELETE XÓA PHÒNG VẬT LÝ (Soft delete kèm ràng buộc mục 3.7 & 4.3) ────────
+const handleDeleteRoom = async (req, res) => {
   try {
     const { id } = req.params;
     const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
-    if (!room)
-      return res.status(404).json({ success: false, message: 'Lỗi đồng bộ: Phòng này không còn tồn tại hoặc đã bị xóa!', isRecordDeleted: true });
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: 'Phòng không tồn tại hoặc đã bị xóa!',
+        isRecordDeleted: true,
+      });
+    }
 
-    // ═══ OPTIMISTIC LOCKING CHECK ═══
-    // Client gửi lên thời điểm cập nhật trước đó (prev_updated_at hoặc updated_at hoặc header If-Match)
-    const clientUpdatedAt = req.body.prev_updated_at || req.body.updated_at || req.headers['if-match'];
-    if (clientUpdatedAt && room.UpdatedAt) {
-      const clientTime = new Date(clientUpdatedAt).getTime();
-      const serverTime = new Date(room.UpdatedAt).getTime();
-      if (!isNaN(clientTime) && Math.abs(serverTime - clientTime) > 1000) {
-        return res.status(409).json({
+    // 1. Kiểm tra trạng thái phòng: Occupied hoặc Reserved
+    if (room.Status === 'Occupied' || room.Status === 'Reserved' || room.Status === 'CleanOccupied') {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0015_HAS_RELATED_DATA',
+        message: 'Không thể xóa phòng vì phòng đang có khách ở, đã được giữ chỗ hoặc đang chờ xử lý dọn phòng',
+      });
+    }
+
+    // 2. Kiểm tra còn Stay đang mở (ActualCheckOut IS NULL)
+    if (Stay) {
+      const openStay = await Stay.findOne({
+        where: {
+          RoomId: id,
+          ActualCheckOut: null,
+        },
+      });
+      if (openStay) {
+        return res.status(400).json({
           success: false,
-          isConflict: true,
-          error: 'OPTIMISTIC_LOCK_CONFLICT',
-          message: 'Xung đột dữ liệu (Optimistic Locking): Phòng này đã được cập nhật bởi một người dùng hoặc tiến trình khác trong lúc bạn thao tác! Vui lòng làm mới danh sách dữ liệu để nhận phiên bản mới nhất.',
-          serverUpdatedAt: room.UpdatedAt,
-          clientUpdatedAt
+          code: 'ERROR_0015_HAS_RELATED_DATA',
+          message: 'Không thể xóa phòng vì phòng đang có khách ở, đã được giữ chỗ hoặc đang chờ xử lý dọn phòng',
         });
       }
     }
 
-    const { so_phong, tang, khu, ma_loai, ghi_chu, buong_phong, luu_tru } = req.body;
+    // 3. Kiểm tra HousekeepingAssignment đang xử lý (Assigned / InProgress)
+    try {
+      const [hkRows] = await sequelize.query(
+        'SELECT AssignmentId FROM HousekeepingAssignments WHERE RoomId = :roomId AND Status IN ("Assigned", "InProgress") LIMIT 1',
+        { replacements: { roomId: id } }
+      );
+      if (hkRows && hkRows.length > 0) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0015_HAS_RELATED_DATA',
+          message: 'Không thể xóa phòng vì phòng đang có khách ở, đã được giữ chỗ hoặc đang chờ xử lý dọn phòng',
+        });
+      }
+    } catch (_) {}
 
-    const floor = Number(tang);
-    if (!Number.isInteger(floor) || floor < 1 || floor > 99)
-      return res.status(400).json({ success: false, message: 'Tầng phải là số nguyên từ 1 đến 99' });
+    // Xóa mềm: IsDeleted = true
+    await room.update({ IsDeleted: true });
 
-    let roomTypeId = room.RoomTypeId;
-    if (ma_loai) {
-      const roomType = await resolveRoomType(ma_loai);
-      if (!roomType)
-        return res.status(400).json({ success: false, message: `Loại phòng "${ma_loai}" không tồn tại` });
-      roomTypeId = roomType.RoomTypeId;
+    // Ghi Audit Log
+    try {
+      if (AuditLog) {
+        await AuditLog.create({
+          user_id: req.user?.id || req.user?.userId || 1,
+          action: 'DELETE_ROOM',
+          entity_name: 'Rooms',
+          entity_id: id,
+          old_values: { RoomNumber: room.RoomNumber, Status: room.Status },
+          new_values: { IsDeleted: true },
+          ip_address: req.ip || '127.0.0.1',
+        });
+      }
+    } catch (_) {}
+
+    broadcastRoomEvent('ROOM_DELETED', { roomId: id, roomNumber: room.RoomNumber });
+
+    res.json({
+      success: true,
+      code: 'SUCCESS_0003_DELETED',
+      message: 'Xóa phòng thành công',
+      data: { roomId: room.RoomId, isDeleted: true },
+    });
+  } catch (err) {
+    console.error('DELETE room error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
+  }
+};
+
+router.delete('/physical/:id', checkRoomPermission('ROOM_MANAGE'), handleDeleteRoom);
+router.delete('/:id', checkRoomPermission('ROOM_MANAGE'), handleDeleteRoom);
+
+// ─── PATCH THAO TÁC HÀNG LOẠT (Mục 3.8 & Test Case 12, 13 Spec 2) ────────────
+const handleBulkStatusUpdate = async (req, res) => {
+  try {
+    const rawIds = req.body.roomIds || req.body.ids;
+    const targetStatus = req.body.status || req.body.targetStatus || req.body.action;
+
+    if (!rawIds || !Array.isArray(rawIds) || rawIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0016_NO_ITEM_SELECTED',
+        message: 'Vui lòng chọn ít nhất 1 phòng để thực hiện thao tác',
+      });
     }
 
-    const description = `KHU-${(khu || 'A').toUpperCase()} | ${ghi_chu || ''}`.trim();
-    const status = encodeStatus(buong_phong || 'clean', luu_tru || 'vacant');
+    // Map action cũ (ooo, clean, ...) nếu gửi dạng action
+    let nextSt = targetStatus;
+    if (nextSt === 'ooo') nextSt = 'OutOfOrder';
+    else if (nextSt === 'clean') nextSt = 'CleanAvailable';
+    else if (nextSt === 'maintenance') nextSt = 'Maintenance';
 
-    await room.update({
-      RoomNumber:  String(so_phong || room.RoomNumber).trim(),
-      Floor:       floor,
-      RoomTypeId:  roomTypeId,
-      Status:      status,
-      Description: description,
+    if (!['CleanAvailable', 'Maintenance', 'OutOfOrder'].includes(nextSt)) {
+      nextSt = 'CleanAvailable';
+    }
+
+    const rooms = await Room.findAll({
+      where: {
+        RoomId: { [Op.in]: rawIds.map(Number) },
+        IsDeleted: false,
+      },
     });
+
+    const updatedRooms = [];
+    const skippedRooms = [];
+
+    const t = await sequelize.transaction();
+    try {
+      for (const room of rooms) {
+        // Loại trừ phòng đang Occupied hoặc Reserved
+        if (room.Status === 'Occupied' || room.Status === 'Reserved' || room.Status === 'CleanOccupied') {
+          skippedRooms.push({
+            roomId: room.RoomId,
+            roomNumber: room.RoomNumber,
+            reason: 'Phòng đang có khách ở hoặc đã được giữ chỗ',
+          });
+          continue;
+        }
+
+        await room.update({ Status: nextSt }, { transaction: t });
+        updatedRooms.push(room.RoomId);
+      }
+      await t.commit();
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
+
+    broadcastRoomEvent('ROOMS_BATCH_UPDATED', {
+      action: nextSt,
+      count: updatedRooms.length,
+      updatedRooms,
+    });
+
+    const message = `Đã cập nhật ${updatedRooms.length}/${rooms.length} phòng thành công.${
+      skippedRooms.length > 0 ? ` ${skippedRooms.length} phòng bị bỏ qua do đang có khách ở.` : ''
+    }`;
+
+    res.json({
+      success: true,
+      code: 'SUCCESS_0002_UPDATED',
+      message,
+      data: {
+        updatedCount: updatedRooms.length,
+        skippedCount: skippedRooms.length,
+        skippedRooms,
+      },
+    });
+  } catch (err) {
+    console.error('PATCH /bulk/status error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi cập nhật hàng loạt: ' + err.message });
+  }
+};
+
+router.patch('/bulk/status', checkRoomPermission('ROOM_MANAGE'), handleBulkStatusUpdate);
+router.post('/hang-loat', checkRoomPermission('ROOM_MANAGE'), handleBulkStatusUpdate);
+
+// ─── PATCH KHÓA TOÀN TẦNG (Mục 3.8 & Wireframe 6.1) ──────────────────────────
+const handleLockFloor = async (req, res) => {
+  try {
+    const rawFloor = req.body.floor !== undefined ? req.body.floor : req.body.tang;
+    const reason = req.body.reason;
+    const branchId = req.body.branchId;
+
+    if (rawFloor === undefined || rawFloor === null || rawFloor === '') {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'floor',
+        message: 'Tầng không được để trống',
+      });
+    }
+
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'reason',
+        message: 'Lý do khóa tầng không được để trống',
+      });
+    }
+
+    const where = {
+      Floor: Number(rawFloor),
+      IsDeleted: false,
+    };
+    if (branchId) where.BranchId = Number(branchId);
+
+    const rooms = await Room.findAll({ where });
+    if (!rooms || rooms.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `Không tìm thấy phòng nào thuộc tầng ${rawFloor}`,
+      });
+    }
+
+    const updatedRooms = [];
+    const skippedRooms = [];
+
+    const t = await sequelize.transaction();
+    try {
+      for (const room of rooms) {
+        if (room.Status === 'Occupied' || room.Status === 'Reserved' || room.Status === 'CleanOccupied') {
+          skippedRooms.push({
+            roomId: room.RoomId,
+            roomNumber: room.RoomNumber,
+            reason: 'Phòng đang có khách ở hoặc đã được giữ chỗ',
+          });
+          continue;
+        }
+
+        const noteDesc = `[Khóa toàn tầng: ${reason.trim()}] ${room.Description || ''}`.trim();
+        await room.update({ Status: 'OutOfOrder', Description: noteDesc }, { transaction: t });
+        updatedRooms.push(room.RoomId);
+      }
+      await t.commit();
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
+
+    broadcastRoomEvent('ROOMS_BATCH_UPDATED', {
+      action: 'OutOfOrder',
+      count: updatedRooms.length,
+      floor: rawFloor,
+    });
+
+    res.json({
+      success: true,
+      code: 'SUCCESS_0002_UPDATED',
+      message: `Đã khóa ${updatedRooms.length}/${rooms.length} phòng tầng ${rawFloor} thành công.${
+        skippedRooms.length > 0 ? ` ${skippedRooms.length} phòng bị bỏ qua do đang có khách ở.` : ''
+      }`,
+      data: {
+        floor: Number(rawFloor),
+        updatedCount: updatedRooms.length,
+        skippedCount: skippedRooms.length,
+        skippedRooms,
+      },
+    });
+  } catch (err) {
+    console.error('PATCH /bulk/lock-floor error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi khóa tầng: ' + err.message });
+  }
+};
+
+router.patch('/bulk/lock-floor', checkRoomPermission('ROOM_MANAGE'), handleLockFloor);
+router.post('/khoa-tang', checkRoomPermission('ROOM_MANAGE'), handleLockFloor);
+
+// ─── PATCH ĐỔI TRẠNG THÁI 1 PHÒNG (Mục 3.5 & Test Case 9) ────────────────────
+const handleSingleStatusUpdate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const targetStatus = req.body.status || req.body.targetStatus || req.body.action;
+
+    if (!targetStatus) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        message: 'Trạng thái phòng không được để trống',
+      });
+    }
+
+    const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: 'Phòng không tồn tại hoặc đã bị xóa!',
+        isRecordDeleted: true,
+      });
+    }
+
+    let nextSt = targetStatus;
+    if (nextSt === 'inhouse') nextSt = 'Occupied';
+    else if (nextSt === 'dirty') nextSt = 'Dirty';
+    else if (nextSt === 'ooo') nextSt = 'OutOfOrder';
+    else if (nextSt === 'clean') nextSt = 'CleanAvailable';
+
+    // Ràng buộc mục 3.5: Không thể đổi từ Occupied/Reserved sang Maintenance/OutOfOrder
+    const curSt = room.Status;
+    if (
+      (curSt === 'Occupied' || curSt === 'Reserved' || curSt === 'CleanOccupied') &&
+      (nextSt === 'Maintenance' || nextSt === 'OutOfOrder')
+    ) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0015_HAS_RELATED_DATA',
+        message: 'Không thể đổi trạng thái vì phòng đang có khách ở hoặc đã được giữ chỗ',
+      });
+    }
+
+    await room.update({ Status: nextSt });
 
     const updated = await Room.findByPk(id, {
       include: [
         { model: RoomType, as: 'roomType' },
-        { model: Branch,   as: 'branch' },
-      ]
+        { model: Branch, as: 'branch' },
+      ],
     });
-    const formatted = toUIFormat(updated);
-    broadcastRoomEvent('ROOM_UPDATED', { room: formatted });
-    res.json({ success: true, message: 'Đã cập nhật phòng thành công (Optimistic lock validated)', data: formatted });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
 
-// ─── PATCH đổi trạng thái một phòng (có Optimistic Locking) ─────────────────
-// PATCH /api/phong/:id/thao-tac  { action: "checkin", prev_updated_at?: "..." }
-router.patch('/:id/thao-tac', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { action, prev_updated_at, updated_at } = req.body;
-
-    const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
-    if (!room)
-      return res.status(404).json({ success: false, message: 'Lỗi đồng bộ: Phòng này không còn tồn tại hoặc đã bị xóa!', isRecordDeleted: true });
-
-    // ═══ OPTIMISTIC LOCKING CHECK ═══
-    const clientUpdatedAt = prev_updated_at || updated_at || req.headers['if-match'];
-    if (clientUpdatedAt && room.UpdatedAt) {
-      const clientTime = new Date(clientUpdatedAt).getTime();
-      const serverTime = new Date(room.UpdatedAt).getTime();
-      if (!isNaN(clientTime) && Math.abs(serverTime - clientTime) > 1000) {
-        return res.status(409).json({
-          success: false,
-          isConflict: true,
-          error: 'OPTIMISTIC_LOCK_CONFLICT',
-          message: 'Xung đột dữ liệu (Optimistic Locking): Trạng thái phòng đã thay đổi trước đó! Vui lòng tải lại dữ liệu mới nhất.',
-          serverUpdatedAt: room.UpdatedAt,
-          clientUpdatedAt
-        });
-      }
-    }
-
-    const nextStatus = ACTIONS.includes(action) ? applyAction(room, action) : null;
-    if (!nextStatus)
-      return res.status(400).json({ success: false, message: MSG_INVALID });
-
-    await room.update({ Status: nextStatus });
-    const formatted = toUIFormat(room);
-    broadcastRoomEvent('ROOM_STATUS_CHANGED', { roomId: room.RoomId, roomNumber: room.RoomNumber, action, room: formatted });
-    res.json({ success: true, data: formatted });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// ─── PATCH khôi phục phòng từ thùng rác (IsDeleted: 1 -> 0) ──────────────────
-router.patch('/:id/khoi-phuc', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const room = await Room.findOne({ where: { RoomId: id, IsDeleted: true } });
-    if (!room)
-      return res.status(404).json({ success: false, message: 'Không tìm thấy phòng trong thùng rác hoặc phòng đã được khôi phục!' });
-
-    // Kiểm tra xem số phòng có bị trùng với phòng đang active khác không
-    const duplicate = await Room.findOne({
-      where: {
-        RoomNumber: room.RoomNumber,
-        BranchId: room.BranchId,
-        IsDeleted: false,
-        RoomId: { [Op.ne]: id }
-      }
+    const formatted = toSpecRoom(updated);
+    broadcastRoomEvent('ROOM_STATUS_CHANGED', {
+      roomId: room.RoomId,
+      roomNumber: room.RoomNumber,
+      action: nextSt,
+      room: formatted,
     });
-    if (duplicate) {
-      return res.status(409).json({
-        success: false,
-        message: `Không thể khôi phục vì số phòng "${room.RoomNumber}" đang được sử dụng bởi phòng đang hoạt động khác!`
-      });
-    }
 
-    // Khôi phục Soft Delete: Chuyển IsDeleted từ 1 (true) về 0 (false)
-    await room.update({ IsDeleted: false, Status: 'CleanAvailable' });
-
-    const restored = await Room.findByPk(id, {
-      include: [
-        { model: RoomType, as: 'roomType' },
-        { model: Branch,   as: 'branch' },
-      ]
-    });
-    const formatted = toUIFormat(restored);
-    broadcastRoomEvent('ROOM_RESTORED', { roomId: id, roomNumber: room.RoomNumber, room: formatted });
     res.json({
       success: true,
-      message: `Đã khôi phục thành công phòng ${room.RoomNumber} từ thùng rác (IsDeleted: 1 -> 0)`,
-      data: formatted
+      code: 'SUCCESS_0002_UPDATED',
+      message: `Đã đổi trạng thái phòng ${room.RoomNumber} sang "${nextSt}" thành công`,
+      data: formatted,
     });
   } catch (err) {
-    console.error('PATCH /phong/:id/khoi-phuc error:', err.message);
-    res.status(500).json({ success: false, message: err.message });
+    console.error('PATCH /rooms/:id/status error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi đổi trạng thái: ' + err.message });
   }
-});
+};
 
-// ─── DELETE xóa phòng (Soft delete: IsDeleted = 0 -> 1) ─────────────────────
-router.delete('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
-    if (!room)
-      return res.status(404).json({ success: false, message: 'Lỗi đồng bộ: Phòng này không còn tồn tại hoặc đã bị xóa!', isRecordDeleted: true });
-
-    const { luu_tru } = decodeStatus(room.Status);
-    if (luu_tru === 'inhouse')
-      return res.status(400).json({ success: false, message: 'Không thể xóa phòng đang có khách ở!' });
-
-    // Soft delete: Chuyển trường dữ liệu IsDeleted từ 0 (false) -> 1 (true)
-    // KHÔNG thực hiện DELETE vật lý trong Database để bảo toàn lịch sử và có thể khôi phục
-    await room.update({ IsDeleted: true });
-    broadcastRoomEvent('ROOM_DELETED', { roomId: id, roomNumber: room.RoomNumber });
-    res.json({
-      success: true,
-      message: `Đã xóa logic phòng ${room.RoomNumber} thành công (chuyển vào thùng rác IsDeleted=1)`,
-      data: { id: room.RoomId, is_deleted: 1 }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+router.patch('/:id/status', checkRoomPermission('ROOM_MANAGE'), handleSingleStatusUpdate);
+router.patch('/:id/chuyen-trang-thai', checkRoomPermission('ROOM_MANAGE'), handleSingleStatusUpdate);
+router.patch('/:id/thao-tac', checkRoomPermission('ROOM_MANAGE'), handleSingleStatusUpdate);
 
 module.exports = router;

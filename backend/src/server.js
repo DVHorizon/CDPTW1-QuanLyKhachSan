@@ -27,9 +27,11 @@ app.use('/api/auth',     require('./routes/authRoutes'));   // backward compat
 // Spec 1 Room Types API
 app.use('/api/v1/room-types', require('./routes/roomTypes'));
 app.use('/api/loai-phong', require('./routes/roomTypes'));
-app.use('/api/phong',      require('./routes/rooms'));
-app.use('/api/so-do-phong', require('./routes/rooms'));
-app.use('/api/room-status', require('./routes/rooms'));
+// Spec 2 Physical Rooms API
+app.use('/api/v1/rooms',      require('./routes/rooms'));
+app.use('/api/phong',          require('./routes/rooms'));
+app.use('/api/so-do-phong',    require('./routes/rooms'));
+app.use('/api/room-status',    require('./routes/rooms'));
 // Route Quản lý danh sách booking toàn hệ thống (Master Bookings)
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/v1/bookings', require('./routes/bookings'));
