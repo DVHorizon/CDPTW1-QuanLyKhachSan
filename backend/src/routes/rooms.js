@@ -3,10 +3,16 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const { Room, RoomType, Branch, Stay, AuditLog, sequelize } = require('../models');
+const { Room, RoomType, Branch, Stay, AuditLog, RoomStatusHistory, User, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { broadcastRoomEvent } = require('../sockets/socketHandler');
+const websocketService = require('../services/websocketService');
 const { JWT_SECRET } = require('../middlewares/authMiddleware');
+
+// Tự động tạo bảng RoomStatusHistory nếu chưa có (FEAT-ROOMSTATUS-01)
+if (RoomStatusHistory && RoomStatusHistory.sync) {
+  RoomStatusHistory.sync({ alter: false }).catch(() => {});
+}
 
 // ─── AUTH & PERMISSION MIDDLEWARE (Theo mục 3.1 & 5.1 Spec 2) ─────────────────
 function checkRoomPermission(requiredPermission = 'ROOM_MANAGE') {
@@ -707,6 +713,7 @@ const handleUpdateRoom = async (req, res) => {
 
     const oldValues = toSpecRoom(room);
 
+    const oldStatus = room.Status;
     await room.update({
       BranchId: branchId,
       RoomTypeId: roomTypeId,
@@ -715,6 +722,18 @@ const handleUpdateRoom = async (req, res) => {
       Status: nextStatus,
       Description: description,
     });
+
+    if (oldStatus !== nextStatus && RoomStatusHistory) {
+      await RoomStatusHistory.create({
+        RoomId: room.RoomId,
+        OldStatus: oldStatus,
+        NewStatus: nextStatus,
+        TriggerEvent: 'MANUAL',
+        StatusChangedAt: new Date(),
+        StatusChangedBy: req.user ? req.user.UserId : null,
+        Note: description || null,
+      }).catch(() => {});
+    }
 
     const updated = await Room.findByPk(id, {
       include: [
@@ -1001,6 +1020,11 @@ const handleLockFloor = async (req, res) => {
       floor: rawFloor,
     });
 
+    // Phát sự kiện real-time (FEAT-ROOMSTATUS-01 mục 4.1/4.2/4.3)
+    if (websocketService.broadcastRoomMapUpdate) {
+      websocketService.broadcastRoomMapUpdate({ roomId: room.RoomId, newStatus: nextStatus, roomNumber: room.RoomNumber });
+    }
+
     res.json({
       success: true,
       code: 'SUCCESS_0002_UPDATED',
@@ -1097,5 +1121,280 @@ const handleSingleStatusUpdate = async (req, res) => {
 router.patch('/:id/status', checkRoomPermission('ROOM_MANAGE'), handleSingleStatusUpdate);
 router.patch('/:id/chuyen-trang-thai', checkRoomPermission('ROOM_MANAGE'), handleSingleStatusUpdate);
 router.patch('/:id/thao-tac', checkRoomPermission('ROOM_MANAGE'), handleSingleStatusUpdate);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEAT-ROOMSTATUS-01: API QUẢN LÝ TRẠNG THÁI PHÒNG TỰ ĐỘNG (Spec 5)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── PATCH Đánh dấu / Gỡ bảo trì (Spec 3.5 & 4.4) ───────────────────────────
+// PATCH /api/phong/:id/maintenance  { action: 'on'|'off', maintenanceNote, userId }
+router.patch('/:id/maintenance', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, maintenanceNote, userId } = req.body;
+
+    // Kiểm tra action hợp lệ
+    if (!action || !['on', 'off'].includes(action)) {
+      return res.status(400).json({ success: false, message: 'Hành động không hợp lệ. Phải là "on" hoặc "off".' });
+    }
+
+    const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
+    if (!room) {
+      return res.status(404).json({ success: false, isRecordDeleted: true, message: 'Phòng không tồn tại hoặc đã bị xóa!' });
+    }
+
+    const { buong_phong, luu_tru } = decodeStatus(room.Status);
+    const oldStatus = room.Status;
+
+    if (action === 'on') {
+      // ─── Đánh dấu bảo trì (→ OutOfOrder / MAINTENANCE) ──────────────────
+      // Spec 3.5: Không được phép khi phòng đang OCCUPIED
+      if (luu_tru === 'inhouse') {
+        return res.status(400).json({
+          success: false,
+          errorCode: 'ERROR_0019_INVALID_STATUS_TRANSITION',
+          message: 'Không thể đánh dấu bảo trì khi phòng đang có khách lưu trú'
+        });
+      }
+
+      // Spec 3.5: maintenanceNote bắt buộc 5-500 ký tự
+      const note = (maintenanceNote || '').trim();
+      if (!note) {
+        return res.status(400).json({
+          success: false,
+          errorCode: 'ERROR_0001_REQUIRED',
+          message: 'Vui lòng nhập lý do bảo trì'
+        });
+      }
+      if (note.length < 5) {
+        return res.status(400).json({
+          success: false,
+          errorCode: 'ERROR_0002_MIN_LENGTH',
+          message: 'Lý do bảo trì phải có ít nhất 5 ký tự'
+        });
+      }
+      if (note.length > 500) {
+        return res.status(400).json({
+          success: false,
+          errorCode: 'ERROR_0003_MAX_LENGTH',
+          message: 'Lý do bảo trì không được vượt quá 500 ký tự'
+        });
+      }
+
+      // Cập nhật trong 1 transaction kèm ghi lịch sử (Spec 3.9 & 3.8)
+      await sequelize.transaction(async (t) => {
+        await room.update({ Status: 'OutOfOrder' }, { transaction: t });
+        await RoomStatusHistory.create({
+          RoomId: room.RoomId,
+          OldStatus: oldStatus,
+          NewStatus: 'OutOfOrder',
+          TriggerEvent: 'MAINTENANCE_ON',
+          StatusChangedAt: new Date(),
+          StatusChangedBy: userId || null,
+          Note: note,
+        }, { transaction: t });
+      });
+
+    } else {
+      // ─── Gỡ bảo trì (MAINTENANCE → VACANT_DIRTY) ────────────────────────
+      // Spec 3.5: Gỡ bảo trì luôn → VACANT_DIRTY (không phải VACANT_CLEAN)
+      if (buong_phong !== 'ooo') {
+        return res.status(400).json({
+          success: false,
+          errorCode: 'ERROR_0019_INVALID_STATUS_TRANSITION',
+          message: 'Phòng không đang ở trạng thái bảo trì'
+        });
+      }
+
+      await sequelize.transaction(async (t) => {
+        await room.update({ Status: 'DirtyVacant' }, { transaction: t });
+        await RoomStatusHistory.create({
+          RoomId: room.RoomId,
+          OldStatus: oldStatus,
+          NewStatus: 'DirtyVacant',
+          TriggerEvent: 'MAINTENANCE_OFF',
+          StatusChangedAt: new Date(),
+          StatusChangedBy: userId || null,
+          Note: (maintenanceNote || '').trim() || null,
+        }, { transaction: t });
+      });
+    }
+
+    const updated = await Room.findByPk(id, {
+      include: [
+        { model: RoomType, as: 'roomType' },
+        { model: Branch, as: 'branch' },
+      ]
+    });
+
+    // Phát sự kiện real-time (Spec 4.4)
+    if (websocketService.broadcastRoomMapUpdate) {
+      websocketService.broadcastRoomMapUpdate({
+        roomId: room.RoomId,
+        newStatus: updated.Status,
+        roomNumber: room.RoomNumber
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Cập nhật trạng thái phòng thành công',
+      data: toUIFormat(updated)
+    });
+  } catch (err) {
+    console.error('PATCH /maintenance error:', err.message);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
+  }
+});
+
+// ─── GET lịch sử trạng thái phòng (Spec 3.8 & 6.1) ─────────────────────────
+// GET /api/phong/:id/status-history?from=2024-01-01&to=2024-12-31&page=1&pageSize=20
+router.get('/:id/status-history', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { from, to, page = 1, pageSize = 20 } = req.query;
+
+    const room = await Room.findOne({ where: { RoomId: id, IsDeleted: false } });
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Phòng không tồn tại hoặc đã bị xóa!' });
+    }
+
+    const where = { RoomId: id };
+    if (from || to) {
+      where.StatusChangedAt = {};
+      if (from) where.StatusChangedAt[Op.gte] = new Date(from);
+      if (to) where.StatusChangedAt[Op.lte] = new Date(to + 'T23:59:59');
+    }
+
+    const offset = (Number(page) - 1) * Number(pageSize);
+    const { count, rows } = await RoomStatusHistory.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'changedBy', attributes: ['UserId', 'FullName', 'Email'], required: false }
+      ],
+      order: [['StatusChangedAt', 'DESC']],
+      limit: Number(pageSize),
+      offset,
+    });
+
+    // Map sang định dạng hiển thị tiếng Việt
+    const statusLabel = (s) => {
+      const map = {
+        'CleanAvailable': 'Trống sạch', 'OutOfOrder': 'Đang bảo trì',
+        'CleanOccupied': 'Đang ở', 'DirtyVacant': 'Chờ dọn dẹp',
+        'DirtyOccupied': 'Đang ở (chưa dọn)', 'Occupied': 'Đang ở',
+        'Dirty': 'Chờ dọn dẹp', 'Inspected': 'Trống sạch',
+      };
+      return map[s] || s;
+    };
+    const eventLabel = (e) => {
+      const map = {
+        'CHECKIN': 'Check-in', 'CHECKOUT': 'Check-out',
+        'CLEANING_COMPLETED': 'Hoàn tất dọn phòng',
+        'MAINTENANCE_ON': 'Đánh dấu bảo trì', 'MAINTENANCE_OFF': 'Gỡ bảo trì',
+        'MANUAL': 'Thủ công',
+      };
+      return map[e] || e;
+    };
+
+    const data = rows.map(h => ({
+      historyId: h.HistoryId,
+      roomId: h.RoomId,
+      roomNumber: room.RoomNumber,
+      oldStatus: h.OldStatus,
+      oldStatusLabel: statusLabel(h.OldStatus),
+      newStatus: h.NewStatus,
+      newStatusLabel: statusLabel(h.NewStatus),
+      triggerEvent: h.TriggerEvent,
+      triggerEventLabel: eventLabel(h.TriggerEvent),
+      isAutomatic: h.StatusChangedBy === null,
+      changedBy: h.changedBy ? h.changedBy.FullName : 'Hệ thống',
+      changedAt: h.StatusChangedAt,
+      note: h.Note,
+    }));
+
+    res.json({
+      success: true,
+      data,
+      total: count,
+      page: Number(page),
+      pageSize: Number(pageSize),
+      totalPages: Math.ceil(count / Number(pageSize)),
+      roomNumber: room.RoomNumber,
+    });
+  } catch (err) {
+    console.error('GET /status-history error:', err.message);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
+  }
+});
+
+// ─── GET danh sách tất cả phòng với lịch sử (cho màn hình tra cứu) ───────────
+// GET /api/phong/all-status-history?from=&to=&page=1
+router.get('/all-status-history', async (req, res) => {
+  try {
+    const { from, to, page = 1, pageSize = 20, roomNumber } = req.query;
+    const where = {};
+    if (from || to) {
+      where.StatusChangedAt = {};
+      if (from) where.StatusChangedAt[Op.gte] = new Date(from);
+      if (to) where.StatusChangedAt[Op.lte] = new Date(to + 'T23:59:59');
+    }
+
+    const roomInclude = [
+      { model: Room, as: 'room', attributes: ['RoomId', 'RoomNumber', 'Floor'], required: true,
+        where: roomNumber ? { RoomNumber: { [Op.like]: `%${roomNumber}%` } } : undefined }
+    ];
+
+    const offset = (Number(page) - 1) * Number(pageSize);
+    const { count, rows } = await RoomStatusHistory.findAndCountAll({
+      where,
+      include: [
+        ...roomInclude,
+        { model: User, as: 'changedBy', attributes: ['UserId', 'FullName'], required: false }
+      ],
+      order: [['StatusChangedAt', 'DESC']],
+      limit: Number(pageSize),
+      offset,
+    });
+
+    const statusLabel = (s) => {
+      const map = {
+        'CleanAvailable': 'Trống sạch', 'OutOfOrder': 'Đang bảo trì',
+        'CleanOccupied': 'Đang ở', 'DirtyVacant': 'Chờ dọn dẹp',
+        'DirtyOccupied': 'Đang ở (chưa dọn)', 'Occupied': 'Đang ở',
+        'Dirty': 'Chờ dọn dẹp', 'Inspected': 'Trống sạch',
+      };
+      return map[s] || s;
+    };
+    const eventLabel = (e) => {
+      const map = {
+        'CHECKIN': 'Check-in', 'CHECKOUT': 'Check-out',
+        'CLEANING_COMPLETED': 'Hoàn tất dọn phòng',
+        'MAINTENANCE_ON': 'Đánh dấu bảo trì', 'MAINTENANCE_OFF': 'Gỡ bảo trì',
+        'MANUAL': 'Thủ công',
+      };
+      return map[e] || e;
+    };
+
+    const data = rows.map(h => ({
+      historyId: h.HistoryId,
+      roomId: h.RoomId,
+      roomNumber: h.room?.RoomNumber || '',
+      floor: h.room?.Floor || '',
+      oldStatusLabel: statusLabel(h.OldStatus),
+      newStatusLabel: statusLabel(h.NewStatus),
+      triggerEvent: h.TriggerEvent,
+      triggerEventLabel: eventLabel(h.TriggerEvent),
+      isAutomatic: h.StatusChangedBy === null,
+      changedBy: h.changedBy ? h.changedBy.FullName : 'Hệ thống',
+      changedAt: h.StatusChangedAt,
+      note: h.Note,
+    }));
+
+    res.json({ success: true, data, total: count, page: Number(page), pageSize: Number(pageSize), totalPages: Math.ceil(count / Number(pageSize)) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
+  }
+});
 
 module.exports = router;
