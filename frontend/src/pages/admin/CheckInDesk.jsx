@@ -54,16 +54,23 @@ async function getHtml5QrcodeClass() {
 
 // Hỗ trợ cả cổng 5000 và qua Proxy /api của Vite theo Spec 8
 const API_ENDPOINTS = [
-  'http://localhost:5000/api/v1/check-ins',
   '/api/v1/check-ins',
-  'http://localhost:5000/api/v1/check-in',
   '/api/v1/check-in',
+  'http://localhost:5000/api/v1/check-ins',
+  'http://localhost:5000/api/v1/check-in',
 ];
 
 // Hàm gọi API an toàn, tự động đính kèm Token Authorization
 async function safeFetchJson(path, options = {}) {
   let lastErr = null;
-  const token = localStorage.getItem('token') || localStorage.getItem('grand_horizon_token');
+  // Lấy token từ key chính hotel_token của AuthContext, kèm fallback các key khác
+  const token =
+    localStorage.getItem('hotel_token') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('grand_horizon_token') ||
+    sessionStorage.getItem('hotel_token') ||
+    sessionStorage.getItem('token') ||
+    '';
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   for (const base of API_ENDPOINTS) {
