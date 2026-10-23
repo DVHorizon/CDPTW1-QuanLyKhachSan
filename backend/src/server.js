@@ -44,6 +44,11 @@ app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
 
 // Route Quản lý tình trạng phòng trống (Room Availability)
 app.use('/api/admin/room-availability', require('./routes/admin/roomAvailability'));
+app.use('/api/v1/room-map', require('./routes/admin/roomAvailability'));
+app.use('/api/v1/rooms/:roomId/status', (req, res, next) => {
+  req.url = `/${req.params.roomId}/status`;
+  return require('./routes/admin/roomAvailability')(req, res, next);
+});
 
 // Route Phân bổ phòng & xác nhận (Room Allocation & Confirmation Engine)
 app.use('/api/v1/allocation', require('./routes/admin/roomAllocationRoutes'));

@@ -130,8 +130,14 @@ const RoomStatusManagement = () => {
         setRooms(data.data);
         setTotalInDb(data.totalInDb || data.data.length);
 
-        // Tự động giữ selection nếu có
+        // Tự động giữ selection hoặc ưu tiên chọn theo URL param roomId (?roomId=...)
+        const searchParams = new URLSearchParams(window.location.search);
+        const targetRoomId = searchParams.get('roomId');
         setSelectedRoom((prev) => {
+          if (targetRoomId) {
+            const foundByParam = data.data.find((x) => String(x.id) === String(targetRoomId) || String(x.so_phong) === String(targetRoomId));
+            if (foundByParam) return foundByParam;
+          }
           if (!prev) return data.data[0] || null;
           const found = data.data.find((x) => x.id === prev.id);
           return found || data.data[0] || null;
