@@ -68,9 +68,9 @@ function App() {
             <Route path="/admin/menu" element={<ProtectedRoute><MenuManagement /></ProtectedRoute>} />
             <Route path="/admin/room-types" element={<ProtectedRoute><RoomTypeManagement /></ProtectedRoute>} />
             <Route path="/admin/rooms" element={<ProtectedRoute><RoomManagement /></ProtectedRoute>} />
-            <Route path="/admin/bookings" element={<ProtectedRoute><BookingManagement /></ProtectedRoute>} />
-            <Route path="/admin/dat-phong" element={<ProtectedRoute><BookingManagement /></ProtectedRoute>} />
-            <Route path="/admin/danh-sach-dat-phong" element={<ProtectedRoute><BookingManagement /></ProtectedRoute>} />
+            <Route path="/admin/bookings" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><BookingManagement /></ProtectedRoute>} />
+            <Route path="/admin/dat-phong" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><BookingManagement /></ProtectedRoute>} />
+            <Route path="/admin/danh-sach-dat-phong" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><BookingManagement /></ProtectedRoute>} />
             <Route path="/admin/room-assignment" element={<ProtectedRoute><RoomAssignment /></ProtectedRoute>} />
             <Route path="/admin/room-assignment/:bookingId" element={<ProtectedRoute><RoomAssignment /></ProtectedRoute>} />
             <Route path="/admin/room-allocation" element={<ProtectedRoute><RoomAssignment /></ProtectedRoute>} />
