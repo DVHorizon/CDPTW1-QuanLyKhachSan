@@ -215,6 +215,7 @@ exports.createOnlineBooking = async (req, res) => {
     const diffTime = Math.max(dOut - dIn, 86400000);
     const numberOfNights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     const basePrice = parseFloat(roomType.BasePrice || 0);
+    const effectiveBaseRate = basePrice;
     const roomSubtotal = numberOfNights * basePrice * effectiveUnits;
 
     // Gold discount 10% if applicable
@@ -253,13 +254,30 @@ exports.createOnlineBooking = async (req, res) => {
             addonsTotal += shuttlePrice;
             resolvedAddons.push({ id: 'ADDON_SHUTTLE', name: 'Đưa Đón Sân Bay Bằng Limousine', price: shuttlePrice });
           } else if (addon === 'ADDON_EARLY_CI') {
-            const earlyPrice = effectiveBaseRate >= 100000 ? Math.round(effectiveBaseRate * 0.5) : Math.round(effectiveBaseRate * 0.5 * 100) / 100;
+            const earlyPrice = effectiveBaseRate >= 100000 ? Math.round(effectiveBaseRate * 0.30) : Math.round(effectiveBaseRate * 0.30 * 100) / 100;
             addonsTotal += earlyPrice;
-            resolvedAddons.push({ id: 'ADDON_EARLY_CI', name: 'Nhận Phòng Sớm (Early Check-In)', price: earlyPrice });
-          } else if (addon === 'ADDON_LATE_CO') {
-            const latePrice = effectiveBaseRate >= 100000 ? Math.round(effectiveBaseRate * 0.5) : Math.round(effectiveBaseRate * 0.5 * 100) / 100;
+            resolvedAddons.push({ id: 'ADDON_EARLY_CI', name: 'Nhận Phòng Sớm (Early Check-In 12:00 - 14:00)', price: earlyPrice });
+          } else if (String(addon).startsWith('ADDON_LATE_CO') || addon === 'late_checkout') {
+            const addonStr = String(addon);
+            const reqMinutes = parseInt(req.body.lateCheckOutMinutes, 10) || 30;
+            let lateRate = 0.10;
+            let lateName = 'Trả Phòng Trễ đến 12:30 (+30 phút)';
+            if (addonStr.includes('60') || reqMinutes === 60) {
+              lateRate = 0.20;
+              lateName = 'Trả Phòng Trễ đến 13:00 (+60 phút)';
+            } else if (addonStr.includes('90') || reqMinutes === 90) {
+              lateRate = 0.30;
+              lateName = 'Trả Phòng Trễ đến 13:30 (+90 phút)';
+            } else if (addonStr.includes('120') || reqMinutes === 120) {
+              lateRate = 0.40;
+              lateName = 'Trả Phòng Trễ đến 14:00 (+120 phút)';
+            } else if (addonStr.includes('360') || addonStr.includes('1800') || reqMinutes >= 180) {
+              lateRate = 0.50;
+              lateName = 'Trả Phòng Trễ đến 18:00 (Chiều muộn)';
+            }
+            const latePrice = effectiveBaseRate >= 100000 ? Math.round(effectiveBaseRate * lateRate) : Math.round(effectiveBaseRate * lateRate * 100) / 100;
             addonsTotal += latePrice;
-            resolvedAddons.push({ id: 'ADDON_LATE_CO', name: 'Trả Phòng Trễ (Late Check-Out)', price: latePrice });
+            resolvedAddons.push({ id: 'ADDON_LATE_CO', name: lateName, price: latePrice });
           }
         }
       }
@@ -410,6 +428,7 @@ exports.calculatePricing = async (req, res) => {
     if (!checkInDate || !checkOutDate) {
       return res.status(400).json({
         success: false,
+        code: 'ERROR_0034_INVALID_CALCULATION_PARAMS',
         errorCode: 'ERROR_0034_INVALID_CALCULATION_PARAMS',
         message: 'Dữ liệu ngày hoặc số lượng khách không hợp lệ để tính giá'
       });
@@ -424,6 +443,7 @@ exports.calculatePricing = async (req, res) => {
     if (isNaN(d1.getTime()) || isNaN(d2.getTime()) || d2 <= d1 || isNaN(numAdults) || numAdults < 1) {
       return res.status(400).json({
         success: false,
+        code: 'ERROR_0034_INVALID_CALCULATION_PARAMS',
         errorCode: 'ERROR_0034_INVALID_CALCULATION_PARAMS',
         message: 'Dữ liệu ngày hoặc số lượng khách không hợp lệ để tính giá'
       });
@@ -434,6 +454,7 @@ exports.calculatePricing = async (req, res) => {
     if (numberOfNights <= 0) {
       return res.status(400).json({
         success: false,
+        code: 'ERROR_0034_INVALID_CALCULATION_PARAMS',
         errorCode: 'ERROR_0034_INVALID_CALCULATION_PARAMS',
         message: 'Dữ liệu ngày hoặc số lượng khách không hợp lệ để tính giá'
       });
@@ -495,14 +516,14 @@ exports.calculatePricing = async (req, res) => {
       },
       ADDON_EARLY_CI: {
         code: 'ADDON_EARLY_CI',
-        name: 'Nhận Phòng Sớm (Early Check-In)',
-        fixedPrice: isVND ? Math.round(effectiveRate * 0.5) : Math.round(effectiveRate * 0.5 * 100) / 100,
+        name: 'Nhận Phòng Sớm (Early Check-In 12:00 - 14:00)',
+        fixedPrice: isVND ? Math.round(effectiveRate * 0.30) : Math.round(effectiveRate * 0.30 * 100) / 100,
         type: 'FIXED'
       },
       ADDON_LATE_CO: {
         code: 'ADDON_LATE_CO',
-        name: 'Trả Phòng Trễ (Late Check-Out)',
-        fixedPrice: isVND ? Math.round(effectiveRate * 0.5) : Math.round(effectiveRate * 0.5 * 100) / 100,
+        name: 'Trả Phòng Trễ đến 12:30 (+30 phút)',
+        fixedPrice: isVND ? Math.round(effectiveRate * 0.10) : Math.round(effectiveRate * 0.10 * 100) / 100,
         type: 'FIXED'
       },
       ADDON_SPA: {
@@ -539,6 +560,38 @@ exports.calculatePricing = async (req, res) => {
       else if (normalizedCode.includes('FLOAT') || normalizedCode === 'ADDON_FLOATING') key = 'ADDON_FLOATING';
       else if (normalizedCode.includes('EARLY') || normalizedCode === 'ADDON_EARLY_CI') key = 'ADDON_EARLY_CI';
       else if (normalizedCode.includes('LATE') || normalizedCode === 'ADDON_LATE_CO') key = 'ADDON_LATE_CO';
+
+      if (key === 'ADDON_LATE_CO') {
+        let lateRate = 0.10;
+        let lateName = 'Trả Phòng Trễ đến 12:30 (+30 phút)';
+        const minutes = parseInt(req.body.lateCheckOutMinutes, 10) || 30;
+        if (normalizedCode.includes('60') || minutes === 60) {
+          lateRate = 0.20;
+          lateName = 'Trả Phòng Trễ đến 13:00 (+60 phút)';
+        } else if (normalizedCode.includes('90') || minutes === 90) {
+          lateRate = 0.30;
+          lateName = 'Trả Phòng Trễ đến 13:30 (+90 phút)';
+        } else if (normalizedCode.includes('120') || minutes === 120) {
+          lateRate = 0.40;
+          lateName = 'Trả Phòng Trễ đến 14:00 (+120 phút)';
+        } else if (normalizedCode.includes('360') || normalizedCode.includes('1800') || minutes >= 180) {
+          lateRate = 0.50;
+          lateName = 'Trả Phòng Trễ đến 18:00 (Chiều muộn)';
+        } else if (req.body.lateCheckOutRate) {
+          lateRate = parseFloat(req.body.lateCheckOutRate);
+        }
+
+        const latePrice = isVND ? Math.round(effectiveRate * lateRate) : Math.round(effectiveRate * lateRate * 100) / 100;
+        addOnsBreakdown.push({
+          code: 'ADDON_LATE_CO',
+          name: lateName,
+          unitPrice: latePrice,
+          quantity: 1,
+          total: latePrice
+        });
+        addOnsTotal += latePrice;
+        continue;
+      }
 
       const addonConfig = ADDON_CATALOG[key];
       if (addonConfig) {

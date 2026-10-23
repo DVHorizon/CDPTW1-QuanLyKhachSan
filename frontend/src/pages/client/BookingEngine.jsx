@@ -77,14 +77,25 @@ export default function BookingEngine() {
   const [specialRequests, setSpecialRequests] = useState('');
   const [isPolicyAccepted, setIsPolicyAccepted] = useState(false);
 
-  // Add-on experiences (FEAT-GUEST-06)
+  // Add-on experiences (FEAT-GUEST-06: 4 gói tiện ích cốt lõi khách sạn)
   const [addonBuffet, setAddonBuffet] = useState(false);
   const [addonLimo, setAddonLimo] = useState(false);
-  const [addonFloating, setAddonFloating] = useState(false);
-  const [addonSpa, setAddonSpa] = useState(false);
-  const [addonBbq, setAddonBbq] = useState(false);
   const [addonEarlyCI, setAddonEarlyCI] = useState(false);
   const [addonLateCO, setAddonLateCO] = useState(false);
+
+  // Mốc trả phòng trễ từng nấc 30 phút theo yêu cầu
+  const LATE_CHECKOUT_OPTIONS = [
+    { minutes: 30, time: '12:30', label: '+30p (12:30)', rate: 0.10, desc: '+10% giá đêm' },
+    { minutes: 60, time: '13:00', label: '+1h (13:00)', rate: 0.20, desc: '+20% giá đêm' },
+    { minutes: 90, time: '13:30', label: '+1.5h (13:30)', rate: 0.30, desc: '+30% giá đêm' },
+    { minutes: 120, time: '14:00', label: '+2h (14:00)', rate: 0.40, desc: '+40% giá đêm' },
+    { minutes: 360, time: '18:00', label: 'Chiều muộn (18:00)', rate: 0.50, desc: '+50% giá đêm' }
+  ];
+  const [lateCheckOutMinutes, setLateCheckOutMinutes] = useState(30);
+
+  const selectedLateOption = useMemo(() => {
+    return LATE_CHECKOUT_OPTIONS.find(opt => opt.minutes === lateCheckOutMinutes) || LATE_CHECKOUT_OPTIONS[0];
+  }, [lateCheckOutMinutes]);
 
   // Room Type data from API
   const [roomType, setRoomType] = useState(null);
@@ -148,11 +159,8 @@ export default function BookingEngine() {
       const selectedAddonsList = [];
       if (addonBuffet) selectedAddonsList.push('ADDON_BUFFET');
       if (addonLimo) selectedAddonsList.push('ADDON_SHUTTLE');
-      if (addonFloating) selectedAddonsList.push('ADDON_FLOATING');
-      if (addonSpa) selectedAddonsList.push('ADDON_SPA');
-      if (addonBbq) selectedAddonsList.push('ADDON_BBQ');
       if (addonEarlyCI) selectedAddonsList.push('ADDON_EARLY_CI');
-      if (addonLateCO) selectedAddonsList.push('ADDON_LATE_CO');
+      if (addonLateCO) selectedAddonsList.push(`ADDON_LATE_CO_${lateCheckOutMinutes}`);
 
       const currentBaseRate = roomType?.BasePrice ? parseFloat(roomType.BasePrice) : 8500000;
 
@@ -166,6 +174,7 @@ export default function BookingEngine() {
           children: childrenCount,
           roomQuantity: unitsAllocated,
           selectedAddOns: selectedAddonsList,
+          lateCheckOutMinutes: addonLateCO ? lateCheckOutMinutes : undefined,
           taxesAndFeesRate: 0.12,
           depositRate: 0.20,
           isGoldMember: user?.MembershipTier?.TierName === 'Gold' || user?.TierId === 3
@@ -191,7 +200,7 @@ export default function BookingEngine() {
 
     calculateStayPrice();
     return () => { isMounted = false; };
-  }, [checkInDate, checkOutDate, roomType, roomTypeId, adultsCount, childrenCount, unitsAllocated, addonBuffet, addonLimo, addonFloating, addonSpa, addonBbq, addonEarlyCI, addonLateCO, user]);
+  }, [checkInDate, checkOutDate, roomType, roomTypeId, adultsCount, childrenCount, unitsAllocated, addonBuffet, addonLimo, addonEarlyCI, addonLateCO, lateCheckOutMinutes, user]);
 
   const roomSubtotal = useMemo(() => {
     if (pricingData?.roomSubtotal) return pricingData.roomSubtotal;
@@ -207,12 +216,11 @@ export default function BookingEngine() {
     if (pricingData?.addOnsTotal !== undefined) return pricingData.addOnsTotal;
     let total = 0;
     if (addonBuffet) total += (basePricePerNight < 100000 ? 25 : 250000) * numberOfNights;
-    if (addonLimo) total += 800000;
-    if (addonFloating) total += 900000;
-    if (addonSpa) total += 1800000;
-    if (addonBbq) total += 2200000;
+    if (addonLimo) total += (basePricePerNight < 100000 ? 35 : 800000);
+    if (addonEarlyCI) total += Math.round(basePricePerNight * 0.30);
+    if (addonLateCO) total += Math.round(basePricePerNight * (selectedLateOption?.rate || 0.10));
     return total;
-  }, [pricingData, addonBuffet, addonLimo, addonFloating, addonSpa, addonBbq, basePricePerNight, numberOfNights]);
+  }, [pricingData, addonBuffet, addonLimo, addonEarlyCI, addonLateCO, selectedLateOption, basePricePerNight, numberOfNights]);
 
   const finalTotalAmount = useMemo(() => {
     if (pricingData?.totalAmount !== undefined) return pricingData.totalAmount;
@@ -278,11 +286,8 @@ export default function BookingEngine() {
     const selectedAddonsList = [];
     if (addonBuffet) selectedAddonsList.push('ADDON_BUFFET');
     if (addonLimo) selectedAddonsList.push('ADDON_SHUTTLE');
-    if (addonFloating) selectedAddonsList.push('ADDON_FLOATING');
-    if (addonSpa) selectedAddonsList.push('ADDON_SPA');
-    if (addonBbq) selectedAddonsList.push('ADDON_BBQ');
     if (addonEarlyCI) selectedAddonsList.push('ADDON_EARLY_CI');
-    if (addonLateCO) selectedAddonsList.push('ADDON_LATE_CO');
+    if (addonLateCO) selectedAddonsList.push(`ADDON_LATE_CO_${lateCheckOutMinutes}`);
 
     setIsSubmitting(true);
 
@@ -303,6 +308,7 @@ export default function BookingEngine() {
         isPolicyAccepted: true,
         bedPreference,
         selectedAddons: selectedAddonsList,
+        lateCheckOutMinutes: addonLateCO ? lateCheckOutMinutes : undefined,
         isGoldMember: user?.MembershipTier?.TierName === 'Gold' || user?.TierId === 3,
         totalAmount: pricingData?.totalAmount || finalTotalAmount,
         depositAmount: pricingData?.depositAmount || depositRequired,
@@ -668,89 +674,14 @@ export default function BookingEngine() {
                     {specialRequests.length}/500 ký tự
                   </div>
                 </div>
-              </div>
-            </section>
 
-            {/* Section 2: Room Preferences Configuration */}
-            <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-              <div className="flex items-center gap-2 pb-4 mb-4 border-b border-slate-100">
-                <span className="w-2 h-6 bg-[#725b38] rounded-full inline-block"></span>
-                <h2 className="font-serif text-xl font-bold text-slate-900">Tùy Chọn Cấu Hình Phòng Biệt Thự</h2>
-              </div>
-
-              <div className="space-y-4">
-                {/* Bed Type Selection */}
-                <div>
-                  <span className="block text-xs font-semibold text-slate-600 mb-2">Quy cách giường nghỉ yêu thích</span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
-                      bedPreference === 'king' ? 'bg-[#eff4ff] border-[#725b38]' : 'bg-[#f8f9ff] border-slate-200 hover:border-slate-300'
-                    }`}>
-                      <input 
-                        type="radio" 
-                        name="bed_type"
-                        value="king"
-                        checked={bedPreference === 'king'}
-                        onChange={() => setBedPreference('king')}
-                        className="w-4 h-4 accent-[#725b38] cursor-pointer"
-                      />
-                      <span className="material-symbols-outlined text-[#725b38] text-[24px]">king_bed</span>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-sm text-slate-900">1 Giường King Lớn</span>
-                        <span className="text-xs text-slate-500">Đệm lông vũ cao cấp 2m0 x 2m2</span>
-                      </div>
-                    </label>
-
-                    <label className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
-                      bedPreference === 'twin' ? 'bg-[#eff4ff] border-[#725b38]' : 'bg-[#f8f9ff] border-slate-200 hover:border-slate-300'
-                    }`}>
-                      <input 
-                        type="radio" 
-                        name="bed_type"
-                        value="twin"
-                        checked={bedPreference === 'twin'}
-                        onChange={() => setBedPreference('twin')}
-                        className="w-4 h-4 accent-[#725b38] cursor-pointer"
-                      />
-                      <span className="material-symbols-outlined text-[#725b38] text-[24px]">bed</span>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-sm text-slate-900">2 Giường Đơn Twin</span>
-                        <span className="text-xs text-slate-500">Hai giường đơn tách biệt 1m2 x 2m0</span>
-                      </div>
-                    </label>
+                {/* Default Bed & Room Configuration Info */}
+                <div className="sm:col-span-2 p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between text-xs text-slate-700">
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-[#725b38] text-[20px]">king_bed</span>
+                    <span>Quy cách giường mặc định: <strong className="text-slate-900 font-semibold">1 Giường King Lớn</strong> (Đệm lông vũ cao cấp 2m0 × 2m2) • <strong className="text-slate-900 font-semibold">Khu vực không hút thuốc</strong></span>
                   </div>
-                </div>
-
-                {/* Additional Room Wishes */}
-                <div>
-                  <span className="block text-xs font-semibold text-slate-600 mb-2">Mong muốn lưu trú bổ sung</span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="flex items-center justify-between p-3 px-4 rounded-xl bg-[#eff4ff] border border-blue-100/50 cursor-pointer hover:bg-blue-50 transition-colors">
-                      <span className="flex items-center gap-2 text-sm text-slate-900 font-medium">
-                        <span className="material-symbols-outlined text-[#725b38] text-[20px]">smoke_free</span>
-                        Khu vực Không hút thuốc
-                      </span>
-                      <input 
-                        type="checkbox" 
-                        checked={noSmoking}
-                        onChange={(e) => setNoSmoking(e.target.checked)}
-                        className="w-4 h-4 accent-[#725b38] rounded cursor-pointer"
-                      />
-                    </label>
-
-                    <label className="flex items-center justify-between p-3 px-4 rounded-xl bg-[#eff4ff] border border-blue-100/50 cursor-pointer hover:bg-blue-50 transition-colors">
-                      <span className="flex items-center gap-2 text-sm text-slate-900 font-medium">
-                        <span className="material-symbols-outlined text-[#725b38] text-[20px]">terrain</span>
-                        Vị trí vách đá góc nhìn panorama
-                      </span>
-                      <input 
-                        type="checkbox" 
-                        checked={highFloorPanorama}
-                        onChange={(e) => setHighFloorPanorama(e.target.checked)}
-                        className="w-4 h-4 accent-[#725b38] rounded cursor-pointer"
-                      />
-                    </label>
-                  </div>
+                  <span className="text-slate-400 text-[11px] hidden md:inline">Nếu cần 2 giường đơn (Twin), quý khách vui lòng ghi chú bên trên</span>
                 </div>
               </div>
             </section>
@@ -831,7 +762,7 @@ export default function BookingEngine() {
                   </div>
                 </label>
 
-                {/* Addon: Early Check-in */}
+                {/* Addon: Early Check-in (12:00 - 14:00) */}
                 <label className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
                   addonEarlyCI ? 'bg-[#eff4ff] border-[#725b38]/40 shadow-sm' : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100/80'
                 }`}>
@@ -846,131 +777,116 @@ export default function BookingEngine() {
                       <span className="material-symbols-outlined text-[28px]">login</span>
                     </div>
                     <div>
-                      <div className="font-bold text-sm text-slate-900">Nhận Phòng Sớm (Early Check-In từ 09:00)</div>
-                      <div className="text-xs text-slate-500">Ưu tiên nhận phòng sớm khi đến resort, đảm bảo phòng sạch sẽ sẵn sàng</div>
+                      <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                        <span>Nhận Phòng Sớm (Early Check-In từ 12:00 - 14:00)</span>
+                        <span className="text-[11px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">Tiết kiệm 40%</span>
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Ưu tiên nhận phòng sớm từ 12:00 (chuẩn 14:00), đảm bảo phòng sạch sẽ và sẵn sàng đón tiếp
+                      </div>
                     </div>
                   </div>
                   <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
                     <div className="font-bold text-sm text-slate-900">
-                      +{pricingData?.currency === 'USD' ? `$${(pricingData.baseRate * 0.5).toFixed(2)}` : formatVND(basePricePerNight * 0.5)}
+                      +{pricingData?.currency === 'USD' ? `$${((pricingData?.baseRate || basePricePerNight) * 0.30).toFixed(2)}` : formatVND(basePricePerNight * 0.30)}
                     </div>
-                    <div className="text-[11px] text-slate-400">/ 50% giá đêm</div>
+                    <div className="text-[11px] text-slate-400">/ 30% giá đêm</div>
                   </div>
                 </label>
 
-                {/* Addon: Late Check-out */}
-                <label className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
+                {/* Addon: Late Check-out (từng nấc 30 phút) */}
+                <div className={`p-4 rounded-xl border transition-all ${
                   addonLateCO ? 'bg-[#eff4ff] border-[#725b38]/40 shadow-sm' : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100/80'
                 }`}>
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="checkbox"
-                      checked={addonLateCO}
-                      onChange={(e) => setAddonLateCO(e.target.checked)}
-                      className="w-5 h-5 accent-[#725b38] rounded shrink-0 cursor-pointer"
-                    />
-                    <div className="w-16 h-14 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shadow-xs shrink-0">
-                      <span className="material-symbols-outlined text-[28px]">logout</span>
+                  <div 
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer"
+                    onClick={() => setAddonLateCO(!addonLateCO)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        checked={addonLateCO}
+                        onChange={(e) => setAddonLateCO(e.target.checked)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-5 h-5 accent-[#725b38] rounded shrink-0 cursor-pointer"
+                      />
+                      <div className="w-16 h-14 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shadow-xs shrink-0">
+                        <span className="material-symbols-outlined text-[28px]">logout</span>
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                          <span>Trả Phòng Trễ (Late Check-Out sau 12:00)</span>
+                          {addonLateCO && (
+                            <span className="text-[11px] font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">
+                              Đến {selectedLateOption.time}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          Thư thả nghỉ ngơi, sử dụng tiện ích resort linh hoạt từng nấc 30 phút theo lịch trình chuyến bay
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-bold text-sm text-slate-900">Trả Phòng Trễ (Late Check-Out đến 18:00)</div>
-                      <div className="text-xs text-slate-500">Thư thả nghỉ ngơi, sử dụng hồ bơi và tiện ích resort trọn vẹn đến chiều tối</div>
+                    <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
+                      <div className="font-bold text-sm text-slate-900">
+                        +{pricingData?.currency === 'USD' 
+                          ? `$${((pricingData?.baseRate || basePricePerNight) * (selectedLateOption?.rate || 0.10)).toFixed(2)}` 
+                          : formatVND(basePricePerNight * (selectedLateOption?.rate || 0.10))}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        / {selectedLateOption?.desc || '+10% giá đêm'}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
-                    <div className="font-bold text-sm text-slate-900">
-                      +{pricingData?.currency === 'USD' ? `$${(pricingData.baseRate * 0.5).toFixed(2)}` : formatVND(basePricePerNight * 0.5)}
-                    </div>
-                    <div className="text-[11px] text-slate-400">/ 50% giá đêm</div>
-                  </div>
-                </label>
 
-                {/* Addon 2: Floating Breakfast */}
-                <label className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
-                  addonFloating ? 'bg-[#eff4ff] border-[#725b38]/40 shadow-sm' : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100/80'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="checkbox"
-                      checked={addonFloating}
-                      onChange={(e) => setAddonFloating(e.target.checked)}
-                      className="w-5 h-5 accent-[#725b38] rounded shrink-0 cursor-pointer"
-                    />
-                    <img 
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuAz0qv8ig2oxlN2RwvK6i1c9mJ--5phiBWF-QQN4-nTlpz0WDROV7mz_4JE0Qm-sb8w4S_kEYdhXYqfqHsE4tEr_P4XkSjrrMIfg1kiV3UyAwaujNWDjVnH5h7krtoGM813CddU9VY8Vo4xIgXGiY7E8KugGOBGIp8GcFsaYndfXPdhuHuxOn0aBJ5v08OG4cC7lU13SXz2vbsOknkVMaQd8UCMm6HzsVM_cC6p8rnh-Al2BUmejMx9" 
-                      alt="Floating Breakfast"
-                      className="w-16 h-14 rounded-lg object-cover shadow-xs shrink-0"
-                    />
-                    <div>
-                      <div className="font-bold text-sm text-slate-900">Bữa Sáng Bồng Bềnh Floating Breakfast</div>
-                      <div className="text-xs text-slate-500">Phục vụ trên khay mây trôi tại hồ bơi riêng kèm bánh tươi &amp; nước ép</div>
+                  {/* Thanh chọn mốc thời gian tăng dần 30 phút khi bật Late Check-Out */}
+                  {addonLateCO && (
+                    <div className="mt-3 pt-3 border-t border-blue-200/60 pl-8 sm:pl-9">
+                      <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-[#725b38]">schedule</span>
+                          <span>Chọn giờ trả phòng trễ mong muốn:</span>
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-normal">
+                          Chuẩn trả phòng: 12:00 trưa
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        {LATE_CHECKOUT_OPTIONS.map((opt) => {
+                          const isSelected = lateCheckOutMinutes === opt.minutes;
+                          const optCost = pricingData?.currency === 'USD'
+                            ? `$${((pricingData?.baseRate || basePricePerNight) * opt.rate).toFixed(2)}`
+                            : formatVND(basePricePerNight * opt.rate);
+                          return (
+                            <button
+                              key={opt.minutes}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLateCheckOutMinutes(opt.minutes);
+                              }}
+                              className={`p-2.5 rounded-xl border text-left transition-all ${
+                                isSelected
+                                  ? 'bg-[#725b38] text-white border-[#725b38] shadow-sm ring-2 ring-[#725b38]/20'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="font-bold text-xs flex items-center justify-between">
+                                <span>{opt.time}</span>
+                                <span className={`text-[10px] px-1 rounded ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                  +{Math.round(opt.rate * 100)}%
+                                </span>
+                              </div>
+                              <div className={`text-[11px] mt-1 font-semibold truncate ${isSelected ? 'text-amber-200' : 'text-[#725b38]'}`}>
+                                +{optCost}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
-                    <div className="font-bold text-sm text-slate-900">
-                      +{pricingData?.currency === 'USD' ? '$40.00' : '900.000đ'}
-                    </div>
-                    <div className="text-[11px] text-slate-400">/ 2 người / sáng</div>
-                  </div>
-                </label>
-
-                {/* Addon 3: Couple Spa */}
-                <label className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
-                  addonSpa ? 'bg-[#eff4ff] border-[#725b38]/40 shadow-sm' : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100/80'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="checkbox"
-                      checked={addonSpa}
-                      onChange={(e) => setAddonSpa(e.target.checked)}
-                      className="w-5 h-5 accent-[#725b38] rounded shrink-0 cursor-pointer"
-                    />
-                    <img 
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoKB51-9l3TyoSaYnWJOrVgdkPzheCerhf2BvZLeFPHbLyIxBBOWsiUILoO0whOE-nuO_b2zCF5vsJsb3k71CwBHsLicpLKwkv6QfQxh6mjw0BdKnE53pku6mAeb27h1PtW1wwa6e0JqJQPIuPEoPquInBlrQfPaoU520etnRVE5yCgZLgmhqKIV3QS6nmWxx_jPEOhhvQZ9QNd01qc0QqxB4V7DE8eOzufB1awUWaG0SBJr0gzGfU" 
-                      alt="Couple Spa"
-                      className="w-16 h-14 rounded-lg object-cover shadow-xs shrink-0"
-                    />
-                    <div>
-                      <div className="font-bold text-sm text-slate-900">Trị Liệu Spa Toàn Thân Cặp Đôi 90 Phút</div>
-                      <div className="text-xs text-slate-500">Liệu pháp đá nóng núi lửa &amp; tinh dầu hoa sen độc quyền Serenity Spa</div>
-                    </div>
-                  </div>
-                  <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
-                    <div className="font-bold text-sm text-slate-900">
-                      +{pricingData?.currency === 'USD' ? '$80.00' : '1.800.000đ'}
-                    </div>
-                    <div className="text-[11px] text-slate-400">/ 2 khách</div>
-                  </div>
-                </label>
-
-                {/* Addon 4: Seafood BBQ */}
-                <label className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
-                  addonBbq ? 'bg-[#eff4ff] border-[#725b38]/40 shadow-sm' : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100/80'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="checkbox"
-                      checked={addonBbq}
-                      onChange={(e) => setAddonBbq(e.target.checked)}
-                      className="w-5 h-5 accent-[#725b38] rounded shrink-0 cursor-pointer"
-                    />
-                    <img 
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCZGQeOWqlgS7l1N-g76SPU0GXGc6l2Va2A0dvTFv4Ud3UaSMSbGRS44e28vlqaraU0n76F_jlSSIeaI--Nyrhw0xPVH3dQdTul2rFQqXfaB3xbDOEfO6g3L4P84exX4sRiuo4VeP4slRy8Bl1f2m7Bwdx8OmvKYevD4FgqKA6zVs5YkfqwQod4JfMQug3pfMEtATyap4y7AHpXodAG7tufSMx0J3JfA90UMCvye3hhNQUhDUKt-P7" 
-                      alt="BBQ"
-                      className="w-16 h-14 rounded-lg object-cover shadow-xs shrink-0"
-                    />
-                    <div>
-                      <div className="font-bold text-sm text-slate-900">Tiệc BBQ Hải Sản Tối Lãng Mạn Bờ Cát</div>
-                      <div className="text-xs text-slate-500">Đầu bếp riêng phục vụ tôm hùm Nha Trang, rượu vang &amp; ánh nến hoàng hôn</div>
-                    </div>
-                  </div>
-                  <div className="text-right sm:shrink-0 pl-8 sm:pl-0">
-                    <div className="font-bold text-sm text-slate-900">
-                      +{pricingData?.currency === 'USD' ? '$100.00' : '2.200.000đ'}
-                    </div>
-                    <div className="text-[11px] text-slate-400">/ 2 người</div>
-                  </div>
-                </label>
+                  )}
+                </div>
               </div>
             </section>
 

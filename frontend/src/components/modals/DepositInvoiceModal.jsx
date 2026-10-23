@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef } from "react";
 
 // Common CSS for both on-screen modal and 1-page A4 print iframe
 const INVOICE_CSS = `
@@ -331,13 +331,13 @@ const INVOICE_CSS = `
 
 // Helper format VND
 const formatVND = (num) => {
-  return new Intl.NumberFormat('vi-VN').format(Math.round(num || 0)) + ' ₫';
+  return new Intl.NumberFormat("vi-VN").format(Math.round(num || 0)) + " ₫";
 };
 
 // Helper format date DD/MM/YYYY
 const formatDisplayDate = (dStr) => {
-  if (!dStr) return '';
-  const parts = String(dStr).split('T')[0].split('-');
+  if (!dStr) return "";
+  const parts = String(dStr).split("T")[0].split("-");
   if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
   return dStr;
 };
@@ -347,16 +347,21 @@ export default function DepositInvoiceModal({
   onClose,
   booking,
   paymentSuccess,
-  paymentMethod = 'BANK_TRANSFER',
-  user
+  paymentMethod = "BANK_TRANSFER",
+  user,
 }) {
   const invoiceRef = useRef(null);
 
   if (!isOpen) return null;
 
   // Extract variables with intelligent fallbacks
-  const transactionCode = paymentSuccess?.transactionCode || 'TXN-' + (booking?.bookingId || Date.now().toString().slice(-8));
-  const confirmationCode = paymentSuccess?.confirmationCode || booking?.confirmationCode || 'GH-293357';
+  const transactionCode =
+    paymentSuccess?.transactionCode ||
+    "TXN-" + (booking?.bookingId || Date.now().toString().slice(-8));
+  const confirmationCode =
+    paymentSuccess?.confirmationCode ||
+    booking?.confirmationCode ||
+    "GH-293357";
 
   // Compute total amount
   let totalAmount = booking?.totalAmount || paymentSuccess?.totalAmount || 0;
@@ -375,35 +380,55 @@ export default function DepositInvoiceModal({
 
   // Compute remaining balance
   let remainingBalance = paymentSuccess?.remainingBalance;
-  if (remainingBalance === undefined || remainingBalance === null || (remainingBalance === 0 && amountPaid < totalAmount)) {
+  if (
+    remainingBalance === undefined ||
+    remainingBalance === null ||
+    (remainingBalance === 0 && amountPaid < totalAmount)
+  ) {
     remainingBalance = Math.max(0, totalAmount - amountPaid);
   }
 
-  const qrCodeUrl = paymentSuccess?.qrCodeUrl || booking?.BookingQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${confirmationCode}`;
+  const qrCodeUrl =
+    paymentSuccess?.qrCodeUrl ||
+    booking?.BookingQrCode ||
+    `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${confirmationCode}`;
 
-  const guestName = booking?.primaryGuest?.fullName || user?.FullName || 'Nguyễn Văn An';
-  const guestPhone = booking?.primaryGuest?.phone || user?.Phone || '+84 908 123 456';
-  const memberTier = user?.MembershipTier?.TierName || 'Hội viên Gold';
+  const guestName =
+    booking?.primaryGuest?.fullName || user?.FullName || "Nguyễn Văn An";
+  const guestPhone =
+    booking?.primaryGuest?.phone || user?.Phone || "+84 908 123 456";
+  const memberTier = user?.MembershipTier?.TierName || "Hội viên Gold";
 
-  const roomTypeName = booking?.roomType?.TypeName || booking?.roomTypeName || 'Spa Suite #136';
-  const checkInDate = booking?.checkInDate || '2026-10-21';
-  const checkOutDate = booking?.checkOutDate || '2026-10-23';
+  const roomTypeName =
+    booking?.roomType?.TypeName || booking?.roomTypeName || "Spa Suite #136";
+  const checkInDate = booking?.checkInDate || "2026-10-21";
+  const checkOutDate = booking?.checkOutDate || "2026-10-23";
   const numberOfNights = booking?.numberOfNights || 2;
   const roomQuantity = booking?.roomQuantity || 1;
   const adults = booking?.adults || 2;
   const children = booking?.children || 0;
 
-  const paymentMethodLabel = 
-    paymentMethod === 'CREDIT_CARD' ? 'Thẻ Quốc Tế (Visa/Mastercard)' :
-    paymentMethod === 'DIGITAL_WALLET' ? 'Ví Điện Tử VNPAY' :
-    'Chuyển Khoản Ngân Hàng (VietQR)';
+  const paymentMethodLabel =
+    paymentMethod === "CREDIT_CARD"
+      ? "Thẻ Quốc Tế (Visa/Mastercard)"
+      : paymentMethod === "DIGITAL_WALLET"
+        ? "Ví Điện Tử VNPAY"
+        : "Chuyển Khoản Ngân Hàng (VietQR)";
 
-  const issueDateStr = paymentSuccess?.paymentDate 
-    ? new Date(paymentSuccess.paymentDate).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })
-    : new Date().toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+  const issueDateStr = paymentSuccess?.paymentDate
+    ? new Date(paymentSuccess.paymentDate).toLocaleString("vi-VN", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })
+    : new Date().toLocaleString("vi-VN", {
+        dateStyle: "short",
+        timeStyle: "short",
+      });
 
   // Base price per night estimation
-  const basePricePerNight = booking?.roomType?.BasePrice || Math.round((totalAmount / 1.12) / (numberOfNights || 1));
+  const basePricePerNight =
+    booking?.roomType?.BasePrice ||
+    Math.round(totalAmount / 1.12 / (numberOfNights || 1));
   const roomSubtotal = booking?.roomSubtotal || Math.round(totalAmount / 1.12);
   const taxAndFee = totalAmount - roomSubtotal;
 
@@ -416,16 +441,16 @@ export default function DepositInvoiceModal({
         return;
       }
 
-      let iframe = document.getElementById('deposit-invoice-print-frame');
+      let iframe = document.getElementById("deposit-invoice-print-frame");
       if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'deposit-invoice-print-frame';
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0px';
-        iframe.style.height = '0px';
-        iframe.style.border = 'none';
+        iframe = document.createElement("iframe");
+        iframe.id = "deposit-invoice-print-frame";
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0px";
+        iframe.style.height = "0px";
+        iframe.style.border = "none";
         document.body.appendChild(iframe);
       }
 
@@ -458,7 +483,7 @@ export default function DepositInvoiceModal({
         iframe.contentWindow.print();
       }, 350);
     } catch (err) {
-      console.warn('Lỗi in qua iframe, chuyển sang window.print():', err);
+      console.warn("Lỗi in qua iframe, chuyển sang window.print():", err);
       window.print();
     }
   };
@@ -469,26 +494,38 @@ export default function DepositInvoiceModal({
       <style>{INVOICE_CSS}</style>
 
       <div className="bg-white max-w-3xl w-full rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[96vh]">
-        
         {/* Top Control Bar */}
         <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#fedeb2] text-[22px]">receipt_long</span>
+            <span className="material-symbols-outlined text-[#fedeb2] text-[22px]">
+              receipt_long
+            </span>
             <div>
-              <h3 className="font-bold text-xs sm:text-sm tracking-wide">XÁC NHẬN CỌC &amp; MÃ NHẬN PHÒNG NHANH (1 TRANG A4)</h3>
+              <h3 className="font-bold text-xs sm:text-sm tracking-wide">
+                XÁC NHẬN CỌC &amp; MÃ NHẬN PHÒNG NHANH (1 TRANG A4)
+              </h3>
               <p className="text-[11px] text-slate-300">
-                Mã Check-in: <strong className="text-[#fedeb2] font-mono tracking-wider">{confirmationCode}</strong> • Giao dịch: <strong className="text-slate-200 font-mono">{transactionCode}</strong>
+                Mã Check-in:{" "}
+                <strong className="text-[#fedeb2] font-mono tracking-wider">
+                  {confirmationCode}
+                </strong>{" "}
+                • Giao dịch:{" "}
+                <strong className="text-slate-200 font-mono">
+                  {transactionCode}
+                </strong>
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md hover:shadow-lg"
             >
-              <span className="material-symbols-outlined text-[17px]">print</span>
+              <span className="material-symbols-outlined text-[17px]">
+                print
+              </span>
               <span>In Hóa Đơn (A4 / PDF)</span>
             </button>
             <button
@@ -497,7 +534,9 @@ export default function DepositInvoiceModal({
               className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
               title="Đóng"
             >
-              <span className="material-symbols-outlined text-[18px]">close</span>
+              <span className="material-symbols-outlined text-[18px]">
+                close
+              </span>
             </button>
           </div>
         </div>
@@ -505,30 +544,28 @@ export default function DepositInvoiceModal({
         {/* Scrollable Document Container */}
         <div className="overflow-y-auto p-3 sm:p-6 bg-slate-100 flex-1">
           <div className="invoice-wrapper">
-            <div 
-              ref={invoiceRef}
-              className="invoice-frame"
-            >
+            <div ref={invoiceRef} className="invoice-frame">
               {/* 1. COMPACT RESORT HEADER */}
               <div className="header-row">
                 <div>
                   <h1 className="resort-title">GRAND HORIZON</h1>
-                  <div className="resort-sub">RESORT &amp; SUITES ĐÀ NẴNG ★★★★★</div>
+                  <div className="resort-sub">
+                    RESORT &amp; SUITES ĐÀ NẴNG ★★★★★
+                  </div>
                   <div className="resort-info">
-                    Bán đảo Horizon, Đường Duyên Hải, TP. Đà Nẵng • Hotline: <strong>1900 6868</strong> • MST: <strong>0401892837</strong>
+                    Bán đảo Horizon, Đường Duyên Hải, TP. Đà Nẵng • Hotline:{" "}
+                    <strong>1900 6868</strong> • MST:{" "}
+                    <strong>0401892837</strong>
                   </div>
                 </div>
 
                 <div className="header-right">
-                  <div className="paid-badge">
-                    ✓ ĐÃ THANH TOÁN TIỀN CỌC
-                  </div>
+                  <div className="paid-badge">✓ ĐÃ THANH TOÁN TIỀN CỌC</div>
                   <div className="meta-info">
-                    Ngày lập: <strong style={{ color: '#0f172a' }}>{issueDateStr}</strong>
+                    Ngày lập:{" "}
+                    <strong style={{ color: "#0f172a" }}>{issueDateStr}</strong>
                   </div>
-                  <div className="meta-info">
-                    {paymentMethodLabel}
-                  </div>
+                  <div className="meta-info">{paymentMethodLabel}</div>
                 </div>
               </div>
 
@@ -540,29 +577,29 @@ export default function DepositInvoiceModal({
                     <span>MÃ SỐ CHECK-IN TẠI QUẦY (FAST CHECK-IN CODE)</span>
                   </div>
                   <div className="pass-code-container">
-                    <span className="pass-code-box">
-                      {confirmationCode}
-                    </span>
-                    <span className="pass-confirm-badge">
-                      XÁC NHẬN
-                    </span>
+                    <span className="pass-code-box">{confirmationCode}</span>
+                    <span className="pass-confirm-badge">XÁC NHẬN</span>
                   </div>
                   <p className="pass-desc">
-                    Xuất trình <strong>Mã số này</strong> hoặc <strong>Mã QR</strong> tại quầy Lễ Tân (Fast Track Check-in) khi đến khách sạn để nhận phòng ngay lập tức.
+                    Xuất trình <strong>Mã số này</strong> hoặc{" "}
+                    <strong>Mã QR</strong> tại quầy Lễ Tân (Fast Track Check-in)
+                    khi đến khách sạn để nhận phòng ngay lập tức.
                   </p>
                 </div>
 
                 {/* QR Code Box */}
                 <div className="qr-container">
-                  <img 
-                    src={qrCodeUrl} 
-                    alt="QR Check-in" 
+                  <img
+                    src={qrCodeUrl}
+                    alt="QR Check-in"
                     className="qr-img"
-                    style={{ width: '78px', height: '78px', objectFit: 'contain' }}
+                    style={{
+                      width: "78px",
+                      height: "78px",
+                      objectFit: "contain",
+                    }}
                   />
-                  <span className="qr-caption">
-                    QUÉT CHECK-IN
-                  </span>
+                  <span className="qr-caption">QUÉT CHECK-IN</span>
                 </div>
               </div>
 
@@ -572,7 +609,7 @@ export default function DepositInvoiceModal({
                 <div className="info-card">
                   <div className="info-card-header">
                     <span>Thông Tin Khách Hàng</span>
-                    <span style={{ color: '#64748b' }}>{memberTier}</span>
+                    <span style={{ color: "#64748b" }}>{memberTier}</span>
                   </div>
                   <div className="info-row">
                     <span className="info-label">Khách lưu trú:</span>
@@ -584,7 +621,9 @@ export default function DepositInvoiceModal({
                   </div>
                   <div className="info-row">
                     <span className="info-label">Mã giao dịch:</span>
-                    <span className="info-val font-mono">{transactionCode}</span>
+                    <span className="info-val font-mono">
+                      {transactionCode}
+                    </span>
                   </div>
                 </div>
 
@@ -592,7 +631,9 @@ export default function DepositInvoiceModal({
                 <div className="info-card">
                   <div className="info-card-header">
                     <span>Chi Tiết Kỳ Nghỉ</span>
-                    <span className="font-mono" style={{ color: '#0f172a' }}>{roomQuantity} Phòng</span>
+                    <span className="font-mono" style={{ color: "#0f172a" }}>
+                      {roomQuantity} Phòng
+                    </span>
                   </div>
                   <div className="info-row">
                     <span className="info-label">Hạng phòng:</span>
@@ -600,11 +641,16 @@ export default function DepositInvoiceModal({
                   </div>
                   <div className="info-row">
                     <span className="info-label">Nhận phòng:</span>
-                    <span className="info-val">14:00 • {formatDisplayDate(checkInDate)}</span>
+                    <span className="info-val">
+                      14:00 • {formatDisplayDate(checkInDate)}
+                    </span>
                   </div>
                   <div className="info-row">
                     <span className="info-label">Trả phòng:</span>
-                    <span className="info-val">12:00 • {formatDisplayDate(checkOutDate)} ({numberOfNights} đêm)</span>
+                    <span className="info-val">
+                      12:00 • {formatDisplayDate(checkOutDate)} (
+                      {numberOfNights} đêm)
+                    </span>
                   </div>
                 </div>
               </div>
@@ -622,56 +668,126 @@ export default function DepositInvoiceModal({
                 <tbody>
                   <tr>
                     <td>
-                      <strong style={{ color: '#0f172a' }}>{roomTypeName}</strong> ({adults} lớn{children > 0 ? `, ${children} trẻ` : ''})
+                      <strong style={{ color: "#0f172a" }}>
+                        {roomTypeName}
+                      </strong>{" "}
+                      ({adults} lớn{children > 0 ? `, ${children} trẻ` : ""})
                     </td>
-                    <td className="text-center font-mono">{numberOfNights} đêm × {roomQuantity} phòng</td>
-                    <td className="text-right font-mono">{formatVND(basePricePerNight)}</td>
-                    <td className="text-right font-mono" style={{ fontWeight: 700, color: '#0f172a' }}>{formatVND(roomSubtotal)}</td>
+                    <td className="text-center font-mono">
+                      {numberOfNights} đêm × {roomQuantity} phòng
+                    </td>
+                    <td className="text-right font-mono">
+                      {formatVND(basePricePerNight)}
+                    </td>
+                    <td
+                      className="text-right font-mono"
+                      style={{ fontWeight: 700, color: "#0f172a" }}
+                    >
+                      {formatVND(roomSubtotal)}
+                    </td>
                   </tr>
 
-                  {booking?.addonsBreakdown && booking.addonsBreakdown.length > 0 && booking.addonsBreakdown.map((addon, index) => (
-                    <tr key={index}>
-                      <td>
-                        <span style={{ color: '#334155' }}>• {addon.name}</span>
-                      </td>
-                      <td className="text-center font-mono">{addon.quantity || 1}</td>
-                      <td className="text-right font-mono">{formatVND(addon.unitPrice)}</td>
-                      <td className="text-right font-mono" style={{ fontWeight: 600, color: '#0f172a' }}>{formatVND(addon.total)}</td>
-                    </tr>
-                  ))}
+                  {booking?.addonsBreakdown &&
+                    booking.addonsBreakdown.length > 0 &&
+                    booking.addonsBreakdown.map((addon, index) => (
+                      <tr key={index}>
+                        <td>
+                          <span style={{ color: "#334155" }}>
+                            • {addon.name}
+                          </span>
+                        </td>
+                        <td className="text-center font-mono">
+                          {addon.quantity || 1}
+                        </td>
+                        <td className="text-right font-mono">
+                          {formatVND(addon.unitPrice)}
+                        </td>
+                        <td
+                          className="text-right font-mono"
+                          style={{ fontWeight: 600, color: "#0f172a" }}
+                        >
+                          {formatVND(addon.total)}
+                        </td>
+                      </tr>
+                    ))}
 
                   <tr>
-                    <td colSpan="3" className="text-right" style={{ color: '#64748b' }}>
-                      Thuế Giá Trị Gia Tăng (VAT) &amp; Phí Dịch Vụ Địa Phương (12%):
+                    <td
+                      colSpan="3"
+                      className="text-right"
+                      style={{ color: "#64748b" }}
+                    >
+                      Thuế Giá Trị Gia Tăng (VAT) &amp; Phí Dịch Vụ Địa Phương
+                      (12%):
                     </td>
-                    <td className="text-right font-mono" style={{ fontWeight: 600, color: '#334155' }}>
+                    <td
+                      className="text-right font-mono"
+                      style={{ fontWeight: 600, color: "#334155" }}
+                    >
                       {formatVND(taxAndFee)}
                     </td>
                   </tr>
 
                   <tr className="row-total">
-                    <td colSpan="3" className="text-right" style={{ textTransform: 'uppercase', color: '#0f172a', fontSize: '10.5px' }}>
+                    <td
+                      colSpan="3"
+                      className="text-right"
+                      style={{
+                        textTransform: "uppercase",
+                        color: "#0f172a",
+                        fontSize: "10.5px",
+                      }}
+                    >
                       Tổng Giá Trị Đặt Phòng (Total Amount):
                     </td>
-                    <td className="text-right font-mono" style={{ color: '#0f172a', fontSize: '11.5px', fontWeight: 800 }}>
+                    <td
+                      className="text-right font-mono"
+                      style={{
+                        color: "#0f172a",
+                        fontSize: "11.5px",
+                        fontWeight: 800,
+                      }}
+                    >
                       {formatVND(totalAmount)}
                     </td>
                   </tr>
 
                   <tr className="row-deposit">
-                    <td colSpan="3" className="text-right" style={{ textTransform: 'uppercase', color: '#065f46' }}>
+                    <td
+                      colSpan="3"
+                      className="text-right"
+                      style={{ textTransform: "uppercase", color: "#065f46" }}
+                    >
                       Số Tiền Cọc Đã Thanh Toán (Deposit Paid):
                     </td>
-                    <td className="text-right font-mono" style={{ color: '#047857', fontSize: '12px', fontWeight: 800 }}>
+                    <td
+                      className="text-right font-mono"
+                      style={{
+                        color: "#047857",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                      }}
+                    >
                       {formatVND(amountPaid)}
                     </td>
                   </tr>
 
                   <tr className="row-remaining">
-                    <td colSpan="3" className="text-right" style={{ textTransform: 'uppercase', color: '#92400e' }}>
+                    <td
+                      colSpan="3"
+                      className="text-right"
+                      style={{ textTransform: "uppercase", color: "#92400e" }}
+                    >
                       Số Tiền Còn Lại Cần Thanh Toán Khi Check-in:
                     </td>
-                    <td className="text-right font-mono" style={{ color: '#b45309', fontSize: '12px', fontWeight: 800 }}>
+                    <td
+                      className="text-right font-mono"
+                      style={{
+                        color: "#b45309",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                      }}
+                    >
                       {formatVND(remainingBalance)}
                     </td>
                   </tr>
@@ -681,21 +797,37 @@ export default function DepositInvoiceModal({
               {/* 5. BRIEF TERMS & OFFICIAL RESORT SEAL */}
               <div className="footer-section">
                 <div className="notes-list">
-                  <p>• Nhận phòng từ <strong>14:00</strong> • Trả phòng trước <strong>12:00</strong> trưa. Quý khách vui lòng mang theo CCCD/Passport gốc.</p>
-                  <p>• Số tiền còn lại <strong style={{ color: '#b45309' }}>{formatVND(remainingBalance)}</strong> sẽ thanh toán tại quầy Lễ Tân khi nhận phòng (Tiền mặt / Thẻ / QR).</p>
-                  <p>• Chứng từ điện tử được tạo tự động bởi Hệ Thống Grand Horizon Resort. Có giá trị xác nhận đặt cọc chính thức.</p>
+                  <p>
+                    • Nhận phòng từ <strong>14:00</strong> • Trả phòng trước{" "}
+                    <strong>12:00</strong> trưa. Quý khách vui lòng mang theo
+                    CCCD/Passport gốc.
+                  </p>
+                  <p>
+                    • Số tiền còn lại{" "}
+                    <strong style={{ color: "#b45309" }}>
+                      {formatVND(remainingBalance)}
+                    </strong>{" "}
+                    sẽ thanh toán tại quầy Lễ Tân khi nhận phòng (Tiền mặt / Thẻ
+                    / QR).
+                  </p>
+                  <p>
+                    • Chứng từ điện tử được tạo tự động bởi Hệ Thống Grand
+                    Horizon Resort. Có giá trị xác nhận đặt cọc chính thức.
+                  </p>
                 </div>
 
                 <div className="seal-box">
                   <div className="official-stamp">
-                    GRAND HORIZON RESORT<br />
+                    GRAND HORIZON RESORT
+                    <br />
                     ★ ĐÃ THU TIỀN CỌC ★<br />
-                    <span className="stamp-sub">Xác nhận bởi Bộ phận Thu ngân</span>
+                    <span className="stamp-sub">
+                      Xác nhận bởi Bộ phận Thu ngân
+                    </span>
                   </div>
                   <div className="seal-caption">Hệ Thống Đặt Phòng Điện Tử</div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
@@ -718,7 +850,6 @@ export default function DepositInvoiceModal({
             <span>In Ngay (1 Trang A4 / PDF)</span>
           </button>
         </div>
-
       </div>
     </div>
   );
