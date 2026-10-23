@@ -1,8 +1,56 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
-import { Html5Qrcode } from 'html5-qrcode';
 import { useAuth } from '../../context/AuthContext';
 import AdminLayout from '../../components/admin/layout/AdminLayout';
+
+// Trình tải Html5Qrcode thông minh: không dùng static import để tránh lỗi Vite import-analysis
+// khi thành viên khác git pull mà chưa chạy npm install
+let cachedHtml5Qrcode = null;
+async function getHtml5QrcodeClass() {
+  if (cachedHtml5Qrcode) return cachedHtml5Qrcode;
+  if (typeof window !== 'undefined' && window.Html5Qrcode) {
+    cachedHtml5Qrcode = window.Html5Qrcode;
+    return cachedHtml5Qrcode;
+  }
+  if (typeof window === 'undefined') return null;
+
+  return new Promise((resolve, reject) => {
+    if (window.Html5Qrcode) {
+      cachedHtml5Qrcode = window.Html5Qrcode;
+      return resolve(window.Html5Qrcode);
+    }
+    const existing = document.getElementById('lib-html5-qrcode-script');
+    if (existing) {
+      existing.addEventListener('load', () => {
+        cachedHtml5Qrcode = window.Html5Qrcode;
+        resolve(window.Html5Qrcode);
+      });
+      existing.addEventListener('error', () => reject(new Error('Không thể tải thư viện camera')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = 'lib-html5-qrcode-script';
+    script.src = '/libs/html5-qrcode.min.js';
+    script.onload = () => {
+      cachedHtml5Qrcode = window.Html5Qrcode;
+      resolve(window.Html5Qrcode);
+    };
+    script.onerror = () => {
+      // Fallback CDN nếu môi trường không phục vụ /libs
+      const cdnScript = document.createElement('script');
+      cdnScript.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+      cdnScript.onload = () => {
+        cachedHtml5Qrcode = window.Html5Qrcode;
+        resolve(window.Html5Qrcode);
+      };
+      cdnScript.onerror = () => {
+        reject(new Error('Chưa thể nạp thư viện camera. Hãy chạy "npm install" ở thư mục frontend hoặc nhập mã đặt phòng thủ công.'));
+      };
+      document.head.appendChild(cdnScript);
+    };
+    document.head.appendChild(script);
+  });
+}
 
 // Hỗ trợ cả cổng 5000 và qua Proxy /api của Vite theo Spec 8
 const API_ENDPOINTS = [
@@ -551,10 +599,15 @@ const BookingQrCameraModal = ({ onScanSuccess, onClose, arrivalsList = [] }) => 
     async function initCamera() {
       try {
         setCameraError(null);
+        const QrClass = await getHtml5QrcodeClass();
+        if (!QrClass) {
+          throw new Error('Thư viện quét camera chưa sẵn sàng.');
+        }
+
         // Lấy danh sách camera trên thiết bị
         let devices = [];
         try {
-          devices = await Html5Qrcode.getCameras();
+          devices = await QrClass.getCameras();
         } catch (e) {
           console.warn('getCameras error:', e);
         }
@@ -577,7 +630,7 @@ const BookingQrCameraModal = ({ onScanSuccess, onClose, arrivalsList = [] }) => 
         if (!feedEl || !isMounted) return;
         feedEl.innerHTML = '';
 
-        html5QrCode = new Html5Qrcode('booking-qr-camera-feed');
+        html5QrCode = new QrClass('booking-qr-camera-feed');
         scannerRef.current = html5QrCode;
 
         await html5QrCode.start(
@@ -692,10 +745,14 @@ const BookingQrCameraModal = ({ onScanSuccess, onClose, arrivalsList = [] }) => 
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     try {
+      const QrClass = await getHtml5QrcodeClass();
+      if (!QrClass) {
+        throw new Error('Thư viện quét mã chưa sẵn sàng.');
+      }
       let scanner = scannerRef.current;
       let needCleanup = false;
       if (!scanner) {
-        scanner = new Html5Qrcode('booking-qr-camera-feed');
+        scanner = new QrClass('booking-qr-camera-feed');
         needCleanup = true;
       }
       const decodedText = await scanner.scanFile(file, true);
@@ -857,7 +914,11 @@ const IdDocumentCameraModal = ({ onScanSuccess, onClose, defaultDocType = 'natl_
     async function initCamera() {
       try {
         setCameraError(null);
-        const devices = await Html5Qrcode.getCameras();
+        const QrClass = await getHtml5QrcodeClass();
+        if (!QrClass) {
+          throw new Error('Thư viện camera chưa sẵn sàng.');
+        }
+        const devices = await QrClass.getCameras();
         if (!isMounted) return;
 
         if (devices && devices.length > 0) {
@@ -866,7 +927,7 @@ const IdDocumentCameraModal = ({ onScanSuccess, onClose, defaultDocType = 'natl_
           const camId = backCam ? backCam.id : devices[0].id;
           setSelectedCameraId(camId);
 
-          html5QrCode = new Html5Qrcode('id-camera-feed-canvas');
+          html5QrCode = new QrClass('id-camera-feed-canvas');
           scannerRef.current = html5QrCode;
 
           await html5QrCode.start(
