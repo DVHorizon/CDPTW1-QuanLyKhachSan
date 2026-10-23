@@ -4,9 +4,14 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const bookingEngineController = require('../controllers/bookingEngineController');
+const voucherController = require('../controllers/voucherController');
 
 // ─── TÍNH NĂNG 6: TỰ ĐỘNG TÍNH SỐ ĐÊM, PHỤ THU & TỔNG TIỀN PHÒNG (FEAT-GUEST-06 / A6) ───
 router.post('/calculate-pricing', bookingEngineController.calculatePricing);
+
+// ─── TÍNH NĂNG 7: ÁP DỤNG MÃ GIẢM GIÁ VÀ VOUCHER KHUYẾN MÃI (FEAT-GUEST-07 / A7) ───
+router.post('/apply-voucher', voucherController.validateVoucher);
+router.post('/:bookingId/apply-voucher', voucherController.applyVoucherToBooking);
 
 // ─── Hằng số trạng thái nghiệp vụ đặt phòng ─────────────────────────────────
 // Khớp đúng dữ liệu đang lưu trong bảng Bookings (Pending/Confirmed/CheckedIn/Completed/Cancelled/NoShow)
