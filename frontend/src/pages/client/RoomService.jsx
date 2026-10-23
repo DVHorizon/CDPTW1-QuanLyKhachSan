@@ -394,8 +394,8 @@ const RoomService = () => {
                   </span>
                 </div>
                 <div className="flex items-start gap-space-md pt-space-xs">
-                  <div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-admin-primary flex-shrink-0 shadow-inner">
-                    <span className="font-headline-lg text-headline-sm font-bold">
+                  <div className="min-w-[48px] px-2.5 py-2 rounded-xl bg-surface-container-high flex items-center justify-center text-admin-primary flex-shrink-0 shadow-inner">
+                    <span className="font-headline-sm text-label-md font-bold text-center tracking-tight">
                       {selectedStay?.roomNumber || '804'}
                     </span>
                   </div>
@@ -411,27 +411,6 @@ const RoomService = () => {
                         Stay #{selectedStay?.stayId || 1}
                       </span>
                     </div>
-                  </div>
-                </div>
-                {/* Thông tin hạn mức & Tài chính */}
-                <div className="bg-surface-container-low rounded-lg p-space-md space-y-space-xs">
-                  <div className="flex items-center justify-between text-body-sm font-body-sm">
-                    <span className="text-on-surface-variant flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px] text-secondary">credit_card</span>
-                      Visa Ký Quỹ
-                    </span>
-                    <span className="font-semibold text-on-surface">**** 4092</span>
-                  </div>
-                  <div className="flex items-center justify-between text-body-sm font-body-sm">
-                    <span className="text-on-surface-variant">Hạn mức khả dụng</span>
-                    <span className="font-bold text-admin-primary">30.000.000 đ</span>
-                  </div>
-                  <div className="w-full bg-surface-variant h-1.5 rounded-full overflow-hidden mt-1">
-                    <div className="bg-admin-primary h-full rounded-full" style={{ width: '22%' }}></div>
-                  </div>
-                  <div className="flex justify-between items-center pt-0.5">
-                    <span className="font-label-sm text-label-sm text-outline">Đã tiêu: 6.600.000 đ</span>
-                    <span className="font-label-sm text-label-sm text-outline">Quyền ghi nợ: Mở</span>
                   </div>
                 </div>
                 {/* Ghi chú đơn hàng cho Bếp (Lưu vào FoodOrders.Note) */}
