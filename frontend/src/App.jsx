@@ -30,6 +30,7 @@ import RoomAssignment from './pages/admin/RoomAssignment';
 import CheckInDesk from './pages/admin/CheckInDesk';
 import CheckOutDesk from './pages/admin/CheckOutDesk';
 import FnbReview from './pages/client/FnbReview';
+import MockPaymentGateway from './pages/client/MockPaymentGateway';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 
@@ -53,6 +54,7 @@ function App() {
             <Route path="/thanh-toan" element={<DepositPayment />} />
             <Route path="/checkout/payment" element={<DepositPayment />} />
             <Route path="/checkout/step-2" element={<DepositPayment />} />
+            <Route path="/mock-payment/:transactionCode" element={<MockPaymentGateway />} />
             <Route path="/room-service" element={<RoomService />} />
             <Route path="/fnb/history" element={<GuestOrderHistory />} />
             <Route path="/lich-su-dat-mon" element={<GuestOrderHistory />} />
