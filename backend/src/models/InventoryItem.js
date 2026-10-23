@@ -56,11 +56,6 @@ module.exports = (sequelize) => {
     StorageTemp: {
       type: DataTypes.STRING(50),
       defaultValue: 'Kho lạnh: 3.8°C Chuẩn'
-    },
-    // Optimistic Locking: version increment on each update
-    Version: {
-      type: DataTypes.INTEGER,
-      defaultValue: 1
     }
   }, {
     tableName: 'InventoryItems',

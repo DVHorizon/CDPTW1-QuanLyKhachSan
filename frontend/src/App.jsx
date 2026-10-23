@@ -12,6 +12,9 @@ import MarketingDashboard from './pages/admin/marketing/MarketingDashboard';
 import CampaignComposer from './pages/admin/marketing/CampaignComposer';
 import ConsumablesInventory from './pages/admin/housekeeping/ConsumablesInventory';
 import LinenManagement from './pages/admin/housekeeping/LinenManagement';
+import LostAndFoundManagement from './pages/admin/housekeeping/LostAndFoundManagement';
+import MaintenanceDashboard from './pages/admin/engineering/MaintenanceDashboard';
+import MaintenanceTicketCreate from './pages/admin/engineering/MaintenanceTicketCreate';
 import AuditLogs from './pages/AuditLogs';
 import RosterShifts from './pages/RosterShifts';
 
@@ -37,6 +40,10 @@ function App() {
           <Route path="/admin/housekeeping" element={<ConsumablesInventory />} />
           <Route path="/admin/housekeeping/inventory" element={<ConsumablesInventory />} />
           <Route path="/admin/housekeeping/linen" element={<LinenManagement />} />
+          <Route path="/admin/housekeeping/lost-and-found" element={<LostAndFoundManagement />} />
+          <Route path="/admin/lost-and-found" element={<LostAndFoundManagement />} />
+          <Route path="/admin/engineering" element={<MaintenanceDashboard />} />
+          <Route path="/admin/engineering/new" element={<MaintenanceTicketCreate />} />
           <Route path="/admin/audit-logs" element={<AuditLogs />} />
           <Route path="/admin/roster" element={<RosterShifts />} />
           <Route path="/admin/shifts" element={<RosterShifts />} />

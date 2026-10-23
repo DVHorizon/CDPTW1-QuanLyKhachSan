@@ -29,6 +29,16 @@ const menuItems = [
     to: '/admin/housekeeping/linen',
   },
   {
+    label: 'Đồ Thất Lạc & Bỏ Quên',
+    icon: 'search_hands_free',
+    to: '/admin/housekeeping/lost-and-found',
+  },
+  {
+    label: 'Bảo Trì & Kỹ Thuật Phòng',
+    icon: 'engineering',
+    to: '/admin/engineering',
+  },
+  {
     label: 'Dịch Vụ & Spa',
     icon: 'spa',
     to: '/admin/services',

@@ -52,10 +52,6 @@ module.exports = (sequelize) => {
     ParStatus: {
       type: DataTypes.STRING(50), // '3.1X TỐI ƯU', '2.9X CẦN BỔ SUNG', '2.7X NGƯỠNG NGUY'
       defaultValue: 'TỐI ƯU'
-    },
-    Version: {
-      type: DataTypes.INTEGER,
-      defaultValue: 1
     }
   }, {
     tableName: 'LinenItems',

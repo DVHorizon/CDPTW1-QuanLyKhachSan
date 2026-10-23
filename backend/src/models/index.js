@@ -14,10 +14,15 @@ const defineMenuCategory = require('./MenuCategory');
 const defineMenuItem = require('./MenuItem');
 const defineAuditLog = require('./AuditLog');
 const defineFraudAlert = require('./FraudAlert');
+const defineMarketingCampaign = require('./MarketingCampaign');
+const defineGuestNotificationTemplate = require('./GuestNotificationTemplate');
+const defineDispatchLog = require('./DispatchLog');
 const defineInventoryItem = require('./InventoryItem');
 const defineInventoryBatch = require('./InventoryBatch');
 const defineLinenItem = require('./LinenItem');
 const defineLaundryBatch = require('./LaundryBatch');
+const defineMaintenanceTicket = require('./MaintenanceTicket');
+const defineLostAndFoundItem = require('./LostAndFoundItem');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -33,10 +38,15 @@ const MenuCategory = defineMenuCategory(sequelize);
 const MenuItem = defineMenuItem(sequelize);
 const AuditLog = defineAuditLog(sequelize);
 const FraudAlert = defineFraudAlert(sequelize);
+const MarketingCampaign = defineMarketingCampaign(sequelize);
+const GuestNotificationTemplate = defineGuestNotificationTemplate(sequelize);
+const DispatchLog = defineDispatchLog(sequelize);
 const InventoryItem = defineInventoryItem(sequelize);
 const InventoryBatch = defineInventoryBatch(sequelize);
 const LinenItem = defineLinenItem(sequelize);
 const LaundryBatch = defineLaundryBatch(sequelize);
+const MaintenanceTicket = defineMaintenanceTicket(sequelize);
+const LostAndFoundItem = defineLostAndFoundItem(sequelize);
 
 // Inventory Relationships
 InventoryItem.hasMany(InventoryBatch, { foreignKey: 'ItemId', as: 'batches' });
@@ -90,8 +100,13 @@ module.exports = {
   MenuItem,
   AuditLog,
   FraudAlert,
+  MarketingCampaign,
+  GuestNotificationTemplate,
+  DispatchLog,
   InventoryItem,
   InventoryBatch,
   LinenItem,
-  LaundryBatch
+  LaundryBatch,
+  MaintenanceTicket,
+  LostAndFoundItem
 };
