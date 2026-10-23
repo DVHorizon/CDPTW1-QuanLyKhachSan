@@ -133,12 +133,13 @@ export const reactivateServiceApi = async (id) => {
 };
 
 /**
- * 7. Kích hoạt đồng bộ sang trạm POS
+ * 2b. Thêm mới nhóm dịch vụ (POST /api/v1/services/categories)
  */
-export const syncPosApi = async () => {
-  const res = await fetch(`${BASE_URL}/sync-pos`, {
+export const createCategoryApi = async (categoryData) => {
+  const res = await fetch(`${BASE_URL}/categories`, {
     method: 'POST',
     headers: getAuthHeaders(),
+    body: JSON.stringify(categoryData),
   });
   const data = await res.json();
   if (!res.ok) throw data;

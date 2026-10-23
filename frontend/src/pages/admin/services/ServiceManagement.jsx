@@ -9,7 +9,6 @@ import {
   updateServiceApi,
   deactivateServiceApi,
   reactivateServiceApi,
-  syncPosApi,
 } from "../../../api/serviceApi";
 
 // ─── DỮ LIỆU DANH MỤC MẪU BAN ĐẦU (FALLBACK) ──────────────────────────────────
@@ -194,7 +193,7 @@ const OverviewKpiCards = ({ services, categories }) => {
 
 // ─── HEADER SECTION ────────────────────────────────────────────────────────────
 
-const HeaderSection = ({ onAddNew, onExportExcel, onSyncPOS, isSyncing }) => (
+const HeaderSection = ({ onAddNew, onExportExcel }) => (
   <div className={styles.headerCard}>
     <div className={styles.headerInfo}>
       <span className={styles.headerSubtitle}>Module 22 • FEAT-SERVICE-01</span>
@@ -214,21 +213,6 @@ const HeaderSection = ({ onAddNew, onExportExcel, onSyncPOS, isSyncing }) => (
           file_download
         </span>
         <span>Xuất File Bảng Giá</span>
-      </button>
-
-      <button
-        onClick={onSyncPOS}
-        disabled={isSyncing}
-        className={`${styles.btn} ${styles.btnOutline}`}
-        style={isSyncing ? { opacity: 0.6, cursor: "not-allowed" } : {}}
-        type="button"
-      >
-        <span
-          className={`material-symbols-outlined text-[18px] ${isSyncing ? "animate-spin" : ""}`}
-        >
-          sync_alt
-        </span>
-        <span>{isSyncing ? "Đang Đồng Bộ..." : "Đồng Bộ Sang POS"}</span>
       </button>
 
       <Link
@@ -999,8 +983,7 @@ const ServiceManagement = () => {
   const [formData, setFormData] = useState(INITIAL_SERVICES[0]);
   const [formErrors, setFormErrors] = useState({});
 
-  // Thông báo & POS sync
-  const [isSyncing, setIsSyncing] = useState(false);
+  // Thông báo
   const [notification, setNotification] = useState(null);
 
   const showToast = (message, type = "success") => {
@@ -1239,20 +1222,6 @@ const ServiceManagement = () => {
     }
   };
 
-  const handleSyncPOS = async () => {
-    setIsSyncing(true);
-    try {
-      const res = await syncPosApi();
-      showToast(res.message || "Đồng bộ giá sang POS thành công!", "success");
-    } catch (err) {
-      showToast(
-        err.message || "Đồng bộ giá sang POS thất bại — vui lòng thử lại.",
-        "error",
-      );
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   const handleExportExcel = () => {
     try {
@@ -1328,8 +1297,6 @@ const ServiceManagement = () => {
         <HeaderSection
           onAddNew={handleAddNew}
           onExportExcel={handleExportExcel}
-          onSyncPOS={handleSyncPOS}
-          isSyncing={isSyncing}
         />
 
         {/* 2. Chỉ số KPI */}
