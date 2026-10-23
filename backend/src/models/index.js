@@ -12,6 +12,7 @@ const defineBooking = require('./Booking');
 const defineReview = require('./Review');
 const defineMenuCategory = require('./MenuCategory');
 const defineMenuItem = require('./MenuItem');
+const defineRoomStatusHistory = require('./RoomStatusHistory');
 
 const defineStay = require('./Stay');
 const defineFoodOrder = require('./FoodOrder');
@@ -32,6 +33,7 @@ const Booking = defineBooking(sequelize);
 const Review = defineReview(sequelize);
 const MenuCategory = defineMenuCategory(sequelize);
 const MenuItem = defineMenuItem(sequelize);
+const RoomStatusHistory = defineRoomStatusHistory(sequelize);
 const Stay = defineStay(sequelize);
 const FoodOrder = defineFoodOrder(sequelize);
 const FoodOrderDetail = defineFoodOrderDetail(sequelize);
@@ -81,6 +83,12 @@ Stay.belongsTo(Booking, { foreignKey: 'BookingId' });
 Room.hasMany(Stay, { foreignKey: 'RoomId' });
 Stay.belongsTo(Room, { foreignKey: 'RoomId' });
 
+// 15. Room & RoomStatusHistory (FEAT-ROOMSTATUS-01)
+Room.hasMany(RoomStatusHistory, { foreignKey: 'RoomId', as: 'statusHistory' });
+RoomStatusHistory.belongsTo(Room, { foreignKey: 'RoomId', as: 'room' });
+User.hasMany(RoomStatusHistory, { foreignKey: 'StatusChangedBy', as: 'statusChanges' });
+RoomStatusHistory.belongsTo(User, { foreignKey: 'StatusChangedBy', as: 'changedBy' });
+
 // 11. Stay & FoodOrder
 Stay.hasMany(FoodOrder, { foreignKey: 'StayId' });
 FoodOrder.belongsTo(Stay, { foreignKey: 'StayId' });
@@ -124,6 +132,7 @@ module.exports = {
   FoodOrderDetail,
   Invoice,
   InvoiceDetail,
-  Payment
+  Payment,
+  RoomStatusHistory
 };
 
