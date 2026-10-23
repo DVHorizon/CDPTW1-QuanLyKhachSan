@@ -1,6 +1,6 @@
 'use strict';
 
-const { sequelize, Branch, RoomType, Room, Booking } = require('../models');
+const { sequelize, Branch, RoomType, Room, Booking, RoomSearchIndex } = require('../models');
 const { Op } = require('sequelize');
 const searchEngine = require('../services/searchEngine');
 const availabilityService = require('../services/availabilityService');
@@ -671,7 +671,33 @@ exports.suggestRooms = async (req, res) => {
       };
     });
 
+    const cleanQ = (q || '').trim();
+    const unaccentQ = searchEngine.removeVietnameseTones ? searchEngine.removeVietnameseTones(cleanQ) : cleanQ.toLowerCase();
+
+    // 1. Tra cứu siêu tốc từ Cây Nhị Phân B-Tree trên bảng RoomSearchIndex
+    let btreeKeywords = [];
+    try {
+      const btreeRows = await RoomSearchIndex.findAll({
+        attributes: ['Keyword', 'Category'],
+        where: {
+          [Op.or]: [
+            { Keyword: { [Op.like]: `${cleanQ}%` } },
+            { KeywordUnaccent: { [Op.like]: `${unaccentQ}%` } }
+          ]
+        },
+        limit: 6,
+        raw: true
+      });
+      btreeKeywords = [...new Set(btreeRows.map(r => r.Keyword))];
+    } catch (_) {}
+
     const suggestions = searchEngine.suggest(roomList, q);
+
+    if (btreeKeywords.length > 0) {
+      suggestions.keywordSuggestions = [
+        ...new Set([...btreeKeywords, ...(suggestions.keywordSuggestions || [])])
+      ].slice(0, 8);
+    }
 
     return res.json({
       success: true,

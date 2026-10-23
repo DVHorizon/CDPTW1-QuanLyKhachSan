@@ -12,7 +12,12 @@
     "seed:dev": "node src/seeders/seedRunner.js --count=10000",
     "seed:full": "node src/seeders/seedRunner.js --count=100000",
     "seed:legacy": "node src/seeders/seedAll.js",
-    "verify:db": "node src/seeders/verifyTables.js"
+    "seed:stays": "node src/seeders/seedInHouseStays.js",
+    "verify:db": "node src/seeders/verifyTables.js",
+    "test:pricing": "node tests/test_feat_guest_06_pricing_calculation.js",
+    "test:booking": "node tests/test_feat_guest_05_booking_engine.js",
+    "test:deposit": "node tests/test_feat_guest_08_deposit_payment.js",
+    "test:all": "node tests/test_feat_guest_06_pricing_calculation.js && node tests/test_feat_guest_05_booking_engine.js && node tests/test_feat_guest_08_deposit_payment.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

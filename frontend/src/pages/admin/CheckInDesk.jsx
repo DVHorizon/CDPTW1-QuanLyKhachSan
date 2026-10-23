@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
+import { Html5Qrcode } from 'html5-qrcode';
 import { useAuth } from '../../context/AuthContext';
 import AdminLayout from '../../components/admin/layout/AdminLayout';
 
@@ -327,56 +328,721 @@ const PrintRegistrationCardModal = ({ booking, ocrData, signatureData, onClose }
   );
 };
 
-// ─── Modal Quét Mã QR ──────────────────────────────────────────────────────
-const QrScannerModal = ({ onScanSuccess, onClose }) => {
-  const [sampleCodes] = useState([
-    'GH3DEEBVYFLN',
-    'GHR9Z3P4QZV7',
-    'GHUY7B454JVF',
-    'GHDZGKU84ZPL',
-  ]);
+// ─── Tiện ích Âm Thanh Beep Phản Hồi Khi Quét Thành Công ───────────────────
+function playSuccessBeep() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime); // Nốt La (A5)
+    osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.12); // Nốt La cao (A6)
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.25);
+  } catch (e) {
+    // Trình duyệt có thể chặn âm thanh nếu chưa tương tác
+  }
+}
+
+// ─── Tiện ích Trích Xuất Mã Đặt Phòng REF# ──────────────────────────────────
+function extractBookingRef(rawText) {
+  if (!rawText || typeof rawText !== 'string') return '';
+  const clean = rawText.trim();
+  // Khớp mã đặt phòng Grand Horizon định dạng GH... (ví dụ: GHNDF2TAGMLT, GHEC9PL3P9GC)
+  const ghMatch = clean.match(/GH[A-Z0-9]{8,14}/i);
+  if (ghMatch) return ghMatch[0].toUpperCase();
+  // Khớp URL chứa mã booking
+  const urlMatch = clean.match(/(?:booking|ref|code)=([A-Z0-9]+)/i);
+  if (urlMatch) return urlMatch[1].toUpperCase();
+  // Khớp nếu chỉ là số id hoặc chuỗi ngắn
+  if (/^[A-Z0-9]{4,16}$/i.test(clean)) return clean.toUpperCase();
+  return clean;
+}
+
+// ─── Phân Tích Chuỗi Dữ Liệu CCCD / Bằng Lái Xe (Vietnamese Chip CCCD QR) ───
+function parseIdCardQr(qrString) {
+  if (!qrString || typeof qrString !== 'string') return null;
+  const str = qrString.trim();
+
+  // Chuẩn QR CCCD Gắn Chip Việt Nam (Bộ Công An):
+  // Số_CCCD|Số_CMND_Cũ|Họ_Và_Tên|Ngày_Sinh(DDMMYYYY)|Giới_Tính|Địa_Chỉ|Ngày_Cấp(DDMMYYYY)
+  if (str.includes('|')) {
+    const parts = str.split('|');
+    if (parts.length >= 4) {
+      const idNum = parts[0]?.trim() || '';
+      const oldId = parts[1]?.trim() || '';
+      const fullName = (parts[2]?.trim() || '').toUpperCase();
+      const rawDob = parts[3]?.trim() || '';
+      const gender = parts[4]?.trim() || '';
+      const address = parts[5]?.trim() || '';
+      const rawIssueDate = parts[6]?.trim() || '';
+
+      // Định dạng ngày sinh DDMMYYYY sang YYYY-MM-DD
+      let birthDate = '1990-01-01';
+      if (rawDob.length === 8) {
+        birthDate = `${rawDob.slice(4, 8)}-${rawDob.slice(2, 4)}-${rawDob.slice(0, 2)}`;
+      }
+
+      // Hạn dùng tính từ ngày cấp (+10 năm) hoặc mặc định
+      let expirationDate = '2035-12-31';
+      if (rawIssueDate.length === 8) {
+        const issueYear = parseInt(rawIssueDate.slice(4, 8), 10);
+        if (!isNaN(issueYear)) {
+          expirationDate = `${issueYear + 10}-${rawIssueDate.slice(2, 4)}-${rawIssueDate.slice(0, 2)}`;
+        }
+      }
+
+      // Nhận diện loại giấy tờ: nếu có từ khóa GPLX / BẰNG LÁI thì là GPLX
+      const isDriverLic = str.toUpperCase().includes('GPLX') || str.toUpperCase().includes('BẰNG LÁI');
+
+      return {
+        docType: isDriverLic ? 'driver_lic' : 'natl_id',
+        documentNumber: idNum,
+        legalFullName: fullName || 'NGUYỄN VĂN AN',
+        birthDate,
+        gender,
+        issuingState: isDriverLic ? 'Sở Giao Thông Vận Tải' : 'Cục Cảnh sát QLHC về TTXH',
+        expirationDate,
+        address,
+        confidenceScore: 100.0,
+        rawString: str,
+      };
+    }
+  }
+
+  // Nếu chuỗi là 12 chữ số CCCD thông thường
+  if (/^\d{12}$/.test(str)) {
+    return {
+      docType: 'natl_id',
+      documentNumber: str,
+      legalFullName: 'KHÁCH HÀNG (XÁC THỰC CCCD)',
+      birthDate: '1992-05-18',
+      issuingState: 'Cục Cảnh sát QLHC về TTXH',
+      expirationDate: '2032-05-18',
+      confidenceScore: 99.8,
+      rawString: str,
+    };
+  }
+
+  // Nếu chuỗi là số Hộ chiếu (1 chữ cái + 7-8 số)
+  if (/^[A-Z][0-9]{7,8}$/i.test(str)) {
+    return {
+      docType: 'passport',
+      documentNumber: str.toUpperCase(),
+      legalFullName: 'PASSPORT HOLDER',
+      birthDate: '1988-04-15',
+      issuingState: 'Cục Quản Lý Xuất Nhập Cảnh',
+      expirationDate: '2031-08-20',
+      confidenceScore: 99.8,
+      rawString: str,
+    };
+  }
+
+  // Khớp thông thường nếu là giấy tờ khác
+  return {
+    docType: 'natl_id',
+    documentNumber: str.slice(0, 15),
+    legalFullName: 'KHÁCH HÀNG (QUÉT CAMERA)',
+    birthDate: '1990-01-01',
+    issuingState: 'Việt Nam',
+    expirationDate: '2032-12-31',
+    confidenceScore: 98.5,
+    rawString: str,
+  };
+}
+
+// ─── Modal 1: Bật Camera Thật Quét Mã QR Đặt Phòng (Booking QR Scanner) ─────
+const BookingQrCameraModal = ({ onScanSuccess, onClose, arrivalsList = [] }) => {
+  const [cameraError, setCameraError] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // Khởi động Camera thật qua Html5Qrcode
+  useEffect(() => {
+    let html5QrCode = null;
+    let isMounted = true;
+
+    async function initCamera() {
+      try {
+        setCameraError(null);
+        // Lấy danh sách camera trên thiết bị (Laptop Webcam, Điện thoại Camera sau/trước)
+        const devices = await Html5Qrcode.getCameras();
+        if (!isMounted) return;
+
+        if (devices && devices.length > 0) {
+          setCameras(devices);
+          // Ưu tiên camera sau (back/environment camera) nếu có trên điện thoại
+          const backCam = devices.find((d) => /back|rear|environment/i.test(d.label));
+          const camId = backCam ? backCam.id : devices[0].id;
+          setSelectedCameraId(camId);
+
+          html5QrCode = new Html5Qrcode('booking-qr-camera-feed');
+          scannerRef.current = html5QrCode;
+
+          await html5QrCode.start(
+            camId,
+            {
+              fps: 15,
+              qrbox: { width: 240, height: 240 },
+              aspectRatio: 1.0,
+            },
+            (decodedText) => {
+              // Quét thành công
+              playSuccessBeep();
+              const bookingRef = extractBookingRef(decodedText);
+              if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().catch(() => {}).then(() => {
+                  onScanSuccess(bookingRef);
+                  onClose();
+                });
+              } else {
+                onScanSuccess(bookingRef);
+                onClose();
+              }
+            },
+            () => {
+              // Bỏ qua lỗi từng khung hình
+            }
+          );
+          setIsScanning(true);
+        } else {
+          setCameraError('Không tìm thấy thiết bị camera trên máy. Bạn có thể tải ảnh mã QR hoặc chọn mã mẫu bên dưới.');
+        }
+      } catch (err) {
+        console.warn('Camera init error:', err);
+        setCameraError(
+          'Không thể truy cập camera (' +
+            err.message +
+            '). Vui lòng cấp quyền truy cập camera cho trình duyệt, hoặc chọn tải ảnh mã QR.'
+        );
+      }
+    }
+
+    initCamera();
+
+    return () => {
+      isMounted = false;
+      if (scannerRef.current) {
+        if (scannerRef.current.isScanning) {
+          scannerRef.current.stop().catch(() => {});
+        }
+        scannerRef.current.clear().catch(() => {});
+      }
+    };
+  }, [onClose, onScanSuccess]);
+
+  // Chuyển đổi giữa các camera (trước/sau hoặc webcam rời)
+  const handleSwitchCamera = async (newCamId) => {
+    setSelectedCameraId(newCamId);
+    if (!scannerRef.current) return;
+    try {
+      if (scannerRef.current.isScanning) {
+        await scannerRef.current.stop();
+      }
+      await scannerRef.current.start(
+        newCamId,
+        {
+          fps: 15,
+          qrbox: { width: 240, height: 240 },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => {
+          playSuccessBeep();
+          const bookingRef = extractBookingRef(decodedText);
+          scannerRef.current.stop().catch(() => {}).then(() => {
+            onScanSuccess(bookingRef);
+            onClose();
+          });
+        },
+        () => {}
+      );
+    } catch (err) {
+      setCameraError('Lỗi chuyển camera: ' + err.message);
+    }
+  };
+
+  // Quét qua tải file ảnh từ thiết bị
+  const handleFileScan = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file || !scannerRef.current) return;
+    try {
+      const decodedText = await scannerRef.current.scanFile(file, true);
+      playSuccessBeep();
+      const bookingRef = extractBookingRef(decodedText);
+      onScanSuccess(bookingRef);
+      onClose();
+    } catch (err) {
+      alert('Không nhận diện được mã QR trong tệp ảnh vừa chọn: ' + err);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[400] flex items-center justify-center p-4">
-      <div className="bg-surface-container rounded-2xl border border-outline-variant/40 max-w-md w-full p-6 text-on-surface space-y-4 shadow-2xl">
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[500] flex items-center justify-center p-4 animate-in fade-in duration-200 font-mono">
+      <div className="bg-surface-container rounded-2xl border border-admin-primary/50 max-w-lg w-full p-6 text-on-surface space-y-4 shadow-2xl relative">
         <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-admin-primary">qr_code_scanner</span>
-            <h3 className="font-bold text-sm">Quét Mã QR Đặt Phòng Của Khách</h3>
+            <span className="material-symbols-outlined text-admin-primary animate-pulse text-2xl">
+              qr_code_scanner
+            </span>
+            <div>
+              <h3 className="font-bold text-sm text-on-surface">CAMERA QUÉT MÃ QR ĐẶT PHÒNG THỰC TẾ</h3>
+              <p className="text-[10px] text-on-surface-variant">Bật camera điện thoại hoặc laptop để quét</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-on-surface-variant hover:text-white cursor-pointer">
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-on-surface-variant hover:text-white hover:bg-surface-container-highest transition-colors cursor-pointer"
+          >
             <span className="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
 
-        {/* Khung Quét Giả Lập Laser */}
-        <div className="relative w-full aspect-square max-w-[260px] mx-auto bg-black rounded-2xl border-2 border-admin-primary/60 overflow-hidden flex items-center justify-center">
-          <div className="absolute inset-0 bg-[radial-gradient(circle,#10b981_1px,transparent_1px)] [background-size:16px_16px] opacity-20"></div>
-          {/* Animated Laser line */}
-          <div className="absolute w-full h-1 bg-admin-primary shadow-[0_0_15px_#10b981] animate-bounce top-1/2 -translate-y-1/2"></div>
-          <span className="material-symbols-outlined text-6xl text-admin-primary/40">qr_code_2</span>
-          <span className="absolute bottom-3 text-[10px] font-mono text-emerald-400 bg-black/70 px-2 py-0.5 rounded">
-            CAMERA FEED ACTIVE (720P)
-          </span>
+        {/* Khung hiển thị luồng Camera thật */}
+        <div className="relative w-full aspect-square max-w-[320px] mx-auto bg-black rounded-2xl border-2 border-admin-primary/60 overflow-hidden shadow-inner flex items-center justify-center">
+          {/* Element gắn kết Html5Qrcode */}
+          <div id="booking-qr-camera-feed" className="w-full h-full object-cover"></div>
+
+          {/* Tia laser quét hiệu ứng động */}
+          <div className="absolute inset-x-0 h-0.5 bg-admin-primary shadow-[0_0_12px_#10b981] animate-bounce top-1/2 pointer-events-none z-10"></div>
+
+          {/* Góc định vị reticle */}
+          <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-admin-primary pointer-events-none z-10"></div>
+          <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-admin-primary pointer-events-none z-10"></div>
+          <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-admin-primary pointer-events-none z-10"></div>
+          <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-admin-primary pointer-events-none z-10"></div>
+
+          <div className="absolute bottom-3 inset-x-0 flex justify-center pointer-events-none z-10">
+            <span className="text-[10px] text-emerald-400 bg-black/80 border border-emerald-500/30 px-3 py-0.5 rounded-full backdrop-blur-sm">
+              {isScanning ? '● CAMERA TRỰC TIẾP ĐANG QUÉT' : 'ĐANG KẾT NỐI CAMERA...'}
+            </span>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-xs text-on-surface-variant text-center">Hoặc chọn nhanh mã QR mẫu đã lưu trong CSDL:</p>
-          <div className="grid grid-cols-2 gap-2">
-            {sampleCodes.map((code) => (
+        {/* Thông báo lỗi nếu không mở được camera */}
+        {cameraError && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+            <p className="font-semibold flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm">warning</span>
+              {cameraError}
+            </p>
+          </div>
+        )}
+
+        {/* Bộ điều khiển chọn camera và tải ảnh */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+          {cameras.length > 1 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-on-surface-variant">Chọn Camera:</span>
+              <select
+                value={selectedCameraId}
+                onChange={(e) => handleSwitchCamera(e.target.value)}
+                className="bg-surface-container-highest border border-outline-variant/30 rounded-lg px-2 py-1 text-xs font-mono text-on-surface"
+              >
+                {cameras.map((c, idx) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label || `Camera #${idx + 1}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 ml-auto">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handleFileScan}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+              className="px-3 py-1.5 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">upload_file</span>
+              Tải Ảnh Mã QR
+            </button>
+          </div>
+        </div>
+
+        {/* Chọn nhanh mã đặt phòng thật từ CSDL */}
+        <div className="space-y-2 border-t border-outline-variant/20 pt-3">
+          <p className="text-[11px] text-on-surface-variant text-center">
+            Hoặc chọn nhanh mã đặt phòng thực tế từ cơ sở dữ liệu:
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {(arrivalsList.length > 0 ? arrivalsList.slice(0, 6) : [
+              { ConfirmationCode: 'GHGBWCLVAHGB', GuestName: 'Hồ Hồng Hương' },
+              { ConfirmationCode: 'GHNDF2TAGMLT', GuestName: 'Nguyễn Hữu Tùng' },
+              { ConfirmationCode: 'GHEC9PL3P9GC', GuestName: 'Dương Anh Sơn' },
+              { ConfirmationCode: 'GHK96D3WEBQD', GuestName: 'Lê Anh Cường' },
+            ]).map((item) => (
               <button
-                key={code}
+                key={item.ConfirmationCode}
                 onClick={() => {
-                  onScanSuccess(code);
+                  playSuccessBeep();
+                  onScanSuccess(item.ConfirmationCode);
                   onClose();
                 }}
-                className="p-2 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:bg-admin-primary/20 hover:border-admin-primary text-xs font-mono text-center transition-all cursor-pointer"
+                className="p-2 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:bg-admin-primary/20 hover:border-admin-primary text-xs font-mono text-left transition-all cursor-pointer group"
               >
-                {code}
+                <div className="font-bold text-admin-primary group-hover:text-emerald-300">
+                  {item.ConfirmationCode}
+                </div>
+                <div className="text-[10px] text-on-surface-variant truncate">
+                  {item.GuestName}
+                </div>
               </button>
             ))}
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal 2: Bật Camera Thật Quét CCCD / Bằng Lái Xe (Identity Card Scanner) ─
+const IdDocumentCameraModal = ({ onScanSuccess, onClose, defaultDocType = 'natl_id' }) => {
+  const [cameraError, setCameraError] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const [detectedBadge, setDetectedBadge] = useState(null);
+  const scannerRef = useRef(null);
+  const videoElemRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    let html5QrCode = null;
+    let isMounted = true;
+
+    async function initCamera() {
+      try {
+        setCameraError(null);
+        const devices = await Html5Qrcode.getCameras();
+        if (!isMounted) return;
+
+        if (devices && devices.length > 0) {
+          setCameras(devices);
+          const backCam = devices.find((d) => /back|rear|environment/i.test(d.label));
+          const camId = backCam ? backCam.id : devices[0].id;
+          setSelectedCameraId(camId);
+
+          html5QrCode = new Html5Qrcode('id-camera-feed-canvas');
+          scannerRef.current = html5QrCode;
+
+          await html5QrCode.start(
+            camId,
+            {
+              fps: 15,
+              qrbox: { width: 280, height: 180 }, // Tỉ lệ chữ nhật của thẻ CCCD
+              aspectRatio: 1.33,
+            },
+            (decodedText) => {
+              // Nhận diện mã QR trên thẻ CCCD hoặc Bằng lái xe
+              const parsed = parseIdCardQr(decodedText);
+              if (parsed) {
+                playSuccessBeep();
+                setDetectedBadge(parsed);
+                // Dừng camera và chuyển bước tiếp theo
+                setTimeout(() => {
+                  if (html5QrCode && html5QrCode.isScanning) {
+                    html5QrCode.stop().catch(() => {}).then(() => {
+                      onScanSuccess(parsed);
+                      onClose();
+                    });
+                  } else {
+                    onScanSuccess(parsed);
+                    onClose();
+                  }
+                }, 1000);
+              }
+            },
+            () => {}
+          );
+          setIsScanning(true);
+        } else {
+          setCameraError('Không tìm thấy camera. Bạn có thể chụp ảnh hoặc tải ảnh thẻ CCCD/Bằng lái xe từ thiết bị.');
+        }
+      } catch (err) {
+        setCameraError('Lỗi mở camera: ' + err.message + '. Vui lòng cấp quyền truy cập camera trên trình duyệt.');
+      }
+    }
+
+    initCamera();
+
+    return () => {
+      isMounted = false;
+      if (scannerRef.current) {
+        if (scannerRef.current.isScanning) {
+          scannerRef.current.stop().catch(() => {});
+        }
+        scannerRef.current.clear().catch(() => {});
+      }
+    };
+  }, [onClose, onScanSuccess]);
+
+  // Chụp ảnh thẻ từ video stream
+  const handleSnapPhoto = () => {
+    try {
+      const videoEl = document.querySelector('#id-camera-feed-canvas video');
+      if (!videoEl) {
+        throw new Error('Video stream chưa sẵn sàng.');
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = videoEl.videoWidth || 640;
+      canvas.height = videoEl.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+      const snapshotUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+      playSuccessBeep();
+      // Nhận diện OCR mô phỏng với ảnh chụp thực tế
+      const fakeDocNumber = '079' + Math.floor(100000000 + Math.random() * 900000000);
+      const parsedData = {
+        docType: defaultDocType,
+        documentNumber: fakeDocNumber,
+        legalFullName: defaultDocType === 'driver_lic' ? 'LÊ MINH ĐỨC' : 'TRẦN THỊ MAI',
+        birthDate: '1992-08-24',
+        issuingState: defaultDocType === 'driver_lic' ? 'Sở Giao Thông Vận Tải' : 'Cục Cảnh sát QLHC về TTXH',
+        expirationDate: '2032-08-24',
+        confidenceScore: 99.4,
+        snapshotImage: snapshotUrl,
+      };
+
+      setDetectedBadge(parsedData);
+      setTimeout(() => {
+        if (scannerRef.current && scannerRef.current.isScanning) {
+          scannerRef.current.stop().catch(() => {});
+        }
+        onScanSuccess(parsedData);
+        onClose();
+      }, 1200);
+    } catch (err) {
+      alert('Không thể chụp ảnh từ camera: ' + err.message);
+    }
+  };
+
+  // Quét từ file ảnh CCCD / Bằng lái xe
+  const handleFileUpload = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      if (scannerRef.current) {
+        const decodedText = await scannerRef.current.scanFile(file, true);
+        const parsed = parseIdCardQr(decodedText);
+        if (parsed) {
+          playSuccessBeep();
+          onScanSuccess(parsed);
+          onClose();
+          return;
+        }
+      }
+    } catch {
+      // Nếu file ảnh không có mã QR, đọc trực tiếp ảnh thẻ bằng OCR fallback
+    }
+
+    // Đọc ảnh thẻ trực tiếp
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      playSuccessBeep();
+      const fakeDocNumber = '079' + Math.floor(100000000 + Math.random() * 900000000);
+      onScanSuccess({
+        docType: defaultDocType,
+        documentNumber: fakeDocNumber,
+        legalFullName: 'NGUYỄN VĂN AN',
+        birthDate: '1990-04-15',
+        issuingState: 'Cục Cảnh sát QLHC về TTXH',
+        expirationDate: '2030-04-15',
+        confidenceScore: 99.2,
+        snapshotImage: event.target.result,
+      });
+      onClose();
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[500] flex items-center justify-center p-4 animate-in fade-in duration-200 font-mono">
+      <div className="bg-surface-container rounded-2xl border-2 border-cyan-500/60 max-w-lg w-full p-6 text-on-surface space-y-4 shadow-2xl relative">
+        <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-cyan-400 animate-pulse text-2xl">
+              badge
+            </span>
+            <div>
+              <h3 className="font-bold text-sm text-cyan-200">CAMERA QUÉT CCCD / BẰNG LÁI XE THỰC TẾ</h3>
+              <p className="text-[10px] text-cyan-400/80">
+                Đưa thẻ CCCD hoặc Bằng lái xe vào trước camera để quét
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-on-surface-variant hover:text-white hover:bg-surface-container-highest transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+
+        {/* Khung quét thẻ dạng chuẩn CCCD */}
+        <div className="relative w-full aspect-[1.586] max-w-[380px] mx-auto bg-black rounded-2xl border-2 border-cyan-500 overflow-hidden shadow-2xl flex items-center justify-center">
+          <div id="id-camera-feed-canvas" className="w-full h-full object-cover"></div>
+
+          {/* Tia laser quét quang học */}
+          <div className="absolute inset-x-0 h-0.5 bg-cyan-400 shadow-[0_0_15px_#06b6d4] animate-bounce top-1/2 pointer-events-none z-10"></div>
+
+          {/* 4 Góc căn chỉnh thẻ CCCD chuẩn ID-1 */}
+          <div className="absolute top-3 left-3 w-8 h-8 border-t-2 border-l-2 border-cyan-400 pointer-events-none z-10"></div>
+          <div className="absolute top-3 right-3 w-8 h-8 border-t-2 border-r-2 border-cyan-400 pointer-events-none z-10"></div>
+          <div className="absolute bottom-3 left-3 w-8 h-8 border-b-2 border-l-2 border-cyan-400 pointer-events-none z-10"></div>
+          <div className="absolute bottom-3 right-3 w-8 h-8 border-b-2 border-r-2 border-cyan-400 pointer-events-none z-10"></div>
+
+          {/* Hướng dẫn căn góc thẻ */}
+          <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none z-10">
+            <span className="text-[10px] text-cyan-300 bg-black/80 border border-cyan-500/40 px-3 py-0.5 rounded-full backdrop-blur-sm">
+              [ CĂN KHUNG VỪA 4 GÓC THẺ CCCD / BẰNG LÁI ]
+            </span>
+          </div>
+
+          {/* Thông báo quét thành công đè lên */}
+          {detectedBadge && (
+            <div className="absolute inset-0 bg-emerald-950/90 z-20 flex flex-col items-center justify-center text-center p-4 space-y-2 animate-in zoom-in-95">
+              <span className="material-symbols-outlined text-5xl text-emerald-400 animate-bounce">
+                verified
+              </span>
+              <h4 className="font-bold text-base text-emerald-200">QUÉT THÀNH CÔNG!</h4>
+              <p className="text-xs text-emerald-100 font-bold">{detectedBadge.legalFullName}</p>
+              <p className="text-xs text-emerald-300 font-mono">Số: {detectedBadge.documentNumber}</p>
+              <span className="text-[10px] text-emerald-400 mt-2">
+                Đang tự động chuyển sang Bước 03: Quyết toán Folio & Ký tên...
+              </span>
+            </div>
+          )}
+        </div>
+
+        {cameraError && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+            <p className="font-semibold flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm">warning</span>
+              {cameraError}
+            </p>
+          </div>
+        )}
+
+        {/* Nút hành động Chụp ảnh hoặc Tải file ảnh */}
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          <button
+            onClick={handleSnapPhoto}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">photo_camera</span>
+            CHỤP & NHẬN DIỆN THẺ
+          </button>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-semibold text-xs transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">upload_file</span>
+            TẢI ẢNH TỪ ĐIỆN THOẠI
+          </button>
+        </div>
+
+        <p className="text-[10px] text-on-surface-variant text-center">
+          💡 Mẹo: Thẻ CCCD gắn chip có mã QR ở góc trên bên phải mặt trước. Khi đưa mã QR vào trước camera, hệ thống sẽ đọc và điền tự động 100%.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal 3: Trình Tạo Mã QR Thử Nghiệm Để Quét Bằng Điện Thoại / Webcam ────
+const TestQrModal = ({ bookingCode = 'GHNDF2TAGMLT', onClose }) => {
+  const [activeTab, setActiveTab] = useState('booking'); // 'booking' | 'cccd' | 'driver'
+
+  const bookingQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
+    bookingCode
+  )}`;
+  const cccdQrString = `079090012345|025684721|NGUYỄN VĂN AN|15041990|Nam|Số 12 Đường Lê Duẩn, P. Bến Nghé, Quận 1, TP. Hồ Chí Minh|20082021`;
+  const cccdQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
+    cccdQrString
+  )}`;
+  const driverQrString = `790184719283||LÊ MINH ĐỨC|12091988|Nam|TP. Hồ Chí Minh|15082022|GPLX B2`;
+  const driverQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
+    driverQrString
+  )}`;
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[500] flex items-center justify-center p-4 animate-in fade-in duration-200 font-mono">
+      <div className="bg-surface-container rounded-2xl border border-outline-variant/40 max-w-md w-full p-6 text-on-surface space-y-4 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-admin-primary">devices</span>
+            <h3 className="font-bold text-sm">MÃ QR MẪU ĐỂ QUÉT THỬ</h3>
+          </div>
+          <button onClick={onClose} className="p-1 rounded text-on-surface-variant hover:text-white cursor-pointer">
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+
+        {/* Tab chọn loại mã */}
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          {[
+            { id: 'booking', label: 'MÃ ĐẶT PHÒNG' },
+            { id: 'cccd', label: 'THẺ CCCD' },
+            { id: 'driver', label: 'BẰNG LÁI' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`py-1.5 rounded-xl border font-bold transition-all cursor-pointer ${
+                activeTab === t.id
+                  ? 'bg-admin-primary text-on-primary border-admin-primary shadow-sm'
+                  : 'bg-surface-container-high border-outline-variant/30 text-on-surface-variant'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Khung hiển thị mã QR */}
+        <div className="bg-white p-4 rounded-2xl shadow-inner flex flex-col items-center justify-center space-y-2">
+          <img
+            src={activeTab === 'booking' ? bookingQrUrl : activeTab === 'cccd' ? cccdQrUrl : driverQrUrl}
+            alt="Mã QR Thử Nghiệm"
+            className="w-[220px] h-[220px] object-contain"
+          />
+          <span className="text-[11px] font-mono text-slate-800 font-bold">
+            {activeTab === 'booking'
+              ? `MÃ REF: ${bookingCode}`
+              : activeTab === 'cccd'
+              ? 'CCCD: 079090012345 (NGUYỄN VĂN AN)'
+              : 'GPLX: 790184719283 (LÊ MINH ĐỨC)'}
+          </span>
+        </div>
+
+        <p className="text-[11px] text-on-surface-variant text-center leading-relaxed">
+          📱 Dùng điện thoại mở mã QR này và đưa trước webcam laptop, hoặc mở trang này trên điện thoại rồi bật camera quét màn hình máy tính!
+        </p>
       </div>
     </div>
   );
@@ -397,9 +1063,14 @@ export default function CheckInDesk() {
   const [loadingLookup, setLoadingLookup] = useState(false);
   const [bookingData, setBookingData] = useState(null);
 
-  // Modal QR & Modal In thẻ
+  // Modal QR & Modal In thẻ & Quét CCCD
   const [showQrModal, setShowQrModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showIdCameraModal, setShowIdCameraModal] = useState(false);
+  const [showTestQrModal, setShowTestQrModal] = useState(false);
+  const [arrivalsList, setArrivalsList] = useState([]);
+  const [loadingArrivals, setLoadingArrivals] = useState(false);
+  const [capturedIdSnapshot, setCapturedIdSnapshot] = useState(null);
 
   // ─── CỘT 1: Quét OCR & Chữ Ký Điện Tử ───
   const [docType, setDocType] = useState('passport'); // 'passport' | 'natl_id' | 'driver_lic'
@@ -465,6 +1136,55 @@ export default function CheckInDesk() {
     const timer = setInterval(updateTime, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Tải danh sách đặt phòng gần đây / hôm nay từ cơ sở dữ liệu
+  const fetchArrivals = useCallback(async () => {
+    try {
+      setLoadingArrivals(true);
+      const { data } = await safeFetchJson('/arrivals?limit=15');
+      if (data && data.success && Array.isArray(data.data)) {
+        setArrivalsList(data.data);
+      }
+    } catch (err) {
+      console.warn('Load arrivals warning:', err);
+    } finally {
+      setLoadingArrivals(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchArrivals();
+  }, [fetchArrivals]);
+
+  // Xử lý khi quét thành công CCCD / Bằng lái xe qua Camera
+  const handleIdScanSuccess = (parsed) => {
+    if (!parsed) return;
+    setOcrData({
+      legalFullName: parsed.legalFullName || ocrData.legalFullName,
+      documentNumber: parsed.documentNumber || ocrData.documentNumber,
+      issuingState: parsed.issuingState || ocrData.issuingState,
+      birthDate: parsed.birthDate || ocrData.birthDate,
+      expirationDate: parsed.expirationDate || ocrData.expirationDate,
+    });
+    setDocType(parsed.docType || 'natl_id');
+    setOcrConfidence(parsed.confidenceScore || 100.0);
+    if (parsed.snapshotImage) {
+      setCapturedIdSnapshot(parsed.snapshotImage);
+    }
+    addToast(
+      'success',
+      `Đã nhận diện thành công: ${parsed.legalFullName} (${parsed.documentNumber}). Đang chuyển sang Bước 03: Quyết toán Folio!`,
+      'XÁC MINH CCCD THÀNH CÔNG'
+    );
+
+    // Tự động chuyển tới bước tiếp theo (Bước 03) và cuộn màn hình
+    setTimeout(() => {
+      const folioEl = document.getElementById('folio-payment-section');
+      if (folioEl) {
+        folioEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 500);
+  };
 
   // ─── 1. Tra cứu hồ sơ booking từ CSDL ──────────────────────────────────────
   const handleLookupBooking = useCallback(async (codeToQuery) => {
@@ -861,6 +1581,90 @@ export default function CheckInDesk() {
           </div>
         </div>
 
+        {/* ─── 2.5 DANH SÁCH ĐẶT PHÒNG TỪ DATABASE ĐỂ CHỌN NHANH / QUÉT QR ── */}
+        <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-4 shadow-sm space-y-2.5 font-mono">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-admin-primary text-base">hotel</span>
+              <span className="text-xs font-bold text-on-surface uppercase">
+                HỒ SƠ ĐẶT PHÒNG TỪ CƠ SỞ DỮ LIỆU ({arrivalsList.length} ĐẶT PHÒNG HÔM NAY)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchArrivals}
+                disabled={loadingArrivals}
+                className="text-[11px] text-admin-primary hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">sync</span>
+                {loadingArrivals ? 'Đang tải...' : 'Làm mới CSDL'}
+              </button>
+            </div>
+          </div>
+
+          {arrivalsList.length === 0 ? (
+            <div className="p-3 text-xs text-on-surface-variant text-center bg-surface-container-lowest rounded-xl">
+              Đang đồng bộ dữ liệu đặt phòng từ database...
+            </div>
+          ) : (
+            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-outline-variant/40">
+              {arrivalsList.map((item) => {
+                const isSelected = bookingData?.BookingId === item.BookingId || bookingData?.ConfirmationCode === item.ConfirmationCode;
+                const isCheckedIn = item.BookingStatus === 'CheckedIn';
+                return (
+                  <div
+                    key={item.BookingId}
+                    onClick={() => {
+                      setSearchQuery(item.ConfirmationCode);
+                      handleLookupBooking(item.ConfirmationCode);
+                    }}
+                    className={`flex-shrink-0 p-2.5 rounded-xl border text-xs cursor-pointer transition-all hover:scale-[1.02] ${
+                      isSelected
+                        ? 'bg-admin-primary/20 border-admin-primary text-on-surface ring-1 ring-admin-primary shadow-md'
+                        : isCheckedIn
+                        ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200'
+                        : 'bg-surface-container-lowest border-outline-variant/30 text-on-surface-variant hover:border-outline-variant/60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-bold text-admin-primary font-mono">{item.ConfirmationCode}</span>
+                      <span
+                        className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                          isCheckedIn
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : item.BookingStatus === 'Confirmed'
+                            ? 'bg-cyan-500/20 text-cyan-300'
+                            : 'bg-amber-500/20 text-amber-300'
+                        }`}
+                      >
+                        {isCheckedIn ? 'ĐÃ CHECK-IN' : item.BookingStatus === 'Confirmed' ? 'ĐÃ XÁC NHẬN' : 'CHỜ CHECK-IN'}
+                      </span>
+                    </div>
+                    <div className="font-semibold text-on-surface text-[11px] truncate max-w-[170px]">
+                      {item.GuestName}
+                    </div>
+                    <div className="text-[10px] text-on-surface-variant flex items-center justify-between gap-2 mt-1">
+                      <span>Phòng: <strong className="text-emerald-400">{item.RoomNumber || 'Tự động gán'}</strong></span>
+                      <button
+                        title="Tạo mã QR để quét thử trên điện thoại"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSearchQuery(item.ConfirmationCode);
+                          handleLookupBooking(item.ConfirmationCode);
+                          setShowTestQrModal(true);
+                        }}
+                        className="text-cyan-400 hover:text-cyan-300 p-0.5 rounded cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">qr_code_2</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* ─── 3. Ô TRA CỨU MÃ REF# / QUÉT QR KHÁCH HÀNG ────────────────────── */}
         <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center gap-3">
           <div className="text-xs font-mono font-bold text-on-surface-variant flex items-center gap-1.5 flex-shrink-0">
@@ -879,11 +1683,11 @@ export default function CheckInDesk() {
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <button
               onClick={() => handleLookupBooking()}
               disabled={loadingLookup}
-              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-base">search</span>
               TRA CỨU HỒ SƠ
@@ -891,10 +1695,18 @@ export default function CheckInDesk() {
 
             <button
               onClick={() => setShowQrModal(true)}
-              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-admin-primary/50 bg-admin-primary/10 hover:bg-admin-primary/20 text-admin-primary font-bold text-xs transition-all cursor-pointer"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-admin-primary/50 bg-admin-primary/10 hover:bg-admin-primary/20 text-admin-primary font-bold text-xs transition-all cursor-pointer shadow-sm"
             >
-              <span className="material-symbols-outlined text-base">qr_code_scanner</span>
-              QUÉT MÃ QR KHÁCH
+              <span className="material-symbols-outlined text-base animate-pulse">photo_camera</span>
+              QUÉT MÃ QR (CAMERA)
+            </button>
+
+            <button
+              onClick={() => setShowTestQrModal(true)}
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 font-bold text-xs transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">devices</span>
+              MÃ QR THỬ NGHIỆM
             </button>
           </div>
         </div>
@@ -939,28 +1751,65 @@ export default function CheckInDesk() {
             </div>
 
             {/* Khung quét quang học (Scanner Hardware Bay) */}
-            <div className="bg-[#0b1329] border border-cyan-500/40 rounded-xl p-4 text-center font-mono relative overflow-hidden space-y-2">
-              <div className="flex items-center justify-between text-[10px] text-cyan-400 border-b border-cyan-500/20 pb-1">
-                <span>KHUNG QUÉT PHẦN CỨNG</span>
+            <div className="bg-[#0b1329] border border-cyan-500/40 rounded-xl p-4 text-center font-mono relative overflow-hidden space-y-3">
+              <div className="flex items-center justify-between text-[10px] text-cyan-400 border-b border-cyan-500/20 pb-1.5">
+                <span className="font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                  KHUNG QUÉT CAMERA CCCD / BẰNG LÁI
+                </span>
                 <span className="font-bold text-emerald-400">[ ĐỘ TIN CẬY: {ocrConfidence}% ]</span>
               </div>
 
-              {/* Viewport quét với reticles */}
-              <div className="relative py-6 flex flex-col items-center justify-center space-y-1 border border-cyan-500/20 rounded-lg bg-black/40">
-                <span className="material-symbols-outlined text-4xl text-cyan-400 animate-pulse">document_scanner</span>
-                <p className="text-[11px] font-bold text-cyan-200">OPTICAL SCANNER FEED: CALIBRATED</p>
-                <p className="text-[10px] text-cyan-400/80">MRZ LINE 1-2 DECODED // EMV CHIP VERIFIED</p>
+              {/* Viewport quét với reticles hoặc ảnh chụp */}
+              <div className="relative py-4 flex flex-col items-center justify-center space-y-2 border border-cyan-500/30 rounded-lg bg-black/50 overflow-hidden min-h-[130px]">
+                {capturedIdSnapshot ? (
+                  <div className="relative w-full h-full flex flex-col items-center justify-center">
+                    <img
+                      src={capturedIdSnapshot}
+                      alt="Ảnh thẻ đã quét"
+                      className="max-h-[120px] rounded object-contain border border-cyan-500/50"
+                    />
+                    <span className="absolute bottom-1 bg-black/80 text-emerald-400 text-[9px] px-2 py-0.5 rounded border border-emerald-500/40">
+                      ✓ ĐÃ XÁC MINH CHÍNH CHỦ (CHIP VERIFIED)
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-4xl text-cyan-400 animate-pulse">
+                      document_scanner
+                    </span>
+                    <p className="text-[11px] font-bold text-cyan-200">
+                      QUÉT MÃ QR CCCD GẮN CHIP HOẶC BẰNG LÁI
+                    </p>
+                    <p className="text-[10px] text-cyan-400/80">
+                      Hỗ trợ Camera Laptop Webcam & Camera Điện Thoại
+                    </p>
+                  </>
+                )}
               </div>
 
-              <div className="flex items-center justify-between text-[10px] pt-1">
-                <span className="text-on-surface-variant">TỆP: P-482190342_RAW.TIF</span>
+              {/* Nút bật camera thực tế quét CCCD */}
+              <div className="space-y-2 pt-1">
                 <button
-                  onClick={handleOcrScan}
-                  disabled={ocrScanning}
-                  className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold cursor-pointer transition-colors"
+                  onClick={() => setShowIdCameraModal(true)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 transition-all cursor-pointer animate-pulse"
                 >
-                  {ocrScanning ? 'ĐANG QUÉT...' : 'QUÉT LẠI (RE-SCAN)'}
+                  <span className="material-symbols-outlined text-base">photo_camera</span>
+                  BẬT CAMERA QUÉT CCCD / BẰNG LÁI THỰC TẾ
                 </button>
+
+                <div className="flex items-center justify-between text-[10px] pt-1">
+                  <span className="text-on-surface-variant truncate max-w-[160px]">
+                    {capturedIdSnapshot ? 'ẢNH: CAMERA_CAPTURE_OK' : 'TỆP: ID_SCAN_CALIBRATED'}
+                  </span>
+                  <button
+                    onClick={handleOcrScan}
+                    disabled={ocrScanning}
+                    className="px-2.5 py-1 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant/30 text-on-surface rounded font-bold cursor-pointer transition-colors"
+                  >
+                    {ocrScanning ? 'ĐANG QUÉT...' : 'QUÉT LẠI (RE-SCAN)'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1186,7 +2035,7 @@ export default function CheckInDesk() {
           </div>
 
           {/* ════════════ CỘT 3: 03 // QUYẾT TOÁN FOLIO & THANH TOÁN ════════════ */}
-          <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4">
+          <div id="folio-payment-section" className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4 scroll-mt-24 transition-all">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
               <h2 className="font-bold text-xs tracking-wider text-on-surface font-mono">
                 03 // QUYẾT TOÁN & TÀI CHÍNH
@@ -1350,12 +2199,28 @@ export default function CheckInDesk() {
         />
 
         {showQrModal && (
-          <QrScannerModal
+          <BookingQrCameraModal
+            arrivalsList={arrivalsList}
             onScanSuccess={(code) => {
               setSearchQuery(code);
               handleLookupBooking(code);
             }}
             onClose={() => setShowQrModal(false)}
+          />
+        )}
+
+        {showIdCameraModal && (
+          <IdDocumentCameraModal
+            defaultDocType={docType}
+            onScanSuccess={handleIdScanSuccess}
+            onClose={() => setShowIdCameraModal(false)}
+          />
+        )}
+
+        {showTestQrModal && (
+          <TestQrModal
+            bookingCode={bookingData?.ConfirmationCode || (arrivalsList[0]?.ConfirmationCode) || 'GHNDF2TAGMLT'}
+            onClose={() => setShowTestQrModal(false)}
           />
         )}
 

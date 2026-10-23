@@ -156,6 +156,14 @@ async function run() {
     console.log('📈 Đang cập nhật bảng chỉ mục cho MySQL Optimizer (ANALYZE TABLE)...');
     await sequelize.query('ANALYZE TABLE Users, Rooms, Bookings, Stays, Invoices, MenuItems;').catch(() => {});
 
+    // 5.1. Đồng bộ dữ liệu Cây Nhị Phân (B-Tree) cho bảng RoomSearchIndex
+    try {
+      const { syncSearchIndex } = require('../services/searchIndexService');
+      await syncSearchIndex();
+    } catch (e) {
+      console.log('   (Bỏ qua đồng bộ RoomSearchIndex: ' + e.message + ')');
+    }
+
     const totalMinutes = ((Date.now() - startTimeTotal) / 60000).toFixed(2);
     console.log('\n================================================================================');
     console.log(`🎉 TẤT CẢ CÁC BẢNG ĐÃ ĐƯỢC SEED THÀNH CÔNG! (Tổng thời gian: ${totalMinutes} phút)`);

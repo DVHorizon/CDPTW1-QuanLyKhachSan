@@ -43,10 +43,12 @@ const Auth = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Nếu đã đăng nhập thành công, tự động chuyển hướng
+  // Nếu đã đăng nhập thành công, tự động chuyển hướng theo vai trò Database
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.roleId === 1 || user.roleName === 'Admin') {
+      const internalRoles = [1, 2, 3, 4];
+      const isInternal = internalRoles.includes(user.roleId) || ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'].includes(user.roleName);
+      if (isInternal) {
         navigate('/admin');
       } else {
         navigate('/');
@@ -68,7 +70,7 @@ const Auth = () => {
     setSuccessMessage('');
 
     if (!loginIdentifier.trim()) {
-      setErrorMessage('Vui lòng nhập Email hoặc Số điện thoại.');
+      setErrorMessage('Vui lòng nhập Email, Tên đăng nhập hoặc Số điện thoại.');
       return;
     }
     if (!loginPassword) {
@@ -82,7 +84,9 @@ const Auth = () => {
       if (res.success) {
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          if (res.user?.roleId === 1 || res.user?.roleName === 'Admin') {
+          const internalRoles = [1, 2, 3, 4];
+          const isInternal = internalRoles.includes(res.user?.roleId) || ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'].includes(res.user?.roleName);
+          if (isInternal) {
             navigate('/admin');
           } else {
             navigate('/');
@@ -287,11 +291,11 @@ const Auth = () => {
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-[#0b1c30] mb-2">
-                  Email hoặc Số điện thoại
+                  Email, Tên đăng nhập hoặc Số điện thoại
                 </label>
                 <div className="relative flex items-center">
                   <span className="absolute left-4 text-[#45464d] material-symbols-outlined text-xl pointer-events-none">
-                    mail
+                    account_circle
                   </span>
                   <input
                     type="text"
@@ -299,7 +303,7 @@ const Auth = () => {
                     disabled={isLoading}
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="vip.guest@grandhorizon.com"
+                    placeholder="admin, receptionist hoặc email / số điện thoại"
                     className="w-full h-12 pl-12 pr-4 bg-white border border-[#d3e4fe] rounded-xl text-[#0b1c30] text-sm placeholder-[#76777d] focus:outline-none focus:border-[#725b38] focus:ring-2 focus:ring-[#725b38]/30 transition-all shadow-xs"
                   />
                 </div>
