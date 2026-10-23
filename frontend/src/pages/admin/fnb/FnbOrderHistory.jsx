@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import AdminLayout from "../../../components/admin/layout/AdminLayout";
+import OrderPrintModal from "../../../components/admin/fnb/OrderPrintModal";
 
 const API = "http://localhost:5000/api/v1/fnb-orders/history";
 
@@ -106,7 +107,7 @@ function FilterBar({ filters, onChange, onApply, loading }) {
   );
 }
 
-function StaffTable({ orders }) {
+function StaffTable({ orders, onPrintDoc }) {
   const [expanded, setExpanded] = useState(null);
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
@@ -121,6 +122,7 @@ function StaffTable({ orders }) {
               <th className="py-3 px-4">Trạng thái</th>
               <th className="py-3 px-4">Hình thức TT</th>
               <th className="py-3 px-4">Thời gian</th>
+              <th className="py-3 px-4 text-center">In Phiếu (FEAT-FNB-11)</th>
               <th className="py-3 px-4"></th>
             </tr>
           </thead>
@@ -132,18 +134,39 @@ function StaffTable({ orders }) {
               const isOpen = expanded === o.foodOrderId;
               return (
                 <React.Fragment key={o.foodOrderId}>
-                  <tr className={"hover:bg-slate-50 transition-colors cursor-pointer" + (isOpen ? " bg-emerald-50" : "")}
-                    onClick={() => setExpanded(isOpen ? null : o.foodOrderId)}>
-                    <td className="py-3 px-4 font-mono font-semibold text-slate-700">#{o.foodOrderId}</td>
-                    <td className="py-3 px-4 text-slate-600">{o.roomNumber || "—"}</td>
-                    <td className="py-3 px-4 text-slate-500 max-w-[200px] truncate">{itemSummary || "—"}</td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">{fmt(o.totalAmount)}</td>
-                    <td className="py-3 px-4">
+                  <tr className={"hover:bg-slate-50 transition-colors" + (isOpen ? " bg-emerald-50" : "")}>
+                    <td className="py-3 px-4 font-mono font-semibold text-slate-700 cursor-pointer" onClick={() => setExpanded(isOpen ? null : o.foodOrderId)}>#{o.foodOrderId}</td>
+                    <td className="py-3 px-4 text-slate-600 cursor-pointer" onClick={() => setExpanded(isOpen ? null : o.foodOrderId)}>{o.roomNumber || "—"}</td>
+                    <td className="py-3 px-4 text-slate-500 max-w-[200px] truncate cursor-pointer" onClick={() => setExpanded(isOpen ? null : o.foodOrderId)}>{itemSummary || "—"}</td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700 cursor-pointer" onClick={() => setExpanded(isOpen ? null : o.foodOrderId)}>{fmt(o.totalAmount)}</td>
+                    <td className="py-3 px-4 cursor-pointer" onClick={() => setExpanded(isOpen ? null : o.foodOrderId)}>
                       <span className={"px-2 py-0.5 rounded-full text-xs font-semibold " + s.color}>{s.label}</span>
                     </td>
-                    <td className="py-3 px-4 text-slate-500 text-xs">{PAY_LABEL[o.paymentMode] || o.paymentMode}</td>
-                    <td className="py-3 px-4 text-slate-400 text-xs whitespace-nowrap">{fmtDate(o.orderTime)}</td>
-                    <td className="py-3 px-4 text-slate-400">
+                    <td className="py-3 px-4 text-slate-500 text-xs cursor-pointer" onClick={() => setExpanded(isOpen ? null : o.foodOrderId)}>{PAY_LABEL[o.paymentMode] || o.paymentMode}</td>
+                    <td className="py-3 px-4 text-slate-400 text-xs whitespace-nowrap cursor-pointer" onClick={() => setExpanded(isOpen ? null : o.foodOrderId)}>{fmtDate(o.orderTime)}</td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => onPrintDoc && onPrintDoc(o.foodOrderId, 'KitchenTicket', 'Print')}
+                          className="px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          title="In phiếu Bếp chuyển nhà bếp"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">soup_kitchen</span>
+                          <span>Bếp</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onPrintDoc && onPrintDoc(o.foodOrderId, 'ProvisionalBill', 'View')}
+                          className="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Xem / In hóa đơn tạm tính"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">receipt</span>
+                          <span>Tạm tính</span>
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-slate-400 cursor-pointer" onClick={() => setExpanded(isOpen ? null : o.foodOrderId)}>
                       <span className="material-symbols-outlined text-[18px]">{isOpen ? "expand_less" : "expand_more"}</span>
                     </td>
                   </tr>
@@ -250,6 +273,53 @@ export default function FnbOrderHistory() {
     status: "",
     paymentMode: ""
   });
+
+  // Modal in ấn phiếu bếp & hóa đơn tạm tính (FEAT-FNB-11)
+  const [printModal, setPrintModal] = useState({
+    isOpen: false,
+    orderId: null,
+    printType: 'KitchenTicket',
+    action: 'View',
+    documentData: null,
+    isLoading: false
+  });
+
+  const handleOpenPrintDoc = async (orderId, printType, action = 'View') => {
+    setPrintModal({
+      isOpen: true,
+      orderId,
+      printType,
+      action,
+      documentData: null,
+      isLoading: true
+    });
+
+    try {
+      const token = localStorage.getItem('hotel_token') || localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/${orderId}/print?printType=${printType}&action=${action}`, {
+        headers
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setError(data.message || 'Không thể tạo phiếu order.');
+        setPrintModal(prev => ({ ...prev, isLoading: false }));
+      } else {
+        setPrintModal(prev => ({
+          ...prev,
+          documentData: data.data,
+          isLoading: false
+        }));
+      }
+    } catch (e) {
+      console.error('Lỗi in phiếu:', e);
+      setError('Không thể gửi lệnh in. Vui lòng kiểm tra máy in.');
+      setPrintModal(prev => ({ ...prev, isLoading: false }));
+    }
+  };
 
   const fetchOrders = useCallback(async (tabToFetch = activeTab) => {
     setLoading(true); setError(""); setEmptyMsg("");
@@ -404,8 +474,16 @@ export default function FnbOrderHistory() {
 
         {/* Danh sách hiển thị bảng đơn hàng F&B */}
         {!loading && !error && orders.length > 0 && (
-          <StaffTable orders={orders} />
+          <StaffTable orders={orders} onPrintDoc={handleOpenPrintDoc} />
         )}
+
+        {/* MODAL IN PHIẾU BẾP & HÓA ĐƠN TẠM TÍNH (FEAT-FNB-11) */}
+        <OrderPrintModal
+          isOpen={printModal.isOpen}
+          onClose={() => setPrintModal(prev => ({ ...prev, isOpen: false }))}
+          documentData={printModal.documentData}
+          isLoading={printModal.isLoading}
+        />
       </div>
     </AdminLayout>
   );

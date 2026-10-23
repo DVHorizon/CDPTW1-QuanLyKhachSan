@@ -303,14 +303,32 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                     <span>Hồ Sơ Cá Nhân</span>
                   </Link>
 
-                  {(user.roleId === 1 || user.roleName === 'Admin') && (
+                  <Link
+                    to="/fnb/history"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-base text-[#b9a277]">receipt_long</span>
+                    <span>Lịch Sử Gọi Món</span>
+                  </Link>
+
+                  <Link
+                    to="/fnb/dat-ban"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-base text-[#b9a277]">restaurant</span>
+                    <span>Đặt Bàn Thưởng Vị</span>
+                  </Link>
+
+                  {([1, 2, 3, 4].includes(user.roleId) || ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'].includes(user.roleName)) && (
                     <Link
                       to="/admin"
                       onClick={() => setIsUserMenuOpen(false)}
                       className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
                     >
                       <span className="material-symbols-outlined text-base text-[#b9a277]">dashboard</span>
-                      <span>Quản Trị Khách Sạn</span>
+                      <span>Bàn Làm Việc / Quản Trị ({user.roleName || 'Nội Bộ'})</span>
                     </Link>
                   )}
 
@@ -451,13 +469,14 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                   <span>Hồ Sơ Cá Nhân</span>
                 </Link>
 
-                {(user.roleId === 1 || user.roleName === 'Admin') && (
+                {([1, 2, 3, 4].includes(user.roleId) || ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'].includes(user.roleName)) && (
                   <Link
                     to="/admin"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="w-full py-2 px-3 rounded-lg bg-[#203044] text-[#fedeb2] text-xs font-bold text-center"
+                    className="w-full py-2 px-3 rounded-lg bg-[#203044] text-[#fedeb2] text-xs font-bold text-center flex items-center justify-center gap-1.5"
                   >
-                    Vào Trang Quản Trị Khách Sạn
+                    <span className="material-symbols-outlined text-[16px]">dashboard</span>
+                    <span>Bàn Làm Việc / Quản Trị ({user.roleName || 'Nội Bộ'})</span>
                   </Link>
                 )}
               </div>

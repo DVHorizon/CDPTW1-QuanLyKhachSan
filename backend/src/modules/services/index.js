@@ -7,6 +7,10 @@
 const express = require('express');
 const router = express.Router();
 
+// Routes quản lý đơn đặt dịch vụ (FEAT-SERVICE-03)
+router.use('/orders',         require('./routes/serviceOrderRoutes'));
+router.use('/service-orders', require('./routes/serviceOrderRoutes'));
+
 // Routes quản lý danh mục dịch vụ & bảng giá
 router.use('/items', require('./routes/serviceRoutes'));
 router.use('/',      require('./routes/serviceRoutes'));

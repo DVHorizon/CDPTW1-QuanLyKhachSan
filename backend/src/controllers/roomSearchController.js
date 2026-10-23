@@ -1,8 +1,10 @@
 'use strict';
 
-const { sequelize, Branch, RoomType, Room, Booking } = require('../models');
+const { sequelize, Branch, RoomType, Room, Booking, RoomSearchIndex } = require('../models');
 const { Op } = require('sequelize');
 const searchEngine = require('../services/searchEngine');
+const availabilityService = require('../services/availabilityService');
+const { broadcastRoomEvent } = require('../sockets/socketHandler');
 
 /**
  * Trả về chuỗi ngày hiện tại YYYY-MM-DD theo giờ địa phương
@@ -669,7 +671,33 @@ exports.suggestRooms = async (req, res) => {
       };
     });
 
+    const cleanQ = (q || '').trim();
+    const unaccentQ = searchEngine.removeVietnameseTones ? searchEngine.removeVietnameseTones(cleanQ) : cleanQ.toLowerCase();
+
+    // 1. Tra cứu siêu tốc từ Cây Nhị Phân B-Tree trên bảng RoomSearchIndex
+    let btreeKeywords = [];
+    try {
+      const btreeRows = await RoomSearchIndex.findAll({
+        attributes: ['Keyword', 'Category'],
+        where: {
+          [Op.or]: [
+            { Keyword: { [Op.like]: `${cleanQ}%` } },
+            { KeywordUnaccent: { [Op.like]: `${unaccentQ}%` } }
+          ]
+        },
+        limit: 6,
+        raw: true
+      });
+      btreeKeywords = [...new Set(btreeRows.map(r => r.Keyword))];
+    } catch (_) {}
+
     const suggestions = searchEngine.suggest(roomList, q);
+
+    if (btreeKeywords.length > 0) {
+      suggestions.keywordSuggestions = [
+        ...new Set([...btreeKeywords, ...(suggestions.keywordSuggestions || [])])
+      ].slice(0, 8);
+    }
 
     return res.json({
       success: true,
@@ -697,6 +725,7 @@ exports.createBooking = async (req, res) => {
       roomTypeId,
       checkInDate,
       checkOutDate,
+      lockSessionId,
       guestName,
       guestPhone,
       guestEmail,
@@ -712,6 +741,25 @@ exports.createBooking = async (req, res) => {
         success: false,
         code: 'ERROR_0001_REQUIRED',
         message: 'Vui lòng điền đầy đủ hạng phòng và thời gian lưu trú.'
+      });
+    }
+
+    // 1. Kiểm tra tranh chấp phòng thời gian thực (Atomic Concurrency Overlap Check)
+    const availCheck = await availabilityService.checkAvailability({
+      roomTypeId,
+      checkInDate,
+      checkOutDate,
+      quantity: roomQuantity,
+      excludeSessionId: lockSessionId // Cho phép người đang giữ lock này được đặt
+    });
+
+    if (!availCheck.isAvailable || availCheck.availableRoomsCount < roomQuantity) {
+      await transaction.rollback();
+      return res.status(409).json({
+        success: false,
+        code: 'ERROR_0022_ROOM_SOLD_OUT',
+        message: 'Rất tiếc! Trong lúc bạn thao tác, phòng đã được một khách hàng khác hoàn tất thanh toán trước hoặc đã hết phòng trống.',
+        availableRoomsCount: availCheck.availableRoomsCount
       });
     }
 
@@ -751,6 +799,22 @@ exports.createBooking = async (req, res) => {
     }, { transaction });
 
     await transaction.commit();
+
+    // 2. Tự động giải phóng lock session tạm thời nếu có (vì đã thành booking chính thức)
+    if (lockSessionId) {
+      await availabilityService.releaseRoomLock(lockSessionId);
+    }
+
+    broadcastRoomEvent('BOOKING_CREATED', {
+      bookingId: booking.BookingId,
+      confirmationCode: booking.ConfirmationCode,
+      roomTypeId: booking.RoomTypeId,
+      checkInDate: booking.CheckInDate,
+      checkOutDate: booking.CheckOutDate,
+      roomQuantity: booking.RoomQuantity,
+      totalAmount: booking.TotalAmount,
+      guestName: guestName || req.user?.FullName || req.user?.username || 'Khách trực tuyến'
+    });
 
     return res.status(201).json({
       success: true,

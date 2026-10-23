@@ -1,8 +1,31 @@
 const { MenuItem, MenuCategory } = require('../../models');
-
 const { Op } = require('sequelize');
 
-// Get all Menu Items
+// Hàm loại bỏ dấu tiếng Việt để tìm kiếm không dấu
+const removeVietnameseTones = (str) => {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+};
+
+// Hàm lấy chữ cái đầu của từng từ (Acronym / Viết tắt)
+// Ví dụ: "Bò Wagyu Thượng Hạng" -> "bwth"
+const getAcronym = (str) => {
+  if (!str) return '';
+  const cleanStr = removeVietnameseTones(str);
+  return cleanStr
+    .split(/\s+/)
+    .map(word => word[0])
+    .filter(Boolean)
+    .join('');
+};
+
+// Get all Menu Items với Smart Search Engine
 exports.getMenuItems = async (req, res) => {
   try {
     const { category, keyword, stockStatus, servingTime, kitchenStation } = req.query;
@@ -24,40 +47,122 @@ exports.getMenuItems = async (req, res) => {
       whereClause.KitchenStation = kitchenStation;
     }
 
-    if (keyword) {
-      whereClause[Op.or] = [
-        { ItemName: { [Op.like]: `%${keyword}%` } },
-        { Description: { [Op.like]: `%${keyword}%` } },
-        { SKU: { [Op.like]: `%${keyword}%` } },
-        { Ingredients: { [Op.like]: `%${keyword}%` } },
-        { Allergens: { [Op.like]: `%${keyword}%` } }
-      ];
-    }
-
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    // Lấy dữ liệu theo các filter cứng (Category, Status, Time, Station)
     const items = await MenuItem.findAll({
       where: whereClause,
       include: MenuCategory,
-      order: [['MenuItemId', 'ASC']],
-      limit
+      order: [['MenuItemId', 'ASC']]
     });
 
-    if (items.length === 0) {
-      if (keyword) {
-        return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn phù hợp với từ khóa.' });
-      }
-      if (category) {
-        return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn trong danh mục đã chọn.' });
-      }
-      if (stockStatus) {
-        return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không có món ăn phù hợp với tình trạng đã chọn.' });
-      }
+    // Nếu không có keyword, trả về danh sách đầy đủ (giới hạn theo limit)
+    if (!keyword || !keyword.trim()) {
+      const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+      return res.status(200).json({
+        success: true,
+        total: items.length,
+        data: items.slice(0, limit)
+      });
     }
 
-    res.status(200).json({ success: true, data: items });
+    // XỬ LÝ SMART SEARCH:
+    // 1. Tìm chính xác từ khóa
+    // 2. Tìm Tiếng Việt không dấu
+    // 3. Tìm viết tắt chữ cái đầu (Acronym, ví dụ 'bwth' -> 'Bò Wagyu Thượng Hạng')
+    const rawKw = keyword.trim().toLowerCase();
+    const cleanKw = removeVietnameseTones(keyword);
+    const isShortAcronym = /^[a-z0-9]{2,8}$/i.test(cleanKw); // Nếu người dùng gõ chuỗi ngắn không dấu cách
+
+    const Fuse = require('fuse.js');
+
+    // 1. Kiểm tra so khớp chính xác / không dấu / viết tắt
+    let matchedList = items.filter(item => {
+      const itemName = item.ItemName || '';
+      const sku = item.SKU || '';
+      const desc = item.Description || '';
+      const ingredients = item.Ingredients || '';
+      const allergens = item.Allergens || '';
+
+      const cleanItemName = removeVietnameseTones(itemName);
+      const cleanSku = removeVietnameseTones(sku);
+      const cleanDesc = removeVietnameseTones(desc);
+      const cleanIngredients = removeVietnameseTones(ingredients);
+      const cleanAllergens = removeVietnameseTones(allergens);
+
+      // (A) So khớp chuỗi con không dấu liên tục:
+      // - Luôn so khớp trên Tên món (ItemName) và Mã (SKU)
+      // - Với Mô tả (Description) & Nguyên liệu: chỉ so khớp khi từ khóa >= 3 ký tự HOẶC chứa ranh giới từ
+      const matchNameOrSku = cleanItemName.includes(cleanKw) || cleanSku.includes(cleanKw);
+      if (matchNameOrSku) return true;
+
+      // (B) So khớp viết tắt chữ cái đầu (Acronym: 'sc' -> 'Salad Cá', 'bwth' -> 'Bò Wagyu Thượng Hạng')
+      // Bắt đầu bằng chữ cái đầu của các từ
+      if (isShortAcronym) {
+        const itemAcronym = getAcronym(itemName);
+        if (itemAcronym.startsWith(cleanKw) || itemAcronym.includes(cleanKw)) {
+          return true;
+        }
+
+        const skuCompact = cleanSku.replace(/[^a-z0-9]/g, '');
+        if (skuCompact.includes(cleanKw)) {
+          return true;
+        }
+      }
+
+      // (C) So khớp từ khóa rời rạc (Ví dụ: 'tôm nướng' -> 'Tôm Hùm Nướng Bơ Tỏi')
+      const kwWords = cleanKw.split(/\s+/).filter(w => w.length > 0);
+      if (kwWords.length > 1) {
+        const fullItemText = `${cleanItemName} ${cleanIngredients} ${cleanDesc} ${cleanSku}`;
+        const allWordsPresent = kwWords.every(word => fullItemText.includes(word));
+        if (allWordsPresent) return true;
+      }
+
+      // (D) So khớp trên Mô tả & Nguyên liệu: CHỈ KHI từ khóa dài >= 3 ký tự để tránh dính chữ ngẫu nhiên (như 'sc' trong mascarpone)
+      if (cleanKw.length >= 3) {
+        const matchDetails = cleanIngredients.includes(cleanKw) || cleanDesc.includes(cleanKw) || cleanAllergens.includes(cleanKw);
+        if (matchDetails) return true;
+      }
+
+      return false;
+    });
+
+    // 2. NẾU VẪN CHƯA TÌM THẤY (Do gõ sai chính tả: ví dụ 'wagiu', 'vagyu', 'tom humm', 'sup bao ngu')
+    // -> Kích hoạt Fuzzy Search với Fuse.js (Ngưỡng sai số threshold = 0.4)
+    if (matchedList.length === 0 && cleanKw.length >= 3) {
+      const fuseData = items.map(item => ({
+        original: item,
+        cleanName: removeVietnameseTones(item.ItemName || ''),
+        cleanIngredients: removeVietnameseTones(item.Ingredients || ''),
+        cleanDesc: removeVietnameseTones(item.Description || ''),
+        cleanSku: removeVietnameseTones(item.SKU || '')
+      }));
+
+      const fuse = new Fuse(fuseData, {
+        keys: [
+          { name: 'cleanName', weight: 0.6 },
+          { name: 'cleanIngredients', weight: 0.2 },
+          { name: 'cleanDesc', weight: 0.1 },
+          { name: 'cleanSku', weight: 0.1 }
+        ],
+        threshold: 0.4, // Cho phép sai khác khoảng 40% ký tự do gõ nhầm/thiếu
+        distance: 100,
+        minMatchCharLength: 3
+      });
+
+      const fuzzyResults = fuse.search(cleanKw);
+      matchedList = fuzzyResults.map(r => r.item.original);
+    }
+
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    // Luôn trả về 200 kể cả khi không tìm thấy món nào
+    return res.status(200).json({
+      success: true,
+      total: matchedList.length,
+      data: matchedList.slice(0, limit)
+    });
+
   } catch (error) {
     console.error('Error fetching menu items:', error);
-    res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể tải danh sách món ăn.' });
+    return res.status(500).json({ success: false, message: 'Không thể tải danh sách món ăn.' });
   }
 };
 
@@ -231,3 +336,17 @@ exports.updateMenuItemStatus = async (req, res) => {
     return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể cập nhật trạng thái món.' });
   }
 };
+
+exports.getMenuCategories = async (req, res) => {
+  try {
+    const categories = await MenuCategory.findAll({
+      where: { IsDeleted: false },
+      order: [['CategoryId', 'ASC']]
+    });
+    return res.status(200).json({ success: true, data: categories });
+  } catch (error) {
+    console.error('Error fetching menu categories:', error);
+    return res.status(500).json({ code: 'ERROR_0500_INTERNAL', message: 'Không thể tải danh mục thực đơn.' });
+  }
+};
+
