@@ -3,6 +3,8 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const { requirePermissions } = require('../middlewares/authMiddleware');
+const roomAllocCtrl = require('../controllers/admin/roomAllocationController');
 
 // ─── Hằng số trạng thái nghiệp vụ đặt phòng ─────────────────────────────────
 // Khớp đúng dữ liệu đang lưu trong bảng Bookings (Pending/Confirmed/CheckedIn/Completed/Cancelled/NoShow)
@@ -367,12 +369,23 @@ router.get('/', async (req, res) => {
   }
 });
 
+// ─── FEAT-ROOMALLOC-01: Booking Confirmation & Room Allocation Endpoints ────
+router.put('/:id/confirm', requirePermissions('BOOKING_CONFIRM'), roomAllocCtrl.confirmBooking);
+router.post('/:id/confirm', requirePermissions('BOOKING_CONFIRM'), roomAllocCtrl.confirmBooking);
+router.post('/:id/room-allocation', requirePermissions('ROOM_ALLOCATION'), roomAllocCtrl.allocateRooms);
+router.post(
+  '/:id/confirm-and-allocate',
+  requirePermissions(['BOOKING_CONFIRM', 'ROOM_ALLOCATION']),
+  roomAllocCtrl.confirmAndAllocate
+);
+router.delete('/:id/room-allocation', requirePermissions('ROOM_ALLOCATION'), roomAllocCtrl.deallocateRooms);
+
 // ─── GET /api/bookings/:id (Xem chi tiết một đặt phòng) ──────────────────────
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     if (!/^\d+$/.test(String(id))) {
-      return res.status(400).json({ success: false, message: 'Mã đặt phòng không hợp lệ.' });
+      return res.status(400).json({ success: false, code: 'ERROR_0001_REQUIRED', message: 'Mã đặt phòng không hợp lệ.' });
     }
 
     const query = `
@@ -382,6 +395,8 @@ router.get('/:id', async (req, res) => {
         CAST(b.CheckOutDate AS CHAR) AS CheckOutDate,
         CAST(b.CreatedAt AS CHAR)    AS CreatedAt,
         CAST(b.UpdatedAt AS CHAR)    AS UpdatedAt,
+        CAST(b.ConfirmedAt AS CHAR)  AS ConfirmedAt,
+        CAST(b.AllocatedAt AS CHAR)  AS AllocatedAt,
         CAST(b.ConfirmationSentAt AS CHAR) AS ConfirmationSentAt,
         COALESCE(bg.FullName, u.FullName, 'Khách Vãng Lai') AS GuestName,
         COALESCE(bg.Email, u.Email, '---') AS GuestEmail,
@@ -401,8 +416,9 @@ router.get('/:id', async (req, res) => {
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
+      LEFT JOIN BookingRoomAllocations bra ON b.BookingId = bra.BookingId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
-      LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Rooms r ON COALESCE(bra.RoomId, s.RoomId) = r.RoomId
       WHERE b.BookingId = ?
       ORDER BY s.StayId DESC
       LIMIT 1
@@ -412,12 +428,40 @@ router.get('/:id', async (req, res) => {
     if (!rows.length) {
       return res.status(404).json({
         success: false,
+        code: 'ERROR_0022_BOOKING_NOT_FOUND',
         isRecordDeleted: true,
-        message: 'Lỗi đồng bộ: Đặt phòng này không còn tồn tại trong cơ sở dữ liệu (đã bị xóa bởi người khác)!',
+        message: 'Không tìm thấy booking',
       });
     }
 
-    res.json({ success: true, data: rows[0] });
+    // Lấy danh sách các phòng được gán
+    const [allocRows] = await pool.query(
+      `SELECT bra.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
+              bra.AllocationNote, CAST(bra.AllocatedAt AS CHAR) AS AllocatedAt
+       FROM BookingRoomAllocations bra
+       JOIN Rooms r ON bra.RoomId = r.RoomId
+       LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
+       WHERE bra.BookingId = ?`,
+      [id]
+    );
+
+    const bookingData = {
+      ...rows[0],
+      quantity: rows[0].RoomQuantity || 1,
+      bookingCode: rows[0].ConfirmationCode,
+      bookingStatus: rows[0].Status,
+      checkInDate: rows[0].CheckInDate,
+      checkOutDate: rows[0].CheckOutDate,
+      roomTypeId: rows[0].RoomTypeId,
+      roomTypeName: rows[0].RoomTypeName,
+      allocatedRooms: allocRows,
+      roomIds: allocRows.map((a) => a.RoomId),
+      confirmedBy: rows[0].ConfirmedBy,
+      confirmedAt: rows[0].ConfirmedAt,
+      allocatedAt: rows[0].AllocatedAt,
+    };
+
+    res.json({ success: true, data: bookingData });
   } catch (err) {
     console.error('GET /api/bookings/:id error:', err);
     res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });

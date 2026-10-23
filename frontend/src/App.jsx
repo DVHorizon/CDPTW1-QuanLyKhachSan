@@ -45,6 +45,8 @@ function App() {
           <Route path="/admin/bookings" element={<BookingManagement />} />
           <Route path="/admin/dat-phong" element={<BookingManagement />} />
           <Route path="/admin/danh-sach-dat-phong" element={<BookingManagement />} />
+          <Route path="/admin/checkin" element={<BookingManagement />} />
+          <Route path="/admin/check-in" element={<BookingManagement />} />
           <Route path="/admin/room-assignment" element={<RoomAssignment />} />
           <Route path="/admin/room-assignment/:bookingId" element={<RoomAssignment />} />
           <Route path="/admin/room-allocation" element={<RoomAssignment />} />
