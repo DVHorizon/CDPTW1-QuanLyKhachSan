@@ -18,6 +18,8 @@
     "test:voucher": "node tests/test_feat_guest_07_voucher_redemption.js",
     "test:booking": "node tests/test_feat_guest_05_booking_engine.js",
     "test:deposit": "node tests/test_feat_guest_08_deposit_payment.js",
+    "test:service-step0": "node tests/test_feat_service_01_step0.js",
+    "test:service-status": "node tests/test_feat_service_04_status.js",
     "test:all": "node tests/test_feat_guest_06_pricing_calculation.js && node tests/test_feat_guest_07_voucher_redemption.js && node tests/test_feat_guest_05_booking_engine.js && node tests/test_feat_guest_08_deposit_payment.js"
   },
   "dependencies": {
