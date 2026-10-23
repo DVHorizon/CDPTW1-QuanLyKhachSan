@@ -78,6 +78,7 @@ function App() {
             <Route path="/admin/room-assignment/:bookingId" element={<ProtectedRoute><RoomAssignment /></ProtectedRoute>} />
             <Route path="/admin/room-allocation" element={<ProtectedRoute><RoomAssignment /></ProtectedRoute>} />
             <Route path="/admin/gan-phong" element={<ProtectedRoute><RoomAssignment /></ProtectedRoute>} />
+            <Route path="/admin/checkin" element={<Navigate to="/admin/check-in" replace />} />
             <Route path="/admin/check-in" element={<ProtectedRoute><CheckInDesk /></ProtectedRoute>} />
             <Route path="/admin/check-in/:bookingId" element={<ProtectedRoute><CheckInDesk /></ProtectedRoute>} />
             <Route path="/admin/guest-check-in" element={<ProtectedRoute><CheckInDesk /></ProtectedRoute>} />

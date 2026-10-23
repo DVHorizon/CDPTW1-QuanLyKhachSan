@@ -9,9 +9,10 @@ const API_ENDPOINTS = [
   '/api/v1/allocation',
 ];
 
-// Hàm gọi API an toàn, chống lỗi Unexpected token '<', "<!DOCTYPE "...
+// Hàm gọi API an toàn, kèm JWT Bearer Token theo chuẩn Spec
 async function safeFetchJson(path, options = {}) {
   let lastErr = null;
+  const token = localStorage.getItem('hotel_token');
   for (const base of API_ENDPOINTS) {
     try {
       const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
@@ -19,6 +20,7 @@ async function safeFetchJson(path, options = {}) {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
           ...(options.headers || {}),
         },
         ...options,
@@ -580,10 +582,17 @@ export default function RoomAssignment() {
     req_ocean: true,
   });
 
-  // Danh sách phòng gợi ý
+  // Danh sách phòng gợi ý & Gán phòng theo Spec FEAT-ROOMALLOC-01
   const [recommendedRooms, setRecommendedRooms] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [selectedRoomIds, setSelectedRoomIds] = useState([]);
+  const [allocationNote, setAllocationNote] = useState('');
+  const [fieldError, setFieldError] = useState('');
+  const [isConfirmingBooking, setIsConfirmingBooking] = useState(false);
+  const [isSavingAllocation, setIsSavingAllocation] = useState(false);
+  const [isComboAllocating, setIsComboAllocating] = useState(false);
+  const [isDeallocating, setIsDeallocating] = useState(false);
 
   // Sơ đồ mặt bằng CAD theo tầng
   const [cadRooms, setCadRooms] = useState([]);
@@ -701,9 +710,17 @@ export default function RoomAssignment() {
         if (data.data.AssignedFloor) {
           setCadFloor(Number(data.data.AssignedFloor) || 8);
         }
-        if (data.data.AssignedRoomId) {
-          setSelectedRoomId(data.data.AssignedRoomId);
+        const initialRoomIds = Array.isArray(data.data.roomIds) && data.data.roomIds.length
+          ? data.data.roomIds
+          : (data.data.AssignedRoomId ? [data.data.AssignedRoomId] : []);
+        setSelectedRoomIds(initialRoomIds);
+        if (initialRoomIds.length > 0) {
+          setSelectedRoomId(initialRoomIds[0]);
         }
+        if (data.data.allocationNote || data.data.Note) {
+          setAllocationNote(data.data.allocationNote || data.data.Note || '');
+        }
+        setFieldError('');
       } else {
         addToast('error', data.message || 'Không tìm thấy hồ sơ đặt phòng', 'LỖI DỮ LIỆU');
       }
@@ -826,32 +843,73 @@ export default function RoomAssignment() {
     }
   }, [currentSelectedRoom]);
 
+  // Số lượng phòng cần gán theo hồ sơ đặt phòng (Spec FEAT-ROOMALLOC-01)
+  const targetQuantity = Number(bookingDossier?.quantity || bookingDossier?.RoomQuantity || 1);
+
+  // ─── Tiện ích chọn / bỏ chọn phòng tương tác (Hỗ trợ gán nhiều phòng) ──────
+  const toggleRoomSelection = useCallback((rId) => {
+    setFieldError('');
+    const idNum = Number(rId);
+    setSelectedRoomIds((prev) => {
+      if (prev.includes(idNum)) {
+        const next = prev.filter((id) => id !== idNum);
+        if (selectedRoomId === idNum) {
+          setSelectedRoomId(next[0] || null);
+        }
+        return next;
+      }
+
+      if (targetQuantity === 1) {
+        setSelectedRoomId(idNum);
+        return [idNum];
+      }
+
+      if (prev.length < targetQuantity) {
+        setSelectedRoomId(idNum);
+        return [...prev, idNum];
+      }
+
+      addToast(
+        'warn',
+        `Đã chọn đủ ${targetQuantity} phòng theo yêu cầu đặt phòng. Bỏ bớt phòng cũ nếu muốn chọn phòng khác.`,
+        'ĐÃ CHỌN ĐỦ SỐ LƯỢNG'
+      );
+      return prev;
+    });
+  }, [targetQuantity, selectedRoomId, addToast]);
+
   // ─── HÀNH ĐỘNG 1: Tự Động Phân Bổ (Auto-Allocate Best Match) ───────────────
   const handleAutoAllocate = () => {
     if (!recommendedRooms.length) {
       addToast('error', 'Không có phòng phù hợp để gán tự động.', 'BỘ ĐIỀU PHỐI PHÒNG');
       return;
     }
-    const bestRoom = recommendedRooms[0];
-    setSelectedRoomId(bestRoom.RoomId);
-    setCadFloor(Number(bestRoom.Floor) || 8);
+    const chosenRooms = recommendedRooms.slice(0, targetQuantity);
+    const chosenIds = chosenRooms.map((r) => r.RoomId);
+    setSelectedRoomIds(chosenIds);
+    if (chosenRooms[0]) {
+      setSelectedRoomId(chosenRooms[0].RoomId);
+      setCadFloor(Number(chosenRooms[0].Floor) || 8);
+    }
+    setFieldError('');
     addToast(
       'success',
-      `Đã tự động chọn Phòng ${bestRoom.RoomNumber} có độ phù hợp cao nhất (${bestRoom.MatchPercent}%).`,
+      `Đã tự động chọn ${chosenIds.length} phòng có độ phù hợp cao nhất.`,
       'TỰ ĐỘNG ĐIỀU PHỐI'
     );
   };
 
   // ─── HÀNH ĐỘNG 2: Giữ Phòng Tạm Thời (Hold Reservation 15 Phút) ───────────
   const handleHoldRoom = async () => {
-    if (!selectedRoomId) {
+    const targetRoom = selectedRoomId || selectedRoomIds[0];
+    if (!targetRoom) {
       addToast('warn', 'Vui lòng chọn một phòng trong danh sách trước khi kích hoạt giữ phòng.', 'CẢNH BÁO');
       return;
     }
     try {
       const { status, data } = await safeFetchJson('/hold', {
         method: 'POST',
-        body: JSON.stringify({ roomId: selectedRoomId, bookingId: selectedBookingId }),
+        body: JSON.stringify({ roomId: targetRoom, bookingId: selectedBookingId }),
       });
 
       if (status === 404 || data.isRecordDeleted) {
@@ -885,10 +943,11 @@ export default function RoomAssignment() {
 
   // ─── HÀNH ĐỘNG 3: Hủy Giữ Phòng (Release Hold) ─────────────────────────────
   const handleReleaseHold = async () => {
-    if (selectedRoomId) {
+    const targetRoom = selectedRoomId || selectedRoomIds[0];
+    if (targetRoom) {
       await safeFetchJson('/release-hold', {
         method: 'POST',
-        body: JSON.stringify({ roomId: selectedRoomId, bookingId: selectedBookingId }),
+        body: JSON.stringify({ roomId: targetRoom, bookingId: selectedBookingId }),
       });
     }
     setHeldRoom(null);
@@ -897,67 +956,255 @@ export default function RoomAssignment() {
     addToast('info', 'Đã hủy giữ phòng tạm thời.', 'GIẢI PHÓNG PHÒNG');
   };
 
-  // ─── HÀNH ĐỘNG 4: Xác Nhận Gán Phòng Chính Thức & Đồng Bộ CSDL ────────────
-  const handleConfirmAllocation = async (proceedToCheckIn = false) => {
-    if (!selectedRoomId) {
-      addToast('warn', 'Vui lòng chọn một số phòng cụ thể để gán cho khách.', 'THIẾU THÔNG TIN');
+  // ─── HÀNH ĐỘNG 4: Luồng 4.1 - Xác Nhận Booking Riêng Biệt ─────────────────
+  const handleConfirmBookingOnly = async () => {
+    if (!selectedBookingId) return;
+    try {
+      setIsConfirmingBooking(true);
+      const { status, data } = await safeFetchJson(`/booking/${selectedBookingId}/confirm`, {
+        method: 'PUT',
+      });
+
+      if (status === 401 || data.code === 'ERROR_0009_UNAUTHENTICATED') {
+        addToast('error', data.message || 'Bạn cần đăng nhập để thực hiện chức năng này', 'CHƯA ĐĂNG NHẬP');
+        return;
+      }
+      if (status === 403 || data.code === 'ERROR_0010_FORBIDDEN') {
+        addToast('error', data.message || 'Bạn không có quyền thực hiện chức năng này', 'TỪ CHỐI TRUY CẬP');
+        return;
+      }
+      if (!data.success) {
+        addToast('error', data.message || 'Không thể xác nhận booking', data.code || 'LỖI');
+        return;
+      }
+
+      addToast('success', data.message || 'Xác nhận booking thành công', 'SUCCESS_0005_CONFIRMED');
+      await fetchBookingDossier(selectedBookingId);
+      await fetchBookings();
+    } catch (err) {
+      addToast('error', 'Lỗi kết nối máy chủ: ' + err.message, 'LỖI MẠNG');
+    } finally {
+      setIsConfirmingBooking(false);
+    }
+  };
+
+  // ─── HÀNH ĐỘNG 5: Luồng 4.2 - Gán Phòng (POST /api/v1/bookings/:id/room-allocation) ──
+  const handleSaveAllocation = async () => {
+    if (!selectedBookingId) return;
+
+    if (selectedRoomIds.length !== targetQuantity) {
+      const msg = `Vui lòng chọn đúng ${targetQuantity} phòng`;
+      setFieldError(msg);
+      addToast('error', msg, 'ERROR_0027_ROOM_ALLOCATION_COUNT');
       return;
     }
 
     try {
-      setConfirming(true);
-      const { status, data } = await safeFetchJson('/confirm', {
+      setIsSavingAllocation(true);
+      setFieldError('');
+      const { status, data } = await safeFetchJson(`/booking/${selectedBookingId}/room-allocation`, {
         method: 'POST',
         body: JSON.stringify({
-          bookingId: selectedBookingId,
-          roomId: selectedRoomId,
-          holdToken,
-          sendSmsEmail,
-          notifyHousekeeping,
-          preProgramKeycard,
-          proceedToCheckIn,
+          quantity: targetQuantity,
+          roomIds: selectedRoomIds,
+          allocationNote,
         }),
       });
 
-      if (status === 404 || data.isRecordDeleted) {
-        setConcurrencyConflict({
-          isOpen: true,
-          message: data.message || 'Dữ liệu đặt phòng đã bị xóa bởi người dùng khác trong cơ sở dữ liệu.',
+      if (status === 401 || data.code === 'ERROR_0009_UNAUTHENTICATED') {
+        addToast('error', data.message || 'Bạn cần đăng nhập để thực hiện chức năng này', 'CHƯA ĐĂNG NHẬP');
+        return;
+      }
+      if (status === 403 || data.code === 'ERROR_0010_FORBIDDEN') {
+        addToast('error', data.message || 'Bạn không có quyền thực hiện chức năng này', 'TỪ CHỐI TRUY CẬP');
+        return;
+      }
+      if (!data.success) {
+        if (data.code === 'ERROR_0027_ROOM_ALLOCATION_COUNT') {
+          setFieldError(data.message);
+        }
+        addToast('error', data.message || 'Không thể gán phòng', data.code || 'LỖI GÁN PHÒNG');
+        await fetchRecommendedRooms();
+        return;
+      }
+
+      addToast('success', data.message || 'Gán phòng thành công', 'SUCCESS_0006_ROOM_ALLOCATED');
+      setHeldRoom(null);
+      setHoldExpiresAt(null);
+      await fetchBookingDossier(selectedBookingId);
+      await fetchBookings();
+      await fetchRecommendedRooms();
+      await fetchCadFloorSchematic(cadFloor);
+    } catch (err) {
+      addToast('error', 'Lỗi kết nối máy chủ: ' + err.message, 'LỖI MẠNG');
+    } finally {
+      setIsSavingAllocation(false);
+    }
+  };
+
+  // ─── HÀNH ĐỘNG 6: Luồng 4.3 - Xác Nhận & Gán Phòng Cùng Lúc ───────────────
+  const handleConfirmAndAllocateCombo = async () => {
+    if (!selectedBookingId) return;
+
+    if (selectedRoomIds.length !== targetQuantity) {
+      const msg = `Vui lòng chọn đúng ${targetQuantity} phòng`;
+      setFieldError(msg);
+      addToast('error', msg, 'ERROR_0027_ROOM_ALLOCATION_COUNT');
+      return;
+    }
+
+    try {
+      setIsComboAllocating(true);
+      setFieldError('');
+      const { status, data } = await safeFetchJson(`/booking/${selectedBookingId}/confirm-and-allocate`, {
+        method: 'POST',
+        body: JSON.stringify({
+          quantity: targetQuantity,
+          roomIds: selectedRoomIds,
+          allocationNote,
+        }),
+      });
+
+      if (status === 401 || data.code === 'ERROR_0009_UNAUTHENTICATED') {
+        addToast('error', data.message || 'Bạn cần đăng nhập để thực hiện chức năng này', 'CHƯA ĐĂNG NHẬP');
+        return;
+      }
+      if (status === 403 || data.code === 'ERROR_0010_FORBIDDEN') {
+        addToast('error', data.message || 'Bạn không có quyền thực hiện chức năng này', 'TỪ CHỐI TRUY CẬP');
+        return;
+      }
+      if (!data.success) {
+        if (data.code === 'ERROR_0027_ROOM_ALLOCATION_COUNT') {
+          setFieldError(data.message);
+        }
+        addToast('error', data.message || 'Không thể xác nhận và gán phòng', data.code || 'LỖI');
+        await fetchRecommendedRooms();
+        return;
+      }
+
+      addToast('success', data.message || 'Xác nhận và gán phòng thành công', 'SUCCESS_0006_ROOM_ALLOCATED');
+      setHeldRoom(null);
+      setHoldExpiresAt(null);
+      await fetchBookingDossier(selectedBookingId);
+      await fetchBookings();
+      await fetchRecommendedRooms();
+      await fetchCadFloorSchematic(cadFloor);
+    } catch (err) {
+      addToast('error', 'Lỗi kết nối máy chủ: ' + err.message, 'LỖI MẠNG');
+    } finally {
+      setIsComboAllocating(false);
+    }
+  };
+
+  // ─── HÀNH ĐỘNG 7: Luồng 3.5 - Hủy / Bỏ Gán Phòng Trước Check-In ───────────
+  const handleDeallocateRooms = async () => {
+    if (!selectedBookingId) return;
+    if (!window.confirm('Bạn có chắc chắn muốn hủy phân bổ phòng cho đặt phòng này không?')) return;
+
+    try {
+      setIsDeallocating(true);
+      const { status, data } = await safeFetchJson(`/booking/${selectedBookingId}/room-allocation`, {
+        method: 'DELETE',
+      });
+
+      if (!data.success) {
+        addToast('error', data.message || 'Không thể hủy gán phòng', data.code || 'LỖI');
+        return;
+      }
+
+      addToast('info', data.message || 'Đã hủy gán phòng cho booking thành công.', 'HỦY GÁN PHÒNG');
+      setSelectedRoomIds([]);
+      await fetchBookingDossier(selectedBookingId);
+      await fetchBookings();
+      await fetchRecommendedRooms();
+      await fetchCadFloorSchematic(cadFloor);
+    } catch (err) {
+      addToast('error', 'Lỗi kết nối máy chủ: ' + err.message, 'LỖI MẠNG');
+    } finally {
+      setIsDeallocating(false);
+    }
+  };
+
+  // ─── HÀNH ĐỘNG 8: Tương thích Check-in tại quầy trực tiếp ────────────────
+  const handleConfirmAllocation = async (proceedToCheckIn = false) => {
+    if (!selectedBookingId) return;
+
+    if (proceedToCheckIn) {
+      if (selectedRoomIds.length !== targetQuantity) {
+        const msg = `Vui lòng chọn đúng ${targetQuantity} phòng trước khi nhận phòng.`;
+        setFieldError(msg);
+        addToast('error', msg, 'ERROR_0027_ROOM_ALLOCATION_COUNT');
+        return;
+      }
+
+      try {
+        setConfirming(true);
+        // 1. Thực hiện gán phòng (hoặc xác nhận & gán phòng nếu Pending)
+        if (bookingDossier?.Status === 'Pending') {
+          const { data } = await safeFetchJson(`/booking/${selectedBookingId}/confirm-and-allocate`, {
+            method: 'POST',
+            body: JSON.stringify({
+              quantity: targetQuantity,
+              roomIds: selectedRoomIds,
+              allocationNote,
+            }),
+          });
+          if (!data.success) {
+            addToast('error', data.message || 'Không thể xác nhận và gán phòng', data.code || 'LỖI');
+            return;
+          }
+        } else {
+          const { data } = await safeFetchJson(`/booking/${selectedBookingId}/room-allocation`, {
+            method: 'POST',
+            body: JSON.stringify({
+              quantity: targetQuantity,
+              roomIds: selectedRoomIds,
+              allocationNote,
+            }),
+          });
+          if (!data.success) {
+            addToast('error', data.message || 'Không thể gán phòng', data.code || 'LỖI');
+            return;
+          }
+        }
+
+        // 2. Chuyển trạng thái sang CheckedIn qua API bookings
+        const targetRoomId = selectedRoomIds[0] || selectedRoomId;
+        const token = localStorage.getItem('token') || localStorage.getItem('hotel_token');
+        const checkInRes = await fetch(`http://localhost:5000/api/bookings/${selectedBookingId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            status: 'CheckedIn',
+            roomId: targetRoomId,
+          }),
         });
-        return;
-      }
+        const checkInData = await checkInRes.json();
 
-      if (status === 410 || data.isExpired) {
-        setIsHoldExpired(true);
-        addToast('warn', data.message || 'Thời gian giữ phòng đã hết, vui lòng gán lại.', 'HẾT HẠN GIỮ PHÒNG');
-        fetchRecommendedRooms();
-        return;
-      }
+        if (checkInData.success) {
+          addToast('success', 'Đã gán phòng và hoàn tất thủ tục nhận phòng (Check-in) thành công!', 'NHẬN PHÒNG THÀNH CÔNG');
+        } else {
+          addToast('warn', 'Gán phòng thành công. Trạng thái Check-in: ' + (checkInData.message || 'Chờ hoàn tất'), 'THÔNG BÁO');
+        }
 
-      if (status === 409 || data.isConflict) {
-        addToast('error', data.message || 'Phòng vừa được gán cho booking khác, vui lòng chọn phòng khác.', 'XUNG ĐỘT GÁN PHÒNG');
-        fetchRecommendedRooms();
-        return;
-      }
-
-      if (data.success) {
-        addToast('success', data.message, 'XÁC NHẬN THÀNH CÔNG');
         setHeldRoom(null);
         setHoldExpiresAt(null);
-        // Đồng bộ tức thời lại toàn bộ dữ liệu từ CSDL
         await fetchBookingDossier(selectedBookingId);
         await fetchBookings();
         await fetchRecommendedRooms();
         await fetchCadFloorSchematic(cadFloor);
-      } else {
-        addToast('error', data.message || 'Không thể xác nhận gán phòng', 'LỖI XÁC NHẬN');
+      } catch (err) {
+        addToast('error', 'Lỗi kết nối khi nhận phòng: ' + err.message, 'LỖI');
+      } finally {
+        setConfirming(false);
       }
-    } catch (err) {
-      console.error('Confirm allocation error:', err);
-      addToast('error', 'Lỗi kết nối máy chủ: ' + err.message, 'LỖI MẠNG');
-    } finally {
-      setConfirming(false);
+      return;
     }
+
+    await handleSaveAllocation();
   };
 
   // ─── Bộ lọc danh sách booking nhanh ───────────────────────────────────────
@@ -1348,6 +1595,149 @@ export default function RoomAssignment() {
           </div>
         </div>
 
+        {/* ─── SPEC FEAT-ROOMALLOC-01: FORM GÁN PHÒNG CHO BOOKING (MỤC 6.2) ─── */}
+        <div className="bg-surface-container border-2 border-admin-primary/40 rounded-2xl p-5 shadow-lg space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-outline-variant/20 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-admin-primary/20 border border-admin-primary/40 flex items-center justify-center text-admin-primary font-bold">
+                <span className="material-symbols-outlined text-xl">assignment_turned_in</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-on-surface uppercase tracking-wide">
+                  Gán phòng cho booking
+                </h3>
+                <p className="text-xs text-on-surface-variant font-mono">
+                  MÃ ĐẶT PHÒNG: <strong className="text-admin-primary">{bookingDossier?.ConfirmationCode || '---'}</strong> • TRẠNG THÁI: <span className="font-bold">{bookingDossier?.Status || 'Pending'}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Bộ đếm Đã chọn X/{quantity} phòng theo Mục 6.3 */}
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold border transition-all ${
+                selectedRoomIds.length === targetQuantity
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 ring-2 ring-emerald-500/20'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+              }`}>
+                Đã chọn {selectedRoomIds.length}/{targetQuantity} phòng
+              </span>
+            </div>
+          </div>
+
+          {/* Các trường thông tin Read-only theo Mục 6.2 */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-surface-container-lowest p-3.5 rounded-xl border border-outline-variant/20 text-xs">
+            <div>
+              <span className="text-[10px] uppercase text-on-surface-variant block font-medium">Mã Booking</span>
+              <span className="font-mono font-bold text-on-surface">{bookingDossier?.ConfirmationCode || '—'}</span>
+            </div>
+            <div>
+              <span className="text-[10px] uppercase text-on-surface-variant block font-medium">Loại phòng</span>
+              <span className="font-bold text-admin-primary">{bookingDossier?.RoomTypeName || '—'}</span>
+            </div>
+            <div>
+              <span className="text-[10px] uppercase text-on-surface-variant block font-medium">Nhận phòng – Trả phòng</span>
+              <span className="font-bold text-on-surface">
+                {fmtDateMonth(bookingDossier?.CheckInDate)} – {fmtDateMonth(bookingDossier?.CheckOutDate)}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] uppercase text-on-surface-variant block font-medium">Số phòng cần gán</span>
+              <span className="font-bold text-emerald-400 font-mono">{targetQuantity} phòng</span>
+            </div>
+          </div>
+
+          {/* Lỗi field hiển thị màu đỏ ngay dưới field theo Mục 6.3 */}
+          {fieldError && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs font-semibold">
+              <span className="material-symbols-outlined text-lg text-rose-400">error</span>
+              <span>{fieldError}</span>
+            </div>
+          )}
+
+          {/* Trường Ghi chú gán phòng (allocationNote - tối đa 500 ký tự) */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-on-surface">
+              Ghi chú gán phòng <span className="text-on-surface-variant text-[11px] font-normal">(Tối đa 500 ký tự)</span>
+            </label>
+            <textarea
+              rows={2}
+              maxLength={500}
+              value={allocationNote}
+              onChange={(e) => setAllocationNote(e.target.value)}
+              placeholder="Nhập ghi chú gán phòng nếu cần (ví dụ: ưu tiên tầng cao yên tĩnh, gần lối thoát hiểm...)"
+              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-3 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-1 focus:ring-admin-primary"
+            />
+            <div className="flex justify-between text-[10px] text-on-surface-variant font-mono">
+              <span>Không bắt buộc</span>
+              <span>{allocationNote.length}/500</span>
+            </div>
+          </div>
+
+          {/* Nút thao tác của Form theo Mục 6.2 (btnCancel bên trái, btnSave bên phải) & các luồng Spec */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-outline-variant/20">
+            <button
+              onClick={() => {
+                setSelectedRoomIds([]);
+                setFieldError('');
+              }}
+              className="px-4 py-2 rounded-xl border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high text-xs font-semibold transition-all cursor-pointer"
+            >
+              Hủy Chọn Phòng ({selectedRoomIds.length})
+            </button>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Nút Xác nhận Booking (Mục 6.1 - Luồng 4.1) */}
+              {bookingDossier?.Status === 'Pending' && (
+                <button
+                  disabled={isConfirmingBooking}
+                  onClick={handleConfirmBookingOnly}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                  title="Chuyển trạng thái booking sang Confirmed"
+                >
+                  <span className="material-symbols-outlined text-base">check_circle</span>
+                  {isConfirmingBooking ? 'Đang xác nhận...' : 'Xác nhận Booking'}
+                </button>
+              )}
+
+              {/* Nút Xác nhận & Gán phòng kết hợp (Mục 6.1 - Luồng 4.3) */}
+              {bookingDossier?.Status === 'Pending' && (
+                <button
+                  disabled={isComboAllocating || selectedRoomIds.length !== targetQuantity}
+                  onClick={handleConfirmAndAllocateCombo}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer shadow-md disabled:opacity-50"
+                  title="Xác nhận và gán phòng trong cùng 1 transaction"
+                >
+                  <span className="material-symbols-outlined text-base">domain_verification</span>
+                  {isComboAllocating ? 'Đang xử lý...' : 'Xác nhận & Gán phòng'}
+                </button>
+              )}
+
+              {/* Nút Bỏ / Hủy gán phòng trước check-in (Mục 3.5) */}
+              {bookingDossier?.assignedRooms?.length > 0 && bookingDossier?.Status !== 'CheckedIn' && (
+                <button
+                  disabled={isDeallocating}
+                  onClick={handleDeallocateRooms}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                  title="Bỏ phân bổ phòng hiện tại cho booking này"
+                >
+                  <span className="material-symbols-outlined text-base">link_off</span>
+                  {isDeallocating ? 'Đang hủy...' : 'Hủy Gán Phòng'}
+                </button>
+              )}
+
+              {/* Nút btnSave: Gán phòng (Mục 6.2 & 6.3 - chỉ enable khi đã chọn đúng số lượng) */}
+              <button
+                disabled={isSavingAllocation || selectedRoomIds.length !== targetQuantity}
+                onClick={handleSaveAllocation}
+                className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary text-xs font-bold transition-all cursor-pointer shadow-lg shadow-admin-primary/20 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-base">meeting_room</span>
+                {isSavingAllocation ? 'Đang lưu...' : 'Gán phòng'}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* ─── 5. DANH SÁCH PHÒNG PHÙ HỢP NHẤT ĐƯỢC CHẤM ĐIỂM ────────────────── */}
         <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-outline-variant/20 pb-3">
@@ -1426,14 +1816,14 @@ export default function RoomAssignment() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {recommendedRooms.slice(0, 9).map((room) => {
-                const isSelected = selectedRoomId === room.RoomId;
+                const isSelected = selectedRoomIds.includes(room.RoomId) || selectedRoomId === room.RoomId;
                 const isHeld = heldRoom && heldRoom.RoomId === room.RoomId;
 
                 return (
                   <div
                     key={room.RoomId}
                     onClick={() => {
-                      setSelectedRoomId(room.RoomId);
+                      toggleRoomSelection(room.RoomId);
                       setCadFloor(Number(room.Floor) || 8);
                     }}
                     className={`rounded-2xl border p-4 transition-all cursor-pointer relative space-y-3 ${
@@ -1604,7 +1994,7 @@ export default function RoomAssignment() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 relative z-10">
                 {cadRooms.map((rm) => {
-                  const isSelected = selectedRoomId === rm.RoomId;
+                  const isSelected = selectedRoomIds.includes(rm.RoomId) || selectedRoomId === rm.RoomId;
                   const isOccupied = rm.Status === 'Occupied';
                   const isClean = rm.Status === 'CleanAvailable' || rm.Status === 'Inspected';
 
@@ -1612,7 +2002,7 @@ export default function RoomAssignment() {
                     <button
                       key={rm.RoomId}
                       disabled={isOccupied}
-                      onClick={() => setSelectedRoomId(rm.RoomId)}
+                      onClick={() => toggleRoomSelection(rm.RoomId)}
                       className={`p-3 rounded-xl border text-center transition-all cursor-pointer relative font-mono ${
                         isSelected
                           ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/20'
@@ -1690,6 +2080,8 @@ export default function RoomAssignment() {
                   <span className="font-bold text-sm text-on-surface">
                     {heldRoom
                       ? `Phòng ${heldRoom.RoomNumber} Đang Được Giữ Tạm`
+                      : selectedRoomIds.length > 0
+                      ? `Đã chọn ${selectedRoomIds.length}/${targetQuantity} phòng`
                       : currentSelectedRoom
                       ? `Đã chọn Phòng ${currentSelectedRoom.RoomNumber} để gán`
                       : 'Chưa chọn số phòng'}
@@ -1697,6 +2089,15 @@ export default function RoomAssignment() {
                   {heldRoom && (
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
                       THỜI GIAN GIỮ: {timeFormatted}
+                    </span>
+                  )}
+                  {selectedRoomIds.length > 0 && (
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold border ${
+                      selectedRoomIds.length === targetQuantity
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    }`}>
+                      {selectedRoomIds.length}/{targetQuantity} PHÒNG
                     </span>
                   )}
                 </div>
@@ -1741,32 +2142,59 @@ export default function RoomAssignment() {
               </label>
             </div>
 
-            {/* Nút Hành Động */}
-            <div className="flex items-center gap-3">
+            {/* Nút Hành Động Theo Spec FEAT-ROOMALLOC-01 */}
+            <div className="flex flex-wrap items-center gap-2">
               {heldRoom && (
                 <button
                   onClick={handleReleaseHold}
-                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer"
+                  className="px-3 py-2 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer"
                 >
                   Hủy Giữ Phòng
                 </button>
               )}
 
+              {/* Nút Xác nhận Booking riêng biệt (Luồng 4.1) */}
+              {bookingDossier?.Status === 'Pending' && (
+                <button
+                  disabled={isConfirmingBooking}
+                  onClick={handleConfirmBookingOnly}
+                  className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                  title="Xác nhận đặt phòng riêng biệt"
+                >
+                  {isConfirmingBooking ? 'Đang xác nhận...' : 'Xác Nhận Booking'}
+                </button>
+              )}
+
+              {/* Nút Xác nhận & Gán phòng Combo (Luồng 4.3) */}
+              {bookingDossier?.Status === 'Pending' && (
+                <button
+                  disabled={isComboAllocating || selectedRoomIds.length !== targetQuantity}
+                  onClick={handleConfirmAndAllocateCombo}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all cursor-pointer shadow-md disabled:opacity-50"
+                  title="Xác nhận và gán phòng cùng lúc trong 1 transaction"
+                >
+                  <span className="material-symbols-outlined text-base">domain_verification</span>
+                  {isComboAllocating ? 'Đang xử lý...' : 'Xác Nhận & Gán'}
+                </button>
+              )}
+
+              {/* Nút Gán phòng (Luồng 4.2) */}
               <button
-                disabled={confirming || !selectedRoomId}
-                onClick={() => handleConfirmAllocation(false)}
-                className="px-5 py-2.5 rounded-xl border border-admin-primary/60 bg-admin-primary/10 hover:bg-admin-primary/20 text-admin-primary font-bold text-xs transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                disabled={isSavingAllocation || selectedRoomIds.length !== targetQuantity}
+                onClick={handleSaveAllocation}
+                className="px-4 py-2 rounded-xl border border-admin-primary/60 bg-admin-primary/10 hover:bg-admin-primary/20 text-admin-primary font-bold text-xs transition-all cursor-pointer shadow-sm disabled:opacity-50"
               >
-                {confirming ? 'Đang Xử Lý...' : 'Xác Nhận Gán Phòng'}
+                {isSavingAllocation ? 'Đang Xử Lý...' : 'Gán Phòng'}
               </button>
 
+              {/* Nút Nhận Phòng Ngay */}
               <button
-                disabled={confirming || !selectedRoomId}
+                disabled={confirming || selectedRoomIds.length !== targetQuantity}
                 onClick={() => handleConfirmAllocation(true)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs transition-all cursor-pointer shadow-lg shadow-admin-primary/20 disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs transition-all cursor-pointer shadow-lg shadow-admin-primary/20 disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-base">login</span>
-                Gán & Nhận Phòng Ngay
+                {confirming ? 'Đang Nhận Phòng...' : 'Nhận Phòng Ngay'}
               </button>
             </div>
           </div>
