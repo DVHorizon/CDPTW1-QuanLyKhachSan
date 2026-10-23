@@ -4,25 +4,32 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { useAuth } from '../../context/AuthContext';
 import AdminLayout from '../../components/admin/layout/AdminLayout';
 
-// Hỗ trợ cả cổng 5000 và qua Proxy /api của Vite
+// Hỗ trợ cả cổng 5000 và qua Proxy /api của Vite theo Spec 8
 const API_ENDPOINTS = [
+  'http://localhost:5000/api/v1/check-ins',
+  '/api/v1/check-ins',
   'http://localhost:5000/api/v1/check-in',
   '/api/v1/check-in',
 ];
 
-// Hàm gọi API an toàn, chống lỗi Unexpected token '<', "<!DOCTYPE "...
+// Hàm gọi API an toàn, tự động đính kèm Token Authorization
 async function safeFetchJson(path, options = {}) {
   let lastErr = null;
+  const token = localStorage.getItem('token') || localStorage.getItem('grand_horizon_token');
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
   for (const base of API_ENDPOINTS) {
     try {
       const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+      const { headers, ...restOptions } = options;
       const res = await fetch(url, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          ...(options.headers || {}),
+          ...authHeaders,
+          ...(headers || {}),
         },
-        ...options,
+        ...restOptions,
       });
 
       const text = await res.text();
@@ -1526,6 +1533,16 @@ export default function CheckInDesk() {
     expirationDate: '',
   });
 
+  // ─── SPEC 8: Form Thông Tin Giấy Tờ CCCD / Passport (Mục 2 & 6.2) ───────────
+  const [documentType, setDocumentType] = useState('CCCD'); // 'CCCD' | 'Passport'
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [gender, setGender] = useState('Khác'); // Nam | Nữ | Khác | Không xác định
+  const [nationality, setNationality] = useState('Việt Nam');
+  const [documentExpiryDate, setDocumentExpiryDate] = useState('');
+  const [formErrors, setFormErrors] = useState({});
+
   // Chữ ký điện tử Canvas
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -1601,6 +1618,16 @@ export default function CheckInDesk() {
   // Xử lý khi quét thành công CCCD / Bằng lái xe qua Camera
   const handleIdScanSuccess = (parsed) => {
     if (!parsed) return;
+    const isPass = parsed.docType === 'passport';
+    setDocumentType(isPass ? 'Passport' : 'CCCD');
+    setDocumentNumber(parsed.documentNumber || '');
+    setFullName(parsed.legalFullName || '');
+    setDateOfBirth(parsed.birthDate || '');
+    setGender(parsed.gender || 'Khác');
+    setNationality(parsed.issuingState || (isPass ? '' : 'Việt Nam'));
+    setDocumentExpiryDate(parsed.expirationDate || '');
+    setFormErrors({});
+
     setOcrData({
       legalFullName: parsed.legalFullName || ocrData.legalFullName,
       documentNumber: parsed.documentNumber || ocrData.documentNumber,
@@ -1615,20 +1642,12 @@ export default function CheckInDesk() {
     }
     addToast(
       'success',
-      `Đã nhận diện thành công: ${parsed.legalFullName} (${parsed.docType === 'student_card' ? 'MSSV' : 'Số'}: ${parsed.documentNumber}). Đang chuyển sang Bước 03: Quyết toán Folio!`,
+      `Đã nhận diện thành công: ${parsed.legalFullName} (${parsed.docType === 'student_card' ? 'MSSV' : 'Số'}: ${parsed.documentNumber}). Đã cập nhật vào Form CCCD/Passport!`,
       parsed.docType === 'student_card' ? 'XÁC MINH THẺ SINH VIÊN THÀNH CÔNG' : 'XÁC MINH DANH TÍNH THÀNH CÔNG'
     );
-
-    // Tự động chuyển tới bước tiếp theo (Bước 03) và cuộn màn hình
-    setTimeout(() => {
-      const folioEl = document.getElementById('folio-payment-section');
-      if (folioEl) {
-        folioEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 500);
   };
 
-  // ─── 1. Tra cứu hồ sơ booking từ CSDL ──────────────────────────────────────
+  // ─── 1. Tra cứu & Quét QR booking từ CSDL (Spec 8 Endpoint 1 & 2) ───────────
   const handleLookupBooking = useCallback(async (codeToQuery) => {
     const q = codeToQuery !== undefined ? codeToQuery : searchQuery;
     if (!String(q).trim()) {
@@ -1638,28 +1657,66 @@ export default function CheckInDesk() {
 
     try {
       setLoadingLookup(true);
-      const { status, data } = await safeFetchJson(`/lookup?query=${encodeURIComponent(q.trim())}`);
+      // Gọi API POST /api/v1/check-ins/scan-qr theo Spec 8
+      const { status, ok, data } = await safeFetchJson('/scan-qr', {
+        method: 'POST',
+        body: JSON.stringify({ qrPayload: q.trim() }),
+      });
 
-      if (status === 404 || data.isRecordDeleted) {
-        addToast('error', data.message || 'Không tìm thấy mã đặt phòng.', 'TRA CỨU THẤT BẠI');
+      if (ok && data && data.success && data.data) {
+        const b = data.data;
+        // Bổ sung các trường tương thích
+        b.ConfirmationCode = b.bookingCode || b.ConfirmationCode;
+        b.BookingId = b.bookingId || b.BookingId;
+        b.GuestName = b.guestName || b.GuestName;
+        b.GuestPhone = b.phone || b.GuestPhone;
+        b.GuestEmail = b.email || b.GuestEmail;
+        b.RoomNumber = b.roomNumber || b.RoomNumber;
+        b.RoomId = b.roomId || b.RoomId;
+        b.BookingStatus = b.status || b.BookingStatus;
+        b.RoomTypeName = b.roomTypeName || b.RoomTypeName;
+        b.TotalAmount = b.totalAmount || b.TotalAmount;
+        b.DepositAmount = b.depositAmount || b.DepositAmount;
+        b.NumberOfNights = b.numberOfNights || b.NumberOfNights;
+
+        setBookingData(b);
+
+        // Đồng bộ vào Form CCCD/Passport (Spec 8 Mục 6.2)
+        const isPass = b.idType && b.idType.toLowerCase().includes('passport');
+        setDocumentType(isPass ? 'Passport' : 'CCCD');
+        setDocumentNumber(b.idNumber || '');
+        setFullName(b.guestName || '');
+        setDateOfBirth(b.dateOfBirth ? String(b.dateOfBirth).slice(0, 10) : '');
+        setGender('Khác');
+        setNationality(isPass ? '' : 'Việt Nam');
+        setDocumentExpiryDate('');
+        setFormErrors({});
+
+        setKeycardEncoded(false);
+        setPaymentSettled(false);
+        setTermsAccepted(false);
+        clearSignature();
+
+        addToast('success', `Đã tìm thấy booking ${b.ConfirmationCode} của khách ${b.GuestName}.`, 'TRA CỨU THÀNH CÔNG');
         return;
       }
 
-      if (data.success && data.data) {
-        const b = data.data;
+      // Fallback: Tra cứu qua endpoint /lookup nếu scan-qr trả lỗi hoặc mã không tìm thấy
+      const lookupRes = await safeFetchJson(`/lookup?query=${encodeURIComponent(q.trim())}`);
+      if (lookupRes.data && lookupRes.data.success && lookupRes.data.data) {
+        const b = lookupRes.data.data;
         setBookingData(b);
-        // Cập nhật dữ liệu OCR mặc định theo khách
-        if (b.docData) {
-          setOcrData({
-            legalFullName: b.docData.legalFullName || b.GuestName,
-            documentNumber: b.docData.documentNumber || b.IdNumber,
-            issuingState: b.docData.issuingState || 'Việt Nam',
-            birthDate: b.docData.birthDate || '1988-04-15',
-            expirationDate: b.docData.expirationDate || '2031-08-20',
-          });
-          setDocType(b.docData.docType || 'passport');
-        }
-        // Reset trạng thái tiến trình
+
+        const isPass = b.docData?.docType === 'passport' || (b.IdType && b.IdType.toLowerCase().includes('passport'));
+        setDocumentType(isPass ? 'Passport' : 'CCCD');
+        setDocumentNumber(b.docData?.documentNumber || b.IdNumber || '');
+        setFullName(b.docData?.legalFullName || b.GuestName || '');
+        setDateOfBirth(b.docData?.birthDate || (b.DateOfBirth ? String(b.DateOfBirth).slice(0, 10) : ''));
+        setGender('Khác');
+        setNationality(b.docData?.issuingState || (isPass ? '' : 'Việt Nam'));
+        setDocumentExpiryDate(b.docData?.expirationDate || '');
+        setFormErrors({});
+
         setKeycardEncoded(false);
         setPaymentSettled(false);
         setTermsAccepted(false);
@@ -1667,7 +1724,11 @@ export default function CheckInDesk() {
 
         addToast('success', `Đã tìm thấy hồ sơ của khách ${b.GuestName} (${b.ConfirmationCode}).`, 'TRA CỨU THÀNH CÔNG');
       } else {
-        addToast('error', data.message || 'Không tìm thấy mã đặt phòng.', 'TRA CỨU THẤT BẠI');
+        addToast(
+          'error',
+          data?.message || lookupRes.data?.message || 'Không tìm thấy booking từ mã QR hoặc booking không ở trạng thái cho phép check-in.',
+          data?.code || 'TRA CỨU THẤT BẠI'
+        );
       }
     } catch (err) {
       console.error('Lookup error:', err);
@@ -1851,53 +1912,71 @@ export default function CheckInDesk() {
     }
   };
 
-  // ─── 6. Hoàn tất Check-in & Kích hoạt phòng ───────────────────────────────
+  // ─── 6. Hoàn tất Check-in & Xác nhận lưu CCCD/Passport (Spec 8) ─────────────
   const handleCompleteCheckIn = async () => {
-    // 1. Kiểm tra 4 bước bắt buộc
-    if (!ocrData.documentNumber || !ocrData.legalFullName) {
-      addToast('warn', 'Vui lòng hoàn tất đủ 4 bước trước khi kích hoạt (Thiếu thông tin giấy tờ OCR).', 'CẢNH BÁO');
-      return;
+    // 1. Validate Form CCCD/Passport theo Spec 8 Mục 2, 5.1 & 6.3
+    const errors = {};
+    if (!documentType || !String(documentType).trim()) {
+      errors.documentType = 'Loại giấy tờ không được để trống';
     }
 
-    // Kiểm tra tính hợp lệ ngày hết hạn
-    const expDt = new Date(ocrData.expirationDate);
-    if (!isNaN(expDt.getTime()) && expDt < new Date()) {
-      addToast('error', 'Giấy tờ đã hết hạn.', 'LỖI XÁC THỰC GIẤY TỜ');
-      return;
+    const cleanDocNum = String(documentNumber || '').trim();
+    if (!cleanDocNum) {
+      errors.documentNumber = 'Số CCCD/Passport không được để trống';
+    } else if (documentType === 'CCCD') {
+      if (!/^\d{12}$/.test(cleanDocNum)) {
+        errors.documentNumber = 'Số CCCD phải gồm đúng 12 chữ số';
+      }
+    } else if (documentType === 'Passport') {
+      if (!/^[A-Za-z0-9]{6,9}$/.test(cleanDocNum)) {
+        errors.documentNumber = 'Số Passport phải gồm 6 đến 9 ký tự chữ và số';
+      }
     }
 
-    if (!hasSignature && !signatureImage) {
-      addToast('warn', 'Vui lòng để khách ký xác nhận.', 'THIẾU CHỮ KÝ');
-      return;
+    const cleanName = String(fullName || '').trim();
+    if (!cleanName || cleanName.length < 2 || cleanName.length > 150) {
+      errors.fullName = 'Họ và tên trên giấy tờ không hợp lệ';
     }
 
-    if (!keycardEncoded) {
-      addToast('warn', 'Vui lòng mã hóa thẻ từ vật lý trước khi hoàn tất.', 'THIẾU THẺ PHÒNG');
-      return;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (!dateOfBirth) {
+      errors.dateOfBirth = 'Ngày sinh không được để trống';
+    } else if (dateOfBirth > todayStr) {
+      errors.dateOfBirth = 'Ngày sinh không được lớn hơn ngày hiện tại';
     }
 
-    if (!paymentSettled) {
-      addToast('warn', 'Vui lòng xử lý tạm giữ hoặc thanh toán tại quầy trước khi hoàn tất.', 'CHƯA THANH TOÁN');
-      return;
+    const cleanNat = String(nationality || '').trim();
+    if (!cleanNat) {
+      errors.nationality = 'Quốc tịch không được để trống';
     }
 
-    if (!termsAccepted) {
-      addToast('warn', 'Khách chưa đồng ý điều khoản lưu trú.', 'ĐIỀU KHOẢN');
+    if (documentType === 'Passport' && documentExpiryDate && documentExpiryDate < todayStr) {
+      errors.documentExpiryDate = 'Passport đã hết hạn, không thể hoàn tất check-in';
+    }
+
+    // Nếu có lỗi, hiển thị ngay dưới trường tương ứng và không gọi API (Mục 4.1 & 6.3)
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      addToast('warn', 'Vui lòng kiểm tra lại các trường thông tin giấy tờ bị lỗi màu đỏ.', 'THÔNG TIN CHƯA HỢP LỆ');
       return;
     }
 
     try {
       setCompletingCheckIn(true);
-      const { status, data } = await safeFetchJson('/complete', {
+      // Gọi API POST /api/v1/check-ins theo Spec 8 Endpoint 3
+      const { status, ok, data } = await safeFetchJson('', {
         method: 'POST',
         body: JSON.stringify({
-          bookingId: bookingData.BookingId,
-          roomId: bookingData.RoomId,
-          guestName: ocrData.legalFullName,
-          idNumber: ocrData.documentNumber,
-          idType: docType === 'natl_id' ? 'CCCD' : docType === 'passport' ? 'Passport' : 'DriverLicense',
-          dateOfBirth: ocrData.birthDate,
-          nationality: ocrData.issuingState,
+          bookingId: bookingData.BookingId || bookingData.bookingId,
+          bookingCode: bookingData.ConfirmationCode || bookingData.bookingCode,
+          documentType,
+          documentNumber: cleanDocNum,
+          fullName: cleanName,
+          dateOfBirth,
+          gender,
+          nationality: cleanNat,
+          documentExpiryDate: documentExpiryDate || null,
+          roomId: bookingData.RoomId || bookingData.roomId,
           signatureData: signatureImage,
           idCardImage: capturedIdSnapshot,
           dispatchNfc,
@@ -1907,38 +1986,58 @@ export default function CheckInDesk() {
         }),
       });
 
-      if (status === 404 || data.isRecordDeleted) {
+      if (status === 404 || data?.isRecordDeleted) {
         setConcurrencyConflict({
           isOpen: true,
-          message: data.message || 'Dữ liệu đặt phòng đã bị xóa bởi người dùng khác trong cơ sở dữ liệu.',
+          message: data?.message || 'Dữ liệu đặt phòng đã bị xóa bởi người dùng khác trong cơ sở dữ liệu.',
         });
         return;
       }
 
-      if (data.success) {
-        setSavedCheckInResult(data);
-        setShowStorageModal(true);
-        addToast('success', data.message, 'CHECK-IN HOÀN TẤT THÀNH CÔNG');
-        // Nạp lại dữ liệu mới từ CSDL
-        await handleLookupBooking(bookingData.BookingId);
-        await fetchArrivals();
-      } else {
-        addToast('error', data.message || 'Lỗi hoàn tất check-in.', 'LỖI THỰC THI');
+      if (!ok || !data || !data.success) {
+        if (data && data.field) {
+          setFormErrors((prev) => ({ ...prev, [data.field]: data.message }));
+        }
+        addToast(
+          'error',
+          data?.message || 'Không thể hoàn tất check-in, vui lòng thử lại',
+          data?.code || 'LỖI CHECK-IN'
+        );
+        return;
       }
+
+      // Check-in thành công (Mục 5 & 6.3)
+      setSavedCheckInResult(data);
+      addToast('success', data.message || 'Check-in thành công', 'SUCCESS_0004_CHECKED_IN');
+
+      // Cập nhật trạng thái booking hiện tại sang CheckedIn
+      setBookingData((prev) =>
+        prev
+          ? {
+              ...prev,
+              Status: 'CheckedIn',
+              status: 'CheckedIn',
+              BookingStatus: 'CheckedIn',
+              checkedInAt: data.data?.checkInAt || new Date().toISOString(),
+            }
+          : null
+      );
+
+      fetchArrivals();
     } catch (err) {
       console.error('Complete check-in error:', err);
-      addToast('error', 'Lỗi kết nối máy chủ: ' + err.message, 'LỖI MẠNG');
+      addToast('error', 'Không thể hoàn tất check-in, vui lòng thử lại: ' + err.message, 'ERROR_0021_CHECKIN_TRANSACTION');
     } finally {
       setCompletingCheckIn(false);
     }
   };
 
-  // Tiến độ 4 bước
+  // Tiến độ các bước theo Spec 8 & PMS
   const step1Done = Boolean(bookingData);
-  const step2Done = Boolean(ocrData.documentNumber && hasSignature);
+  const step2Done = Boolean(documentNumber && fullName && dateOfBirth);
   const step3Done = Boolean(paymentSettled);
   const step4Done = Boolean(keycardEncoded);
-  const allStepsComplete = step1Done && step2Done && step3Done && step4Done && termsAccepted;
+  const allStepsComplete = Boolean(bookingData && documentNumber && fullName && dateOfBirth);
 
   // Kiểm tra quyền truy cập RBAC
   if (isUnauthorized) {
@@ -2431,62 +2530,238 @@ export default function CheckInDesk() {
               </div>
             </div>
 
-            {/* Dữ liệu trích xuất OCR */}
-            <div className="space-y-3 font-mono text-xs">
-              <span className="text-[10px] font-bold text-on-surface-variant uppercase block">
-                DỮ LIỆU ĐÃ TRÍCH XUẤT OCR (PARSED OCR DATA)
-              </span>
+            {/* ════════════ FORM THÔNG TIN CCCD / PASSPORT (SPEC 8 - MỤC 6.2) ════════════ */}
+            <div className="space-y-3 font-mono text-xs border-t border-outline-variant/30 pt-3">
+              <div className="flex items-center justify-between pb-1 border-b border-outline-variant/20">
+                <span className="text-[11px] font-bold text-admin-primary uppercase flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">badge</span>
+                  THÔNG TIN CCCD / PASSPORT
+                </span>
+                <span className="text-[10px] text-on-surface-variant italic">
+                  <span className="text-rose-500 font-bold">*</span> Bắt buộc
+                </span>
+              </div>
 
+              {/* 1. Loại giấy tờ * (Select/Radio) */}
               <div>
-                <label className="text-[10px] text-on-surface-variant block uppercase">Họ và tên hợp pháp</label>
+                <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                  Loại giấy tờ <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocumentType('CCCD');
+                      if (formErrors.documentType) setFormErrors((prev) => ({ ...prev, documentType: '' }));
+                      if (!nationality) setNationality('Việt Nam');
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-center font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      documentType === 'CCCD'
+                        ? 'bg-admin-primary text-on-primary border-admin-primary shadow-sm'
+                        : 'bg-surface-container-lowest border-outline-variant/30 text-on-surface-variant hover:border-outline-variant/60'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-sm">id_card</span>
+                    CCCD (12 chữ số)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocumentType('Passport');
+                      if (formErrors.documentType) setFormErrors((prev) => ({ ...prev, documentType: '' }));
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-center font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      documentType === 'Passport'
+                        ? 'bg-admin-primary text-on-primary border-admin-primary shadow-sm'
+                        : 'bg-surface-container-lowest border-outline-variant/30 text-on-surface-variant hover:border-outline-variant/60'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-sm">flight</span>
+                    Hộ chiếu (Passport)
+                  </button>
+                </div>
+                {formErrors.documentType && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.documentType}
+                  </p>
+                )}
+              </div>
+
+              {/* 2. Số CCCD/Passport * */}
+              <div>
+                <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                  Số CCCD/Passport <span className="text-rose-500 font-bold">*</span>
+                </label>
                 <input
                   type="text"
-                  value={ocrData.legalFullName}
-                  onChange={(e) => setOcrData({ ...ocrData, legalFullName: e.target.value })}
-                  className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-1.5 font-bold text-on-surface text-xs focus:ring-1 focus:ring-admin-primary"
+                  value={documentNumber}
+                  onChange={(e) => {
+                    setDocumentNumber(e.target.value);
+                    if (formErrors.documentNumber) setFormErrors((prev) => ({ ...prev, documentNumber: '' }));
+                  }}
+                  placeholder={documentType === 'CCCD' ? 'Nhập đúng 12 chữ số CCCD (VD: 079123456789)...' : 'Nhập 6 đến 9 ký tự chữ và số (VD: B1234567)...'}
+                  className={`w-full bg-surface-container-lowest border rounded-xl px-3.5 py-2 font-bold text-xs font-mono transition-colors focus:outline-none focus:ring-2 ${
+                    formErrors.documentNumber
+                      ? 'border-rose-500 text-rose-200 focus:ring-rose-500'
+                      : 'border-outline-variant/40 text-on-surface focus:ring-admin-primary'
+                  }`}
                 />
+                {formErrors.documentNumber && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.documentNumber}
+                  </p>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {/* 3. Họ và tên trên giấy tờ * */}
+              <div>
+                <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                  Họ và tên trên giấy tờ <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    if (formErrors.fullName) setFormErrors((prev) => ({ ...prev, fullName: '' }));
+                  }}
+                  placeholder="NGUYỄN VĂN AN"
+                  className={`w-full bg-surface-container-lowest border rounded-xl px-3.5 py-2 font-bold text-xs transition-colors focus:outline-none focus:ring-2 ${
+                    formErrors.fullName
+                      ? 'border-rose-500 text-rose-200 focus:ring-rose-500'
+                      : 'border-outline-variant/40 text-on-surface focus:ring-admin-primary'
+                  }`}
+                />
+                {formErrors.fullName && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.fullName}
+                  </p>
+                )}
+              </div>
+
+              {/* 4 & 5. Ngày sinh * & Giới tính */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-[10px] text-on-surface-variant block uppercase">Số giấy tờ</label>
+                  <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                    Ngày sinh <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <input
-                    type="text"
-                    value={ocrData.documentNumber}
-                    onChange={(e) => setOcrData({ ...ocrData, documentNumber: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-1.5 font-bold text-admin-primary text-xs focus:ring-1 focus:ring-admin-primary"
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => {
+                      setDateOfBirth(e.target.value);
+                      if (formErrors.dateOfBirth) setFormErrors((prev) => ({ ...prev, dateOfBirth: '' }));
+                    }}
+                    className={`w-full bg-surface-container-lowest border rounded-xl px-3 py-2 text-xs transition-colors focus:outline-none focus:ring-2 ${
+                      formErrors.dateOfBirth
+                        ? 'border-rose-500 text-rose-200 focus:ring-rose-500'
+                        : 'border-outline-variant/40 text-on-surface focus:ring-admin-primary'
+                    }`}
                   />
+                  {formErrors.dateOfBirth && (
+                    <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.dateOfBirth}
+                    </p>
+                  )}
                 </div>
+
                 <div>
-                  <label className="text-[10px] text-on-surface-variant block uppercase">Quốc gia / Nơi cấp</label>
-                  <input
-                    type="text"
-                    value={ocrData.issuingState}
-                    onChange={(e) => setOcrData({ ...ocrData, issuingState: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-1.5 text-on-surface text-xs focus:ring-1 focus:ring-admin-primary"
-                  />
+                  <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                    Giới tính
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-admin-primary"
+                  >
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                    <option value="Khác">Khác</option>
+                    <option value="Không xác định">Không xác định</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-on-surface-variant block uppercase">Ngày sinh (YYYY-MM-DD)</label>
-                  <input
-                    type="date"
-                    value={ocrData.birthDate}
-                    onChange={(e) => setOcrData({ ...ocrData, birthDate: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-1.5 text-on-surface text-xs focus:ring-1 focus:ring-admin-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-on-surface-variant block uppercase">Ngày hết hạn</label>
-                  <input
-                    type="date"
-                    value={ocrData.expirationDate}
-                    onChange={(e) => setOcrData({ ...ocrData, expirationDate: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-1.5 text-on-surface text-xs focus:ring-1 focus:ring-admin-primary"
-                  />
-                </div>
+              {/* 6. Quốc tịch * */}
+              <div>
+                <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                  Quốc tịch <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={nationality}
+                  onChange={(e) => {
+                    setNationality(e.target.value);
+                    if (formErrors.nationality) setFormErrors((prev) => ({ ...prev, nationality: '' }));
+                  }}
+                  placeholder="Việt Nam"
+                  className={`w-full bg-surface-container-lowest border rounded-xl px-3.5 py-2 text-xs transition-colors focus:outline-none focus:ring-2 ${
+                    formErrors.nationality
+                      ? 'border-rose-500 text-rose-200 focus:ring-rose-500'
+                      : 'border-outline-variant/40 text-on-surface focus:ring-admin-primary'
+                  }`}
+                />
+                {formErrors.nationality && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.nationality}
+                  </p>
+                )}
+              </div>
+
+              {/* 7. Ngày hết hạn (Hiển thị rõ khi chọn Passport) */}
+              <div>
+                <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                  Ngày hết hạn {documentType === 'Passport' && <span className="text-[10px] text-amber-400 font-normal">(Passport phải còn hạn)</span>}
+                </label>
+                <input
+                  type="date"
+                  value={documentExpiryDate}
+                  onChange={(e) => {
+                    setDocumentExpiryDate(e.target.value);
+                    if (formErrors.documentExpiryDate) setFormErrors((prev) => ({ ...prev, documentExpiryDate: '' }));
+                  }}
+                  className={`w-full bg-surface-container-lowest border rounded-xl px-3.5 py-2 text-xs transition-colors focus:outline-none focus:ring-2 ${
+                    formErrors.documentExpiryDate
+                      ? 'border-rose-500 text-rose-200 focus:ring-rose-500'
+                      : 'border-outline-variant/40 text-on-surface focus:ring-admin-primary'
+                  }`}
+                />
+                {formErrors.documentExpiryDate && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.documentExpiryDate}
+                  </p>
+                )}
+              </div>
+
+              {/* 8 & 9. Nút Hủy / Quét booking khác & Xác nhận Check-in ngay trong Form */}
+              <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-outline-variant/20">
+                <button
+                  type="button"
+                  id="btnCancel"
+                  onClick={() => {
+                    setBookingData(null);
+                    setSearchQuery('');
+                    setFormErrors({});
+                    addToast('info', 'Đã hủy phiên làm việc. Mời quét mã QR hoặc chọn booking khác.', 'HỦY CHECK-IN');
+                  }}
+                  className="px-3.5 py-2 rounded-xl border border-outline-variant/40 bg-surface-container hover:bg-surface-container-highest text-xs font-semibold text-on-surface transition-colors cursor-pointer"
+                >
+                  Hủy / Quét booking khác
+                </button>
+
+                <button
+                  type="button"
+                  id="btnConfirmCheckIn"
+                  disabled={completingCheckIn}
+                  onClick={handleCompleteCheckIn}
+                  className="px-4 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-base">
+                    {completingCheckIn ? 'sync' : 'check_circle'}
+                  </span>
+                  {completingCheckIn ? 'Đang xử lý...' : 'Xác nhận Check-in'}
+                </button>
               </div>
             </div>
 

@@ -59,7 +59,9 @@ app.use('/api/v1/rooms/:roomId/status', (req, res, next) => {
 app.use('/api/v1/allocation', require('./routes/admin/roomAllocationRoutes'));
 app.use('/api/allocation', require('./routes/admin/roomAllocationRoutes'));
 
-// Route Nghiệp vụ Check-in tại quầy (Front Desk Express Check-In Workflow)
+// Route Nghiệp vụ Check-in tại quầy (Front Desk Express Check-In Workflow - Spec 8)
+app.use('/api/v1/check-ins', require('./routes/admin/checkInRoutes'));
+app.use('/api/check-ins', require('./routes/admin/checkInRoutes'));
 app.use('/api/v1/check-in', require('./routes/admin/checkInRoutes'));
 app.use('/api/check-in', require('./routes/admin/checkInRoutes'));
 

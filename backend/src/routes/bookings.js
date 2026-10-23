@@ -814,19 +814,36 @@ router.get('/', checkBookingPermission, async (req, res) => {
   }
 });
 
-// ─── GET /api/v1/bookings/:id — Chi Tiết Booking + Data Masking (Mục 3.10 & 3.11)
+// ─── GET /api/v1/bookings/:id — Chi Tiết Booking + Data Masking (Mục 3.10 & 3.11 & Spec 8)
 router.get('/:id', checkBookingPermission, async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingId = Number(id);
+    const cleanId = String(id || '').trim();
 
-    // Test Case 32: ID không hợp lệ hoặc số âm/0
-    if (!Number.isInteger(bookingId) || bookingId <= 0) {
+    if (!cleanId) {
       return res.status(404).json({
         success: false,
         code: 'ERROR_0024_NOT_FOUND',
         message: 'Không tìm thấy booking hoặc booking đã bị xóa',
       });
+    }
+
+    const isNumeric = /^-?\d+$/.test(cleanId);
+    let whereIdClause = 'b.ConfirmationCode = ?';
+    let queryParam = cleanId;
+
+    if (isNumeric) {
+      const numId = Number(cleanId);
+      // Test Case 32: ID không hợp lệ hoặc số âm/0
+      if (!Number.isInteger(numId) || numId <= 0) {
+        return res.status(404).json({
+          success: false,
+          code: 'ERROR_0024_NOT_FOUND',
+          message: 'Không tìm thấy booking hoặc booking đã bị xóa',
+        });
+      }
+      whereIdClause = '(b.BookingId = ? OR b.ConfirmationCode = ?)';
+      queryParam = numId;
     }
 
     // 1. Tải thông tin chính của booking
@@ -866,10 +883,11 @@ router.get('/:id', checkBookingPermission, async (req, res) => {
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
-      WHERE b.BookingId = ?
+      WHERE ${whereIdClause}
       LIMIT 1
     `;
-    const [bRows] = await pool.query(bookingQuery, [bookingId]);
+    const queryArgs = isNumeric ? [queryParam, cleanId] : [queryParam];
+    const [bRows] = await pool.query(bookingQuery, queryArgs);
 
     // Test Case 32: Không tìm thấy hoặc đã bị xóa mềm (IsDeleted = 1)
     if (!bRows.length || bRows[0].IsDeleted === 1 || bRows[0].IsDeleted === true) {
