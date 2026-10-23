@@ -10,6 +10,7 @@ const {
   Room,
   RoomType,
   MembershipTier,
+  BookingGuest,
   sequelize,
 } = require('../../../models');
 
@@ -44,7 +45,6 @@ exports.createServiceOrder = async (req, res) => {
       include: [
         {
           model: Booking,
-          as: 'booking',
           attributes: ['BookingId', 'UserId', 'Status'],
         },
       ],
@@ -59,10 +59,27 @@ exports.createServiceOrder = async (req, res) => {
     }
 
     // 2. Quyền thực hiện (Mục 3.3.a & Test case 1)
-    // Guest chỉ được đặt cho đúng Stay của chính mình
+    // Guest chỉ được đặt cho đúng Stay của chính mình (kiểm tra Stay → Booking.UserId hoặc có mặt trong BookingGuests khớp UserId đăng nhập)
     if (!isStaffOrAdmin) {
       const stayOwnerId = stay.booking?.UserId || stay.Booking?.UserId;
-      if (stayOwnerId && Number(stayOwnerId) !== Number(userId)) {
+      let isOwner = stayOwnerId && Number(stayOwnerId) === Number(userId);
+
+      if (!isOwner && BookingGuest && stay.BookingId) {
+        const userEmail = req.user?.email || req.user?.Email;
+        if (userEmail) {
+          const guestMatch = await BookingGuest.findOne({
+            where: {
+              BookingId: stay.BookingId,
+              Email: userEmail,
+            },
+          });
+          if (guestMatch) {
+            isOwner = true;
+          }
+        }
+      }
+
+      if (!isOwner) {
         return res.status(403).json({
           success: false,
           code: 'ERROR_0010_FORBIDDEN',
@@ -207,30 +224,28 @@ exports.getActiveStays = async (req, res) => {
       include: [
         {
           model: Room,
-          as: 'room',
           attributes: ['RoomId', 'RoomNumber', 'Floor'],
           include: [
             {
               model: RoomType,
               as: 'roomType',
-              attributes: ['RoomTypeId', 'TypeName', 'PricePerNight'],
+              attributes: ['RoomTypeId', 'TypeName', 'BasePrice'],
             },
           ],
         },
         {
           model: Booking,
-          as: 'booking',
-          attributes: ['BookingId', 'BookingCode', 'CheckInDate', 'CheckOutDate', 'TotalPrice'],
+          attributes: ['BookingId', 'ConfirmationCode', 'CheckInDate', 'CheckOutDate', 'TotalAmount'],
           include: [
             {
               model: User,
               as: 'user',
-              attributes: ['UserId', 'FullName', 'Email', 'PhoneNumber'],
+              attributes: ['UserId', 'FullName', 'Email', 'Phone'],
               include: [
                 {
                   model: MembershipTier,
                   as: 'membershipTier',
-                  attributes: ['TierName', 'DiscountPercent'],
+                  attributes: ['TierName', 'DiscountRate'],
                 },
               ],
             },
@@ -270,33 +285,66 @@ exports.getMyActiveStay = async (req, res) => {
       });
     }
 
-    const myStay = await Stay.findOne({
+    let myStay = await Stay.findOne({
       where: {
         Status: ['CheckedIn', 'Extended'],
       },
       include: [
         {
           model: Booking,
-          as: 'booking',
           where: { UserId: userId },
-          attributes: ['BookingId', 'BookingCode', 'CheckInDate', 'CheckOutDate', 'TotalPrice'],
+          attributes: ['BookingId', 'ConfirmationCode', 'CheckInDate', 'CheckOutDate', 'TotalAmount'],
         },
         {
           model: Room,
-          as: 'room',
           attributes: ['RoomId', 'RoomNumber', 'Floor'],
           include: [
             {
               model: RoomType,
               as: 'roomType',
-              attributes: ['RoomTypeId', 'TypeName', 'PricePerNight'],
+              attributes: ['RoomTypeId', 'TypeName', 'BasePrice'],
             },
           ],
         },
       ],
     });
 
-    return res.status(200).json({
+    if (!myStay && BookingGuest) {
+      const userEmail = req.user?.email || req.user?.Email;
+      if (userEmail) {
+        const guestBooking = await BookingGuest.findOne({
+          where: { Email: userEmail },
+          attributes: ['BookingId'],
+        });
+        if (guestBooking) {
+        myStay = await Stay.findOne({
+          where: {
+            BookingId: guestBooking.BookingId,
+            Status: ['CheckedIn', 'Extended'],
+          },
+          include: [
+            {
+              model: Booking,
+              attributes: ['BookingId', 'ConfirmationCode', 'CheckInDate', 'CheckOutDate', 'TotalAmount'],
+            },
+            {
+              model: Room,
+              attributes: ['RoomId', 'RoomNumber', 'Floor'],
+              include: [
+                {
+                  model: RoomType,
+                  as: 'roomType',
+                  attributes: ['RoomTypeId', 'TypeName', 'BasePrice'],
+                },
+              ],
+            },
+          ],
+        });
+      }
+    }
+  }
+
+  return res.status(200).json({
       success: true,
       hasActiveStay: Boolean(myStay),
       data: myStay || null,
@@ -334,11 +382,10 @@ exports.getServiceOrders = async (req, res) => {
         {
           model: Stay,
           as: 'stay',
-          attributes: ['StayId', 'Status', 'CheckInDate', 'CheckOutDate'],
+          attributes: ['StayId', 'Status', 'ActualCheckIn', 'ExpectedCheckOut'],
           include: [
             {
               model: Room,
-              as: 'room',
               attributes: ['RoomId', 'RoomNumber'],
             },
           ],

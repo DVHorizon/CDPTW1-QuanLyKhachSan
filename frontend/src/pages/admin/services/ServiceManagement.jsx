@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
-import AdminLayout from "../components/admin/layout/AdminLayout";
+import { Link } from "react-router-dom";
+import AdminLayout from "../../../components/admin/layout/AdminLayout";
 import styles from "./ServiceManagement.module.css";
 import {
   fetchServicesApi,
@@ -9,7 +10,7 @@ import {
   deactivateServiceApi,
   reactivateServiceApi,
   syncPosApi,
-} from "../api/serviceApi";
+} from "../../../api/serviceApi";
 
 // ─── DỮ LIỆU DANH MỤC MẪU BAN ĐẦU (FALLBACK) ──────────────────────────────────
 
@@ -229,6 +230,16 @@ const HeaderSection = ({ onAddNew, onExportExcel, onSyncPOS, isSyncing }) => (
         </span>
         <span>{isSyncing ? "Đang Đồng Bộ..." : "Đồng Bộ Sang POS"}</span>
       </button>
+
+      <Link
+        to="/admin/services/dispatch"
+        className={`${styles.btn} ${styles.btnOutline}`}
+        style={{ borderColor: "#047857", color: "#047857", fontWeight: 700, backgroundColor: "#ecfdf5" }}
+        title="Chuyển sang màn hình Tiếp Nhận Đặt Dịch Vụ & Điều Phối Lịch Trình (C3)"
+      >
+        <span className="material-symbols-outlined text-[18px]">event_available</span>
+        <span>Đặt &amp; Điều Phối (C3)</span>
+      </Link>
 
       <button
         onClick={onAddNew}

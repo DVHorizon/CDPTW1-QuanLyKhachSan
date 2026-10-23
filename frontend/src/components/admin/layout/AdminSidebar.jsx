@@ -8,7 +8,7 @@ const ALL_NAV_ITEMS = [
   { icon: "room_service", label: "Lễ Tân & Tiền Sảnh", to: "/admin/le-tan", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "bedroom_parent", label: "Quản Lý Hạng Phòng", to: "/admin/room-types", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "meeting_room", label: "Quản Lý Phòng Vật Lý", to: "/admin/rooms", allowedRoles: ['Admin', 'Receptionist'] },
-  { icon: "dashboard", label: "Sơ Đồ Phòng Trực Quan", to: "/admin/room-availability", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
+  { icon: "dashboard", label: "Sơ Đồ Phòng Trực Quan (Real-time)", to: "/admin/room-availability", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "grid_on", label: "Sơ Đồ Phòng & Trạng Thái", to: "/admin/so-do-phong", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "receipt_long", label: "Quản Lý Đặt Phòng", to: "/admin/dat-phong", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "assignment_turned_in", label: "Gán Phòng (Room Allocation)", to: "/admin/room-assignment", allowedRoles: ['Admin', 'Receptionist'] },
@@ -16,13 +16,17 @@ const ALL_NAV_ITEMS = [
   { icon: "logout", label: "Check-Out & Kiểm Phòng", to: "/admin/check-out", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "event_available", label: "Tiếp Nhận & Đặt Dịch Vụ", to: "/admin/services/dispatch", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "restaurant", label: "Quản Lý Thực Đơn (F&B)", to: "/admin/menu", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
   { icon: "soup_kitchen", label: "Màn Hình Bếp (KDS)", to: "/admin/fnb/kitchen", allowedRoles: ['Admin', 'Kitchen'] },
   { icon: "local_shipping", label: "Theo Dõi & Giao Món", to: "/admin/fnb/dispatch", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
   { icon: "receipt_long", label: "Lịch Sử & Tổng Hợp F&B", to: "/admin/fnb/history", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
+  { icon: "account_balance", label: "Tài Chính & Sổ Cái", to: "/admin/tai-chinh", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "neurology", label: "AI Concierge & Chatbot", to: "/admin/ai-concierge", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "loyalty", label: "Khách Hàng & Hội Viên", to: "/admin/loyalty", allowedRoles: ['Admin', 'Receptionist'] },
   // Quản lý tài khoản (USER_MANAGE) — Spec 3: CHỈ ADMIN mới nhìn thấy menu này!
   { icon: "manage_accounts", label: "Quản Lý Tài Khoản & Phân Quyền", to: "/admin/staff", allowedRoles: ['Admin'], requiredPermission: 'USER_MANAGE' },
+  { icon: "admin_panel_settings", label: "Quản Trị Hệ Thống", to: "/admin/quan-tri", allowedRoles: ['Admin'] },
 ];
 
 const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
@@ -123,7 +127,7 @@ const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
                   key={item.to}
                   to={item.to}
                   title={item.label}
-                  end={item.to === '/admin'}
+                  end={true}
                   className={({ isActive }) =>
                     `flex items-center ${
                       isCollapsed
