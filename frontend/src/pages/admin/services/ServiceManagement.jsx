@@ -244,7 +244,7 @@ const HeaderSection = ({ onAddNew, onExportExcel }) => (
 const ServiceListSection = ({
   services,
   categories,
-  selectedCode,
+  selectedId,
   onSelect,
   searchTerm,
   setSearchTerm,
@@ -593,13 +593,13 @@ const ServiceListSection = ({
           className={`${styles.serviceList} ${viewMode === "grid" ? styles.serviceGridMode : ""}`}
         >
           {paginatedServices.map((svc) => {
-            const isSelected = svc.ServiceCode === selectedCode;
+            const isSelected = svc.ServiceId === selectedId;
             const isActive = svc.Status === "Active";
 
             return (
               <div
-                key={svc.ServiceCode || svc.ServiceId}
-                onClick={() => onSelect(svc.ServiceCode)}
+                key={svc.ServiceId || svc.ServiceCode}
+                onClick={() => onSelect(svc.ServiceId)}
                 className={`${styles.serviceCard} ${isSelected ? styles.serviceCardSelected : ""}`}
               >
                 <div className={styles.cardHeader}>
@@ -965,7 +965,7 @@ const ServiceEditorSection = ({
 const ServiceManagement = () => {
   const [services, setServices] = useState(INITIAL_SERVICES);
   const [categories, setCategories] = useState(INITIAL_CATEGORIES);
-  const [selectedCode, setSelectedCode] = useState("SVC-SPA-001");
+  const [selectedId, setSelectedId] = useState(INITIAL_SERVICES[0]?.ServiceId || 1);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   // Bộ lọc & phân trang (FEAT-SERVICE-02)
@@ -1014,8 +1014,9 @@ const ServiceManagement = () => {
         svcRes.data.length > 0
       ) {
         setServices(svcRes.data);
-        setSelectedCode(svcRes.data[0].ServiceCode);
-        setFormData(svcRes.data[0]);
+        const first = svcRes.data[0];
+        setSelectedId(first.ServiceId);
+        setFormData(first);
       }
     } catch (err) {
       console.info("Đang sử dụng dữ liệu mặc định hệ thống:", err);
@@ -1026,10 +1027,10 @@ const ServiceManagement = () => {
     loadData();
   }, []);
 
-  const handleSelectService = (code) => {
-    const found = services.find((s) => s.ServiceCode === code);
+  const handleSelectService = (idOrCode) => {
+    const found = services.find((s) => s.ServiceId === idOrCode || s.ServiceCode === idOrCode);
     if (found) {
-      setSelectedCode(code);
+      setSelectedId(found.ServiceId);
       setFormData({ ...found });
       setIsCreatingNew(false);
       setFormErrors({});
@@ -1038,7 +1039,7 @@ const ServiceManagement = () => {
 
   const handleAddNew = () => {
     setIsCreatingNew(true);
-    setSelectedCode("");
+    setSelectedId(null);
     setFormData({
       ServiceCode: "",
       CategoryId: categories[0]?.CategoryId || 1,
@@ -1144,7 +1145,7 @@ const ServiceManagement = () => {
       } else {
         try {
           await updateServiceApi(
-            formData.ServiceCode || formData.ServiceId,
+            formData.ServiceId || formData.ServiceCode,
             formData,
           );
         } catch (apiErr) {
@@ -1155,11 +1156,11 @@ const ServiceManagement = () => {
         }
 
         const updated = services.map((s) =>
-          s.ServiceCode === formData.ServiceCode ? { ...formData } : s,
+          s.ServiceId === formData.ServiceId ? { ...formData } : s,
         );
         setServices(updated);
         showToast(
-          `Đã lưu cập nhật cho dịch vụ ${formData.ServiceCode}!`,
+          `Đã lưu cập nhật cho dịch vụ ${formData.ServiceName}!`,
           "success",
         );
       }
@@ -1175,7 +1176,7 @@ const ServiceManagement = () => {
       if (isCurrentlyActive) {
         try {
           await deactivateServiceApi(
-            formData.ServiceCode || formData.ServiceId,
+            formData.ServiceId || formData.ServiceCode,
           );
         } catch (apiErr) {
           if (apiErr.code) {
@@ -1187,17 +1188,17 @@ const ServiceManagement = () => {
         setFormData(updated);
         setServices((prev) =>
           prev.map((s) =>
-            s.ServiceCode === formData.ServiceCode ? updated : s,
+            s.ServiceId === formData.ServiceId ? updated : s,
           ),
         );
         showToast(
-          `Dịch vụ ${formData.ServiceCode} đã chuyển sang trạng thái: "Ngừng cung cấp"`,
+          `Dịch vụ ${formData.ServiceName} đã chuyển sang trạng thái: "Ngừng cung cấp"`,
           "warning",
         );
       } else {
         try {
           await reactivateServiceApi(
-            formData.ServiceCode || formData.ServiceId,
+            formData.ServiceId || formData.ServiceCode,
           );
         } catch (apiErr) {
           if (apiErr.code) {
@@ -1209,11 +1210,11 @@ const ServiceManagement = () => {
         setFormData(updated);
         setServices((prev) =>
           prev.map((s) =>
-            s.ServiceCode === formData.ServiceCode ? updated : s,
+            s.ServiceId === formData.ServiceId ? updated : s,
           ),
         );
         showToast(
-          `Dịch vụ ${formData.ServiceCode} đã kích hoạt thành công (Active)!`,
+          `Dịch vụ ${formData.ServiceName} đã kích hoạt thành công (Active)!`,
           "success",
         );
       }
@@ -1307,7 +1308,7 @@ const ServiceManagement = () => {
           <ServiceListSection
             services={services}
             categories={categories}
-            selectedCode={selectedCode}
+            selectedId={selectedId}
             onSelect={handleSelectService}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}

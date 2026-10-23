@@ -23,6 +23,7 @@ import TableReservation from './pages/client/TableReservation';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 import ServiceManagement from './pages/admin/services/ServiceManagement';
 import ServiceDispatchTerminal from './pages/admin/services/ServiceDispatchTerminal';
+import ServiceOrdersKanban from './pages/admin/services/ServiceOrdersKanban';
 import RoomStatusManagement from './pages/RoomStatusManagement';
 import BookingManagement from './pages/BookingManagement';
 import RoomAssignment from './pages/admin/RoomAssignment';
@@ -101,7 +102,8 @@ function App() {
             <Route path="/admin/fnb/history" element={<ProtectedRoute><FnbOrderHistory /></ProtectedRoute>} />
             <Route path="/admin/services" element={<ProtectedRoute><ServiceManagement /></ProtectedRoute>} />
             <Route path="/admin/services/dispatch" element={<ProtectedRoute><ServiceDispatchTerminal /></ProtectedRoute>} />
-            <Route path="/admin/services/orders" element={<ProtectedRoute><ServiceDispatchTerminal /></ProtectedRoute>} />
+            <Route path="/admin/services/orders" element={<ProtectedRoute><ServiceOrdersKanban /></ProtectedRoute>} />
+            <Route path="/admin/services/kanban" element={<ProtectedRoute><ServiceOrdersKanban /></ProtectedRoute>} />
             <Route path="/admin/loyalty" element={<ProtectedRoute><LoyaltyManagement /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

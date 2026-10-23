@@ -17,6 +17,7 @@ const ALL_NAV_ITEMS = [
   { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "event_available", label: "Tiếp Nhận & Đặt Dịch Vụ", to: "/admin/services/dispatch", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "pending_actions", label: "Tiến Độ Đơn Dịch Vụ", to: "/admin/services/orders", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "restaurant", label: "Quản Lý Thực Đơn (F&B)", to: "/admin/menu", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
   { icon: "soup_kitchen", label: "Màn Hình Bếp (KDS)", to: "/admin/fnb/kitchen", allowedRoles: ['Admin', 'Kitchen'] },
   { icon: "local_shipping", label: "Theo Dõi & Giao Món", to: "/admin/fnb/dispatch", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },

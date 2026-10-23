@@ -388,6 +388,17 @@ exports.getServiceOrders = async (req, res) => {
               model: Room,
               attributes: ['RoomId', 'RoomNumber'],
             },
+            {
+              model: Booking,
+              attributes: ['BookingId', 'ConfirmationCode'],
+              include: [
+                {
+                  model: User,
+                  as: 'user',
+                  attributes: ['UserId', 'FullName', 'Phone', 'Email'],
+                },
+              ],
+            },
           ],
         },
       ],

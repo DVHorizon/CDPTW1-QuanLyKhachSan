@@ -204,3 +204,20 @@ export const fetchServiceOrdersApi = async (params = {}) => {
   return data;
 };
 
+/**
+ * 12. Cập nhật tiến độ đơn dịch vụ (FEAT-SERVICE-04 / C4)
+ * PATCH /api/v1/service-orders/:orderId/status
+ * @param {number|string} orderId
+ * @param {object} payload { newStatus: 'InProgress' | 'Completed' | 'Cancelled', cancelReason?: string }
+ */
+export const updateServiceOrderStatusApi = async (orderId, payload) => {
+  const res = await fetch(`${ORDERS_BASE_URL}/${orderId}/status`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw data;
+  return data;
+};
+
