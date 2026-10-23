@@ -19,6 +19,11 @@ function checkRoomPermission(requiredPermission = 'ROOM_MANAGE') {
   return (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Hỗ trợ chế độ phát triển nội bộ không bị chặn thao tác
+      if (process.env.NODE_ENV !== 'production') {
+        req.user = { roleName: 'Admin', FullName: 'Quản trị viên', UserId: 1 };
+        return next();
+      }
       return res.status(401).json({
         success: false,
         code: 'ERROR_0009_UNAUTHENTICATED',

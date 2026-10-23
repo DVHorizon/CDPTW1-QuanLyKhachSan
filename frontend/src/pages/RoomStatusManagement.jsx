@@ -5,6 +5,29 @@ import { useSocket } from '../context/SocketContext';
 // ─── Cấu hình API Backend ──────────────────────────────────────────────────
 const API_BASE = 'http://localhost:5000/api/phong';
 
+// Helper lấy header xác thực và content-type
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('hotel_token') || localStorage.getItem('token') || '';
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
+// Safe JSON parser phòng ngừa server trả về HTML lỗi (502, 500, 404)
+const safeJson = async (res) => {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    return {
+      success: false,
+      message: res.statusText || `Lỗi phản hồi máy chủ (Mã HTTP ${res.status})`
+    };
+  }
+};
+
 // Mapping 4 trạng thái chuẩn PMS
 const STATUS_CONFIG = {
   clean: {
@@ -142,8 +165,10 @@ const RoomStatusManagement = () => {
   const fetchRealRooms = async (silence = false) => {
     if (!silence) setIsRefreshing(true);
     try {
-      const res = await fetch(`${API_BASE}?limit=50&cat_bot_du_thua=true`);
-      const data = await res.json();
+      const res = await fetch(`${API_BASE}?limit=50&cat_bot_du_thua=true`, {
+        headers: getAuthHeaders()
+      });
+      const data = await safeJson(res);
       if (data.success && Array.isArray(data.data)) {
         setRooms(data.data);
         setTotalInDb(data.totalInDb || data.data.length);
@@ -280,14 +305,14 @@ const RoomStatusManagement = () => {
     try {
       const res = await fetch(`${API_BASE}/${roomId}/chuyen-trang-thai`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           targetStatus,
           prevUpdatedAt: currentRoom.updated_at
         })
       });
 
-      const result = await res.json();
+      const result = await safeJson(res);
 
       // Trường hợp 1: Phòng bị xóa bởi người khác (Xung đột sửa - xóa)
       if (res.status === 404 || result.isRecordDeleted) {
@@ -358,10 +383,10 @@ const RoomStatusManagement = () => {
     try {
       const res = await fetch(`${API_BASE}/${room.id}/maintenance`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ action, maintenanceNote: maintenanceNote.trim() })
       });
-      const result = await res.json();
+      const result = await safeJson(res);
 
       if (!res.ok || !result.success) {
         setMaintenanceError(result.message || 'Lỗi khi cập nhật trạng thái bảo trì');
@@ -396,8 +421,8 @@ const RoomStatusManagement = () => {
         if (historyRoomNumber) params.append('roomNumber', historyRoomNumber);
         url = `${API_BASE}/all-status-history?${params}`;
       }
-      const res = await fetch(url);
-      const data = await res.json();
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      const data = await safeJson(res);
       if (data.success) {
         setHistoryData(data.data || []);
         setHistoryTotal(data.total || 0);
@@ -417,8 +442,11 @@ const RoomStatusManagement = () => {
   const handleSync50Rooms = async () => {
     try {
       setIsRefreshing(true);
-      const res = await fetch(`${API_BASE}/dong-bo-50`, { method: 'POST' });
-      const data = await res.json();
+      const res = await fetch(`${API_BASE}/dong-bo-50`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      const data = await safeJson(res);
       if (data.success) {
         showToast(data.message || 'Đã đồng bộ cơ sở dữ liệu thành công!');
         fetchRealRooms();
@@ -442,8 +470,11 @@ const RoomStatusManagement = () => {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/${roomToDelete.id}`, { method: 'DELETE' });
-      const data = await res.json();
+      const res = await fetch(`${API_BASE}/${roomToDelete.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      const data = await safeJson(res);
 
       if (res.status === 404 || data.isRecordDeleted) {
         setSyncModal({
@@ -501,10 +532,10 @@ const RoomStatusManagement = () => {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(f)
       });
-      const data = await res.json();
+      const data = await safeJson(res);
 
       // Kiểm tra phòng bị xóa khi đang sửa
       if (!isNew && (res.status === 404 || data.isRecordDeleted)) {
