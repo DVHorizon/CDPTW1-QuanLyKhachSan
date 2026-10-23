@@ -20,12 +20,8 @@ const RoomService = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [createdOrder, setCreatedOrder] = useState(null);
 
-  // Delivery Parameters State
-  const [deliveryTimeMode, setDeliveryTimeMode] = useState('immediate'); // 'immediate' | 'scheduled'
-  const [scheduledTime, setScheduledTime] = useState('19:30');
-  const [serviceStyle, setServiceStyle] = useState('trolley'); // 'trolley' | 'door_tray'
-  const [guestCount, setGuestCount] = useState(2);
-  const [conciergeNotes, setConciergeNotes] = useState('Chuẩn bị 2 ly pha lê Bordeaux cao cấp.\nTuyệt đối không dùng hạt mè rắc bánh mì và salad.');
+  // Ghi chú đơn hàng (FoodOrder.Note)
+  const [orderNote, setOrderNote] = useState('');
 
   // Dynamic Database Menu State
   const [categories, setCategories] = useState([]);
@@ -268,18 +264,6 @@ const RoomService = () => {
       const authHeader = { 'Authorization': `Bearer ${token}` };
 
       // Bước 1: Tạo đơn Room Service (FEAT-FNB-04)
-      const serviceStyleLabel = serviceStyle === 'trolley' ? 'Bàn xe đẩy (Khăn trắng 5 sao)' : 'Khay tại cửa (Không tiếp xúc)';
-      const deliveryLabel = deliveryTimeMode === 'scheduled' ? `Hẹn giờ ${scheduledTime}` : 'Ngay tức thì (25-35p)';
-      const noteParts = [
-        `[Phục vụ: ${serviceStyleLabel}]`,
-        `[Thời gian: ${deliveryLabel}]`,
-        `[Số khách: ${guestCount}]`
-      ];
-      if (conciergeNotes.trim()) {
-        noteParts.push(`Ghi chú: ${conciergeNotes.trim()}`);
-      }
-      const aggregatedOrderNote = noteParts.join(' • ');
-
       const createRes = await fetch('http://localhost:5000/api/v1/fnb-orders', {
         method: 'POST',
         headers: {
@@ -296,7 +280,7 @@ const RoomService = () => {
           })),
           userId: user?.id || user?.UserId || user?.userId || undefined,
           paymentMode,
-          note: aggregatedOrderNote
+          note: orderNote.trim() || undefined
         })
       });
 
@@ -450,124 +434,24 @@ const RoomService = () => {
                     <span className="font-label-sm text-label-sm text-outline">Quyền ghi nợ: Mở</span>
                   </div>
                 </div>
-              </div>
-              {/* Thông số giao món & Setup bàn */}
-              <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm space-y-space-md">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Thông Số Giao Hàng</span>
-                  <span className="material-symbols-outlined text-admin-primary text-[18px]">nest_clock_farsight_analog</span>
-                </div>
-                {/* Khung giờ giao */}
-                <div className="space-y-space-xs">
-                  <label className="font-label-sm text-label-sm text-on-surface-variant block">Thời gian giao món</label>
-                  <div className="grid grid-cols-2 gap-space-xs">
-                    <button 
-                      type="button"
-                      onClick={() => setDeliveryTimeMode('immediate')}
-                      className={`py-space-xs px-space-sm rounded-lg font-label-sm text-label-sm text-center font-bold transition-all ${
-                        deliveryTimeMode === 'immediate'
-                          ? 'bg-admin-primary text-on-admin-primary shadow-sm'
-                          : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                      }`}
-                    >
-                      Ngay tức thì (25-35p)
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setDeliveryTimeMode('scheduled')}
-                      className={`py-space-xs px-space-sm rounded-lg font-label-sm text-label-sm text-center font-bold transition-all ${
-                        deliveryTimeMode === 'scheduled'
-                          ? 'bg-admin-primary text-on-admin-primary shadow-sm'
-                          : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                      }`}
-                    >
-                      Hẹn giờ: {scheduledTime}
-                    </button>
-                  </div>
-                  {deliveryTimeMode === 'scheduled' && (
-                    <div className="pt-1 flex items-center gap-2">
-                      <span className="text-xs text-on-surface-variant">Chọn giờ:</span>
-                      <input 
-                        type="time" 
-                        value={scheduledTime}
-                        onChange={(e) => setScheduledTime(e.target.value)}
-                        className="bg-surface-container-low px-2 py-1 rounded text-xs font-semibold text-on-surface border border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-admin-primary"
-                      />
-                    </div>
-                  )}
-                </div>
-                {/* Hình thức dọn bàn */}
-                <div className="space-y-space-xs">
-                  <label className="font-label-sm text-label-sm text-on-surface-variant block">Hình thức phục vụ</label>
-                  <div className="grid grid-cols-2 gap-space-xs">
-                    <div 
-                      onClick={() => setServiceStyle('trolley')}
-                      className={`p-space-xs rounded-lg flex items-center gap-space-xs cursor-pointer transition-all border ${
-                        serviceStyle === 'trolley'
-                          ? 'bg-admin-primary/10 border-admin-primary text-admin-primary shadow-sm'
-                          : 'bg-surface-container border-transparent text-on-surface-variant opacity-75 hover:opacity-100'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">table_restaurant</span>
-                      <div className="flex flex-col text-left">
-                        <span className="font-label-sm text-label-sm font-bold">Bàn xe đẩy</span>
-                        <span className="text-[10px] text-on-surface-variant">Khăn trắng 5 sao</span>
-                      </div>
-                    </div>
-                    <div 
-                      onClick={() => setServiceStyle('door_tray')}
-                      className={`p-space-xs rounded-lg flex items-center gap-space-xs cursor-pointer transition-all border ${
-                        serviceStyle === 'door_tray'
-                          ? 'bg-admin-primary/10 border-admin-primary text-admin-primary shadow-sm'
-                          : 'bg-surface-container border-transparent text-on-surface-variant opacity-75 hover:opacity-100'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">inventory_2</span>
-                      <div className="flex flex-col text-left">
-                        <span className="font-label-sm text-label-sm font-semibold">Khay tại cửa</span>
-                        <span className="text-[10px] text-on-surface-variant">Không tiếp xúc</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {/* Số lượng khách & Ghi chú quản gia */}
-                <div className="space-y-space-xs">
+                {/* Ghi chú đơn hàng cho Bếp (Lưu vào FoodOrders.Note) */}
+                <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-label-sm text-label-sm text-on-surface-variant">Số lượng khách dùng</span>
-                    <div className="flex items-center gap-space-sm bg-surface-container-low px-space-sm py-1 rounded-lg">
-                      <button 
-                        type="button"
-                        onClick={() => setGuestCount(prev => Math.max(1, prev - 1))}
-                        className="text-on-surface-variant hover:text-admin-primary font-bold px-1"
-                        title="Giảm 1 khách"
-                      >
-                        -
-                      </button>
-                      <span className="font-label-md text-label-md text-on-surface font-bold px-1">
-                        {guestCount < 10 ? `0${guestCount}` : guestCount}
-                      </span>
-                      <button 
-                        type="button"
-                        onClick={() => setGuestCount(prev => Math.min(20, prev + 1))}
-                        className="text-on-surface-variant hover:text-admin-primary font-bold px-1"
-                        title="Tăng 1 khách"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="pt-space-xs space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="font-label-sm text-label-sm text-outline">Ghi chú điều phối tiền sảnh</span>
+                    <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px] text-admin-primary">edit_note</span>
+                      Ghi Chú Đơn Hàng Cho Bếp
+                    </span>
                   </div>
                   <textarea 
                     rows="3"
-                    value={conciergeNotes}
-                    onChange={(e) => setConciergeNotes(e.target.value)}
-                    placeholder="Nhập ghi chú phục vụ phòng..."
-                    className="w-full bg-surface-container-low p-space-sm rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-admin-primary resize-none"
+                    value={orderNote}
+                    onChange={(e) => setOrderNote(e.target.value)}
+                    placeholder="Nhập ghi chú yêu cầu chế biến (VD: Không hành, sốt để riêng, mang thêm dao nĩa...)"
+                    className="w-full bg-surface-container-low p-space-sm rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-admin-primary resize-none placeholder:text-outline"
                   />
+                  <p className="text-[11px] text-on-surface-variant">
+                    Ghi chú sẽ được chuyển thẳng đến màn hình điều phối bếp (KDS) và lưu trữ trên hóa đơn.
+                  </p>
                 </div>
               </div>
             </div>
