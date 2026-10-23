@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import Header from '../../components/layout/Header';
 import DepositInvoiceModal from '../../components/modals/DepositInvoiceModal';
-import { getRoomDetailApi, createBookingApi, releaseRoomLockApi, calculatePricingApi } from '../../api/roomApi';
+import { getRoomDetailApi, createBookingApi, releaseRoomLockApi, calculatePricingApi, validateVoucherApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
 
 // Helper format VND currency
@@ -113,6 +113,55 @@ export default function BookingEngine() {
   const [isCalculatingPricing, setIsCalculatingPricing] = useState(false);
   const [pricingError, setPricingError] = useState('');
 
+  // Voucher / Promotion State (FEAT-GUEST-07 / A7)
+  const [voucherInput, setVoucherInput] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [voucherError, setVoucherError] = useState('');
+  const [voucherErrorCode, setVoucherErrorCode] = useState('');
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
+
+  // Handle Apply Voucher (FEAT-GUEST-07)
+  const handleApplyVoucher = async (codeToApply) => {
+    const targetCode = String(codeToApply || voucherInput || '').trim().toUpperCase();
+    if (!targetCode) return;
+    setIsApplyingVoucher(true);
+    setVoucherError('');
+    setVoucherErrorCode('');
+
+    try {
+      const currentSubtotal = pricingData?.roomSubtotal || roomSubtotal;
+      const res = await validateVoucherApi({
+        voucherCode: targetCode,
+        bookingTotal: currentSubtotal,
+        currency: pricingData?.currency || 'VND'
+      });
+
+      if (res && res.success && res.data) {
+        setAppliedVoucher(res.data);
+        setVoucherInput(res.data.voucherCode);
+        setVoucherError('');
+        setVoucherErrorCode('');
+      } else {
+        setAppliedVoucher(null);
+        setVoucherErrorCode(res?.code || 'ERROR_FAILED');
+        setVoucherError(res?.message || 'Mã giảm giá không tồn tại hoặc đã nhập sai');
+      }
+    } catch (err) {
+      console.error('Lỗi khi áp dụng voucher:', err);
+      setVoucherErrorCode('ERROR_NETWORK');
+      setVoucherError('Không thể kết nối đến máy chủ kiểm tra mã giảm giá.');
+    } finally {
+      setIsApplyingVoucher(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherInput('');
+    setVoucherError('');
+    setVoucherErrorCode('');
+  };
+
   // Fetch room type details
   useEffect(() => {
     let isMounted = true;
@@ -175,6 +224,7 @@ export default function BookingEngine() {
           roomQuantity: unitsAllocated,
           selectedAddOns: selectedAddonsList,
           lateCheckOutMinutes: addonLateCO ? lateCheckOutMinutes : undefined,
+          voucherCode: appliedVoucher ? appliedVoucher.voucherCode : undefined,
           taxesAndFeesRate: 0.12,
           depositRate: 0.20,
           isGoldMember: user?.MembershipTier?.TierName === 'Gold' || user?.TierId === 3
@@ -200,7 +250,7 @@ export default function BookingEngine() {
 
     calculateStayPrice();
     return () => { isMounted = false; };
-  }, [checkInDate, checkOutDate, roomType, roomTypeId, adultsCount, childrenCount, unitsAllocated, addonBuffet, addonLimo, addonEarlyCI, addonLateCO, lateCheckOutMinutes, user]);
+  }, [checkInDate, checkOutDate, roomType, roomTypeId, adultsCount, childrenCount, unitsAllocated, addonBuffet, addonLimo, addonEarlyCI, addonLateCO, lateCheckOutMinutes, appliedVoucher, user]);
 
   const roomSubtotal = useMemo(() => {
     if (pricingData?.roomSubtotal) return pricingData.roomSubtotal;
@@ -309,6 +359,7 @@ export default function BookingEngine() {
         bedPreference,
         selectedAddons: selectedAddonsList,
         lateCheckOutMinutes: addonLateCO ? lateCheckOutMinutes : undefined,
+        voucherCode: appliedVoucher ? appliedVoucher.voucherCode : undefined,
         isGoldMember: user?.MembershipTier?.TierName === 'Gold' || user?.TierId === 3,
         totalAmount: pricingData?.totalAmount || finalTotalAmount,
         depositAmount: pricingData?.depositAmount || depositRequired,
@@ -1058,7 +1109,7 @@ export default function BookingEngine() {
                   )}
 
                   {/* Ưu đãi hội viên Gold */}
-                  {pricingData && pricingData.discountAmount > 0 && (
+                  {pricingData && pricingData.discountAmount > 0 && !appliedVoucher && (
                     <div className="flex justify-between items-center text-emerald-700">
                       <span className="flex items-center gap-1 font-medium">
                         <span className="material-symbols-outlined text-[16px]">stars</span>
@@ -1068,11 +1119,36 @@ export default function BookingEngine() {
                     </div>
                   )}
 
+                  {/* Chiết khấu Voucher Khuyến Mãi (FEAT-GUEST-07) */}
+                  {appliedVoucher && (
+                    <div className="p-2.5 rounded-xl bg-emerald-50/90 border border-emerald-200">
+                      <div className="flex justify-between items-center text-emerald-900 font-semibold text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-emerald-600">local_activity</span>
+                          <span>Voucher [{appliedVoucher.voucherCode}]:</span>
+                        </span>
+                        <span className="font-bold text-emerald-800 text-[13px]">
+                          -{formatMoney(appliedVoucher.discountAmount, pricingData?.currency)}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-emerald-700 mt-0.5 flex justify-between items-center">
+                        <span>Giảm {appliedVoucher.discountDisplay} tiền phòng</span>
+                        <button
+                          type="button"
+                          onClick={handleRemoveVoucher}
+                          className="text-[11px] text-red-600 hover:text-red-800 font-medium hover:underline"
+                        >
+                          Gỡ mã
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Chi phí trước thuế */}
                   <div className="flex justify-between items-center text-slate-500 pt-1 border-t border-dashed border-slate-200">
                     <span>Tổng chi phí trước thuế</span>
                     <span className="font-medium text-slate-700">
-                      {formatMoney(pricingData?.subtotalBeforeTax || (roomSubtotal - goldDiscount + addonsTotal), pricingData?.currency)}
+                      {formatMoney(pricingData?.subtotalBeforeTax || (roomSubtotal - goldDiscount + addonsTotal - (appliedVoucher?.discountAmount || 0)), pricingData?.currency)}
                     </span>
                   </div>
 
@@ -1085,6 +1161,121 @@ export default function BookingEngine() {
                       +{formatMoney(pricingData?.taxesAndFees || Math.round((roomSubtotal - goldDiscount + addonsTotal) * 0.12), pricingData?.currency)}
                     </span>
                   </div>
+                </div>
+
+                {/* FEAT-GUEST-07: Khối Nhập Mã Voucher / Promo Code (Wireframe Hình 7) */}
+                <div className="pt-1 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-[#725b38]">confirmation_number</span>
+                      <span>Mã Khuyến Mãi / Voucher</span>
+                    </label>
+                    {appliedVoucher && (
+                      <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-0.5">
+                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                        Đã áp dụng
+                      </span>
+                    )}
+                  </div>
+
+                  {!appliedVoucher ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={voucherInput}
+                            onChange={(e) => {
+                              setVoucherInput(e.target.value.toUpperCase());
+                              if (voucherError) setVoucherError('');
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleApplyVoucher();
+                              }
+                            }}
+                            placeholder="Nhập mã (VD: SUMMER20)"
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs font-mono font-bold tracking-wider uppercase focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
+                          />
+                          {voucherInput && (
+                            <button
+                              type="button"
+                              onClick={() => setVoucherInput('')}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">close</span>
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyVoucher()}
+                          disabled={isApplyingVoucher || !voucherInput.trim()}
+                          className="px-4 py-2.5 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white font-bold text-xs uppercase tracking-wide transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 shrink-0"
+                        >
+                          {isApplyingVoucher ? (
+                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                          ) : (
+                            <span>Áp Dụng</span>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Gợi ý mã khuyến mãi sẵn có */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] text-slate-400">Gợi ý:</span>
+                        <button
+                          type="button"
+                          onClick={() => { setVoucherInput('SUMMER20'); handleApplyVoucher('SUMMER20'); }}
+                          className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors"
+                        >
+                          SUMMER20 (-20%)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setVoucherInput('HORIZON500'); handleApplyVoucher('HORIZON500'); }}
+                          className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 transition-colors"
+                        >
+                          HORIZON500 (-500k)
+                        </button>
+                      </div>
+
+                      {/* Thông báo lỗi Voucher chuẩn nguyên văn đặc tả */}
+                      {voucherError && (
+                        <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs flex items-start gap-1.5 animate-shake">
+                          <span className="material-symbols-outlined text-red-600 text-[16px] shrink-0 mt-0.5">error</span>
+                          <div className="flex-1">
+                            <span className="font-semibold">{voucherErrorCode ? `[${voucherErrorCode}] ` : ''}</span>
+                            <span>{voucherError}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Thẻ thành công khi đã áp dụng mã */
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs animate-fade-in">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-emerald-600 text-[22px]">verified</span>
+                        <div>
+                          <div className="font-bold text-emerald-900 font-mono tracking-wide">
+                            {appliedVoucher.voucherCode}
+                          </div>
+                          <div className="text-[11px] text-emerald-700">
+                            Tiết kiệm {appliedVoucher.discountDisplay} (-{formatMoney(appliedVoucher.discountAmount, pricingData?.currency)})
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveVoucher}
+                        className="text-xs text-red-600 hover:text-red-800 font-semibold hover:underline flex items-center gap-0.5"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">close</span>
+                        <span>Gỡ mã</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Total & Deposit Display */}
@@ -1200,6 +1391,15 @@ export default function BookingEngine() {
                     {successBooking.numberOfNights} đêm ({formatDisplayDate(successBooking.checkInDate)} đến {formatDisplayDate(successBooking.checkOutDate)})
                   </span>
                 </div>
+                {appliedVoucher && (
+                  <div className="flex justify-between text-emerald-700 font-medium">
+                    <span className="flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[15px]">local_activity</span>
+                      Mã giảm giá [{appliedVoucher.voucherCode}]:
+                    </span>
+                    <span className="font-bold">-{formatMoney(appliedVoucher.discountAmount, pricingData?.currency)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-slate-500">Tổng thanh toán:</span>
                   <span className="font-bold text-slate-900">{formatVND(successBooking.totalAmount)}</span>

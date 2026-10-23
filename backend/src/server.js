@@ -84,6 +84,11 @@ app.use('/api/v1/service-orders', require('./modules/services/routes/serviceOrde
 app.use('/api/service-orders',    require('./modules/services/routes/serviceOrderRoutes'));
 app.use('/service-orders',        require('./modules/services/routes/serviceOrderRoutes'));
 
+// FEAT-PAYMENT-01: Core Payment Module (C5)
+app.use('/api/v1/payments',       require('./modules/payments'));
+app.use('/api/payments',          require('./modules/payments'));
+app.use('/payments',              require('./modules/payments'));
+
 // 👤 Trang — F&B
 app.use('/api/v1/fnb',                require('./modules/fnb'));
 app.use('/api/v1/fnb-orders',         require('./routes/admin/fnbOrderRoutes'));
@@ -104,10 +109,17 @@ app.post('/bookings', require('./controllers/bookingEngineController').createOnl
 app.post('/bookings/calculate-pricing', require('./controllers/bookingEngineController').calculatePricing);
 app.post('/api/bookings/calculate-pricing', require('./controllers/bookingEngineController').calculatePricing);
 
+// FEAT-GUEST-07: Promotion & Voucher Redemption endpoints (Mã truy vết: A7)
+app.use('/api/v1/vouchers', require('./routes/voucherRoutes'));
+app.use('/api/vouchers', require('./routes/voucherRoutes'));
+app.post('/bookings/apply-voucher', require('./controllers/voucherController').validateVoucher);
+app.post('/api/bookings/apply-voucher', require('./controllers/voucherController').validateVoucher);
+app.post('/bookings/:bookingId/apply-voucher', require('./controllers/voucherController').applyVoucherToBooking);
+app.post('/api/bookings/:bookingId/apply-voucher', require('./controllers/voucherController').applyVoucherToBooking);
+
 // FEAT-GUEST-08: Direct deposit payment & booking retrieval endpoints
 app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController').getBookingDetails);
 app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
-app.post('/payments', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 app.use(require('./shared/middlewares/errorHandler'));

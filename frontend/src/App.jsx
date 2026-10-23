@@ -23,12 +23,14 @@ import TableReservation from './pages/client/TableReservation';
 import LoyaltyManagement from './pages/LoyaltyManagement';
 import ServiceManagement from './pages/admin/services/ServiceManagement';
 import ServiceDispatchTerminal from './pages/admin/services/ServiceDispatchTerminal';
+import ServiceOrdersKanban from './pages/admin/services/ServiceOrdersKanban';
 import RoomStatusManagement from './pages/RoomStatusManagement';
 import BookingManagement from './pages/BookingManagement';
 import RoomAssignment from './pages/admin/RoomAssignment';
 import CheckInDesk from './pages/admin/CheckInDesk';
 import CheckOutDesk from './pages/admin/CheckOutDesk';
 import FnbReview from './pages/client/FnbReview';
+import MockPaymentGateway from './pages/client/MockPaymentGateway';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 
@@ -52,6 +54,7 @@ function App() {
             <Route path="/thanh-toan" element={<DepositPayment />} />
             <Route path="/checkout/payment" element={<DepositPayment />} />
             <Route path="/checkout/step-2" element={<DepositPayment />} />
+            <Route path="/mock-payment/:transactionCode" element={<MockPaymentGateway />} />
             <Route path="/room-service" element={<RoomService />} />
             <Route path="/fnb/history" element={<GuestOrderHistory />} />
             <Route path="/lich-su-dat-mon" element={<GuestOrderHistory />} />
@@ -68,9 +71,9 @@ function App() {
             <Route path="/admin/menu" element={<ProtectedRoute><MenuManagement /></ProtectedRoute>} />
             <Route path="/admin/room-types" element={<ProtectedRoute><RoomTypeManagement /></ProtectedRoute>} />
             <Route path="/admin/rooms" element={<ProtectedRoute><RoomManagement /></ProtectedRoute>} />
-            <Route path="/admin/bookings" element={<ProtectedRoute><BookingManagement /></ProtectedRoute>} />
-            <Route path="/admin/dat-phong" element={<ProtectedRoute><BookingManagement /></ProtectedRoute>} />
-            <Route path="/admin/danh-sach-dat-phong" element={<ProtectedRoute><BookingManagement /></ProtectedRoute>} />
+            <Route path="/admin/bookings" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><BookingManagement /></ProtectedRoute>} />
+            <Route path="/admin/dat-phong" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><BookingManagement /></ProtectedRoute>} />
+            <Route path="/admin/danh-sach-dat-phong" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><BookingManagement /></ProtectedRoute>} />
             <Route path="/admin/room-assignment" element={<ProtectedRoute><RoomAssignment /></ProtectedRoute>} />
             <Route path="/admin/room-assignment/:bookingId" element={<ProtectedRoute><RoomAssignment /></ProtectedRoute>} />
             <Route path="/admin/room-allocation" element={<ProtectedRoute><RoomAssignment /></ProtectedRoute>} />
@@ -101,7 +104,8 @@ function App() {
             <Route path="/admin/fnb/history" element={<ProtectedRoute><FnbOrderHistory /></ProtectedRoute>} />
             <Route path="/admin/services" element={<ProtectedRoute><ServiceManagement /></ProtectedRoute>} />
             <Route path="/admin/services/dispatch" element={<ProtectedRoute><ServiceDispatchTerminal /></ProtectedRoute>} />
-            <Route path="/admin/services/orders" element={<ProtectedRoute><ServiceDispatchTerminal /></ProtectedRoute>} />
+            <Route path="/admin/services/orders" element={<ProtectedRoute><ServiceOrdersKanban /></ProtectedRoute>} />
+            <Route path="/admin/services/kanban" element={<ProtectedRoute><ServiceOrdersKanban /></ProtectedRoute>} />
             <Route path="/admin/loyalty" element={<ProtectedRoute><LoyaltyManagement /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

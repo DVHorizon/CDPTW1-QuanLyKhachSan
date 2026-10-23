@@ -133,12 +133,13 @@ export const reactivateServiceApi = async (id) => {
 };
 
 /**
- * 7. Kích hoạt đồng bộ sang trạm POS
+ * 2b. Thêm mới nhóm dịch vụ (POST /api/v1/services/categories)
  */
-export const syncPosApi = async () => {
-  const res = await fetch(`${BASE_URL}/sync-pos`, {
+export const createCategoryApi = async (categoryData) => {
+  const res = await fetch(`${BASE_URL}/categories`, {
     method: 'POST',
     headers: getAuthHeaders(),
+    body: JSON.stringify(categoryData),
   });
   const data = await res.json();
   if (!res.ok) throw data;
@@ -197,6 +198,23 @@ export const fetchServiceOrdersApi = async (params = {}) => {
   const url = `${ORDERS_BASE_URL}${query.toString() ? '?' + query.toString() : ''}`;
   const res = await fetch(url, {
     headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw data;
+  return data;
+};
+
+/**
+ * 12. Cập nhật tiến độ đơn dịch vụ (FEAT-SERVICE-04 / C4)
+ * PATCH /api/v1/service-orders/:orderId/status
+ * @param {number|string} orderId
+ * @param {object} payload { newStatus: 'InProgress' | 'Completed' | 'Cancelled', cancelReason?: string }
+ */
+export const updateServiceOrderStatusApi = async (orderId, payload) => {
+  const res = await fetch(`${ORDERS_BASE_URL}/${orderId}/status`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
   });
   const data = await res.json();
   if (!res.ok) throw data;

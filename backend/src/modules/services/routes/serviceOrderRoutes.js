@@ -11,4 +11,7 @@ router.get('/', optionalVerifyToken, serviceOrderController.getServiceOrders);
 router.get('/active-stays', optionalVerifyToken, serviceOrderController.getActiveStays);
 router.get('/my-stay', verifyToken, serviceOrderController.getMyActiveStay);
 
+// ─── ENDPOINTS QUẢN LÝ TIẾN ĐỘ ĐƠN DỊCH VỤ (FEAT-SERVICE-04) ──────────────────
+router.patch('/:orderId/status', verifyToken, serviceOrderController.updateServiceOrderStatus);
+
 module.exports = router;

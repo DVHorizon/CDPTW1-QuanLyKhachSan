@@ -359,4 +359,59 @@ export const calculatePricingApi = async (payload) => {
   }
 };
 
+/**
+ * FEAT-GUEST-07: Áp dụng mã giảm giá và voucher khuyến mãi (Mã truy vết: A7)
+ * POST /bookings/apply-voucher hoặc POST /api/v1/vouchers/validate
+ * @param {Object} payload { voucherCode, bookingTotal, currency }
+ */
+export const validateVoucherApi = async (payload) => {
+  try {
+    let res = await fetch(`${API_BASE_URL}/bookings/apply-voucher`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.status === 404 && !res.headers.get('content-type')?.includes('json')) {
+      res = await fetch(`${API_BASE_URL}/v1/vouchers/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi validateVoucherApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ kiểm tra mã giảm giá.'
+    };
+  }
+};
+
+/**
+ * FEAT-GUEST-07: Áp dụng voucher vào đơn đặt phòng đã tạo
+ * POST /bookings/:bookingId/apply-voucher
+ */
+export const applyVoucherToBookingApi = async (bookingId, voucherCode) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/apply-voucher`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ voucherCode })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi applyVoucherToBookingApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ áp dụng voucher.'
+    };
+  }
+};
+
 
