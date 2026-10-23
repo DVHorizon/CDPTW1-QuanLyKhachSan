@@ -52,6 +52,9 @@ app.use('/api/maintenance', require('./routes/maintenanceRoutes'));
 // Route Quản Lý Đồ Thất Lạc & Bỏ Quên (Lost & Found Management)
 app.use('/api/housekeeping/lost-and-found', require('./routes/lostAndFoundRoutes'));
 
+// Route Khóa Cửa Điện Tử Thông Minh IoT (E-Key & Smart Lock Management)
+app.use('/api/smart-lock', require('./routes/smartLockRoutes'));
+
 const { AuditLog } = require('./models');
 
 app.listen(PORT, async () => {

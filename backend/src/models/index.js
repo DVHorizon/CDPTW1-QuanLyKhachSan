@@ -23,6 +23,7 @@ const defineLinenItem = require('./LinenItem');
 const defineLaundryBatch = require('./LaundryBatch');
 const defineMaintenanceTicket = require('./MaintenanceTicket');
 const defineLostAndFoundItem = require('./LostAndFoundItem');
+const defineSmartLockKey = require('./SmartLockKey');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -47,6 +48,7 @@ const LinenItem = defineLinenItem(sequelize);
 const LaundryBatch = defineLaundryBatch(sequelize);
 const MaintenanceTicket = defineMaintenanceTicket(sequelize);
 const LostAndFoundItem = defineLostAndFoundItem(sequelize);
+const SmartLockKey = defineSmartLockKey(sequelize);
 
 // Inventory Relationships
 InventoryItem.hasMany(InventoryBatch, { foreignKey: 'ItemId', as: 'batches' });
@@ -108,5 +110,6 @@ module.exports = {
   LinenItem,
   LaundryBatch,
   MaintenanceTicket,
-  LostAndFoundItem
+  LostAndFoundItem,
+  SmartLockKey
 };

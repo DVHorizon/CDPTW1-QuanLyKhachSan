@@ -13,6 +13,7 @@ import CampaignComposer from './pages/admin/marketing/CampaignComposer';
 import ConsumablesInventory from './pages/admin/housekeeping/ConsumablesInventory';
 import LinenManagement from './pages/admin/housekeeping/LinenManagement';
 import LostAndFoundManagement from './pages/admin/housekeeping/LostAndFoundManagement';
+import SmartLockManagement from './pages/admin/security/SmartLockManagement';
 import MaintenanceDashboard from './pages/admin/engineering/MaintenanceDashboard';
 import MaintenanceTicketCreate from './pages/admin/engineering/MaintenanceTicketCreate';
 import AuditLogs from './pages/AuditLogs';
@@ -44,6 +45,9 @@ function App() {
           <Route path="/admin/lost-and-found" element={<LostAndFoundManagement />} />
           <Route path="/admin/engineering" element={<MaintenanceDashboard />} />
           <Route path="/admin/engineering/new" element={<MaintenanceTicketCreate />} />
+          <Route path="/admin/security/smart-lock" element={<SmartLockManagement />} />
+          <Route path="/admin/smart-lock" element={<SmartLockManagement />} />
+          <Route path="/admin/ekey" element={<SmartLockManagement />} />
           <Route path="/admin/audit-logs" element={<AuditLogs />} />
           <Route path="/admin/roster" element={<RosterShifts />} />
           <Route path="/admin/shifts" element={<RosterShifts />} />

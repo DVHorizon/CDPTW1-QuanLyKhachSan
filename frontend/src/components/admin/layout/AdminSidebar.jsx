@@ -80,6 +80,11 @@ const menuItems = [
     to: '/admin/audit-logs',
   },
   {
+    label: 'Khóa Thông Minh & E-Key',
+    icon: 'key',
+    to: '/admin/security/smart-lock',
+  },
+  {
     label: 'Điều Độ Lịch Trực Ca ',
     icon: 'event_available',
     to: '/admin/roster',
