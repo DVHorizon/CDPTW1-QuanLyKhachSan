@@ -34,10 +34,30 @@ function broadcastTableReservation(reservation, action = 'NEW_RESERVATION') {
   });
 }
 
+// Broadcast room status change to connected clients (FEAT-ROOMMAP-01)
+function broadcastRoomMapUpdate(payload) {
+  const wss = socketHandler.getWss ? socketHandler.getWss() : null;
+  if (!wss) return;
+
+  const msg = JSON.stringify({
+    type: 'ROOM_MAP_UPDATED',
+    event: 'availability:changed',
+    data: payload
+  });
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1 /* WebSocket.OPEN */) {
+      client.send(msg);
+    }
+  });
+}
+
 module.exports = {
   initWebSocket: socketHandler.initSocket,
   broadcastOrderStatus: socketHandler.broadcastOrderStatus,
   broadcastRoomEvent: socketHandler.broadcastRoomEvent,
   broadcastTableReservation,
+  broadcastNewKitchenOrder: socketHandler.broadcastNewKitchenOrder,
+  broadcastRoomMapUpdate,
   getWss: socketHandler.getWss
 };

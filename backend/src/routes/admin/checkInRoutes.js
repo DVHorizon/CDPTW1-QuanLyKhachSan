@@ -13,6 +13,55 @@ const toDateStr = (d) => {
   return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
 };
 
+// ─── GET /api/v1/check-in/arrivals ──────────────────────────────────────────
+// Lấy danh sách các đặt phòng gần đây / hôm nay để lễ tân chọn nhanh hoặc quét QR
+router.get('/arrivals', async (req, res) => {
+  try {
+    const { limit = 20, status } = req.query;
+    let statusFilter = "b.Status IN ('Confirmed', 'Pending', 'CheckedIn')";
+    if (status) {
+      statusFilter = `b.Status = ${pool.escape(status)}`;
+    }
+
+    const sql = `
+      SELECT
+        b.BookingId,
+        b.ConfirmationCode,
+        CAST(b.CheckInDate AS CHAR)  AS CheckInDate,
+        CAST(b.CheckOutDate AS CHAR) AS CheckOutDate,
+        b.NumberOfNights,
+        b.TotalAmount,
+        b.DepositAmount,
+        b.Status AS BookingStatus,
+        COALESCE(bg.FullName, u.FullName, 'Khách hàng') AS GuestName,
+        COALESCE(bg.Phone, u.Phone, '') AS GuestPhone,
+        COALESCE(bg.IdNumber, u.IdNumber, '') AS IdNumber,
+        COALESCE(rt.TypeName, 'Phòng Tiêu Chuẩn') AS RoomTypeName,
+        r.RoomNumber,
+        r.RoomId,
+        r.Status AS RoomStatus
+      FROM Bookings b
+      LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
+      LEFT JOIN Users u ON b.UserId = u.UserId
+      LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
+      LEFT JOIN Stays s ON b.BookingId = s.BookingId
+      LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      WHERE ${statusFilter}
+      ORDER BY b.BookingId DESC
+      LIMIT ?
+    `;
+
+    const [rows] = await pool.query(sql, [Number(limit) || 20]);
+    res.json({
+      success: true,
+      data: rows,
+    });
+  } catch (err) {
+    console.error('GET /check-in/arrivals error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi tải danh sách đặt phòng: ' + err.message });
+  }
+});
+
 // ─── GET /api/v1/check-in/lookup ────────────────────────────────────────────
 // Tra cứu booking theo mã REF#, mã QR, hoặc tên khách
 router.get('/lookup', async (req, res) => {
@@ -83,6 +132,27 @@ router.get('/lookup', async (req, res) => {
 
     const b = rows[0];
 
+    // Tự động tìm phòng khả dụng nếu booking chưa gán phòng trong Stays
+    if (!b.RoomId) {
+      const [availRooms] = await pool.query(
+        `SELECT RoomId, RoomNumber, Floor, Status
+         FROM Rooms
+         WHERE (RoomTypeId = ? OR ? IS NULL)
+           AND Status IN ('CleanAvailable', 'Available', 'Inspected')
+           AND IsDeleted = 0
+         ORDER BY Status = 'CleanAvailable' DESC, RoomNumber ASC
+         LIMIT 1`,
+        [b.RoomTypeId, b.RoomTypeId]
+      );
+      if (availRooms.length) {
+        b.RoomId = availRooms[0].RoomId;
+        b.RoomNumber = availRooms[0].RoomNumber;
+        b.Floor = availRooms[0].Floor;
+        b.RoomStatus = availRooms[0].Status;
+        b.autoAssigned = true;
+      }
+    }
+
     // Kiểm tra tính hợp lệ trạng thái booking
     if (b.BookingStatus === 'Cancelled') {
       return res.status(410).json({
@@ -92,10 +162,10 @@ router.get('/lookup', async (req, res) => {
       });
     }
 
-    if (b.BookingStatus === 'Completed' || b.StayStatus === 'CheckedOut') {
+    if (b.BookingStatus === 'Completed') {
       return res.status(400).json({
         success: false,
-        message: 'Đặt phòng này đã hoàn tất thủ tục trả phòng (Checked-Out).',
+        message: 'Đặt phòng này đã hoàn tất thủ tục trả phòng (Completed).',
       });
     }
 
@@ -133,7 +203,7 @@ router.get('/lookup', async (req, res) => {
     };
 
     // Kiểm tra trạng thái phòng sẵn sàng
-    const roomReady = b.RoomId && (b.RoomStatus === 'CleanAvailable' || b.RoomStatus === 'Inspected');
+    const roomReady = b.RoomId && (b.RoomStatus === 'CleanAvailable' || b.RoomStatus === 'Inspected' || b.autoAssigned);
 
     res.json({
       success: true,
@@ -412,10 +482,28 @@ router.post('/complete', async (req, res) => {
     }
 
     if (!targetRoomId) {
+      // Tự động phân bổ phòng trống khả dụng theo loại phòng của booking
+      const [bInfo] = await conn.query('SELECT RoomTypeId FROM Bookings WHERE BookingId = ?', [bookingId]);
+      const rtId = bInfo.length ? bInfo[0].RoomTypeId : null;
+      const [avail] = await conn.query(
+        `SELECT RoomId FROM Rooms
+         WHERE (RoomTypeId = ? OR ? IS NULL)
+           AND Status IN ('CleanAvailable', 'Available', 'Inspected')
+           AND IsDeleted = 0
+         ORDER BY Status = 'CleanAvailable' DESC, RoomNumber ASC
+         LIMIT 1 FOR UPDATE`,
+        [rtId, rtId]
+      );
+      if (avail.length) {
+        targetRoomId = avail[0].RoomId;
+      }
+    }
+
+    if (!targetRoomId) {
       await conn.rollback();
       return res.status(400).json({
         success: false,
-        message: 'Đặt phòng này chưa được gán số phòng cụ thể. Vui lòng gán phòng trước khi check-in.',
+        message: 'Không tìm thấy phòng trống khả dụng để nhận khách. Vui lòng kiểm tra lại sơ đồ phòng.',
       });
     }
 

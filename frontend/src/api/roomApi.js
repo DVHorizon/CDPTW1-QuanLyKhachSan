@@ -188,7 +188,7 @@ export const suggestRoomsApi = async (q) => {
     const res = await fetch(`${API_BASE_URL}/v1/rooms/suggest?q=${encodeURIComponent(q.trim())}`);
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const json = await res.json();
-    return json;
+    return json.data || json;
   } catch (err) {
     console.error('Lỗi khi fetch suggester:', err);
     return { data: null };
@@ -319,4 +319,44 @@ export const processDepositPaymentApi = async (bookingId, payload) => {
     };
   }
 };
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PRICE & SURCHARGE CALCULATION API (FEAT-GUEST-06 / A6)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Tự động tính số đêm, phụ thu thêm người lớn/trẻ em và tổng tiền phòng
+ * POST /api/bookings/calculate-pricing
+ * @param {Object} payload { checkInDate, checkOutDate, baseRate, roomTypeId, adults, children, roomQuantity, selectedAddOns, taxesAndFeesRate, depositRate, isGoldMember }
+ */
+export const calculatePricingApi = async (payload) => {
+  try {
+    let res = await fetch(`${API_BASE_URL}/bookings/calculate-pricing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/v1/guest/bookings/calculate-pricing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi calculatePricingApi:', err);
+    return {
+      success: false,
+      errorCode: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ tính toán giá phòng.'
+    };
+  }
+};
+
 

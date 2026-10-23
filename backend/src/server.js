@@ -24,11 +24,14 @@ app.use('/api/auth',     require('./routes/authRoutes'));   // backward compat
 
 // ─── LEGACY routes (backward compat — giữ để frontend cũ không bị break) ──
 // Admin Room & RoomType pages vẫn dùng /api/phong và /api/loai-phong
-// Nhưng giờ chúng đã được rewrite để dùng Sequelize model (bảng Rooms/RoomTypes)
+// Spec 1 Room Types API
+app.use('/api/v1/room-types', require('./routes/roomTypes'));
 app.use('/api/loai-phong', require('./routes/roomTypes'));
-app.use('/api/phong',      require('./routes/rooms'));
-app.use('/api/so-do-phong', require('./routes/rooms'));
-app.use('/api/room-status', require('./routes/rooms'));
+// Spec 2 Physical Rooms API
+app.use('/api/v1/rooms',      require('./routes/rooms'));
+app.use('/api/phong',          require('./routes/rooms'));
+app.use('/api/so-do-phong',    require('./routes/rooms'));
+app.use('/api/room-status',    require('./routes/rooms'));
 // Route Quản lý danh sách booking toàn hệ thống (Master Bookings)
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/v1/bookings', require('./routes/bookings'));
@@ -41,6 +44,11 @@ app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
 
 // Route Quản lý tình trạng phòng trống (Room Availability)
 app.use('/api/admin/room-availability', require('./routes/admin/roomAvailability'));
+app.use('/api/v1/room-map', require('./routes/admin/roomAvailability'));
+app.use('/api/v1/rooms/:roomId/status', (req, res, next) => {
+  req.url = `/${req.params.roomId}/status`;
+  return require('./routes/admin/roomAvailability')(req, res, next);
+});
 
 // Route Phân bổ phòng & xác nhận (Room Allocation & Confirmation Engine)
 app.use('/api/v1/allocation', require('./routes/admin/roomAllocationRoutes'));
@@ -50,9 +58,18 @@ app.use('/api/allocation', require('./routes/admin/roomAllocationRoutes'));
 app.use('/api/v1/check-in', require('./routes/admin/checkInRoutes'));
 app.use('/api/check-in', require('./routes/admin/checkInRoutes'));
 
-// Route Quản lý người dùng & nhân viên
+// Route Nghiệp vụ Check-out & Kiểm phòng (FEAT-CHECKOUT-INSPECT-01)
+const checkOutRoutes = require('./routes/admin/checkOutRoutes');
+app.use('/api/v1/check-out', checkOutRoutes);
+app.use('/api/check-out', checkOutRoutes);
+app.use('/api/v1/stays', checkOutRoutes);
+app.use('/api/v1/folio', checkOutRoutes);
+
+// Route Quản lý người dùng & nhân viên (Spec 3 - FEAT-USER-01)
 app.use('/api/users', require('./routes/users'));
 app.use('/api/v1/users', require('./routes/users'));
+app.use('/api/roles', require('./routes/roleRoutes'));
+app.use('/api/v1/roles', require('./routes/roleRoutes'));
 
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
@@ -82,6 +99,10 @@ app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
 app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
 // FEAT-GUEST-05: Direct booking endpoint
 app.post('/bookings', require('./controllers/bookingEngineController').createOnlineBooking);
+
+// FEAT-GUEST-06: Direct automated real-time pricing calculation endpoint
+app.post('/bookings/calculate-pricing', require('./controllers/bookingEngineController').calculatePricing);
+app.post('/api/bookings/calculate-pricing', require('./controllers/bookingEngineController').calculatePricing);
 
 // FEAT-GUEST-08: Direct deposit payment & booking retrieval endpoints
 app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController').getBookingDetails);
