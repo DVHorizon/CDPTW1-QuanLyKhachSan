@@ -21,7 +21,8 @@ import FnbOrderHistory from './pages/admin/fnb/FnbOrderHistory';
 import GuestOrderHistory from './pages/client/GuestOrderHistory';
 import TableReservation from './pages/client/TableReservation';
 import LoyaltyManagement from './pages/LoyaltyManagement';
-import ServiceManagement from './pages/ServiceManagement';
+import ServiceManagement from './pages/admin/services/ServiceManagement';
+import ServiceDispatchTerminal from './pages/admin/services/ServiceDispatchTerminal';
 import RoomStatusManagement from './pages/RoomStatusManagement';
 import BookingManagement from './pages/BookingManagement';
 import RoomAssignment from './pages/admin/RoomAssignment';
@@ -87,6 +88,8 @@ function App() {
             <Route path="/admin/fnb/room-service" element={<RoomService />} />
             <Route path="/admin/fnb/history" element={<FnbOrderHistory />} />
             <Route path="/admin/services" element={<ServiceManagement />} />
+            <Route path="/admin/services/dispatch" element={<ServiceDispatchTerminal />} />
+            <Route path="/admin/services/orders" element={<ServiceDispatchTerminal />} />
             <Route path="/admin/loyalty" element={<LoyaltyManagement />} />
             {/* Redirect everything else to home for now */}
             <Route path="*" element={<Navigate to="/" />} />
