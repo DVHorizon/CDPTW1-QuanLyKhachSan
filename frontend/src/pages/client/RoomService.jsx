@@ -268,6 +268,18 @@ const RoomService = () => {
       const authHeader = { 'Authorization': `Bearer ${token}` };
 
       // Bước 1: Tạo đơn Room Service (FEAT-FNB-04)
+      const serviceStyleLabel = serviceStyle === 'trolley' ? 'Bàn xe đẩy (Khăn trắng 5 sao)' : 'Khay tại cửa (Không tiếp xúc)';
+      const deliveryLabel = deliveryTimeMode === 'scheduled' ? `Hẹn giờ ${scheduledTime}` : 'Ngay tức thì (25-35p)';
+      const noteParts = [
+        `[Phục vụ: ${serviceStyleLabel}]`,
+        `[Thời gian: ${deliveryLabel}]`,
+        `[Số khách: ${guestCount}]`
+      ];
+      if (conciergeNotes.trim()) {
+        noteParts.push(`Ghi chú: ${conciergeNotes.trim()}`);
+      }
+      const aggregatedOrderNote = noteParts.join(' • ');
+
       const createRes = await fetch('http://localhost:5000/api/v1/fnb-orders', {
         method: 'POST',
         headers: {
@@ -283,7 +295,8 @@ const RoomService = () => {
             note: i.note || ''
           })),
           userId: user?.id || user?.UserId || user?.userId || undefined,
-          paymentMode
+          paymentMode,
+          note: aggregatedOrderNote
         })
       });
 
@@ -436,24 +449,6 @@ const RoomService = () => {
                     <span className="font-label-sm text-label-sm text-outline">Đã tiêu: 6.600.000 đ</span>
                     <span className="font-label-sm text-label-sm text-outline">Quyền ghi nợ: Mở</span>
                   </div>
-                </div>
-                {/* Cảnh báo Y tế & Dị ứng nghiêm ngặt */}
-                <div className="bg-error-container/30 rounded-lg p-space-md space-y-space-xs">
-                  <div className="flex items-center gap-space-xs text-error font-label-sm text-label-sm font-bold">
-                    <span className="material-symbols-outlined text-[18px]">warning</span>
-                    CẢNH BÁO DỊ ỨNG THỰC PHẨM
-                  </div>
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    <span className="px-space-xs py-0.5 rounded bg-error/15 text-error font-label-sm text-label-sm font-semibold">
-                      Giáp xác / Tôm cua (Shellfish)
-                    </span>
-                    <span className="px-space-xs py-0.5 rounded bg-error/15 text-error font-label-sm text-label-sm font-semibold">
-                      Hạt mè (Sesame seed)
-                    </span>
-                  </div>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant pt-1 leading-snug">
-                    • Bếp trưởng cần ký xác nhận miễn nhiễm chéo trước khi đóng gói ra xe đẩy.
-                  </p>
                 </div>
               </div>
               {/* Thông số giao món & Setup bàn */}
@@ -721,6 +716,12 @@ const RoomService = () => {
                                   {item.KitchenStation}
                                 </span>
                               )}
+                              {item.Allergens && (
+                                <span className="px-1.5 py-0.5 rounded bg-error/10 text-[10px] text-error font-medium flex items-center gap-0.5" title={`Dị ứng: ${item.Allergens}`}>
+                                  <span className="material-symbols-outlined text-[12px]">warning</span>
+                                  {item.Allergens}
+                                </span>
+                              )}
                             </div>
 
                             {/* Nút Thêm Món / Hiển thị số lượng đã chọn */}
@@ -759,6 +760,14 @@ const RoomService = () => {
                     </div>
                     <span className="font-label-sm text-label-sm text-admin-primary font-bold">Tùy biến phục vụ</span>
                   </div>
+
+                  {/* Cảnh báo dị ứng thực tế từ DB nếu món có khai báo Allergens */}
+                  {selectedMenuItem.Allergens && (
+                    <div className="bg-error/10 border border-error/20 rounded-lg p-space-xs flex items-center gap-space-xs text-error font-label-sm text-label-sm">
+                      <span className="material-symbols-outlined text-[18px]">warning</span>
+                      <span><strong>Cảnh báo dị ứng từ bếp:</strong> Món này chứa thành phần {selectedMenuItem.Allergens}</span>
+                    </div>
+                  )}
 
                   {/* Options Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-space-xs">
