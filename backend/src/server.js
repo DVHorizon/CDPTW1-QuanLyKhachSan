@@ -27,6 +27,11 @@ app.use('/api/phong',      require('./routes/rooms'));
 app.use('/api/so-do-phong', require('./routes/rooms'));
 app.use('/api/room-status', require('./routes/rooms'));
 app.use('/api/admin/room-availability', require('./routes/admin/roomAvailability'));
+app.use('/api/v1/room-map', require('./routes/admin/roomAvailability'));
+app.use('/api/v1/rooms/:roomId/status', (req, res, next) => {
+  req.url = `/${req.params.roomId}/status`;
+  return require('./routes/admin/roomAvailability')(req, res, next);
+});
 
 // Route Quản lý người dùng & nhân viên
 app.use('/api/users', require('./routes/users'));

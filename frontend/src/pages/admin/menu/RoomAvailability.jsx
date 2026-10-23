@@ -1,342 +1,1022 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../../../components/admin/layout/AdminLayout';
+import { useAuth } from '../../../context/AuthContext';
 
-/* RoomAvailability.jsx — MỘT giao diện duy nhất: Front Desk Operations Center
-   (sơ đồ phòng + tình trạng thời gian thực). Không cần backend vẫn chạy nhờ dữ liệu mẫu. */
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const iso = (d) => d.toISOString().slice(0, 10);
-const addDays = (s, n) => { const d = new Date(s); d.setDate(d.getDate() + n); return iso(d); };
-const today = iso(new Date());
-const d10 = (v) => String(v).slice(0, 10);
-const vd = (s) => d10(s).split('-').reverse().join('/');
-const vnd = (n) => `${Number(n || 0).toLocaleString('vi-VN')} đ`;
+/* ═══════════════════════════════════════════════════════════════════════════
+   FEAT-ROOMMAP-01: SƠ ĐỒ PHÒNG TRỰC QUAN (VISUAL ROOM STATUS BOARD)
+   Theo đúng tài liệu đặc tả Spec_4.SoDoPhongTrucQuan.docx
+   100% Giao diện & Thông báo Tiếng Việt
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:wght@600;700&display=swap');
-.fd{--bg:#eef3f6;--ink:#14232e;--mut:#7a8893;--line:#dbe3e9;--g:#0b6b52;--gs:#e0f2ea;--b:#1d6fb8;--bs:#e4eefa;--a:#9a5b0f;--as:#f7ecd9;--s:#4a9ad8;--ss:#e6f2fb;--r:#c0392b;--rs:#fdeaea;--x:#6b7a86;--xs:#e8ecef;
-font:500 13px Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg);min-height:100vh}
-.fd *{box-sizing:border-box}.fd .m{font-family:'JetBrains Mono',monospace}
-.fd button,.fd input,.fd select{font:inherit;color:inherit}.fd button{cursor:pointer}
-.fd :focus-visible{outline:3px solid #7db7ea;outline-offset:2px}
-.fd .bar{height:4px;background:var(--line);border-radius:4px;overflow:hidden}.fd .bar i{display:block;height:100%;background:var(--c,#e8a33d)}
-.fd .main{padding:12px 16px 24px;display:grid;gap:14px;min-width:0;align-content:start}
-.fd .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.fd .pill{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;display:flex;gap:8px;align-items:center;font-weight:600}
-.fd .pill select{border:0;background:none;font-weight:600}.fd .grow{flex:1}
-.fd .ib{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:#fff;position:relative}
-.fd .ib em{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--r)}
-.fd .user{text-align:right;font-weight:700;line-height:1.3}.fd .user small{display:block;color:var(--g);font:600 10px 'JetBrains Mono'}
-.fd .card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 10px rgba(20,35,46,.06)}
-.fd .live{display:inline-block;font:700 10px 'JetBrains Mono';background:var(--gs);color:var(--g);padding:3px 8px;border-radius:5px;letter-spacing:.04em}
-.fd .live.off{background:var(--rs);color:var(--r)}
-.fd h1{font-size:19px;margin:8px 0 4px;font-weight:800;text-transform:uppercase;letter-spacing:.01em}
-.fd .sub{color:var(--mut);font-size:12px}.fd .head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.fd .hb{display:flex;gap:8px}.fd .hb button{background:var(--bg);border:0;border-radius:10px;padding:8px 14px;font-weight:600;font-size:11.5px}
-.fd .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
-.fd .st{background:#fff;border-radius:14px;padding:14px;display:grid;gap:8px;box-shadow:0 2px 10px rgba(20,35,46,.05);border:2px solid transparent;text-align:left}
-.fd .st.on{border-color:var(--c)}.fd .st span{font:700 10.5px 'JetBrains Mono';color:var(--c);text-transform:uppercase}
-.fd .st div{display:flex;justify-content:space-between;align-items:baseline}.fd .st b{font:700 32px 'JetBrains Mono'}.fd .st small{font:700 11px 'JetBrains Mono';color:var(--c)}
-.fd .st .bar i{background:var(--c);width:var(--w)}
-.fd .tabs{display:inline-flex;gap:4px;background:var(--bg);padding:4px;border-radius:10px}.fd .tabs button{border:0;background:none;padding:7px 12px;border-radius:8px;font-weight:600}.fd .tabs button.on{background:#fff;color:var(--g)}
-.fd .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}
-.fd .chip{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-weight:600}.fd .chip.on{background:var(--g);border-color:var(--g);color:#fff}
-.fd .search{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff}.fd .search input{border:0;outline:0;flex:1;background:none}
-.fd .body{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
-.fd .wing{background:var(--bg);border-radius:16px;padding:14px;margin-bottom:14px}
-.fd .wing h2{font-size:15px;margin:0 0 2px;font-weight:700}.fd .wing .m{font-size:10px;color:var(--mut);text-transform:uppercase}
-.fd .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}
-.fd .rc{background:#fff;border-radius:12px;border:2px solid transparent;border-top:4px solid var(--c);padding:12px;display:grid;gap:7px;text-align:left;box-shadow:0 2px 8px rgba(20,35,46,.06)}
-.fd .rc.sel{border-color:var(--b);border-top-color:var(--b)}
-.fd .rc header{display:flex;gap:8px;align-items:center}.fd .rc header b{font:700 21px 'JetBrains Mono'}
-.fd .tag{font:700 9.5px 'JetBrains Mono';background:var(--soft);color:var(--c);padding:3px 7px;border-radius:5px;text-transform:uppercase}
-.fd .gname{font-weight:700;font-size:15px;display:flex;justify-content:space-between;gap:6px}.fd .meta{font-size:11.5px;color:var(--mut);display:flex;justify-content:space-between;gap:6px}
-.fd .note{background:var(--bg);border-radius:8px;padding:7px 9px;font-size:11px;font-weight:600}
-.fd .s-occupied{--c:var(--b);--soft:var(--bs)}.fd .s-dueIn{--c:var(--a);--soft:var(--as)}.fd .s-dueOut{--c:var(--s);--soft:var(--ss)}
-.fd .s-vacant{--c:var(--g);--soft:var(--gs)}.fd .s-dirty{--c:var(--r);--soft:var(--rs)}.fd .s-ooo{--c:var(--x);--soft:var(--xs)}
-.fd .rc.s-ooo{opacity:.85}.fd .rc.s-dirty .note{background:var(--rs);color:var(--r)}
-.fd .dp{position:sticky;top:12px;display:grid;gap:12px}.fd .dp h3{margin:0;font:700 20px 'JetBrains Mono'}
-.fd .hero{border-radius:12px;height:120px;background:linear-gradient(150deg,#1d5f7a,#d9b27a);color:#fff;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;font-size:11px}
-.fd .who{font:700 26px 'Playfair Display',serif;margin:2px 0}.fd .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.fd .kv div{border:1px solid var(--line);border-radius:10px;padding:9px;display:grid;gap:3px}.fd .kv small{font:600 10px 'JetBrains Mono';color:var(--mut);text-transform:uppercase}.fd .kv b{font:700 13px 'JetBrains Mono'}
-.fd .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.fd .acts button{border:0;background:var(--bg);border-radius:10px;padding:11px 8px;font-weight:700;font-size:12px}
-.fd .acts button.pri{background:var(--g);color:#fff}.fd .acts button:disabled{opacity:.45;cursor:not-allowed}
-.fd .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:10px;font-weight:600;z-index:50}
-.fd .warn{background:var(--as);color:var(--a);padding:9px 14px;border-radius:10px;font-weight:600}
-@media(max-width:1200px){.fd .stats{grid-template-columns:repeat(3,1fr)}.fd .body{grid-template-columns:1fr}.fd .dp{position:static}}
-`;
-
-const ST = {
-    occupied: ['OCCUPIED', 'ĐANG CÓ KHÁCH'], dueIn: ['ARRIVAL TODAY', 'KHÁCH SẮP ĐẾN'], dueOut: ['DEPARTURE TODAY', 'KHÁCH SẮP ĐI'],
-    vacant: ['READY', 'TRỐNG & SẠCH SẼ'], dirty: ['HK DIRTY', 'BẨN CHỜ DỌN'], ooo: ['BẢO TRÌ OOO', 'KHÓA BẢO TRÌ (OOO)'],
+// ─── 3.3 Bảng mã màu 6 trạng thái chuẩn (BẮT BUỘC ĐÚNG TUYỆT ĐỐI) ───────────
+const STATUS_META = {
+  VACANT_CLEAN: {
+    code: 'VACANT_CLEAN',
+    label: 'Trống - sạch',
+    color: '#34A853',
+    textColor: '#FFFFFF',
+    desc: 'Phòng trống, đã vệ sinh sạch sẽ, sẵn sàng đón khách nhận phòng ngay'
+  },
+  VACANT_DIRTY: {
+    code: 'VACANT_DIRTY',
+    label: 'Trống - chưa dọn',
+    color: '#FBBC04',
+    textColor: '#1E293B',
+    desc: 'Khách vừa trả phòng, phòng trống nhưng chưa được dọn dẹp'
+  },
+  CLEANING: {
+    code: 'CLEANING',
+    label: 'Đang dọn',
+    color: '#F59E0B',
+    textColor: '#FFFFFF',
+    desc: 'Nhân viên Buồng phòng đang xử lý dọn dẹp vệ sinh'
+  },
+  RESERVED: {
+    code: 'RESERVED',
+    label: 'Đã đặt',
+    color: '#8B5CF6',
+    textColor: '#FFFFFF',
+    desc: 'Đã có khách đặt phòng hôm nay, đang chờ làm thủ tục nhận phòng'
+  },
+  OCCUPIED: {
+    code: 'OCCUPIED',
+    label: 'Đang ở',
+    color: '#1A73E8',
+    textColor: '#FFFFFF',
+    desc: 'Khách đang lưu trú trong phòng'
+  },
+  OUT_OF_ORDER: {
+    code: 'OUT_OF_ORDER',
+    label: 'Bảo trì / Khóa phòng',
+    color: '#EA4335',
+    textColor: '#FFFFFF',
+    desc: 'Phòng đang tạm khóa để bảo trì, sửa chữa kỹ thuật'
+  }
 };
-const STATS = [['occupied', 'dueOut'], ['dueIn'], ['dueOut'], ['vacant'], ['dirty'], ['ooo']];
-const STAT_KEYS = ['occupied', 'dueIn', 'dueOut', 'vacant', 'dirty', 'ooo'];
 
-// ---------- Dữ liệu mẫu ----------
-const NAMES = ['Nguyễn Văn An', 'Jonathan Sterling', 'Trần Hoàng Nam', 'Đặng Thùy Dung', 'Lê Quốc Huy', 'Phạm Mai Anh', 'Võ Minh Tuấn', 'Hoàng Gia Bảo'];
-const TYPES = ['Oceanfront Royal Villa', 'Peninsula Garden Suite', 'Deluxe King Ocean', 'Family Pool Villa'];
-function buildMock() {
-    const rooms = [], bookings = [];
-    [1, 2, 3].forEach((f) => {
-        for (let i = 1; i <= 8; i++) {
-            const id = f * 100 + i, s = (f * 7 + i * 5) % 10;
-            const status = i === 7 && f === 2 ? 'ooo' : (i + f) % 7 === 2 ? 'dirty' : 'available';
-            rooms.push({ id, roomNumber: `V-${id}`, floor: f, wing: i <= 4 ? 'A' : 'B', status, typeName: TYPES[(i + f) % 4] });
-            if (status !== 'available') continue;
-            const b = { id: `m${id}`, roomId: id, guestName: NAMES[(i + f) % NAMES.length], confirmationNo: String(88000 + id), balance: ((i * 37) % 5) * 6200000, keys: 2 };
-            if (s < 4) bookings.push({ ...b, checkIn: addDays(today, -2), checkOut: addDays(today, 2 + (i % 3)), status: 'checked_in' });
-            else if (s === 4) bookings.push({ ...b, checkIn: addDays(today, -3), checkOut: today, status: 'checked_in' });
-            else if (s === 5) bookings.push({ ...b, checkIn: today, checkOut: addDays(today, 2), status: 'confirmed', keys: 0, balance: 0 });
-        }
-    });
-    return { rooms, bookings };
-}
-const MOCK = buildMock();
-const overlaps = (b, r) => d10(b.checkIn) < r.checkOut && (d10(b.checkOut) > r.checkIn || (b.status === 'checked_in' && d10(b.checkOut) === today && r.checkIn === today));
-const mockFor = (r) => MOCK.rooms.map((x) => ({ ...x, booking: MOCK.bookings.find((b) => b.roomId === x.id && overlaps(b, r)) || null }));
-function derive(room) {
-    const b = room.booking;
-    if (room.status === 'ooo') return 'ooo';
-    if (b) {
-        if (b.status === 'checked_in' && d10(b.checkOut) === today) return 'dueOut';
-        if (b.status !== 'checked_in' && d10(b.checkIn) === today) return 'dueIn';
-        return 'occupied';
+const ALL_STATUS_KEYS = [
+  'VACANT_CLEAN',
+  'VACANT_DIRTY',
+  'CLEANING',
+  'RESERVED',
+  'OCCUPIED',
+  'OUT_OF_ORDER'
+];
+
+// Dữ liệu mẫu tiếng Việt ban đầu
+const INITIAL_MOCK_ROOMS = [
+  { id: 101, roomNumber: '101', floor: 1, typeName: 'Phòng Deluxe King Hướng Biển', currentStatus: 'VACANT_CLEAN', isOverdue: false },
+  { id: 102, roomNumber: '102', floor: 1, typeName: 'Phòng Deluxe Twin Ban Công', currentStatus: 'VACANT_DIRTY', isOverdue: false },
+  { id: 103, roomNumber: '103', floor: 1, typeName: 'Phòng Suite Cao Cấp', currentStatus: 'CLEANING', isOverdue: false },
+  { id: 104, roomNumber: '104', floor: 1, typeName: 'Phòng Suite Cao Cấp', currentStatus: 'RESERVED', isOverdue: false, booking: { guestName: 'Nguyễn Văn An', checkIn: '2026-10-23', checkOut: '2026-10-25', confirmationCode: 'DP-1040' } },
+  { id: 105, roomNumber: '105', floor: 1, typeName: 'Phòng Suite Thương Gia', currentStatus: 'OCCUPIED', isOverdue: true, booking: { guestName: 'Trần Hoàng Nam', checkIn: '2026-10-20', checkOut: '2026-10-23', confirmationCode: 'DP-1051' } },
+  { id: 106, roomNumber: '106', floor: 1, typeName: 'Phòng Deluxe King Hướng Biển', currentStatus: 'OUT_OF_ORDER', isOverdue: false },
+  { id: 107, roomNumber: '107', floor: 1, typeName: 'Phòng Deluxe King Hướng Biển', currentStatus: 'VACANT_CLEAN', isOverdue: false },
+  { id: 108, roomNumber: '108', floor: 1, typeName: 'Phòng Gia Đình Tiêu Chuẩn', currentStatus: 'OCCUPIED', isOverdue: false, booking: { guestName: 'Trịnh Bảo Long', checkIn: '2026-10-22', checkOut: '2026-10-26', confirmationCode: 'DP-1082' } },
+  { id: 201, roomNumber: '201', floor: 2, typeName: 'Phòng Deluxe King Hướng Biển', currentStatus: 'VACANT_CLEAN', isOverdue: false },
+  { id: 202, roomNumber: '202', floor: 2, typeName: 'Phòng Deluxe Twin Ban Công', currentStatus: 'VACANT_DIRTY', isOverdue: false },
+  { id: 203, roomNumber: '203', floor: 2, typeName: 'Phòng Suite Cao Cấp', currentStatus: 'CLEANING', isOverdue: false },
+  { id: 204, roomNumber: '204', floor: 2, typeName: 'Phòng Suite Thương Gia', currentStatus: 'OCCUPIED', isOverdue: false, booking: { guestName: 'Lê Quốc Huy', checkIn: '2026-10-21', checkOut: '2026-10-24', confirmationCode: 'DP-2041' } },
+  { id: 205, roomNumber: '205', floor: 2, typeName: 'Phòng Suite Thương Gia', currentStatus: 'RESERVED', isOverdue: false, booking: { guestName: 'Đặng Thùy Dung', checkIn: '2026-10-23', checkOut: '2026-10-26', confirmationCode: 'DP-2055' } },
+  { id: 206, roomNumber: '206', floor: 2, typeName: 'Phòng Gia Đình Tiêu Chuẩn', currentStatus: 'VACANT_CLEAN', isOverdue: false },
+  { id: 301, roomNumber: '301', floor: 3, typeName: 'Biệt Thự Sky Villa Nghỉ Dưỡng', currentStatus: 'OCCUPIED', isOverdue: false, booking: { guestName: 'Võ Minh Tuấn', checkIn: '2026-10-22', checkOut: '2026-10-25', confirmationCode: 'DP-3010' } },
+  { id: 302, roomNumber: '302', floor: 3, typeName: 'Biệt Thự Sky Villa Nghỉ Dưỡng', currentStatus: 'VACANT_CLEAN', isOverdue: false },
+];
+
+// Helper gọi API an toàn, chống triệt để lỗi Unexpected token '<' do HTML response
+const callApiSafe = async (endpoint, options = {}) => {
+  const envUrl = import.meta.env.VITE_API_URL || '';
+  const candidates = [
+    `${envUrl}${endpoint}`,
+    endpoint,
+    `http://localhost:5000${endpoint}`
+  ];
+
+  let lastError = null;
+
+  for (const url of candidates) {
+    if (!url) continue;
+    try {
+      const res = await fetch(url, options);
+      const text = await res.text();
+
+      // Kiểm tra có phải JSON hợp lệ không
+      try {
+        const json = JSON.parse(text);
+        return { ok: res.ok, status: res.status, data: json };
+      } catch (parseErr) {
+        // Phản hồi HTML (404/500 proxy), tiếp tục thử endpoint kế tiếp
+        lastError = 'Máy chủ trả về phản hồi không hợp lệ';
+      }
+    } catch (networkErr) {
+      lastError = networkErr.message;
     }
-    return room.status === 'dirty' ? 'dirty' : 'vacant';
-}
-const nightsOf = (b) => Math.max(1, Math.round((new Date(d10(b.checkOut)) - new Date(d10(b.checkIn))) / 864e5));
+  }
+
+  return {
+    ok: false,
+    status: 0,
+    data: { success: false, message: 'Lỗi kết nối máy chủ: ' + (lastError || 'Không thể liên lạc') }
+  };
+};
 
 export default function RoomAvailability() {
-    const [checkIn, setCheckIn] = useState(today);
-    const [checkOut, setCheckOut] = useState(addDays(today, 1));
-    const range = useMemo(() => ({ checkIn, checkOut }), [checkIn, checkOut]);
-    const [raw, setRaw] = useState([]);
-    const [ovr, setOvr] = useState({});
-    const [isMock, setIsMock] = useState(false);
-    const [live, setLive] = useState(true);
-    const [filter, setFilter] = useState(null);
-    const [q, setQ] = useState('');
-    const [selId, setSelId] = useState(null);
-    const [notice, setNotice] = useState('');
-    const [clock, setClock] = useState(new Date());
-    const [cd, setCd] = useState(30);
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-    const load = useCallback(async () => {
-        if (!range.checkIn || !range.checkOut) {
-            setNotice('Ngày nhận phòng và ngày trả phòng không được để trống.');
-            return;
-        }
-        if (range.checkOut <= range.checkIn) {
-            setNotice('Ngày trả phòng phải sau ngày nhận phòng.');
-            return;
-        }
+  // Xác định vai trò & quyền hạn theo Mục 3.1
+  const roleName = user?.roleName || user?.role?.RoleName || (user?.roleId === 1 ? 'Admin' : 'Admin');
+  const token = localStorage.getItem('token') || localStorage.getItem('hotel_token') || '';
+
+  // Quyền:
+  // ROOMMAP_VIEW: Admin, Receptionist, Housekeeping. Bếp (Kitchen) bị cấm (Mục 3.1 & Test Case 1)
+  const canView = roleName !== 'Kitchen' && ['Admin', 'Receptionist', 'Housekeeping'].includes(roleName);
+  // ROOMMAP_UPDATE_STATUS: Admin và Dọn phòng (Mục 3.1)
+  const canUpdateStatus = ['Admin', 'Housekeeping'].includes(roleName);
+  // BOOKING_MANAGE: Admin và Lễ tân (Mục 3.1)
+  const canManageBooking = ['Admin', 'Receptionist'].includes(roleName);
+
+  // States
+  const [rooms, setRooms] = useState(INITIAL_MOCK_ROOMS);
+  const [floors, setFloors] = useState([1, 2, 3]);
+  const [selectedFloor, setSelectedFloor] = useState('ALL'); // 'ALL' hoặc số tầng
+  const [statusFilters, setStatusFilters] = useState(ALL_STATUS_KEYS); // Mặc định chọn tất cả 6 trạng thái
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLive, setIsLive] = useState(true);
+  const [countdown, setCountdown] = useState(30);
+  const [toast, setToast] = useState(null);
+
+  // Popup Modal states (Mục 6.2)
+  const [activeModalRoom, setActiveModalRoom] = useState(null);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceNote, setMaintenanceNote] = useState('');
+  const [noteError, setNoteError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Helper hiển thị thông báo Toast
+  const showToast = useCallback((msg, type = 'info') => {
+    setToast({ msg, type });
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // ─── Tải dữ liệu từ Backend API ───────────────────────────────────────────
+  const fetchRoomMap = useCallback(async () => {
+    if (!token) return;
+
+    const result = await callApiSafe('/api/v1/room-map', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!result.ok) {
+      if (result.status === 401) {
+        showToast(result.data.message || 'Bạn cần đăng nhập để thực hiện chức năng này', 'error');
+      } else if (result.status === 403) {
+        showToast(result.data.message || 'Bạn không có quyền thực hiện chức năng này', 'error');
+      }
+      return;
+    }
+
+    if (result.data.rooms && Array.isArray(result.data.rooms)) {
+      setRooms(result.data.rooms);
+    }
+    if (result.data.floors && Array.isArray(result.data.floors) && result.data.floors.length > 0) {
+      setFloors(result.data.floors);
+    }
+  }, [token, showToast]);
+
+  const fetchRef = useRef(fetchRoomMap);
+  useEffect(() => {
+    fetchRef.current = fetchRoomMap;
+  }, [fetchRoomMap]);
+
+  // Khởi động load ban đầu
+  useEffect(() => {
+    if (canView) {
+      fetchRoomMap();
+    }
+  }, [canView, fetchRoomMap]);
+
+  // ─── Đồng bộ thời gian thực Real-time (SSE & Polling Fallback 30s) ────────
+  useEffect(() => {
+    if (!canView) return;
+
+    let eventSource = null;
+    let fallbackTimer = null;
+
+    try {
+      const sseUrl = import.meta.env.VITE_API_URL
+        ? `${import.meta.env.VITE_API_URL}/api/v1/room-map/stream`
+        : '/api/v1/room-map/stream';
+
+      eventSource = new EventSource(sseUrl);
+
+      eventSource.onopen = () => {
+        setIsLive(true);
+      };
+
+      eventSource.onmessage = (event) => {
         try {
-            const res = await fetch(`${API}/api/admin/room-availability?${new URLSearchParams(range)}`, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
-            });
-            const json = await res.json();
-            if (!res.ok || !json.rooms?.length) throw new Error(json.message || 'empty');
-            setRaw(json.rooms); setIsMock(false); setOvr({});
-        } catch (err) {
-            console.warn('Fallback to mock rooms:', err.message);
-            setRaw(mockFor(range)); setIsMock(true);
-        }
-        setCd(30);
-    }, [range]);
-    const loadRef = useRef(load);
-    useEffect(() => { loadRef.current = load; }, [load]);
-    useEffect(() => { load(); }, [load]);
-    useEffect(() => {
-        const t = setInterval(() => { setClock(new Date()); setCd((c) => { if (c <= 1) { loadRef.current(); return 30; } return c - 1; }); }, 1000);
-        return () => clearInterval(t);
-    }, []);
-    useEffect(() => {
-        const s = io(API, { transports: ['websocket', 'polling'], reconnection: true, timeout: 4000 });
-        let t;
-        s.on('connect', () => setLive(true)); s.on('disconnect', () => setLive(false)); s.on('connect_error', () => setLive(false));
-        s.on('availability:changed', () => { clearTimeout(t); t = setTimeout(() => loadRef.current(), 300); });
-        return () => { clearTimeout(t); s.disconnect(); };
-    }, []);
-    useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 3500); return () => clearTimeout(t); }, [notice]);
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'ROOM_STATUS_CHANGED' && payload.data) {
+            const { roomId, newStatus } = payload.data;
+            setRooms((prev) =>
+              prev.map((r) =>
+                r.id === roomId
+                  ? { ...r, currentStatus: newStatus, updatedAt: payload.data.updatedAt || new Date().toISOString() }
+                  : r
+              )
+            );
+          }
+        } catch (_) {}
+      };
 
-    const rooms = useMemo(() => raw.map((r) => {
-        const o = ovr[r.id];
-        const x = o ? { ...r, status: o.status ?? r.status, booking: o.booking === undefined ? r.booking : o.booking } : r;
-        return { ...x, state: derive(x) };
-    }), [raw, ovr]);
+      eventSource.onerror = () => {
+        setIsLive(false);
+      };
+    } catch (_) {
+      setIsLive(false);
+    }
 
-    const total = rooms.length || 1;
-    const count = (keys) => rooms.filter((r) => keys.includes(r.state)).length;
-    const shown = useMemo(() => {
-        const kw = q.trim().toLowerCase();
-        return rooms.filter((r) => (!filter || STATS[filter].includes(r.state)) &&
-            (!kw || `${r.roomNumber} ${r.booking?.guestName || ''} ${r.booking?.confirmationNo || ''}`.toLowerCase().includes(kw)));
-    }, [rooms, filter, q]);
-    const wings = useMemo(() => {
-        const m = {};
-        shown.forEach((r) => { const k = `${r.floor}${r.wing}`; (m[k] = m[k] || []).push(r); });
-        return Object.entries(m);
-    }, [shown]);
-    const sel = rooms.find((r) => r.id === selId) || rooms.find((r) => r.booking) || rooms[0];
+    // Polling fallback đếm ngược 30s (Mục 3.6 & Test Case 9)
+    fallbackTimer = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          fetchRef.current();
+          return 30;
+        }
+        return c - 1;
+      });
+    }, 1000);
 
-    const act = async (kind) => {
-        if (!sel) return;
-        const n = sel.roomNumber, b = sel.booking;
-
-        // Bắt lỗi các trường hợp trước khi gọi API
-        if (kind === 'clean' && sel.state !== 'dirty') {
-            return setNotice(`Phòng ${n} không ở trạng thái bẩn chờ dọn.`);
-        }
-        if (kind === 'key' && !b) {
-            return setNotice(`Phòng ${n} chưa có khách để tạo thẻ E-Key.`);
-        }
-        if (kind === 'out' && !b) {
-            return setNotice(`Phòng ${n} chưa có khách để làm thủ tục trả phòng.`);
-        }
-        if (kind === 'detail') {
-            return setNotice(b ? `Mã xác nhận #${b.confirmationNo} · Khách: ${b.guestName} · ${vd(b.checkIn)} → ${vd(b.checkOut)}` : `Phòng ${n} đang trống sẵn sàng đón khách.`);
-        }
-
-        try {
-            const actionMap = { clean: 'clean', key: 'key', out: 'checkout' };
-            const res = await fetch(`${API}/api/admin/room-availability/${sel.id}/action`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${localStorage.getItem('token') || ''}`
-                },
-                body: JSON.stringify({ action: actionMap[kind] || kind })
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                return setNotice(data.message || 'Thao tác không thành công.');
-            }
-            setNotice(data.message || 'Thao tác thành công!');
-            load(); // Cập nhật đồng bộ dữ liệu thật từ database MySQL
-        } catch (err) {
-            setNotice('Lỗi kết nối máy chủ backend: ' + err.message);
-        }
+    return () => {
+      if (eventSource) eventSource.close();
+      if (fallbackTimer) clearInterval(fallbackTimer);
     };
+  }, [canView]);
 
-    const b = sel?.booking;
-    return (
-        <AdminLayout>
-            <div className="fd">
-                <style>{CSS}</style>
-
-                <div className="main">
-                    {isMock && <div className="warn">Đang hiển thị DỮ LIỆU MẪU vì API chưa kết nối được. Khi backend có dữ liệu, trang tự chuyển sang dữ liệu thật từ CSDL MySQL.</div>}
-
-                    <section className="card head">
-                        <div>
-                            <span className={`live ${live || isMock ? '' : 'off'}`}>● {live ? 'DIRECT LIVE FEED (MYSQL)' : (isMock ? 'DỮ LIỆU MẪU' : 'MẤT KẾT NỐI')}</span>
-                            <h1>Front Desk Operations Center • Sơ đồ phòng và tình trạng thời gian thực</h1>
-                            <div className="sub">Đồng bộ trực tiếp MySQL • Làm mới tự động mỗi 30s • <span className="m">Tổng số: {rooms.length} phòng vận hành</span></div>
-                        </div>
-                        <div className="hb" style={{ alignItems: 'center' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600 }}>
-                                Nhận:
-                                <input type="date" value={checkIn} onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (!val) { setNotice('Ngày nhận phòng không được để trống.'); return; }
-                                    if (val >= checkOut) { setNotice('Ngày nhận phòng phải trước ngày trả phòng.'); return; }
-                                    setCheckIn(val);
-                                }} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', background: '#fff' }} />
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600 }}>
-                                Trả:
-                                <input type="date" value={checkOut} onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (!val) { setNotice('Ngày trả phòng không được để trống.'); return; }
-                                    if (val <= checkIn) { setNotice('Ngày trả phòng phải sau ngày nhận phòng.'); return; }
-                                    setCheckOut(val);
-                                }} style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--line)', background: '#fff' }} />
-                            </label>
-                            <button onClick={load}>⟳ Làm Mới</button>
-                            <button disabled>⏱ {cd}s</button>
-                        </div>
-                    </section>
-
-                    <div className="stats">
-                        {STATS.map((keys, i) => {
-                            const k = STAT_KEYS[i], n = count(keys);
-                            return (
-                                <button key={k} className={`st s-${k} ${filter === i ? 'on' : ''}`} onClick={() => setFilter(filter === i ? null : i)}>
-                                    <span>{ST[k][1]}</span>
-                                    <div><b>{n}</b><small>{Math.round((n / total) * 100)}%</small></div>
-                                    <div className="bar" style={{ '--w': `${(n / total) * 100}%` }}><i /></div>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <section className="card">
-                        <div className="tabs"><button className="on">▦ Lưới Thẻ Phòng (Grid Rack)</button><button onClick={() => setNotice('Chế độ này chưa có trong bản demo.')}>Dòng Thời Gian (Gantt)</button><button onClick={() => setNotice('Chế độ này chưa có trong bản demo.')}>Bản Đồ Phân Khu</button></div>
-                        <div className="filters"><span className="m sub">LỌC NHANH:</span>
-                            <button className={`chip ${filter === null ? 'on' : ''}`} onClick={() => setFilter(null)}>Tất Cả ({rooms.length})</button>
-                            {STAT_KEYS.map((k, i) => <button key={k} className={`chip ${filter === i ? 'on' : ''}`} onClick={() => setFilter(filter === i ? null : i)}>{ST[k][1].replace(/ \(OOO\)/, '')} ({count(STATS[i])})</button>)}
-                        </div>
-                        <label className="search">🔍<input placeholder="Tìm số phòng, tên khách, mã folio..." value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm phòng" /></label>
-                    </section>
-
-                    <div className="body">
-                        <div>
-                            {wings.length === 0 && <div className="card">Không có phòng phù hợp bộ lọc.</div>}
-                            {wings.map(([k, list], i) => (
-                                <section className="wing" key={k}>
-                                    <h2>Dãy {i + 1}: {list[0].typeName}</h2>
-                                    <div className="m">DÃY {k} • {list.filter((r) => r.state !== 'ooo').length} / {list.length} phòng hoạt động</div>
-                                    <div className="grid">{list.map((r) => {
-                                        const bk = r.booking;
-                                        return (
-                                            <button key={r.id} className={`rc s-${r.state} ${sel?.id === r.id ? 'sel' : ''}`} onClick={() => setSelId(r.id)}>
-                                                <header><b>{r.roomNumber}</b><span className="tag">{ST[r.state][0]}</span></header>
-                                                {bk ? (<>
-                                                    <div className="gname">{bk.guestName}</div>
-                                                    <div className="meta"><span>{r.state === 'dueIn' ? `Đến: ${vd(bk.checkIn)}` : `Trả: ${vd(bk.checkOut)}`}</span><span className="m">Folio: {vnd(bk.balance)}</span></div>
-                                                    <div className="note">🔑 {bk.keys || 0} thẻ từ • CONF #{bk.confirmationNo}</div>
-                                                </>) : (<>
-                                                    <div className="gname">{r.state === 'ooo' ? 'Khóa kỹ thuật' : r.state === 'dirty' ? 'Chờ làm vệ sinh' : 'Sẵn sàng đón khách'}</div>
-                                                    <div className="meta"><span>{r.typeName}</span></div>
-                                                    <div className="note">{r.state === 'ooo' ? '🔧 Đang bảo trì' : r.state === 'dirty' ? '🧹 Cần dọn phòng' : '✓ Đã kiểm định, sạch sẽ'}</div>
-                                                </>)}
-                                            </button>
-                                        );
-                                    })}</div>
-                                </section>
-                            ))}
-                        </div>
-
-                        {sel && (
-                            <section className="card dp" aria-label="Chi tiết phòng">
-                                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><h3>{sel.roomNumber}</h3><span className={`tag s-${sel.state}`}>{ST[sel.state][0]}</span></div>
-                                <div className="sub">Hạng: {sel.typeName}</div>
-                                <div className="hero"><b>{b ? 'QUẢN GIA PHỤ TRÁCH' : 'PHÒNG KHÔNG CÓ KHÁCH'}</b>{b ? `RFID Key • ${b.keys || 0} thẻ đang kích hoạt` : ST[sel.state][1]}</div>
-                                {b && (<>
-                                    <div><small className="m sub">CHỦ THẺ LƯU TRÚ</small><div className="who">{b.guestName}</div>
-                                        <div className="sub">{nightsOf(b)} đêm • Mã #{b.confirmationNo}</div></div>
-                                    <div className="kv">
-                                        <div><small>Lịch trình lưu trú</small><b>{vd(b.checkIn)} → {vd(b.checkOut)}</b></div>
-                                        <div><small>Chi tiêu folio</small><b>{vnd(b.balance)}</b></div>
-                                    </div>
-                                </>)}
-                                <div className="kv">
-                                    <div><small>Nhiệt độ</small><b>22.5°C</b></div>
-                                    <div><small>E-Key RFID</small><b>{b ? `${b.keys || 0} thẻ` : '—'}</b></div>
-                                </div>
-                                <div className="acts">
-                                    <button onClick={() => act('detail')}>Chi Tiết Đặt Phòng</button>
-                                    <button onClick={() => act('clean')} disabled={sel.state !== 'dirty'}>Lệnh Dọn Buồng</button>
-                                    <button onClick={() => act('key')} disabled={!b}>Tạo Thẻ E-Key</button>
-                                    <button className="pri" onClick={() => act('out')} disabled={!b}>Thanh Toán &amp; Trả Phòng</button>
-                                </div>
-                            </section>
-                        )}
-                    </div>
-                </div>
-                {notice && <div className="toast" role="status">{notice}</div>}
-            </div>
-        </AdminLayout>
+  // ─── Bộ lọc theo tầng và trạng thái ──────────────────────────────────────
+  const toggleStatusFilter = (statusCode) => {
+    setStatusFilters((prev) =>
+      prev.includes(statusCode)
+        ? prev.filter((s) => s !== statusCode)
+        : [...prev, statusCode]
     );
+  };
+
+  const selectAllFilters = () => setStatusFilters(ALL_STATUS_KEYS);
+  const clearAllFilters = () => setStatusFilters([]);
+
+  // Lọc danh sách phòng theo tầng, bộ lọc trạng thái và ô tìm kiếm
+  const filteredRooms = useMemo(() => {
+    return rooms.filter((r) => {
+      if (selectedFloor !== 'ALL' && r.floor !== Number(selectedFloor)) {
+        return false;
+      }
+      if (!statusFilters.includes(r.currentStatus)) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const kw = searchQuery.trim().toLowerCase();
+        const numMatch = r.roomNumber.toLowerCase().includes(kw);
+        const guestMatch = r.booking?.guestName?.toLowerCase().includes(kw);
+        const confMatch = r.booking?.confirmationCode?.toLowerCase().includes(kw);
+        if (!numMatch && !guestMatch && !confMatch) return false;
+      }
+      return true;
+    });
+  }, [rooms, selectedFloor, statusFilters, searchQuery]);
+
+  // Nhóm phòng theo từng tầng cho chế độ xem "Tất cả" (Mục 3.2 & 6.1 STT 1)
+  const groupedByFloor = useMemo(() => {
+    if (selectedFloor !== 'ALL') {
+      const fNum = Number(selectedFloor);
+      return [{ floor: fNum, rooms: filteredRooms.filter((r) => r.floor === fNum) }];
+    }
+    return floors.map((f) => ({
+      floor: f,
+      rooms: filteredRooms.filter((r) => r.floor === f)
+    }));
+  }, [floors, filteredRooms, selectedFloor]);
+
+  // Thống kê số lượng phòng theo từng trạng thái
+  const statusCounts = useMemo(() => {
+    const counts = {};
+    ALL_STATUS_KEYS.forEach((k) => {
+      counts[k] = rooms.filter((r) => r.currentStatus === k).length;
+    });
+    return counts;
+  }, [rooms]);
+
+  // Mở popup chi tiết phòng
+  const handleOpenRoomModal = (room) => {
+    setActiveModalRoom(room);
+    setMaintenanceMode(false);
+    setMaintenanceNote('');
+    setNoteError('');
+  };
+
+  const handleCloseModal = () => {
+    setActiveModalRoom(null);
+    setMaintenanceMode(false);
+    setMaintenanceNote('');
+    setNoteError('');
+  };
+
+  // ─── Thao tác đổi trạng thái phòng (Mục 3.4 & 4.2 & 4.3 & 5.2) ───────────
+  const executeStatusChange = async (targetStatus, noteValue = '') => {
+    if (!activeModalRoom) return;
+
+    // Kiểm tra quyền (Mục 3.1)
+    if (!canUpdateStatus) {
+      showToast('Bạn không có quyền thực hiện chức năng này', 'error');
+      return;
+    }
+
+    // Nếu chuyển sang OUT_OF_ORDER: bắt buộc nhập note (Mục 3.4 & 5.2 Test Case 5)
+    if (targetStatus === 'OUT_OF_ORDER' && (!noteValue || !noteValue.trim())) {
+      setNoteError('Vui lòng nhập lý do bảo trì');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setNoteError('');
+
+    const result = await callApiSafe(`/api/v1/room-map/rooms/${activeModalRoom.id}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        newStatus: targetStatus,
+        currentStatus: activeModalRoom.currentStatus, // Phục vụ optimistic locking (Mục 3.7)
+        note: noteValue.trim()
+      })
+    });
+
+    setIsSubmitting(false);
+
+    if (!result.ok) {
+      const data = result.data;
+
+      // Lỗi 409 Concurrent Update (Test Case 7)
+      if (result.status === 409 || data.code === 'ERROR_0020_CONCURRENT_UPDATE') {
+        showToast(data.message || 'Trạng thái phòng vừa được cập nhật bởi người khác, vui lòng tải lại', 'error');
+        handleCloseModal();
+        fetchRoomMap();
+        return;
+      }
+
+      // Lỗi 400 Invalid Status Transition (Test Case 4)
+      if (data.code === 'ERROR_0019_INVALID_STATUS_TRANSITION') {
+        showToast(data.message || 'Bước chuyển trạng thái không hợp lệ', 'error');
+        return;
+      }
+
+      // Lỗi 400 Required Note (Test Case 5)
+      if (data.code === 'ERROR_0001_REQUIRED') {
+        setNoteError('Vui lòng nhập lý do bảo trì');
+        return;
+      }
+
+      // Lỗi phân quyền 403
+      if (result.status === 403 || data.code === 'ERROR_0010_FORBIDDEN') {
+        showToast(data.message || 'Bạn không có quyền thực hiện chức năng này', 'error');
+        return;
+      }
+
+      showToast(data.message || 'Thao tác không thành công', 'error');
+      return;
+    }
+
+    // Thành công (Mục 5.2: SUCCESS_0002_UPDATED)
+    showToast(result.data.message || 'Cập nhật trạng thái phòng thành công', 'success');
+
+    // Cập nhật state cục bộ
+    setRooms((prev) =>
+      prev.map((r) =>
+        r.id === activeModalRoom.id ? { ...r, currentStatus: targetStatus } : r
+      )
+    );
+
+    handleCloseModal();
+    fetchRoomMap();
+  };
+
+  // ─── Kiểm tra phân quyền truy cập URL màn hình (Test Case 1 & 2) ───────────
+  if (!token) {
+    return (
+      <AdminLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+            <span className="material-symbols-outlined text-3xl">lock</span>
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Chưa xác thực danh tính</h2>
+          <p className="text-slate-600 mb-6 max-w-md">
+            Bạn cần đăng nhập để thực hiện chức năng này (ERROR_0009_UNAUTHENTICATED)
+          </p>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-6 py-2.5 rounded-lg bg-[#1F4E78] text-white font-semibold hover:brightness-110 transition-all cursor-pointer"
+          >
+            Đến trang Đăng Nhập
+          </button>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!canView) {
+    return (
+      <AdminLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mb-4">
+            <span className="material-symbols-outlined text-3xl">block</span>
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Truy Cập Bị Từ Chối (403)</h2>
+          <p className="text-slate-600 mb-6 max-w-md">
+            Bạn không có quyền thực hiện chức năng này (ERROR_0010_FORBIDDEN)
+          </p>
+          <button
+            onClick={() => navigate('/admin/ban-lam-viec')}
+            className="px-6 py-2.5 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-700 transition-all cursor-pointer"
+          >
+            Quay lại Bàn Làm Việc
+          </button>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  return (
+    <AdminLayout>
+      <div className="p-4 md:p-6 bg-[#F8FAFC] min-h-screen text-slate-800 font-sans">
+        {/* ── 1. HEADER & CHỈ BÁO THỜI GIAN THỰC (Mục 6.1 STT 5) ──────────────── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#1F4E78] bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200/60">
+                MÃ TÍNH NĂNG: FEAT-ROOMMAP-01
+              </span>
+              {/* Chỉ báo Realtime (Mục 6.1 STT 5 & Test Case 9) */}
+              {isLive ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Đang cập nhật trực tiếp
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">
+                  <span className="material-symbols-outlined text-sm text-amber-600">warning</span>
+                  Mất kết nối thời gian thực (Tự làm mới sau {countdown}s)
+                </span>
+              )}
+            </div>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              Sơ Đồ Phòng Trực Quan
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Sơ đồ trạng thái phòng trực quan • Đồng bộ thời gian thực theo từng tầng
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchRoomMap()}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all active:scale-95 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-lg">refresh</span>
+              Làm Mới
+            </button>
+            <div className="hidden sm:flex flex-col text-right text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">Tổng số: {rooms.length} phòng</span>
+              <span>Đang hiển thị: {filteredRooms.length} phòng</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 2. CHÚ THÍCH TRẠNG THÁI (BẢNG MÀU - Mục 6.1 STT 4) ─────────────── */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm mb-6">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">
+            CHÚ THÍCH TRẠNG THÁI (BẢNG MÀU CHUẨN)
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            {ALL_STATUS_KEYS.map((key) => {
+              const meta = STATUS_META[key];
+              const count = statusCounts[key] || 0;
+              return (
+                <div
+                  key={key}
+                  className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-50/80 border border-slate-200/50"
+                  title={meta.desc}
+                >
+                  <span
+                    className="w-4 h-4 rounded-full flex-shrink-0 shadow-xs"
+                    style={{ backgroundColor: meta.color }}
+                  />
+                  <div className="overflow-hidden">
+                    <div className="text-xs font-bold text-slate-800 truncate">
+                      {meta.label}
+                    </div>
+                    <div className="text-[11px] font-mono font-semibold text-slate-500">
+                      {count} phòng
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── 3. BỘ LỌC TRẠNG THÁI & TÌM KIẾM (Mục 6.1 STT 2) ────────────────── */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            {/* Nhóm Checkbox 6 trạng thái kèm chấm màu */}
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  LỌC THEO TRẠNG THÁI:
+                </span>
+                <div className="flex gap-3 text-xs">
+                  <button
+                    type="button"
+                    onClick={selectAllFilters}
+                    className="text-[#1F4E78] hover:underline font-semibold cursor-pointer"
+                  >
+                    Chọn tất cả
+                  </button>
+                  <span className="text-slate-300">•</span>
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="text-slate-500 hover:underline font-semibold cursor-pointer"
+                  >
+                    Bỏ chọn
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                {ALL_STATUS_KEYS.map((key) => {
+                  const meta = STATUS_META[key];
+                  const isChecked = statusFilters.includes(key);
+                  return (
+                    <label
+                      key={key}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-all select-none ${
+                        isChecked
+                          ? 'bg-slate-50 border-slate-300 text-slate-800 shadow-xs'
+                          : 'bg-white border-dashed border-slate-200 text-slate-400 opacity-60'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleStatusFilter(key)}
+                        className="rounded text-[#1F4E78] focus:ring-[#1F4E78] cursor-pointer"
+                      />
+                      <span
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: meta.color }}
+                      />
+                      <span className="font-semibold">{meta.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Ô tìm kiếm số phòng, tên khách */}
+            <div className="w-full lg:w-72">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-2">
+                TÌM KIẾM NHANH:
+              </span>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Số phòng, tên khách, mã đặt phòng..."
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-[#1F4E78] focus:ring-1 focus:ring-[#1F4E78] transition-all bg-slate-50"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 4. THANH TAB TẦNG (Mục 6.1 STT 1: Gạch chân màu #1F4E78) ──────── */}
+        <div className="border-b border-slate-200 mb-6 flex gap-2 overflow-x-auto scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setSelectedFloor('ALL')}
+            className={`pb-3 px-4 text-sm font-semibold transition-all relative flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              selectedFloor === 'ALL'
+                ? 'text-[#1F4E78] font-bold border-b-[3px] border-[#1F4E78]'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span>Tất cả các tầng</span>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full ${
+                selectedFloor === 'ALL'
+                  ? 'bg-blue-100 text-[#1F4E78]'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {rooms.length}
+            </span>
+          </button>
+
+          {floors.map((fl) => {
+            const countOnFloor = rooms.filter((r) => r.floor === fl).length;
+            const isSelected = selectedFloor === String(fl) || selectedFloor === fl;
+            return (
+              <button
+                key={fl}
+                type="button"
+                onClick={() => setSelectedFloor(String(fl))}
+                className={`pb-3 px-4 text-sm font-semibold transition-all relative flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  isSelected
+                    ? 'text-[#1F4E78] font-bold border-b-[3px] border-[#1F4E78]'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>Tầng {fl}</span>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full ${
+                    isSelected
+                      ? 'bg-blue-100 text-[#1F4E78]'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {countOnFloor}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── 5. LƯỚI Ô PHÒNG (Mục 6.1 STT 3 & 6.3: Responsive Grid) ─────────── */}
+        <div className="space-y-8">
+          {groupedByFloor.map(({ floor: flNumber, rooms: flRooms }) => (
+            <section key={flNumber} className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+              {/* Nhãn tên tầng & đường phân cách giữa các nhóm phòng (Mục 3.2 & 6.1 STT 1) */}
+              <div className="flex items-center gap-3 pb-4 mb-4 border-b border-slate-100">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1F4E78] font-black text-sm flex items-center justify-center">
+                  T{flNumber}
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide">
+                    TẦNG {flNumber}
+                  </h2>
+                  <span className="text-xs text-slate-400 font-medium">
+                    {flRooms.length} phòng đang hiển thị
+                  </span>
+                </div>
+              </div>
+
+              {/* Tầng không có phòng nào: hiển thị thông báo theo Mục 3.2 */}
+              {flRooms.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-sm font-medium">
+                  Chưa có phòng nào ở tầng này phù hợp với bộ lọc hiện tại.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3.5">
+                  {flRooms.map((r) => {
+                    const meta = STATUS_META[r.currentStatus] || STATUS_META.VACANT_CLEAN;
+                    const isOOO = r.currentStatus === 'OUT_OF_ORDER';
+                    const isOverdue = r.isOverdue && r.currentStatus === 'OCCUPIED';
+
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => handleOpenRoomModal(r)}
+                        style={{
+                          backgroundColor: meta.color,
+                          color: meta.textColor
+                        }}
+                        className={`relative rounded-xl p-3 flex flex-col justify-between items-center text-center aspect-square shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-lg active:scale-95 cursor-pointer overflow-hidden ${
+                          isOverdue
+                            ? 'ring-4 ring-rose-500 ring-offset-2 animate-pulse'
+                            : ''
+                        }`}
+                      >
+                        {/* Biểu tượng góc trên: Cờ lê (OUT_OF_ORDER) hoặc Cảnh báo Quá hạn (Mục 6.3 & 3.3) */}
+                        <div className="w-full flex justify-between items-start text-xs">
+                          {isOOO ? (
+                            <span
+                              className="material-symbols-outlined text-[17px] opacity-95 bg-black/20 p-1 rounded-full"
+                              title="Khóa bảo trì kỹ thuật (OOO)"
+                            >
+                              build
+                            </span>
+                          ) : <span />}
+
+                          {isOverdue && (
+                            <span
+                              className="material-symbols-outlined text-[17px] text-rose-100 bg-rose-900/60 p-1 rounded-full animate-bounce"
+                              title="Quá hạn trả phòng (Overdue checkout)"
+                            >
+                              timer_off
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Số phòng lớn ở giữa (Mục 6.1 STT 3) */}
+                        <div className="my-auto">
+                          <span className="block font-mono font-extrabold text-2xl tracking-tight leading-none drop-shadow-xs">
+                            {r.roomNumber}
+                          </span>
+                          <span className="block text-[11px] font-semibold mt-1 opacity-90 truncate max-w-[120px]">
+                            {meta.label}
+                          </span>
+                        </div>
+
+                        {/* Tên khách hoặc hạng phòng ở chân ô */}
+                        <div className="w-full text-[10.5px] font-medium opacity-85 truncate">
+                          {r.booking?.guestName ? (
+                            <span className="truncate block font-semibold">
+                              👤 {r.booking.guestName}
+                            </span>
+                          ) : (
+                            <span className="truncate block">{r.typeName}</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
+
+        {/* ── 6. POPUP CHI TIẾT & THAO TÁC NHANH (Mục 6.2) ─────────────────── */}
+        {activeModalRoom && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+              {/* Header (Mục 6.2 STT 1: Nền màu theo trạng thái hiện tại) */}
+              <div
+                style={{
+                  backgroundColor: STATUS_META[activeModalRoom.currentStatus]?.color || '#1F4E78',
+                  color: STATUS_META[activeModalRoom.currentStatus]?.textColor || '#FFFFFF'
+                }}
+                className="p-5 flex items-center justify-between"
+              >
+                <div>
+                  <h3 className="text-lg font-bold">
+                    Phòng {activeModalRoom.roomNumber} — {activeModalRoom.typeName}
+                  </h3>
+                  <div className="text-xs opacity-90">
+                    Tầng {activeModalRoom.floor} • Mã số #{activeModalRoom.id}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 flex items-center justify-center transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              </div>
+
+              {/* Nội dung Popup */}
+              <div className="p-5 space-y-4 text-sm text-slate-700">
+                {/* 2. Badge trạng thái (Mục 6.2 STT 2) */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-500">Trạng thái hiện tại:</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-slate-100 border border-slate-200">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: STATUS_META[activeModalRoom.currentStatus]?.color }}
+                    />
+                    {STATUS_META[activeModalRoom.currentStatus]?.label}
+                  </span>
+                </div>
+
+                {/* 3. Thông tin khách: CHỈ hiển thị khi RESERVED hoặc OCCUPIED (Mục 6.2 STT 3) */}
+                {(activeModalRoom.currentStatus === 'RESERVED' || activeModalRoom.currentStatus === 'OCCUPIED') && (
+                  <div className="bg-blue-50/60 p-3.5 rounded-xl border border-blue-100 space-y-1.5">
+                    <div className="text-xs font-bold text-blue-900 uppercase tracking-wide">
+                      THÔNG TIN KHÁCH LƯU TRÚ
+                    </div>
+                    <div className="text-sm font-bold text-slate-800">
+                      Khách lưu trú: {activeModalRoom.booking?.guestName || 'Khách Vãng Lai'}
+                    </div>
+                    <div className="text-xs text-slate-600 flex justify-between">
+                      <span>Ngày nhận: {activeModalRoom.booking?.checkIn || 'Hôm nay'}</span>
+                      <span>Ngày trả: {activeModalRoom.booking?.checkOut || 'Ngày mai'}</span>
+                    </div>
+                    {activeModalRoom.booking?.confirmationCode && (
+                      <div className="text-xs font-mono text-blue-800">
+                        Mã xác nhận: #{activeModalRoom.booking.confirmationCode}
+                      </div>
+                    )}
+                    {activeModalRoom.isOverdue && activeModalRoom.currentStatus === 'OCCUPIED' && (
+                      <div className="text-xs font-bold text-rose-600 flex items-center gap-1 pt-1">
+                        <span className="material-symbols-outlined text-sm">warning</span>
+                        Cảnh báo: Đã quá giờ trả phòng tiêu chuẩn (12:00)
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. Ô nhập lý do (note) — CHỈ hiển thị khi thao tác "Đánh dấu bảo trì" (Mục 6.2 STT 4 & 5.2) */}
+                {maintenanceMode && (
+                  <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200 space-y-2">
+                    <label className="block text-xs font-bold text-amber-900 uppercase">
+                      Lý do bảo trì <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={maintenanceNote}
+                      onChange={(e) => {
+                        setMaintenanceNote(e.target.value);
+                        if (e.target.value.trim()) setNoteError('');
+                      }}
+                      placeholder="Nhập chi tiết sự cố kỹ thuật hoặc lý do cần bảo trì phòng..."
+                      className="w-full p-2.5 text-xs rounded-lg border border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white"
+                    />
+                    {/* Bắt buộc: Lỗi ERROR_0001_REQUIRED hiển thị chữ đỏ 13px ngay dưới ô nhập (Mục 5.2) */}
+                    {noteError && (
+                      <div className="text-[13px] text-rose-600 font-semibold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">error</span>
+                        {noteError}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 5. Nhóm nút thao tác nhanh (Mục 6.2 STT 5 & 3.4 Ma trận chuyển trạng thái) */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-all cursor-pointer"
+                >
+                  Đóng
+                </button>
+
+                {/* Nếu đang ở chế độ nhập bảo trì: Xác nhận bảo trì */}
+                {maintenanceMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setMaintenanceMode(false)}
+                      disabled={isSubmitting}
+                      className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-200 rounded-lg hover:bg-slate-300 transition-all cursor-pointer"
+                    >
+                      Hủy bỏ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => executeStatusChange('OUT_OF_ORDER', maintenanceNote)}
+                      disabled={isSubmitting}
+                      className="px-5 py-2 text-xs font-bold text-white bg-[#1F4E78] rounded-lg hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      {isSubmitting ? 'Đang lưu...' : 'Xác nhận Khóa Bảo Trì'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* MA TRẬN 3.4: Từ VACANT_DIRTY -> CLEANING ("Bắt đầu dọn") & OUT_OF_ORDER */}
+                    {activeModalRoom.currentStatus === 'VACANT_DIRTY' && (
+                      <>
+                        {canUpdateStatus && (
+                          <button
+                            type="button"
+                            onClick={() => setMaintenanceMode(true)}
+                            disabled={isSubmitting}
+                            className="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-all cursor-pointer"
+                          >
+                            Đánh dấu bảo trì
+                          </button>
+                        )}
+                        {canUpdateStatus && (
+                          <button
+                            type="button"
+                            onClick={() => executeStatusChange('CLEANING')}
+                            disabled={isSubmitting}
+                            className="px-5 py-2 text-xs font-bold text-white bg-[#1F4E78] rounded-lg hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            {isSubmitting ? 'Đang lưu...' : 'Bắt đầu dọn'}
+                          </button>
+                        )}
+                      </>
+                    )}
+
+                    {/* MA TRẬN 3.4: Từ CLEANING -> VACANT_CLEAN ("Hoàn tất dọn") */}
+                    {activeModalRoom.currentStatus === 'CLEANING' && canUpdateStatus && (
+                      <button
+                        type="button"
+                        onClick={() => executeStatusChange('VACANT_CLEAN')}
+                        disabled={isSubmitting}
+                        className="px-5 py-2 text-xs font-bold text-white bg-[#1F4E78] rounded-lg hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        {isSubmitting ? 'Đang lưu...' : 'Hoàn tất dọn'}
+                      </button>
+                    )}
+
+                    {/* MA TRẬN 3.4: Từ VACANT_CLEAN -> OUT_OF_ORDER ("Đánh dấu bảo trì") */}
+                    {activeModalRoom.currentStatus === 'VACANT_CLEAN' && canUpdateStatus && (
+                      <button
+                        type="button"
+                        onClick={() => setMaintenanceMode(true)}
+                        disabled={isSubmitting}
+                        className="px-5 py-2 text-xs font-bold text-white bg-[#1F4E78] rounded-lg hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        Đánh dấu bảo trì
+                      </button>
+                    )}
+
+                    {/* MA TRẬN 3.4: Từ OUT_OF_ORDER -> VACANT_DIRTY ("Gỡ bảo trì") */}
+                    {activeModalRoom.currentStatus === 'OUT_OF_ORDER' && canUpdateStatus && (
+                      <button
+                        type="button"
+                        onClick={() => executeStatusChange('VACANT_DIRTY')}
+                        disabled={isSubmitting}
+                        className="px-5 py-2 text-xs font-bold text-white bg-[#1F4E78] rounded-lg hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        {isSubmitting ? 'Đang lưu...' : 'Gỡ bảo trì'}
+                      </button>
+                    )}
+
+                    {/* MA TRẬN 3.4 & Mục 3.1 & 3.5: Phòng RESERVED -> nút "Nhận Phòng (Check-in)" */}
+                    {activeModalRoom.currentStatus === 'RESERVED' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleCloseModal();
+                          navigate(`/admin/le-tan?roomId=${activeModalRoom.id}`);
+                        }}
+                        disabled={!canManageBooking}
+                        title={!canManageBooking ? 'Bạn không có quyền thực hiện' : ''}
+                        className={`px-5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                          canManageBooking
+                            ? 'bg-[#1F4E78] text-white hover:brightness-110 cursor-pointer'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        }`}
+                      >
+                        Nhận Phòng (Check-in)
+                      </button>
+                    )}
+
+                    {/* MA TRẬN 3.4 & Mục 3.1 & 3.5: Phòng OCCUPIED -> nút "Trả Phòng (Check-out)" */}
+                    {activeModalRoom.currentStatus === 'OCCUPIED' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleCloseModal();
+                          navigate(`/admin/le-tan?roomId=${activeModalRoom.id}`);
+                        }}
+                        disabled={!canManageBooking}
+                        title={!canManageBooking ? 'Bạn không có quyền thực hiện' : ''}
+                        className={`px-5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                          canManageBooking
+                            ? 'bg-[#1F4E78] text-white hover:brightness-110 cursor-pointer'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        }`}
+                      >
+                        Trả Phòng (Check-out)
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── 7. TOAST THÔNG BÁO CHUẨN (Mục 5.2) ────────────────────────────── */}
+        {toast && (
+          <div
+            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-bold animate-in slide-in-from-bottom-4 duration-200 max-w-sm ${
+              toast.type === 'error'
+                ? 'bg-rose-600 text-white'
+                : toast.type === 'success'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-800 text-white'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">
+              {toast.type === 'error' ? 'error' : toast.type === 'success' ? 'check_circle' : 'info'}
+            </span>
+            <span>{toast.msg}</span>
+          </div>
+        )}
+      </div>
+    </AdminLayout>
+  );
 }

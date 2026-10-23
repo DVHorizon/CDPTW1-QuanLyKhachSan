@@ -83,7 +83,25 @@ function broadcastOrderStatus(order) {
   });
 }
 
+// Broadcast room status change to connected clients
+function broadcastRoomMapUpdate(payload) {
+  if (!wss) return;
+
+  const msg = JSON.stringify({
+    type: 'ROOM_MAP_UPDATED',
+    event: 'availability:changed',
+    data: payload
+  });
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
+  });
+}
+
 module.exports = {
   initWebSocket,
-  broadcastOrderStatus
+  broadcastOrderStatus,
+  broadcastRoomMapUpdate
 };

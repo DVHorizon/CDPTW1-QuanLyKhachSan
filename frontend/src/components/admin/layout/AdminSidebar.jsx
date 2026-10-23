@@ -1,5 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../../../context/AuthContext";
 
 // Danh sách menu sidebar với route tương ứng
 const NAV_ITEMS = [
@@ -7,7 +8,7 @@ const NAV_ITEMS = [
   { icon: "room_service", label: "Lễ Tân & Tiền Sảnh", to: "/admin/le-tan" },
   { icon: "bedroom_parent", label: "Quản Lý Hạng Phòng", to: "/admin/room-types" },
   { icon: "meeting_room", label: "Quản Lý Phòng Vật Lý", to: "/admin/rooms" },
-  { icon: "dashboard", label: "Sơ Đồ Phòng Trực Quan (Real-time)", to: "/admin/room-availability" },
+  { icon: "dashboard", label: "Sơ Đồ Phòng Trực Quan", to: "/admin/room-availability", permission: "ROOMMAP_VIEW" },
   { icon: "grid_on", label: "Sơ Đồ Phòng & Trạng Thái", to: "/admin/so-do-phong" },
   { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong" },
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services" },
@@ -24,6 +25,18 @@ const NAV_ITEMS = [
 ];
 
 const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
+  const { user } = useAuth();
+  const roleName = user?.roleName || user?.role?.RoleName || (user?.roleId === 1 ? 'Admin' : '');
+
+  // Phân quyền theo Spec FEAT-ROOMMAP-01 (Mục 3.1 & Test Case 1):
+  // Quyền ROOMMAP_VIEW gán cho Admin, Lễ tân, Dọn phòng. Bếp không có quyền này, menu "Sơ đồ phòng" bị ẩn hoàn toàn.
+  const filteredNavItems = NAV_ITEMS.filter((item) => {
+    if (item.permission === "ROOMMAP_VIEW") {
+      if (roleName === "Kitchen") return false;
+      if (roleName && !["Admin", "Receptionist", "Housekeeping"].includes(roleName)) return false;
+    }
+    return true;
+  });
   return (
     <aside
       className={`fixed left-0 top-0 h-screen ${isCollapsed ? "w-20" : "w-72"
@@ -83,7 +96,7 @@ const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
               {isCollapsed ? "•••" : "Phân Hệ Tác Nghiệp"}
             </div>
             <nav className="flex flex-col gap-space-xs">
-              {NAV_ITEMS.map((item) => (
+              {filteredNavItems.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
