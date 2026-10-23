@@ -179,6 +179,13 @@ DamageItem.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
 RoomInspectionReport.hasMany(DamageItem, { foreignKey: 'InspectionId', as: 'damageItems' });
 DamageItem.belongsTo(RoomInspectionReport, { foreignKey: 'InspectionId', as: 'inspection' });
 
+// 18. Payment Associations (FEAT-PAYMENT-01)
+Invoice.hasMany(Payment, { foreignKey: 'InvoiceId', as: 'payments' });
+Payment.belongsTo(Invoice, { foreignKey: 'InvoiceId', as: 'invoice' });
+
+User.hasMany(Payment, { foreignKey: 'UserId', as: 'payments' });
+Payment.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+
 module.exports = {
   sequelize,
   Branch,
