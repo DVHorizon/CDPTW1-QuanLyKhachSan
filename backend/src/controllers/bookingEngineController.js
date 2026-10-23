@@ -8,7 +8,8 @@
  * Màn hình liên quan: Màn hình 6 (Details & Guest Info - Checkout Step 1)
  */
 
-const { sequelize, Booking, BookingGuest, RoomType, User } = require('../models');
+const { Op } = require('sequelize');
+const { sequelize, Booking, BookingGuest, RoomType, User, Voucher } = require('../models');
 const availabilityService = require('../services/availabilityService');
 const { broadcastRoomEvent } = require('../sockets/socketHandler');
 
@@ -224,6 +225,53 @@ exports.createOnlineBooking = async (req, res) => {
       discountAmount = Math.round(roomSubtotal * 0.1);
     }
 
+    // FEAT-GUEST-07: Áp dụng mã Voucher khuyến mãi (nếu có)
+    let appliedVoucherId = null;
+    let voucherDiscount = 0;
+    if (req.body.voucherCode) {
+      const cleanVoucherCode = String(req.body.voucherCode).trim().toUpperCase();
+      const voucher = await Voucher.findOne({
+        where: { Code: cleanVoucherCode, IsDeleted: false, Status: 'Active' },
+        transaction
+      });
+      if (voucher) {
+        const now = new Date();
+        const isValidDate = (!voucher.StartDate || new Date(voucher.StartDate) <= now) && (!voucher.EndDate || new Date(voucher.EndDate) >= now);
+        const hasLimit = voucher.UsageLimit > 0 && voucher.UsedCount >= voucher.UsageLimit;
+        const meetsMin = roomSubtotal >= (parseFloat(voucher.MinOrderAmount) || 0);
+
+        if (isValidDate && !hasLimit && meetsMin) {
+          const discountType = String(voucher.DiscountType || '').toLowerCase();
+          const val = parseFloat(voucher.DiscountValue) || 0;
+          if (discountType.includes('percent')) {
+            voucherDiscount = (roomSubtotal * val) / 100;
+            if (voucher.MaxDiscountAmount && voucherDiscount > parseFloat(voucher.MaxDiscountAmount)) {
+              voucherDiscount = parseFloat(voucher.MaxDiscountAmount);
+            }
+          } else {
+            voucherDiscount = Math.min(roomSubtotal, val);
+          }
+          voucherDiscount = effectiveBaseRate >= 100000 ? Math.round(voucherDiscount) : Math.round(voucherDiscount * 100) / 100;
+          
+          // Concurrency: Atomic update UsedCount
+          const [updated] = await Voucher.update(
+            { UsedCount: sequelize.literal('UsedCount + 1') },
+            {
+              where: {
+                VoucherId: voucher.VoucherId,
+                UsedCount: { [Op.lt]: voucher.UsageLimit }
+              },
+              transaction
+            }
+          );
+          if (updated > 0) {
+            appliedVoucherId = voucher.VoucherId;
+            discountAmount = Math.round((discountAmount + voucherDiscount) * 100) / 100;
+          }
+        }
+      }
+    }
+
     // Add-on services calculation
     let addonsTotal = 0;
     const resolvedAddons = [];
@@ -300,6 +348,7 @@ exports.createOnlineBooking = async (req, res) => {
     const booking = await Booking.create({
       UserId: req.user?.id || req.user?.UserId || 1,
       RoomTypeId: parseInt(roomTypeId, 10),
+      VoucherId: appliedVoucherId || null,
       CheckInDate: checkInDate,
       CheckOutDate: checkOutDate,
       NumberOfNights: numberOfNights,
@@ -421,7 +470,8 @@ exports.calculatePricing = async (req, res) => {
       selectedAddOns = [],
       taxesAndFeesRate = 0.12,
       depositRate = 0.20,
-      isGoldMember = false
+      isGoldMember = false,
+      voucherCode
     } = req.body;
 
     // 1. Kiểm tra tham số ngày & số lượng khách
@@ -630,6 +680,67 @@ exports.calculatePricing = async (req, res) => {
       discountAmount = Math.round((roomSubtotal * 0.10) * 100) / 100;
     }
 
+    // FEAT-GUEST-07: Áp dụng mã Voucher trong calculatePricing (nếu truyền voucherCode)
+    let voucherData = null;
+    let voucherDiscount = 0;
+    if (voucherCode) {
+      const cleanVoucherCode = String(voucherCode).trim().toUpperCase();
+      const voucher = await Voucher.findOne({
+        where: { Code: cleanVoucherCode, IsDeleted: false }
+      });
+      if (!voucher || voucher.Status !== 'Active') {
+        return res.status(404).json({
+          success: false,
+          code: 'ERROR_0026_VOUCHER_NOT_FOUND',
+          message: 'Mã giảm giá không tồn tại hoặc đã nhập sai'
+        });
+      }
+      const now = new Date();
+      if ((voucher.StartDate && new Date(voucher.StartDate) > now) || (voucher.EndDate && new Date(voucher.EndDate) < now)) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0027_VOUCHER_EXPIRED',
+          message: 'Mã giảm giá đã hết hạn sử dụng'
+        });
+      }
+      if (voucher.UsageLimit > 0 && voucher.UsedCount >= voucher.UsageLimit) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0028_VOUCHER_LIMIT_REACHED',
+          message: 'Mã khuyến mãi đã hết lượt sử dụng'
+        });
+      }
+      const minOrder = parseFloat(voucher.MinOrderAmount) || 0;
+      if (roomSubtotal < minOrder) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0029_VOUCHER_MIN_NOT_MET',
+          message: 'Đơn đặt phòng chưa đạt giá trị tối thiểu để áp dụng mã này'
+        });
+      }
+      const discountType = String(voucher.DiscountType || '').toLowerCase();
+      const val = parseFloat(voucher.DiscountValue) || 0;
+      if (discountType.includes('percent')) {
+        voucherDiscount = (roomSubtotal * val) / 100;
+        if (voucher.MaxDiscountAmount && voucherDiscount > parseFloat(voucher.MaxDiscountAmount)) {
+          voucherDiscount = parseFloat(voucher.MaxDiscountAmount);
+        }
+      } else {
+        voucherDiscount = Math.min(roomSubtotal, val);
+      }
+      voucherDiscount = isVND ? Math.round(voucherDiscount) : Math.round(voucherDiscount * 100) / 100;
+      const display = discountType.includes('percent') ? `${val}%` : (isVND ? `${val.toLocaleString('vi-VN')}đ` : `$${val.toFixed(2)}`);
+      voucherData = {
+        voucherId: voucher.VoucherId,
+        code: voucher.Code,
+        discountType: voucher.DiscountType,
+        discountValue: voucher.DiscountValue,
+        discountAmount: voucherDiscount,
+        discountDisplay: display
+      };
+      discountAmount = Math.round((discountAmount + voucherDiscount) * 100) / 100;
+    }
+
     // Chi phí trước thuế
     const subtotalBeforeTax = Math.round((roomSubtotal + surchargeAmount - discountAmount) * 100) / 100;
 
@@ -663,6 +774,7 @@ exports.calculatePricing = async (req, res) => {
         addOnsTotal,
         surchargeAmount,
         discountAmount,
+        voucher: voucherData,
         subtotalBeforeTax,
         taxesAndFeesRate: taxRate,
         taxesAndFees,

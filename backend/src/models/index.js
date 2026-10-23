@@ -29,6 +29,7 @@ const defineRoomSearchIndex = require('./RoomSearchIndex');
 const defineLateFeePolicy = require('./LateFeePolicy');
 const defineRoomInspectionReport = require('./RoomInspectionReport');
 const defineDamageItem = require('./DamageItem');
+const defineVoucher = require('./Voucher');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -42,6 +43,7 @@ const MembershipTier = defineMembershipTier(sequelize);
 const User = defineUser(sequelize);
 const Booking = defineBooking(sequelize);
 const BookingGuest = defineBookingGuest(sequelize);
+const Voucher = defineVoucher(sequelize);
 const Review = defineReview(sequelize);
 const ReviewPhoto = defineReviewPhoto(sequelize);
 const MenuCategory = defineMenuCategory(sequelize);
@@ -92,6 +94,10 @@ Booking.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
 // 6b. Booking & BookingGuest
 Booking.hasMany(BookingGuest, { foreignKey: 'BookingId', as: 'guests' });
 BookingGuest.belongsTo(Booking, { foreignKey: 'BookingId', as: 'booking' });
+
+// 6c. Booking & Voucher
+Voucher.hasMany(Booking, { foreignKey: 'VoucherId', as: 'bookings' });
+Booking.belongsTo(Voucher, { foreignKey: 'VoucherId', as: 'voucher' });
 
 // 7. User & Review
 User.hasMany(Review, { foreignKey: 'UserId', as: 'reviews' });
@@ -210,6 +216,7 @@ module.exports = {
   LateFeePolicy,
   RoomInspectionReport,
   DamageItem,
+  Voucher,
 };
 
 

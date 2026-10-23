@@ -104,6 +104,14 @@ app.post('/bookings', require('./controllers/bookingEngineController').createOnl
 app.post('/bookings/calculate-pricing', require('./controllers/bookingEngineController').calculatePricing);
 app.post('/api/bookings/calculate-pricing', require('./controllers/bookingEngineController').calculatePricing);
 
+// FEAT-GUEST-07: Promotion & Voucher Redemption endpoints (Mã truy vết: A7)
+app.use('/api/v1/vouchers', require('./routes/voucherRoutes'));
+app.use('/api/vouchers', require('./routes/voucherRoutes'));
+app.post('/bookings/apply-voucher', require('./controllers/voucherController').validateVoucher);
+app.post('/api/bookings/apply-voucher', require('./controllers/voucherController').validateVoucher);
+app.post('/bookings/:bookingId/apply-voucher', require('./controllers/voucherController').applyVoucherToBooking);
+app.post('/api/bookings/:bookingId/apply-voucher', require('./controllers/voucherController').applyVoucherToBooking);
+
 // FEAT-GUEST-08: Direct deposit payment & booking retrieval endpoints
 app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController').getBookingDetails);
 app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
