@@ -13,6 +13,7 @@ const ALL_NAV_ITEMS = [
   { icon: "receipt_long", label: "Quản Lý Đặt Phòng", to: "/admin/dat-phong", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "assignment_turned_in", label: "Gán Phòng (Room Allocation)", to: "/admin/room-assignment", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "how_to_reg", label: "Check-in Tại Quầy (Express)", to: "/admin/check-in", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "more_time", label: "Gia Hạn Lưu Trú & Đổi Phòng", to: "/admin/extend-stay", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "logout", label: "Check-Out & Kiểm Phòng", to: "/admin/check-out", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services", allowedRoles: ['Admin', 'Receptionist'] },

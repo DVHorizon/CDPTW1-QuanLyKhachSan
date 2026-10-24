@@ -9,9 +9,9 @@ import BookingEngine from './pages/client/BookingEngine';
 import DepositPayment from './pages/client/DepositPayment';
 import Auth from './pages/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
+import RoomAvailability from './pages/admin/menu/RoomAvailability';
 import RoomTypeManagement from './pages/RoomTypeManagement';
 import RoomManagement from './pages/RoomManagement';
-import RoomAvailability from './pages/admin/menu/RoomAvailability';
 import StaffManagement from './pages/StaffManagement';
 import RoomService from './pages/client/RoomService';
 import Profile from './pages/client/Profile';
@@ -32,6 +32,7 @@ import CheckOutDesk from './pages/admin/CheckOutDesk';
 import FnbReview from './pages/client/FnbReview';
 import MockPaymentGateway from './pages/client/MockPaymentGateway';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import ExtendStayAndMove from './pages/admin/ExtendStayAndMove';
 
 
 function App() {
@@ -66,6 +67,7 @@ function App() {
             <Route path="/auth" element={<Auth />} />
             <Route path="/login" element={<Auth />} />
             <Route path="/register" element={<Auth />} />
+
             {/* Phân hệ Quản trị (Admin / Nội bộ) - Được bảo vệ bằng RBAC Database */}
             <Route path="/admin" element={<ProtectedRoute><Navigate to="/admin/menu" replace /></ProtectedRoute>} />
             <Route path="/admin/menu" element={<ProtectedRoute><MenuManagement /></ProtectedRoute>} />
@@ -82,6 +84,16 @@ function App() {
             <Route path="/admin/check-in" element={<ProtectedRoute><CheckInDesk /></ProtectedRoute>} />
             <Route path="/admin/check-in/:bookingId" element={<ProtectedRoute><CheckInDesk /></ProtectedRoute>} />
             <Route path="/admin/guest-check-in" element={<ProtectedRoute><CheckInDesk /></ProtectedRoute>} />
+
+            {/* Phân hệ Gia hạn lưu trú & Đổi phòng (FEAT-STAY-EXTEND-01 / Spec 9) */}
+            <Route path="/admin/extend-stay" element={<ProtectedRoute><ExtendStayAndMove /></ProtectedRoute>} />
+            <Route path="/admin/extend-stay/:stayId" element={<ProtectedRoute><ExtendStayAndMove /></ProtectedRoute>} />
+            <Route path="/admin/gia-han-luu-tru" element={<ProtectedRoute><ExtendStayAndMove /></ProtectedRoute>} />
+            <Route path="/admin/gia-han-luu-tru/:stayId" element={<ProtectedRoute><ExtendStayAndMove /></ProtectedRoute>} />
+            <Route path="/admin/doi-phong" element={<ProtectedRoute><ExtendStayAndMove /></ProtectedRoute>} />
+            <Route path="/admin/doi-phong/:stayId" element={<ProtectedRoute><ExtendStayAndMove /></ProtectedRoute>} />
+
+            {/* Phân hệ Check-out & Kiểm phòng (FEAT-CHECKOUT-INSPECT-01 / Spec 11) */}
             <Route path="/admin/check-out" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
             <Route path="/admin/check-out/:stayId" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
             <Route path="/admin/guest-check-out" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />

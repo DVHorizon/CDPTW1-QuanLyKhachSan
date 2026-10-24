@@ -69,8 +69,14 @@ app.use('/api/check-in', require('./routes/admin/checkInRoutes'));
 const checkOutRoutes = require('./routes/admin/checkOutRoutes');
 app.use('/api/v1/check-out', checkOutRoutes);
 app.use('/api/check-out', checkOutRoutes);
-app.use('/api/v1/stays', checkOutRoutes);
 app.use('/api/v1/folio', checkOutRoutes);
+
+// Route Gia hạn lưu trú & Đổi phòng (Stay Extension & Room Move Terminal)
+app.use('/api/v1/stays', require('./routes/admin/stayExtensionRoutes'));
+app.use('/api/stays', require('./routes/admin/stayExtensionRoutes'));
+app.use('/api/v1/stay-extensions', require('./routes/admin/stayExtensionRoutes'));
+app.use('/api/stay-extensions', require('./routes/admin/stayExtensionRoutes'));
+app.use('/api/v1/stays', checkOutRoutes);
 
 // Route Quản lý người dùng & nhân viên (Spec 3 - FEAT-USER-01)
 app.use('/api/users', require('./routes/users'));
