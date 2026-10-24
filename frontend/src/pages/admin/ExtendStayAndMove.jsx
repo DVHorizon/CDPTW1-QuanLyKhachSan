@@ -94,6 +94,7 @@ export default function ExtendStayAndMove() {
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [keyEncodingStep, setKeyEncodingStep] = useState(0);
   const [toastMessage, setToastMessage] = useState(null);
+  const [actionFeedback, setActionFeedback] = useState(null);
 
   // Cập nhật đồng hồ thời gian thực
   useEffect(() => {
@@ -261,16 +262,26 @@ export default function ExtendStayAndMove() {
     setSubmitting(false);
 
     if (res.success) {
+      const successMsg = res.message || `Đã gia hạn lưu trú đến ${fmtDateDisplay(previewData.requestedCheckout)}. Khoản phí đã được ghi nhận vào hóa đơn folio.`;
+      setActionFeedback({
+        type: 'success',
+        text: successMsg,
+      });
       setToastMessage({
         type: 'success',
-        text: res.message || `Đã gia hạn lưu trú đến ${previewData.requestedCheckout}. Khoản phí đã được cập nhật vào hóa đơn.`,
+        text: successMsg,
       });
       await loadDossier(selectedStayId);
       await fetchInHouseList(searchQuery);
     } else {
+      const errorMsg = res.message || 'Lỗi khi xác nhận gia hạn: ' + (res.errorCode || '');
+      setActionFeedback({
+        type: 'error',
+        text: errorMsg,
+      });
       setToastMessage({
         type: 'error',
-        text: res.message || 'Lỗi khi xác nhận gia hạn.',
+        text: errorMsg,
       });
     }
   };
@@ -313,6 +324,11 @@ export default function ExtendStayAndMove() {
     setSubmitting(false);
 
     if (res.success) {
+      const successMsg = res.message || `Đã đổi phòng thành công sang Phòng ${selectedTargetRoom.RoomNumber || selectedTargetRoom.roomNumber}!`;
+      setActionFeedback({
+        type: 'success',
+        text: successMsg,
+      });
       setShowKeyModal(true);
       setKeyEncodingStep(1);
       setTimeout(() => setKeyEncodingStep(2), 700);
@@ -320,7 +336,7 @@ export default function ExtendStayAndMove() {
         setKeyEncodingStep(3);
         setToastMessage({
           type: 'success',
-          text: res.message || `Đã đổi phòng thành công sang Phòng ${selectedTargetRoom.RoomNumber || selectedTargetRoom.roomNumber}!`,
+          text: successMsg,
         });
       }, 1500);
 
@@ -330,9 +346,14 @@ export default function ExtendStayAndMove() {
         fetchMonitoringList();
       }
     } else {
+      const errorMsg = res.message || 'Lỗi khi xử lý đổi phòng: ' + (res.errorCode || '');
+      setActionFeedback({
+        type: 'error',
+        text: errorMsg,
+      });
       setToastMessage({
         type: 'error',
-        text: res.message || 'Lỗi khi xử lý đổi phòng: ' + (res.errorCode || ''),
+        text: errorMsg,
       });
     }
   };
@@ -1286,7 +1307,33 @@ export default function ExtendStayAndMove() {
 
         {/* ─── THANH THỰC THI CHÍNH Ở ĐÁY TRANG ──────────────────────────────── */}
         {activeMode !== 'MONITOR' && (
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-lg sticky bottom-4 z-40">
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xl sticky bottom-4 z-40 space-y-3">
+
+            {/* THÔNG BÁO TRỰC TIẾP NGAY TẠI KHU VỰC NÚT BẤM */}
+            {actionFeedback && (
+              <div
+                className={`p-3.5 rounded-2xl flex items-center justify-between border shadow-sm animate-in fade-in slide-in-from-bottom-2 ${
+                  actionFeedback.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    : 'bg-rose-50 text-rose-800 border-rose-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 text-xs font-bold">
+                  <span className="material-symbols-outlined text-xl shrink-0">
+                    {actionFeedback.type === 'success' ? 'check_circle' : 'error'}
+                  </span>
+                  <span>{actionFeedback.text}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActionFeedback(null)}
+                  className="p-1 rounded-lg hover:bg-black/5 text-slate-500 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-base">close</span>
+                </button>
+              </div>
+            )}
+
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 
               {/* Tóm tắt hành động */}
@@ -1327,25 +1374,39 @@ export default function ExtendStayAndMove() {
                 </button>
 
                 {activeMode === 'EXTEND' ? (
-                  <button
-                    type="button"
-                    disabled={submitting || !previewData || Boolean(conflictError)}
-                    onClick={handleConfirmExtension}
-                    className="px-6 py-3 rounded-2xl bg-admin-primary hover:bg-emerald-600 disabled:bg-slate-300 text-white font-bold text-xs shadow-lg shadow-admin-primary/20 transition-all flex items-center gap-2 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-base">check_circle</span>
-                    <span>{submitting ? 'Đang Xử Lý...' : 'Xác Nhận Gia Hạn'}</span>
-                  </button>
+                  <div className="flex flex-col items-end gap-1">
+                    <button
+                      type="button"
+                      disabled={submitting || !previewData || Boolean(conflictError)}
+                      onClick={handleConfirmExtension}
+                      className="px-6 py-3 rounded-2xl bg-admin-primary hover:bg-emerald-600 disabled:bg-slate-300 text-white font-bold text-xs shadow-lg shadow-admin-primary/20 transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base">check_circle</span>
+                      <span>{submitting ? 'Đang Xử Lý...' : 'Xác Nhận Gia Hạn'}</span>
+                    </button>
+                    {actionFeedback?.type === 'success' && (
+                      <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 animate-in fade-in">
+                        <span className="material-symbols-outlined text-sm">done_all</span> Đã gia hạn thành công!
+                      </span>
+                    )}
+                  </div>
                 ) : (
-                  <button
-                    type="button"
-                    disabled={submitting || !selectedTargetRoom}
-                    onClick={handleConfirmRelocate}
-                    className="px-6 py-3 rounded-2xl bg-admin-primary hover:bg-emerald-600 disabled:bg-slate-300 text-white font-bold text-xs shadow-lg shadow-admin-primary/20 transition-all flex items-center gap-2 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-base">swap_horizontal_circle</span>
-                    <span>{submitting ? 'Đang Chuyển Phòng...' : 'Xác Nhận Đổi Phòng'}</span>
-                  </button>
+                  <div className="flex flex-col items-end gap-1">
+                    <button
+                      type="button"
+                      disabled={submitting || !selectedTargetRoom}
+                      onClick={handleConfirmRelocate}
+                      className="px-6 py-3 rounded-2xl bg-admin-primary hover:bg-emerald-600 disabled:bg-slate-300 text-white font-bold text-xs shadow-lg shadow-admin-primary/20 transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base">swap_horizontal_circle</span>
+                      <span>{submitting ? 'Đang Chuyển Phòng...' : 'Xác Nhận Đổi Phòng'}</span>
+                    </button>
+                    {actionFeedback?.type === 'success' && (
+                      <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 animate-in fade-in">
+                        <span className="material-symbols-outlined text-sm">done_all</span> Đã đổi phòng thành công!
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
