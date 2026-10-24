@@ -93,8 +93,16 @@ export default function ExtendStayAndMove() {
   const [submitting, setSubmitting] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [keyEncodingStep, setKeyEncodingStep] = useState(0);
-  const [toastMessage, setToastMessage] = useState(null);
   const [actionFeedback, setActionFeedback] = useState(null);
+
+  // Tự động tắt thông báo sau 4 giây
+  useEffect(() => {
+    if (!actionFeedback) return;
+    const timer = setTimeout(() => {
+      setActionFeedback(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [actionFeedback]);
 
   // Cập nhật đồng hồ thời gian thực
   useEffect(() => {
@@ -139,7 +147,7 @@ export default function ExtendStayAndMove() {
         setCustomCheckoutDate(nextDay.toISOString().slice(0, 10));
       }
     } else {
-      setToastMessage({ type: 'error', text: res.message || 'Không thể tải hồ sơ lưu trú' });
+      setActionFeedback({ type: 'error', text: res.message || 'Không thể tải hồ sơ lưu trú' });
     }
     setLoadingDossier(false);
   }, [additionalNights]);
@@ -267,19 +275,11 @@ export default function ExtendStayAndMove() {
         type: 'success',
         text: successMsg,
       });
-      setToastMessage({
-        type: 'success',
-        text: successMsg,
-      });
       await loadDossier(selectedStayId);
       await fetchInHouseList(searchQuery);
     } else {
       const errorMsg = res.message || 'Lỗi khi xác nhận gia hạn: ' + (res.errorCode || '');
       setActionFeedback({
-        type: 'error',
-        text: errorMsg,
-      });
-      setToastMessage({
         type: 'error',
         text: errorMsg,
       });
@@ -334,10 +334,6 @@ export default function ExtendStayAndMove() {
       setTimeout(() => setKeyEncodingStep(2), 700);
       setTimeout(() => {
         setKeyEncodingStep(3);
-        setToastMessage({
-          type: 'success',
-          text: successMsg,
-        });
       }, 1500);
 
       await loadDossier(selectedStayId);
@@ -351,10 +347,6 @@ export default function ExtendStayAndMove() {
         type: 'error',
         text: errorMsg,
       });
-      setToastMessage({
-        type: 'error',
-        text: errorMsg,
-      });
     }
   };
 
@@ -364,11 +356,11 @@ export default function ExtendStayAndMove() {
     const res = await completeRoomMoveApi(moveId);
     setSubmitting(false);
     if (res.success) {
-      setToastMessage({ type: 'success', text: 'Đã hoàn tất đổi phòng và bàn giao chìa khóa!' });
+      setActionFeedback({ type: 'success', text: 'Đã hoàn tất đổi phòng và bàn giao chìa khóa!' });
       fetchMonitoringList();
       fetchInHouseList(searchQuery);
     } else {
-      setToastMessage({ type: 'error', text: res.message || 'Lỗi hoàn tất đổi phòng' });
+      setActionFeedback({ type: 'error', text: res.message || 'Lỗi hoàn tất đổi phòng' });
     }
   };
 
@@ -379,10 +371,10 @@ export default function ExtendStayAndMove() {
     const res = await cancelRoomMoveApi(moveId, { cancelReason: reason });
     setSubmitting(false);
     if (res.success) {
-      setToastMessage({ type: 'success', text: 'Đã hủy yêu cầu đổi phòng thành công' });
+      setActionFeedback({ type: 'success', text: 'Đã hủy yêu cầu đổi phòng thành công' });
       fetchMonitoringList();
     } else {
-      setToastMessage({ type: 'error', text: res.message || 'Lỗi hủy yêu cầu đổi phòng' });
+      setActionFeedback({ type: 'error', text: res.message || 'Lỗi hủy yêu cầu đổi phòng' });
     }
   };
 
@@ -404,36 +396,6 @@ export default function ExtendStayAndMove() {
       breadcrumb={[{ label: "Lễ Tân & Tiền Sảnh", to: "/admin/le-tan" }, { label: "Gia Hạn & Đổi Phòng" }]}
     >
       <div className="space-y-6 pb-12 text-[#203044]">
-
-        {/* ─── THÔNG BÁO HỆ THỐNG (TOAST NOTIFICATION) ───────────────────────── */}
-        {toastMessage && (
-          <div
-            className={`p-4 rounded-2xl flex items-center justify-between border shadow-lg animate-in fade-in slide-in-from-top-4 ${
-              toastMessage.type === 'success'
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                : 'bg-rose-50 text-rose-800 border-rose-300'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-2xl font-bold">
-                {toastMessage.type === 'success' ? 'check_circle' : 'error'}
-              </span>
-              <div>
-                <strong className="block text-sm font-bold">
-                  {toastMessage.type === 'success' ? 'Thực thi thành công!' : 'Thông báo từ hệ thống:'}
-                </strong>
-                <span className="text-xs">{toastMessage.text}</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setToastMessage(null)}
-              className="p-1 rounded-lg hover:bg-black/5 transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-lg">close</span>
-            </button>
-          </div>
-        )}
 
         {/* ─── THANH TIÊU ĐỀ & CHUYỂN ĐỔI CHẾ ĐỘ (MODE SWITCHER) ─────────────── */}
         <div className="bg-[#1b2b3d] text-white p-6 rounded-3xl shadow-xl relative overflow-hidden border border-slate-700/60">
