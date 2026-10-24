@@ -71,7 +71,10 @@ app.use('/api/v1/check-out', checkOutRoutes);
 app.use('/api/check-out', checkOutRoutes);
 app.use('/api/v1/folio', checkOutRoutes);
 
-// Route Gia hạn lưu trú & Đổi phòng (Stay Extension & Room Move Terminal)
+// Route Gia hạn lưu trú & Đổi phòng (Stay Extension & Room Move Terminal - Spec 9 & Spec 10)
+const { router: roomMoveRouter } = require('./routes/admin/roomMoveRoutes');
+app.use('/api/v1/room-moves', roomMoveRouter);
+app.use('/api/room-moves', roomMoveRouter);
 app.use('/api/v1/stays', require('./routes/admin/stayExtensionRoutes'));
 app.use('/api/stays', require('./routes/admin/stayExtensionRoutes'));
 app.use('/api/v1/stay-extensions', require('./routes/admin/stayExtensionRoutes'));

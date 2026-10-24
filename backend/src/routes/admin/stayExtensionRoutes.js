@@ -964,222 +964,58 @@ router.post(['/:id/approve', '/stay-extensions/:id/approve'], optionalVerifyToke
   }
 });
 
-// ─── GET /api/v1/stays/:stayId/replacement-rooms ────────────────────────────
-// Danh sách phòng trống để đổi phòng (Mode 02: REPLACEMENT DESTINATION MATRIX)
-router.get('/:stayId/replacement-rooms', optionalVerifyToken, async (req, res) => {
-  try {
-    const permCheck = checkStayPermission(req, 'STAY_VIEW');
-    if (!permCheck.allowed) {
-      return res.status(403).json({ success: false, errorCode: permCheck.error, message: permCheck.message });
-    }
+// ─── PHÂN HỆ ĐỔI PHÒNG (FEAT-ROOM-MOVE-01 - Spec 10) ─────────────────────────
+const {
+  getRoomMoveOptionsCore,
+  createOrExecuteRoomMoveCore,
+  completeRoomMoveCore,
+  checkRoomMovePermission,
+} = require('./roomMoveRoutes');
 
-    const { stayId } = req.params;
-    const { floor, roomClass } = req.query;
-
-    const [stayRows] = await pool.query(
-      `SELECT s.RoomId, r.RoomTypeId, r.Floor, rt.BasePrice, rt.TypeName
-       FROM Stays s
-       JOIN Rooms r ON s.RoomId = r.RoomId
-       JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
-       WHERE s.StayId = ? LIMIT 1`,
-      [stayId]
-    );
-
-    if (!stayRows.length) {
-      return res.status(404).json({ success: false, message: 'Lượt lưu trú không tồn tại.' });
-    }
-
-    const current = stayRows[0];
-    const currentBasePrice = Number(current.BasePrice) || 1500000;
-
-    let sql = `
-      SELECT
-        r.RoomId,
-        r.RoomNumber,
-        r.Floor,
-        r.Status AS HousekeepingState,
-        rt.RoomTypeId,
-        rt.TypeName AS CategoryType,
-        rt.BasePrice,
-        (rt.BasePrice - ?) AS TariffDiff
-      FROM Rooms r
-      JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
-      WHERE r.RoomId != ?
-        AND r.Status IN ('CleanAvailable', 'Available', 'Inspected')
-        AND r.IsDeleted = 0
-    `;
-
-    const params = [currentBasePrice, current.RoomId];
-
-    if (floor && floor !== 'ALL') {
-      sql += ` AND r.Floor = ?`;
-      params.push(Number(floor));
-    }
-
-    if (roomClass && roomClass !== 'ALL') {
-      sql += ` AND r.RoomTypeId = ?`;
-      params.push(Number(roomClass));
-    }
-
-    sql += ` ORDER BY TariffDiff ASC, r.Floor ASC, r.RoomNumber ASC LIMIT 15`;
-
-    const [rooms] = await pool.query(sql, params);
-
-    const formattedRooms = rooms.map((rm) => {
-      let classification = 'Đổi ngang cùng hạng';
-      const diff = Number(rm.TariffDiff) || 0;
-      if (diff > 0) classification = 'Nâng hạng phòng';
-      else if (diff < 0) classification = 'Hạ hạng phòng';
-      else if (rm.Floor === current.Floor) classification = 'Đổi cùng tầng';
-
-      return {
-        ...rm,
-        classification,
-        tariffDifferential: diff,
-        keyEncoderChannel: `REC-NORTH-${String(rm.Floor).padStart(2, '0')}`,
-        clearedBy: `HK_SUPER_${rm.Floor} @ 13:10`,
-      };
+// GET /api/v1/stays/:stayId/room-move/options & /replacement-rooms
+const roomMoveOptionsRouteHandler = async (req, res) => {
+  const permCheck = checkRoomMovePermission(req, 'ROOMMOVE_VIEW');
+  if (!permCheck.allowed) {
+    return res.status(permCheck.status).json({
+      success: false,
+      errorCode: permCheck.errorCode,
+      message: permCheck.message,
     });
-
-    res.json({
-      success: true,
-      data: formattedRooms,
-    });
-  } catch (err) {
-    console.error('GET /replacement-rooms error:', err);
-    res.status(500).json({ success: false, message: 'Lỗi tải danh sách phòng thay thế: ' + err.message });
   }
+  const result = await getRoomMoveOptionsCore(req.params.stayId, req.query, req.user, req.headers);
+  return res.status(result.status).json(result.body);
+};
+
+router.get('/:stayId/room-move/options', optionalVerifyToken, roomMoveOptionsRouteHandler);
+router.get('/:stayId/replacement-rooms', optionalVerifyToken, roomMoveOptionsRouteHandler);
+
+// POST /api/v1/stays/:stayId/room-moves (Khởi tạo yêu cầu đổi phòng)
+router.post('/:stayId/room-moves', optionalVerifyToken, async (req, res) => {
+  const permCheck = checkRoomMovePermission(req, 'ROOMMOVE_CREATE');
+  if (!permCheck.allowed) {
+    return res.status(permCheck.status).json({
+      success: false,
+      errorCode: permCheck.errorCode,
+      message: permCheck.message,
+    });
+  }
+  const result = await createOrExecuteRoomMoveCore(req.params.stayId, req.body, req.user, req.headers);
+  return res.status(result.status).json(result.body);
 });
 
-// ─── POST /api/v1/stays/:stayId/relocate ────────────────────────────────────
-// Thực hiện đổi phòng (Mode 02: CONFIRM ROOM MOVE - Test Case 18)
+// POST /api/v1/stays/:stayId/relocate (Thực hiện đổi phòng ngay - Mode 02)
 router.post('/:stayId/relocate', optionalVerifyToken, async (req, res) => {
-  const conn = await pool.getConnection();
-  try {
-    const permCheck = checkStayPermission(req, 'STAY_EXTENSION_CONFIRM');
-    if (!permCheck.allowed) {
-      return res.status(403).json({ success: false, errorCode: permCheck.error, message: permCheck.message });
-    }
-
-    const { stayId } = req.params;
-    const {
-      targetRoomId,
-      reason = 'Sự cố máy lạnh / Tiếng ồn điều hòa',
-      memo = '',
-      bellhopDispatched = true,
-      voidOldKeys = true,
-      flagOldRoomMaintenance = true,
-    } = req.body;
-
-    if (!targetRoomId) {
-      return res.status(400).json({ success: false, message: 'Vui lòng chọn phòng cần chuyển tới.' });
-    }
-
-    await conn.beginTransaction();
-
-    // 1. Kiểm tra stay
-    const [stays] = await conn.query(
-      `SELECT s.StayId, s.BookingId, s.RoomId, s.Status, r.RoomNumber AS OldRoomNumber
-       FROM Stays s
-       JOIN Rooms r ON s.RoomId = r.RoomId
-       WHERE s.StayId = ? FOR UPDATE`,
-      [stayId]
-    );
-
-    if (!stays.length) {
-      await conn.rollback();
-      return res.status(404).json({ success: false, message: 'Lượt lưu trú không tồn tại.' });
-    }
-
-    const stay = stays[0];
-    const oldRoomId = stay.RoomId;
-
-    // 2. Kiểm tra phòng mới
-    const [targetRooms] = await conn.query(
-      `SELECT RoomId, RoomNumber, Status FROM Rooms WHERE RoomId = ? FOR UPDATE`,
-      [targetRoomId]
-    );
-
-    if (!targetRooms.length) {
-      await conn.rollback();
-      return res.status(404).json({ success: false, message: 'Phòng chuyển đến không tồn tại.' });
-    }
-
-    const targetRoom = targetRooms[0];
-
-    // 3. Cập nhật Stay sang phòng mới
-    await conn.query(`UPDATE Stays SET RoomId = ?, UpdatedAt = NOW() WHERE StayId = ?`, [
-      targetRoomId,
-      stay.StayId,
-    ]);
-
-    // 4. Đổi trạng thái phòng cũ thành DirtyCleaning hoặc Maintenance
-    const oldRoomStatus = flagOldRoomMaintenance ? 'OutOfOrder' : 'DirtyCleaning';
-    await conn.query(`UPDATE Rooms SET Status = ?, UpdatedAt = NOW() WHERE RoomId = ?`, [
-      oldRoomStatus,
-      oldRoomId,
-    ]);
-
-    // 5. Đổi trạng thái phòng mới thành Occupied
-    await conn.query(`UPDATE Rooms SET Status = 'Occupied', UpdatedAt = NOW() WHERE RoomId = ?`, [
-      targetRoomId,
-    ]);
-
-    // 6. Ghi vào bảng RoomMoveHistory
-    await conn.query(
-      `INSERT INTO RoomMoveHistory (StayId, FromRoomId, ToRoomId, MoveDate, Reason, MovedBy)
-       VALUES (?, ?, ?, NOW(), ?, 1)`,
-      [stay.StayId, oldRoomId, targetRoomId, `${reason} - ${memo}`]
-    );
-
-    // 7. Ghi vào RoomStatusHistory cho cả hai phòng
-    try {
-      await conn.query(
-        `INSERT INTO RoomStatusHistory (RoomId, OldStatus, NewStatus, TriggerEvent, StatusChangedAt, StatusChangedBy, Note)
-         VALUES (?, 'Occupied', ?, 'ROOM_MOVE_OUT', NOW(), 1, ?)`,
-        [oldRoomId, oldRoomStatus, `Khách chuyển sang P.${targetRoom.RoomNumber}: ${reason}`]
-      );
-      await conn.query(
-        `INSERT INTO RoomStatusHistory (RoomId, OldStatus, NewStatus, TriggerEvent, StatusChangedAt, StatusChangedBy, Note)
-         VALUES (?, ?, 'Occupied', 'ROOM_MOVE_IN', NOW(), 1, ?)`,
-        [targetRoomId, targetRoom.Status, `Khách chuyển từ P.${stay.OldRoomNumber}`]
-      );
-    } catch (_) {}
-
-    // 8. Ghi AuditLogs
-    try {
-      await conn.query(
-        `INSERT INTO AuditLogs (UserId, ActionType, TableName, RecordId, OldValues, NewValues, ActionTime, IpAddress)
-         VALUES (1, 'ROOM_RELOCATION', 'Stays', ?, ?, ?, NOW(), '127.0.0.1')`,
-        [
-          stay.StayId,
-          JSON.stringify({ oldRoomId, oldRoomNumber: stay.OldRoomNumber }),
-          JSON.stringify({ newRoomId: targetRoomId, newRoomNumber: targetRoom.RoomNumber, reason, memo }),
-        ]
-      );
-    } catch (_) {}
-
-    await conn.commit();
-
-    res.json({
-      success: true,
-      message: `Đã chuyển khách từ Phòng ${stay.OldRoomNumber} sang Phòng ${targetRoom.RoomNumber} thành công!`,
-      data: {
-        stayId: stay.StayId,
-        fromRoomNumber: stay.OldRoomNumber,
-        toRoomNumber: targetRoom.RoomNumber,
-        bellhopDispatched,
-        voidOldKeys,
-        movedAt: new Date().toISOString(),
-      },
+  const permCheck = checkRoomMovePermission(req, 'ROOMMOVE_COMPLETE');
+  if (!permCheck.allowed) {
+    return res.status(permCheck.status).json({
+      success: false,
+      errorCode: permCheck.errorCode,
+      message: permCheck.message,
     });
-  } catch (err) {
-    await conn.rollback();
-    console.error('POST /stays/:stayId/relocate error:', err);
-    res.status(500).json({ success: false, message: 'Lỗi xử lý đổi phòng: ' + err.message });
-  } finally {
-    conn.release();
   }
+  req.body.executeNow = true;
+  const result = await createOrExecuteRoomMoveCore(req.params.stayId, req.body, req.user, req.headers);
+  return res.status(result.status).json(result.body);
 });
 
 module.exports = router;

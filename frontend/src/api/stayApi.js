@@ -110,7 +110,7 @@ export const getReplacementRoomsApi = async (stayId, filters = {}) => {
 };
 
 /**
- * Thực hiện chuyển phòng (Room Relocation)
+ * Thực hiện chuyển phòng (Room Relocation - FEAT-ROOM-MOVE-01)
  */
 export const relocateStayRoomApi = async (stayId, payload) => {
   try {
@@ -125,3 +125,91 @@ export const relocateStayRoomApi = async (stayId, payload) => {
     return { success: false, message: err.message };
   }
 };
+
+/**
+ * Lấy danh sách đề xuất phòng thay thế (Spec 10)
+ */
+export const getRoomMoveOptionsApi = async (stayId, filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+    if (filters.floor) params.append('floor', filters.floor);
+    if (filters.roomClass) params.append('roomClass', filters.roomClass);
+    if (filters.minCapacity) params.append('minCapacity', filters.minCapacity);
+
+    const res = await fetch(`${API_BASE_URL}/v1/stays/${stayId}/room-move/options?${params.toString()}`, {
+      headers: getAuthHeaders(),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('getRoomMoveOptionsApi error:', err);
+    return { success: false, message: err.message, data: [] };
+  }
+};
+
+/**
+ * Khởi tạo yêu cầu đổi phòng do sự cố (Spec 10)
+ */
+export const createRoomMoveRequestApi = async (stayId, payload) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/stays/${stayId}/room-moves`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('createRoomMoveRequestApi error:', err);
+    return { success: false, message: err.message };
+  }
+};
+
+/**
+ * Hoàn tất đổi phòng (Spec 10)
+ */
+export const completeRoomMoveApi = async (moveId, payload = {}) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/room-moves/${moveId}/complete`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('completeRoomMoveApi error:', err);
+    return { success: false, message: err.message };
+  }
+};
+
+/**
+ * Hủy yêu cầu đổi phòng (Spec 10)
+ */
+export const cancelRoomMoveApi = async (moveId, payload = {}) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/room-moves/${moveId}/cancel`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('cancelRoomMoveApi error:', err);
+    return { success: false, message: err.message };
+  }
+};
+
+/**
+ * Lấy danh sách theo dõi đổi phòng (Bảng theo dõi Spec 10)
+ */
+export const getRoomMovesListApi = async (params = {}) => {
+  try {
+    const q = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_BASE_URL}/v1/room-moves?${q}`, {
+      headers: getAuthHeaders(),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('getRoomMovesListApi error:', err);
+    return { success: false, message: err.message, data: [] };
+  }
+};
+

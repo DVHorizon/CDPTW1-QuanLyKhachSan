@@ -9,6 +9,11 @@ import {
   confirmStayExtensionApi,
   getReplacementRoomsApi,
   relocateStayRoomApi,
+  getRoomMoveOptionsApi,
+  createRoomMoveRequestApi,
+  completeRoomMoveApi,
+  cancelRoomMoveApi,
+  getRoomMovesListApi,
 } from '../../api/stayApi';
 
 // Tiện ích format tiền tệ VND
@@ -33,32 +38,39 @@ export default function ExtendStayAndMove() {
   const navigate = useNavigate();
   const { stayId: paramStayId } = useParams();
 
-  // ─── Trạng thái hệ thống ──────────────────────────────────────────────────
+  // Chế độ hoạt động:
+  // 'EXTEND': Gia hạn lưu trú (Spec 9)
+  // 'RELOCATE': Đổi phòng do sự cố (Spec 10)
+  // 'MONITOR': Bảng theo dõi Room Move (Spec 10 Section 6.2)
+  const [activeMode, setActiveMode] = useState('EXTEND');
+
+  // Trạng thái chung & thời gian thực
   const [systemTime, setSystemTime] = useState(new Date());
-  const [activeMode, setActiveMode] = useState('EXTEND'); // 'EXTEND' (Chế độ 01) | 'RELOCATE' (Chế độ 02)
-
-  // ─── Danh sách khách đang lưu trú (In-house) ───────────────────────────────
-  const [inHouseGuests, setInHouseGuests] = useState([]);
-  const [selectedStayId, setSelectedStayId] = useState(paramStayId || null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loadingList, setLoadingList] = useState(false);
-
-  // ─── Hồ sơ lưu trú đang chọn (Dossier) ────────────────────────────────────
+  const [inHouseGuests, setInHouseGuests] = useState([]);
+  const [selectedStayId, setSelectedStayId] = useState(paramStayId ? Number(paramStayId) : null);
   const [stayDossier, setStayDossier] = useState(null);
+  const [loadingList, setLoadingList] = useState(false);
   const [loadingDossier, setLoadingDossier] = useState(false);
 
-  // ─── CHẾ ĐỘ 01: Gia hạn lưu trú (Stay Extension) ──────────────────────────
+  // ─── CHẾ ĐỘ 01: Gia hạn lưu trú (Stay Extension - Spec 9) ──────────────────
   const [additionalNights, setAdditionalNights] = useState(1);
   const [customCheckoutDate, setCustomCheckoutDate] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState(null);
   const [conflictError, setConflictError] = useState(null);
 
-  // ─── CHẾ ĐỘ 02: Đổi phòng (Room Relocation) ────────────────────────────────
-  const [relocateReason, setRelocateReason] = useState('Sự cố máy lạnh / Tiếng ồn điều hòa');
-  const [workOrderMemo, setWorkOrderMemo] = useState(
-    'Khách phản ánh hệ thống máy lạnh phát ra tiếng ồn vào buổi sáng. Bộ phận Kỹ thuật đã xác nhận cần đổi phòng để thay motor.'
+  // ─── CHẾ ĐỘ 02: Đổi phòng do sự cố (Room Move - Spec 10) ───────────────────
+  const [incidentType, setIncidentType] = useState('MAINTENANCE');
+  const [incidentSeverity, setIncidentSeverity] = useState('LOW');
+  const [incidentDescription, setIncidentDescription] = useState(
+    'Hệ thống điều hòa phát tiếng ồn lớn ảnh hưởng giấc ngủ của khách'
   );
+  const [oldRoomDisposition, setOldRoomDisposition] = useState('OUT_OF_ORDER');
+  const [rateAdjustment, setRateAdjustment] = useState('KEEP_ORIGINAL');
+  const [guestAcknowledgement, setGuestAcknowledgement] = useState('ACCEPTED');
+  const [isEmergency, setIsEmergency] = useState(false);
+
   const [bellhopDispatched, setBellhopDispatched] = useState(true);
   const [guestSelfTransfer, setGuestSelfTransfer] = useState(false);
   const [voidCurrentKeys, setVoidCurrentKeys] = useState(true);
@@ -71,10 +83,16 @@ export default function ExtendStayAndMove() {
   const [selectedTargetRoom, setSelectedTargetRoom] = useState(null);
   const [loadingRooms, setLoadingRooms] = useState(false);
 
+  // ─── CHẾ ĐỘ 03: Bảng theo dõi Room Move (Spec 10 Section 6.2) ──────────────
+  const [roomMovesList, setRoomMovesList] = useState([]);
+  const [loadingMovesList, setLoadingMovesList] = useState(false);
+  const [monitorFilterStatus, setMonitorFilterStatus] = useState('ALL');
+  const [monitorFilterSeverity, setMonitorFilterSeverity] = useState('ALL');
+
   // ─── Thao tác thực thi (Execution & Key Encoder) ──────────────────────────
   const [submitting, setSubmitting] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
-  const [keyEncodingStep, setKeyEncodingStep] = useState(0); // 0: Chờ, 1: Đang kết nối, 2: Đang ghi chip, 3: Hoàn tất
+  const [keyEncodingStep, setKeyEncodingStep] = useState(0);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Cập nhật đồng hồ thời gian thực
@@ -110,20 +128,20 @@ export default function ExtendStayAndMove() {
     if (!stayId) return;
     setLoadingDossier(true);
     setConflictError(null);
-    setPreviewData(null);
-    setSelectedTargetRoom(null);
-
     const res = await getStayDossierApi(stayId);
     if (res.success && res.data) {
       setStayDossier(res.data);
-      const curCheck = new Date(res.data.currentCheckout || res.data.ExpectedCheckOut || res.data.CheckOutDate);
-      curCheck.setDate(curCheck.getDate() + 1);
-      const nextDateStr = curCheck.toISOString().slice(0, 10);
-      setCustomCheckoutDate(nextDateStr);
-      setAdditionalNights(1);
+      if (res.data.currentCheckout || res.data.CheckOutDate) {
+        const curCheckout = new Date(res.data.currentCheckout || res.data.CheckOutDate);
+        const nextDay = new Date(curCheckout);
+        nextDay.setDate(nextDay.getDate() + additionalNights);
+        setCustomCheckoutDate(nextDay.toISOString().slice(0, 10));
+      }
+    } else {
+      setToastMessage({ type: 'error', text: res.message || 'Không thể tải hồ sơ lưu trú' });
     }
     setLoadingDossier(false);
-  }, []);
+  }, [additionalNights]);
 
   useEffect(() => {
     if (selectedStayId) {
@@ -131,47 +149,39 @@ export default function ExtendStayAndMove() {
     }
   }, [selectedStayId, loadDossier]);
 
-  // Chạy kiểm tra xung đột lịch & tính phụ thu (Chế độ 01)
-  const runExtensionPreview = useCallback(async (nights, targetDate) => {
-    if (!selectedStayId || !stayDossier) return;
+  // Tải xem trước báo giá gia hạn (Spec 9)
+  const loadExtensionPreview = useCallback(async () => {
+    if (!selectedStayId || !stayDossier || !customCheckoutDate) return;
     setPreviewLoading(true);
     setConflictError(null);
-
-    const payload = {
-      additionalNights: nights,
-      requestedCheckoutAt: targetDate || undefined,
-    };
-
-    const res = await previewStayExtensionApi(selectedStayId, payload);
-    setPreviewLoading(false);
-
+    const res = await previewStayExtensionApi(selectedStayId, customCheckoutDate, additionalNights);
     if (res.success && res.data) {
       setPreviewData(res.data);
-      setConflictError(null);
+      if (res.data.availabilityStatus === 'CONFLICT') {
+        setConflictError(res.data.conflictReason || 'Phòng đã có khách đặt lịch kế tiếp. Vui lòng chọn ngày khác hoặc chuyển sang Đổi Phòng.');
+      }
     } else {
+      setConflictError(res.message || 'Lỗi kiểm tra tính khả dụng của phòng.');
       setPreviewData(null);
-      setConflictError({
-        errorCode: res.errorCode || 'EXTEND_0003_ROOM_CONFLICT',
-        message: res.message || 'Phòng đã có khách hoặc được giữ cho lượt lưu trú kế tiếp trong khoảng thời gian này',
-        data: res.data || {},
-      });
     }
-  }, [selectedStayId, stayDossier]);
+    setPreviewLoading(false);
+  }, [selectedStayId, stayDossier, customCheckoutDate, additionalNights]);
 
   useEffect(() => {
-    if (activeMode === 'EXTEND' && stayDossier) {
-      runExtensionPreview(additionalNights, customCheckoutDate);
+    if (activeMode === 'EXTEND' && selectedStayId && customCheckoutDate) {
+      loadExtensionPreview();
     }
-  }, [activeMode, additionalNights, customCheckoutDate, stayDossier, runExtensionPreview]);
+  }, [activeMode, selectedStayId, customCheckoutDate, loadExtensionPreview]);
 
-  // Tải danh sách phòng thay thế khi ở Chế độ 02
+  // Tải danh sách phòng thay thế (Spec 10)
   const loadReplacementRooms = useCallback(async () => {
     if (!selectedStayId) return;
     setLoadingRooms(true);
-    const res = await getReplacementRoomsApi(selectedStayId, {
-      floor: floorFilter,
-      roomClass: roomClassFilter,
-    });
+    const filters = {};
+    if (floorFilter !== 'ALL') filters.floor = floorFilter;
+    if (roomClassFilter !== 'ALL') filters.roomClass = roomClassFilter;
+
+    const res = await getRoomMoveOptionsApi(selectedStayId, filters);
     if (res.success && res.data) {
       setReplacementRooms(res.data);
       if (res.data.length > 0 && !selectedTargetRoom) {
@@ -186,6 +196,25 @@ export default function ExtendStayAndMove() {
       loadReplacementRooms();
     }
   }, [activeMode, loadReplacementRooms]);
+
+  // Tải danh sách theo dõi đổi phòng (Spec 10 Section 6.2)
+  const fetchMonitoringList = useCallback(async () => {
+    setLoadingMovesList(true);
+    const params = {};
+    if (monitorFilterStatus !== 'ALL') params.status = monitorFilterStatus;
+    if (monitorFilterSeverity !== 'ALL') params.severity = monitorFilterSeverity;
+    const res = await getRoomMovesListApi(params);
+    if (res.success && res.data) {
+      setRoomMovesList(res.data);
+    }
+    setLoadingMovesList(false);
+  }, [monitorFilterStatus, monitorFilterSeverity]);
+
+  useEffect(() => {
+    if (activeMode === 'MONITOR') {
+      fetchMonitoringList();
+    }
+  }, [activeMode, fetchMonitoringList]);
 
   // Xử lý nút thay đổi số ngày nhanh (+1, +2, +3, -1)
   const handleQuickAddDays = (delta) => {
@@ -212,7 +241,7 @@ export default function ExtendStayAndMove() {
     }
   };
 
-  // Xác nhận gia hạn lưu trú (Confirm Extension)
+  // Xác nhận gia hạn lưu trú (Spec 9)
   const handleConfirmExtension = async () => {
     if (!selectedStayId || !previewData) return;
     setSubmitting(true);
@@ -246,35 +275,93 @@ export default function ExtendStayAndMove() {
     }
   };
 
-  // Xác nhận đổi phòng (Confirm Room Move)
+  // Xác nhận đổi phòng (Spec 10 - Room Move)
   const handleConfirmRelocate = async () => {
     if (!selectedStayId || !selectedTargetRoom) return;
+
+    if (!incidentDescription || incidentDescription.trim().length < 10) {
+      setToastMessage({
+        type: 'error',
+        text: 'Vui lòng nhập mô tả sự cố tối thiểu 10 ký tự theo quy định.',
+      });
+      return;
+    }
+
     setSubmitting(true);
 
+    const idempotencyKey = `IDEMP-MOVE-${selectedStayId}-${Date.now()}`;
     const payload = {
-      targetRoomId: selectedTargetRoom.RoomId,
-      reason: relocateReason,
-      memo: workOrderMemo,
+      targetRoomId: selectedTargetRoom.RoomId || selectedTargetRoom.roomId,
+      incidentType,
+      incidentSeverity,
+      incidentDescription: incidentDescription.trim(),
+      moveReason: incidentDescription.trim(),
+      oldRoomDisposition,
+      rateAdjustment,
+      guestAcknowledgement,
+      isEmergency,
       bellhopDispatched,
       voidOldKeys: voidCurrentKeys,
-      flagOldRoomMaintenance: flagRoomDirtyMaintenance,
+      flagOldRoomMaintenance: oldRoomDisposition === 'OUT_OF_ORDER' || oldRoomDisposition === 'MAINTENANCE',
+      version: stayDossier?.Version || 1,
+      idempotencyKey,
+      executeNow: true,
+      simulateKeycardTimeout: false,
     };
 
     const res = await relocateStayRoomApi(selectedStayId, payload);
     setSubmitting(false);
 
     if (res.success) {
-      setToastMessage({
-        type: 'success',
-        text: res.message || `Đã chuyển khách sang Phòng ${selectedTargetRoom.RoomNumber} thành công!`,
-      });
+      setShowKeyModal(true);
+      setKeyEncodingStep(1);
+      setTimeout(() => setKeyEncodingStep(2), 700);
+      setTimeout(() => {
+        setKeyEncodingStep(3);
+        setToastMessage({
+          type: 'success',
+          text: res.message || `Đã đổi phòng thành công sang Phòng ${selectedTargetRoom.RoomNumber || selectedTargetRoom.roomNumber}!`,
+        });
+      }, 1500);
+
       await loadDossier(selectedStayId);
       await fetchInHouseList(searchQuery);
+      if (activeMode === 'MONITOR') {
+        fetchMonitoringList();
+      }
     } else {
       setToastMessage({
         type: 'error',
-        text: res.message || 'Lỗi khi xử lý đổi phòng.',
+        text: res.message || 'Lỗi khi xử lý đổi phòng: ' + (res.errorCode || ''),
       });
+    }
+  };
+
+  // Hoàn tất hoặc hủy yêu cầu đổi phòng từ bảng theo dõi
+  const handleCompleteMoveFromTable = async (moveId) => {
+    setSubmitting(true);
+    const res = await completeRoomMoveApi(moveId);
+    setSubmitting(false);
+    if (res.success) {
+      setToastMessage({ type: 'success', text: 'Đã hoàn tất đổi phòng và bàn giao chìa khóa!' });
+      fetchMonitoringList();
+      fetchInHouseList(searchQuery);
+    } else {
+      setToastMessage({ type: 'error', text: res.message || 'Lỗi hoàn tất đổi phòng' });
+    }
+  };
+
+  const handleCancelMoveFromTable = async (moveId) => {
+    const reason = window.prompt('Nhập lý do hủy yêu cầu đổi phòng:');
+    if (!reason) return;
+    setSubmitting(true);
+    const res = await cancelRoomMoveApi(moveId, { cancelReason: reason });
+    setSubmitting(false);
+    if (res.success) {
+      setToastMessage({ type: 'success', text: 'Đã hủy yêu cầu đổi phòng thành công' });
+      fetchMonitoringList();
+    } else {
+      setToastMessage({ type: 'error', text: res.message || 'Lỗi hủy yêu cầu đổi phòng' });
     }
   };
 
@@ -300,77 +387,59 @@ export default function ExtendStayAndMove() {
         {/* ─── THÔNG BÁO HỆ THỐNG (TOAST NOTIFICATION) ───────────────────────── */}
         {toastMessage && (
           <div
-            className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${
+            className={`p-4 rounded-2xl flex items-center justify-between border shadow-lg animate-in fade-in slide-in-from-top-4 ${
               toastMessage.type === 'success'
-                ? 'bg-emerald-900 text-emerald-100 border-emerald-600 shadow-emerald-900/20'
-                : 'bg-rose-900 text-rose-100 border-rose-600 shadow-rose-900/20'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                : 'bg-rose-50 text-rose-800 border-rose-300'
             }`}
           >
-            <span className="material-symbols-outlined text-xl">
-              {toastMessage.type === 'success' ? 'check_circle' : 'error'}
-            </span>
-            <span className="font-semibold">{toastMessage.text}</span>
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-2xl font-bold">
+                {toastMessage.type === 'success' ? 'check_circle' : 'error'}
+              </span>
+              <div>
+                <strong className="block text-sm font-bold">
+                  {toastMessage.type === 'success' ? 'Thực thi thành công!' : 'Thông báo từ hệ thống:'}
+                </strong>
+                <span className="text-xs">{toastMessage.text}</span>
+              </div>
+            </div>
             <button
+              type="button"
               onClick={() => setToastMessage(null)}
-              className="ml-3 p-1 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
+              className="p-1 rounded-lg hover:bg-black/5 transition-colors cursor-pointer"
             >
-              <span className="material-symbols-outlined text-base">close</span>
+              <span className="material-symbols-outlined text-lg">close</span>
             </button>
           </div>
         )}
 
-        {/* ─── BANNER TIÊU ĐỀ GRAND HORIZON (HERO BANNER) ───────────────────── */}
-        <div className="bg-gradient-to-r from-[#131b2e] via-[#203044] to-[#131b2e] rounded-3xl p-6 text-white shadow-xl border border-white/10 relative overflow-hidden">
-          <div className="absolute -right-16 -top-16 w-64 h-64 bg-admin-primary/10 rounded-full blur-3xl pointer-events-none"></div>
-          <div className="absolute right-32 -bottom-20 w-80 h-80 bg-[#b9a277]/10 rounded-full blur-3xl pointer-events-none"></div>
-
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        {/* ─── THANH TIÊU ĐỀ & CHUYỂN ĐỔI CHẾ ĐỘ (MODE SWITCHER) ─────────────── */}
+        <div className="bg-[#1b2b3d] text-white p-6 rounded-3xl shadow-xl relative overflow-hidden border border-slate-700/60">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-admin-primary/20 text-emerald-300 border border-admin-primary/40">
-                  HỆ THỐNG PMS GRAND HORIZON • QUẦY LỄ TÂN
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-admin-primary/20 text-admin-primary border border-admin-primary/40">
+                  PMS TERMINAL 4.0
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-[#b9a277]/20 text-[#ffd985] border border-[#b9a277]/30">
-                  MÃ HỆ THỐNG #GH-2026
+                <span className="text-xs text-slate-400 font-mono">
+                  {systemTimeStr} • Ca Trực Lễ Tân Sáng
                 </span>
               </div>
-              <h1 className="text-2xl md:text-3xl font-serif font-bold text-white tracking-tight">
-                Gia Hạn Lưu Trú &amp; Điều Chuyển Phòng
+              <h1 className="text-xl md:text-2xl font-serif font-black tracking-tight text-white flex items-center gap-2.5">
+                Điều Phối Lưu Trú &amp; Chuyển Phòng
               </h1>
-              <p className="text-sm text-slate-300 mt-1 max-w-2xl font-sans">
-                Kiểm tra xung đột lịch với khách kế tiếp, tự động tính phụ thu phòng theo biểu giá hiện hành và đồng bộ hóa đơn khách hàng tức thời.
+              <p className="text-xs text-slate-300 mt-1">
+                Gia hạn thời gian lưu trú (Spec 9) và Đổi phòng do sự cố (Spec 10: FEAT-ROOM-MOVE-01)
               </p>
             </div>
 
-            {/* Thẻ trạng thái hệ thống */}
-            <div className="flex flex-wrap items-center gap-3 text-xs">
-              <div className="bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/15 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                <span className="text-slate-300">GIỜ HỆ THỐNG:</span>
-                <strong className="font-mono text-emerald-300 font-bold">{systemTimeStr}</strong>
-              </div>
-
-              <div className="bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/15 flex items-center gap-2">
-                <span className="material-symbols-outlined text-base text-[#ffd985]">hotel</span>
-                <span className="text-slate-300">CÔNG SUẤT:</span>
-                <strong className="text-white font-bold">86.4% (124/144 Phòng)</strong>
-              </div>
-
-              <div className="bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/15 flex items-center gap-2">
-                <span className="material-symbols-outlined text-base text-admin-primary">badge</span>
-                <span className="text-slate-300">LỄ TÂN CA TRỰC:</span>
-                <strong className="text-white font-bold">{user?.fullName || 'Nguyễn Văn Thực (#4092)'}</strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Dải chuyển đổi Chế độ (Mode Tabs) */}
-          <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex bg-black/30 p-1.5 rounded-2xl border border-white/10 backdrop-blur-sm">
+            {/* Thanh Tab Chuyển Chế Độ */}
+            <div className="flex flex-wrap items-center bg-black/40 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
               <button
                 type="button"
                 onClick={() => setActiveMode('EXTEND')}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeMode === 'EXTEND'
                     ? 'bg-admin-primary text-[#002114] shadow-lg shadow-admin-primary/20 font-extrabold'
                     : 'text-slate-300 hover:text-white hover:bg-white/10'
@@ -383,770 +452,908 @@ export default function ExtendStayAndMove() {
               <button
                 type="button"
                 onClick={() => setActiveMode('RELOCATE')}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeMode === 'RELOCATE'
                     ? 'bg-admin-primary text-[#002114] shadow-lg shadow-admin-primary/20 font-extrabold'
                     : 'text-slate-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <span className="material-symbols-outlined text-base">swap_horiz</span>
-                <span>CHẾ ĐỘ 02: ĐIỀU CHUYỂN PHÒNG</span>
+                <span>CHẾ ĐỘ 02: ĐỔI PHÒNG SỰ CỐ</span>
               </button>
-            </div>
 
-            <div className="text-xs text-slate-300 font-sans flex items-center gap-2">
-              <span className="text-emerald-400 font-bold">● Đồng bộ CSDL trực tiếp</span>
-              <span>• Khóa giao dịch nguyên tử chống trùng lịch</span>
+              <button
+                type="button"
+                onClick={() => setActiveMode('MONITOR')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeMode === 'MONITOR'
+                    ? 'bg-amber-400 text-[#002114] shadow-lg shadow-amber-400/20 font-extrabold'
+                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">table_view</span>
+                <span>CHẾ ĐỘ 03: THEO DÕI ĐỔI PHÒNG</span>
+              </button>
             </div>
           </div>
         </div>
 
         {/* ─── BĂNG CHỌN NHANH KHÁCH ĐANG Ở TRONG KHÁCH SẠN ───────────────── */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-admin-primary/15 border border-admin-primary/30 flex items-center justify-center text-admin-primary">
-                <span className="material-symbols-outlined text-xl">luggage</span>
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-[#203044]">
-                  Danh Sách Khách Đang Lưu Trú Tại Khách Sạn ({inHouseGuests.length})
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Chọn một phòng để thực hiện thao tác gia hạn hoặc đổi phòng trực tiếp
-                </p>
-              </div>
-            </div>
-
-            {/* Ô tìm kiếm nhanh */}
-            <div className="relative w-full sm:w-80">
-              <span className="material-symbols-outlined text-slate-400 absolute left-3.5 top-2.5 text-lg pointer-events-none">
-                search
-              </span>
-              <input
-                type="text"
-                placeholder="Tìm số phòng, tên khách, mã đặt phòng..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs font-semibold text-[#203044] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:bg-white transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Băng danh sách khách thẻ chip */}
-          {loadingList ? (
-            <div className="flex items-center justify-center p-8 text-xs text-slate-500 gap-2">
-              <span className="material-symbols-outlined animate-spin text-admin-primary text-xl">progress_activity</span>
-              Đang đồng bộ danh sách lưu trú từ cơ sở dữ liệu Grand Horizon...
-            </div>
-          ) : (
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-              {inHouseGuests.map((g) => {
-                const isSelected = g.StayId === selectedStayId;
-                return (
-                  <button
-                    key={g.StayId}
-                    onClick={() => setSelectedStayId(g.StayId)}
-                    className={`flex-shrink-0 text-left w-72 p-3.5 rounded-2xl border transition-all cursor-pointer relative ${
-                      isSelected
-                        ? 'bg-admin-primary/10 border-admin-primary shadow-md shadow-admin-primary/10 ring-2 ring-admin-primary'
-                        : 'bg-slate-50 border-slate-200/80 hover:border-slate-400 hover:bg-slate-100/60'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-[#203044] text-white">
-                        Phòng {g.RoomNumber}
-                      </span>
-                      <span className="text-[11px] font-mono font-bold text-slate-500">
-                        #{g.ConfirmationCode}
-                      </span>
-                    </div>
-
-                    <div className="font-bold text-sm text-[#203044] truncate">{g.GuestName}</div>
-                    <div className="text-xs text-slate-500 truncate mb-2">{g.RoomTypeName}</div>
-
-                    <div className="flex items-center justify-between text-[11px] pt-2 border-t border-slate-200/70">
-                      <span className="text-slate-600 font-medium">
-                        Trả phòng: <strong className="text-[#203044]">{fmtDateDisplay(g.ExpectedCheckOut || g.CheckOutDate)}</strong>
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#b9a277]/20 text-[#a68e64]">
-                        {g.VipTier}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* ─── GRID NỘI DUNG CHÍNH (HAI CỘT) ─────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-          {/* ══════════════════════════════════════════════════════════════════════
-              CỘT TRÁI (5 CỘT): HỒ SƠ LƯU TRÚ HIỆN TẠI (CURRENT OCCUPANCY DOSSIER)
-              ══════════════════════════════════════════════════════════════════════ */}
-          <div className="lg:col-span-5 space-y-6">
-
-            {/* Khung 1: Hồ sơ lưu trú */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-[#203044]/10 text-[#203044] flex items-center justify-center font-bold">
-                    <span className="material-symbols-outlined text-xl">bedroom_parent</span>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-base text-[#203044]">Hồ Sơ Lưu Trú Hiện Tại</h3>
-                    <p className="text-xs text-slate-500">Thông tin phòng và khách hàng đang ở</p>
-                  </div>
+        {activeMode !== 'MONITOR' && (
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-admin-primary/15 border border-admin-primary/30 flex items-center justify-center text-admin-primary">
+                  <span className="material-symbols-outlined text-xl">luggage</span>
                 </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#203044]">
+                    Danh Sách Khách Đang Lưu Trú ({inHouseGuests.length})
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Chọn một phòng để thực hiện thao tác gia hạn hoặc đổi phòng trực tiếp
+                  </p>
+                </div>
+              </div>
 
-                <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  ĐANG LƯU TRÚ
+              {/* Ô tìm kiếm phòng / tên khách */}
+              <div className="relative w-full sm:w-80">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg">
+                  search
                 </span>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Tìm số phòng, tên khách, mã đặt..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-[#203044] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:bg-white transition-all font-semibold"
+                />
+              </div>
+            </div>
+
+            {/* Băng cuộn ngang các phòng đang ở */}
+            {loadingList ? (
+              <div className="py-8 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
+                Đang nạp danh sách buồng phòng đang có khách...
+              </div>
+            ) : inHouseGuests.length === 0 ? (
+              <div className="p-8 border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-500">
+                Không tìm thấy lượt lưu trú nào phù hợp với từ khóa "{searchQuery}".
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+                {inHouseGuests.map((gst) => {
+                  const isSelected = gst.StayId === selectedStayId;
+                  return (
+                    <div
+                      key={gst.StayId}
+                      onClick={() => setSelectedStayId(gst.StayId)}
+                      className={`shrink-0 w-64 p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${
+                        isSelected
+                          ? 'bg-admin-primary/10 border-admin-primary shadow-md ring-2 ring-admin-primary/30'
+                          : 'bg-slate-50 border-slate-200/80 hover:bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-base font-serif font-black text-[#203044]">
+                          Phòng {gst.RoomNumber}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          ĐANG Ở
+                        </span>
+                      </div>
+                      <div className="text-xs font-bold text-slate-800 truncate mb-1">
+                        {gst.GuestName || 'Khách Vãng Lai'}
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <span>Checkout: {fmtDateDisplay(gst.ExpectedCheckOut)}</span>
+                        <span className="font-semibold text-slate-700">Tầng {gst.Floor || 1}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── NỘI DUNG CHÍNH (THEO CHẾ ĐỘ ĐANG CHỌN) ────────────────────────── */}
+        {activeMode === 'MONITOR' ? (
+          /* ══════════════════════════════════════════════════════════════════════
+              CHẾ ĐỘ 03: BẢNG THEO DÕI ROOM MOVE (Spec 10 Section 6.2)
+             ══════════════════════════════════════════════════════════════════════ */
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-600 flex items-center justify-center font-bold">
+                  <span className="material-symbols-outlined text-xl">table_chart</span>
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#203044]">Bảng Theo Dõi Điều Chuyển Phòng (Room Move Tracker)</h2>
+                  <p className="text-xs text-slate-500">Theo dõi toàn diện các sự cố, yêu cầu di dời và trạng thái bàn giao chìa khóa</p>
+                </div>
               </div>
 
-              {loadingDossier ? (
-                <div className="py-12 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
-                  Đang đồng bộ hồ sơ phòng từ PMS...
+              {/* Bộ lọc trạng thái & mức độ sự cố */}
+              <div className="flex items-center gap-3">
+                <select
+                  value={monitorFilterStatus}
+                  onChange={(e) => setMonitorFilterStatus(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-[#203044]"
+                >
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="REQUESTED">REQUESTED (Mới tạo)</option>
+                  <option value="IN_PROGRESS">IN_PROGRESS (Đang chuyển)</option>
+                  <option value="COMPLETED">COMPLETED (Hoàn tất)</option>
+                  <option value="CANCELLED">CANCELLED (Đã hủy)</option>
+                </select>
+
+                <select
+                  value={monitorFilterSeverity}
+                  onChange={(e) => setMonitorFilterSeverity(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-[#203044]"
+                >
+                  <option value="ALL">Tất cả mức độ</option>
+                  <option value="EMERGENCY">🔴 EMERGENCY (Khẩn cấp)</option>
+                  <option value="HIGH">🟠 HIGH (Nghiêm trọng)</option>
+                  <option value="MEDIUM">🟡 MEDIUM (Trung bình)</option>
+                  <option value="LOW">🟢 LOW (Thấp)</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={fetchMonitoringList}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                  title="Tải lại danh sách"
+                >
+                  <span className="material-symbols-outlined text-base">refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {loadingMovesList ? (
+              <div className="py-12 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
+                Đang tải dữ liệu ca trực điều phối...
+              </div>
+            ) : roomMovesList.length === 0 ? (
+              <div className="p-12 border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-500">
+                Chưa có yêu cầu đổi phòng nào được ghi nhận với bộ lọc hiện tại.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-100">
+                    <tr>
+                      <th className="p-3">Mã &amp; Thời Gian</th>
+                      <th className="p-3">Khách &amp; Phòng Cũ</th>
+                      <th className="p-3">Sự Cố &amp; Mức Độ</th>
+                      <th className="p-3">Phòng Đích &amp; Biểu Phí</th>
+                      <th className="p-3">Trạng Thái</th>
+                      <th className="p-3">Người Tạo</th>
+                      <th className="p-3 text-right">Tác Vụ Tiếp Theo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-sans">
+                    {roomMovesList.map((mv) => {
+                      const isEmg = mv.IncidentSeverity === 'EMERGENCY' || mv.IsEmergency;
+                      return (
+                        <tr key={mv.MoveId} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="p-3">
+                            <span className="font-mono font-bold text-[#203044]">#RM-{mv.MoveId}</span>
+                            <div className="text-[10px] text-slate-400">
+                              {new Date(mv.CreatedAt).toLocaleTimeString('vi-VN')} {fmtDateDisplay(mv.CreatedAt)}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-bold text-slate-800">{mv.GuestName || 'Khách Lưu Trú'}</div>
+                            <div className="text-[11px] text-slate-500">
+                              Phòng nguồn: <strong className="text-slate-700">P.{mv.CurrentRoomNumber}</strong>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                                  mv.IncidentSeverity === 'EMERGENCY'
+                                    ? 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse'
+                                    : mv.IncidentSeverity === 'HIGH'
+                                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                    : mv.IncidentSeverity === 'MEDIUM'
+                                    ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                                    : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                }`}
+                              >
+                                {mv.IncidentSeverity}
+                              </span>
+                              <span className="font-semibold text-slate-600 text-[11px]">{mv.IncidentType}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 max-w-xs truncate" title={mv.IncidentDescription}>
+                              {mv.IncidentDescription}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <strong className="text-[#203044] font-serif">
+                              {mv.TargetRoomNumber ? `P.${mv.TargetRoomNumber}` : '---'}
+                            </strong>
+                            <div className="text-[10px] text-slate-500">
+                              Chính sách: <span className="font-semibold">{mv.RateAdjustment || 'KEEP_ORIGINAL'}</span>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className={`px-2.5 py-1 rounded-xl text-[10px] font-extrabold border ${
+                                mv.MoveStatus === 'COMPLETED'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : mv.MoveStatus === 'IN_PROGRESS'
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse'
+                                  : mv.MoveStatus === 'CANCELLED'
+                                  ? 'bg-slate-100 text-slate-500 border-slate-200'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}
+                            >
+                              {mv.MoveStatus}
+                            </span>
+                          </td>
+                          <td className="p-3 text-slate-600 font-medium">
+                            {mv.CreatedByName || `User #${mv.CreatedBy || 1}`}
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {mv.MoveStatus !== 'COMPLETED' && mv.MoveStatus !== 'CANCELLED' && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCompleteMoveFromTable(mv.MoveId)}
+                                    className="px-2.5 py-1 rounded-lg bg-admin-primary hover:bg-emerald-600 text-white font-bold text-[11px] transition-colors cursor-pointer"
+                                  >
+                                    Hoàn Tất
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancelMoveFromTable(mv.MoveId)}
+                                    className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-bold text-[11px] transition-colors cursor-pointer"
+                                  >
+                                    Hủy
+                                  </button>
+                                </>
+                              )}
+                              {mv.MoveStatus === 'COMPLETED' && (
+                                <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 justify-end">
+                                  <span className="material-symbols-outlined text-sm">done_all</span> Đã Bàn Giao
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* ══════════════════════════════════════════════════════════════════════
+              BỐ CỤC 2 CỘT CHO CHẾ ĐỘ 01 (EXTEND) VÀ CHẾ ĐỘ 02 (RELOCATE)
+             ══════════════════════════════════════════════════════════════════════ */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            {/* ══════════════════════════════════════════════════════════════════════
+                CỘT TRÁI (5 CỘT): HỒ SƠ LƯU TRÚ & BIÊN BẢN SỰ CỐ
+                ══════════════════════════════════════════════════════════════════════ */}
+            <div className="lg:col-span-5 space-y-6">
+
+              {/* Khung 1: Hồ sơ lưu trú của khách đang chọn */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-admin-primary text-xl">contact_page</span>
+                    <h3 className="font-bold text-sm text-[#203044]">Hồ Sơ Lưu Trú Đang Chọn</h3>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 font-mono">
+                    STAY #{stayDossier?.StayId || selectedStayId || '---'}
+                  </span>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Khung trực quan phòng vật lý */}
-                  <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500 font-bold uppercase tracking-wider text-[11px]">Sơ Đồ Phòng Vật Lý</span>
-                      <span className="font-mono text-xs font-extrabold text-admin-primary">
-                        TẦNG_{String(stayDossier?.Floor || '04').padStart(2, '0')}_TÒA BIỂN [P.{stayDossier?.RoomNumber || '---'}]
-                      </span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-serif font-black text-[#203044]">
-                        Phòng {stayDossier?.RoomNumber || '---'}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-600">
-                        (Tầng {stayDossier?.Floor || '---'} • Tòa Biển)
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#b9a277] font-bold">
-                      {stayDossier?.RoomTypeName || 'Hạng Phòng Cao Cấp'}
-                    </p>
+
+                {loadingDossier ? (
+                  <div className="py-8 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
+                    Đang nạp chi tiết hồ sơ...
                   </div>
-
-                  {/* Bảng chi tiết phòng */}
-                  <div className="space-y-3 text-xs divide-y divide-slate-100">
-                    <div className="flex justify-between items-center pt-2">
-                      <span className="text-slate-500 font-medium">Họ &amp; Tên Khách Hàng:</span>
-                      <strong className="text-sm font-bold text-[#203044]">{stayDossier?.GuestName || '---'}</strong>
+                ) : stayDossier ? (
+                  <div className="space-y-3.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-medium">Khách Đại Diện:</span>
+                      <strong className="text-sm font-bold text-[#203044]">{stayDossier.guestName}</strong>
                     </div>
 
-                    <div className="flex justify-between items-center pt-2">
-                      <span className="text-slate-500 font-medium">Khoảng Thời Gian Lưu Trú:</span>
-                      <strong className="text-[#203044] font-semibold">
-                        {fmtDateDisplay(stayDossier?.ActualCheckIn || stayDossier?.CheckInDate)} ➔{' '}
-                        <span className="text-admin-primary font-bold">{fmtDateDisplay(stayDossier?.currentCheckout || stayDossier?.CheckOutDate)}</span>
-                      </strong>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-medium">Phòng Hiện Tại:</span>
+                      <span className="font-serif font-black text-base text-admin-primary">
+                        Phòng {stayDossier.RoomNumber} ({stayDossier.roomType})
+                      </span>
                     </div>
 
-                    <div className="flex justify-between items-center pt-2">
-                      <span className="text-slate-500 font-medium">Đơn Giá Phòng Áp Dụng:</span>
-                      <strong className="text-[#203044] font-semibold">
-                        {fmtMoney(stayDossier?.BasePrice || 1500000)} / Đêm
-                      </strong>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-medium">Số Khách Trong Phòng:</span>
+                      <span className="font-semibold text-slate-700">
+                        {stayDossier.adults || 1} Người lớn, {stayDossier.children || 0} Trẻ em
+                      </span>
                     </div>
 
-                    <div className="flex justify-between items-center pt-2">
-                      <span className="text-slate-500 font-medium">Số Dư Hóa Đơn Chưa Thanh Toán:</span>
-                      <strong className="text-rose-600 font-bold text-sm">
-                        {fmtMoney(stayDossier?.outstandingBalance || 0)}
-                      </strong>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-medium">Thời Gian Lưu Trú:</span>
+                      <span className="font-semibold text-slate-700">
+                        {fmtDateDisplay(stayDossier.CheckInDate)} ➔ {fmtDateDisplay(stayDossier.currentCheckout || stayDossier.CheckOutDate)}
+                      </span>
                     </div>
 
-                    <div className="flex justify-between items-center pt-2">
-                      <span className="text-slate-500 font-medium">Hạng Hội Viên Tích Lũy:</span>
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#b9a277]/20 text-[#a68e64]">
-                        {stayDossier?.VipTier || 'Hội Viên Bạc'}
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-medium">Đơn Giá Phòng Hiện Tại:</span>
+                      <strong className="text-[#203044] font-mono">{fmtMoney(stayDossier.pricePerNight)} / đêm</strong>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      <span className="text-slate-500 font-medium">Tình Trạng Folio / Hóa Đơn:</span>
+                      <span className="px-2 py-0.5 rounded-full font-bold text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        Số dư hiện hành: {fmtMoney(stayDossier.currentFolioBalance || 0)}
                       </span>
                     </div>
                   </div>
+                ) : (
+                  <div className="text-center py-6 text-xs text-slate-400">
+                    Chưa chọn hồ sơ lưu trú.
+                  </div>
+                )}
+              </div>
 
-                  {/* Dòng hạch toán tài khoản Folio */}
-                  <div className="pt-2">
-                    <div className="flex justify-between text-[11px] text-slate-500 font-medium mb-1.5">
-                      <span>Dòng hạch toán chi phí tài khoản Folio</span>
-                      <span className="text-emerald-600 font-bold">100% Hoạt Động</span>
+              {/* Khung 2: Báo cáo sự cố & Biên bản đổi phòng (Chế độ 02 - Spec 10) */}
+              {activeMode === 'RELOCATE' && (
+                <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600 flex items-center justify-center font-bold">
+                        <span className="material-symbols-outlined text-lg">warning</span>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm text-[#203044]">Báo Cáo Sự Cố &amp; Phiếu Đổi Phòng</h3>
+                        <p className="text-[11px] text-slate-500">Mã đặc tả FEAT-ROOM-MOVE-01 (Spec 10)</p>
+                      </div>
                     </div>
-                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                      <div className="h-full bg-admin-primary w-4/5 rounded-full animate-pulse"></div>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isEmergency}
+                        onChange={(e) => setIsEmergency(e.target.checked)}
+                        className="rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                      />
+                      <span className="text-xs font-bold text-rose-600 uppercase">Khẩn Cấp</span>
+                    </label>
+                  </div>
+
+                  {/* Cảnh báo sự cố mức độ cao hoặc Emergency */}
+                  {(incidentSeverity === 'HIGH' || incidentSeverity === 'EMERGENCY' || isEmergency) && (
+                    <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2 animate-in fade-in">
+                      <span className="material-symbols-outlined text-rose-600 text-lg shrink-0">emergency_home</span>
+                      <div>
+                        <strong className="block font-bold">CẢNH BÁO SỰ CỐ MỨC ĐỘ CAO / KHẨN CẤP:</strong>
+                        <span>Hệ thống tự động ghi nhật ký escalation, mở ticket bảo trì khẩn và gửi cảnh báo tới Giám sát ca trực.</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3.5 text-xs">
+                    {/* Loại sự cố */}
+                    <div>
+                      <label className="font-bold text-[#203044] block mb-1">Loại Sự Cố (Incident Type):</label>
+                      <select
+                        value={incidentType}
+                        onChange={(e) => setIncidentType(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold text-[#203044] focus:outline-none focus:ring-2 focus:ring-admin-primary"
+                      >
+                        <option value="MAINTENANCE">MAINTENANCE - Hỏng hóc kỹ thuật (điều hòa, nước, điện)</option>
+                        <option value="SAFETY">SAFETY - Mối nguy an toàn (cháy nổ, khóa cửa, kính vỡ)</option>
+                        <option value="CLEANLINESS">CLEANLINESS - Vệ sinh / Buồng phòng không đạt chuẩn</option>
+                        <option value="NOISE">NOISE - Tiếng ồn xung quanh hoặc công trình</option>
+                        <option value="ROOM_FEATURE">ROOM_FEATURE - Thiếu tiện nghi / Thiết bị cam kết</option>
+                        <option value="GUEST_REQUEST">GUEST_REQUEST - Khách yêu cầu đổi phòng theo nguyện vọng</option>
+                        <option value="OTHER">OTHER - Sự cố khác</option>
+                      </select>
+                    </div>
+
+                    {/* Mức độ sự cố */}
+                    <div>
+                      <label className="font-bold text-[#203044] block mb-1.5">Mức Độ Nghiêm Trọng (Severity):</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { val: 'LOW', label: 'LOW', color: 'border-emerald-200 text-emerald-700 bg-emerald-50' },
+                          { val: 'MEDIUM', label: 'MEDIUM', color: 'border-yellow-200 text-yellow-800 bg-yellow-50' },
+                          { val: 'HIGH', label: 'HIGH', color: 'border-amber-200 text-amber-800 bg-amber-50' },
+                          { val: 'EMERGENCY', label: 'EMERGENCY', color: 'border-rose-300 text-rose-800 bg-rose-50' },
+                        ].map((sev) => (
+                          <button
+                            key={sev.val}
+                            type="button"
+                            onClick={() => {
+                              setIncidentSeverity(sev.val);
+                              if (sev.val === 'EMERGENCY') setIsEmergency(true);
+                            }}
+                            className={`py-2 px-1 rounded-xl text-xs font-extrabold border text-center transition-all cursor-pointer ${
+                              incidentSeverity === sev.val
+                                ? 'ring-2 ring-admin-primary shadow-sm ' + sev.color
+                                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                            }`}
+                          >
+                            {sev.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Mô tả chi tiết sự cố */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-bold text-[#203044]">Mô Tả Chi Tiết Sự Cố (10-1000 ký tự):</label>
+                        <span className={`text-[10px] font-mono ${incidentDescription.length < 10 ? 'text-rose-500 font-bold' : 'text-slate-400'}`}>
+                          {incidentDescription.length}/1000 ký tự
+                        </span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={incidentDescription}
+                        onChange={(e) => setIncidentDescription(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-[#203044] focus:outline-none focus:ring-2 focus:ring-admin-primary placeholder:text-slate-400"
+                        placeholder="Mô tả chính xác hiện trạng sự cố phát sinh tại phòng..."
+                      />
+                    </div>
+
+                    {/* Xử lý phòng cũ */}
+                    <div>
+                      <label className="font-bold text-[#203044] block mb-1">Xử Lý Phòng Cũ (Old Room Disposition):</label>
+                      <select
+                        value={oldRoomDisposition}
+                        onChange={(e) => setOldRoomDisposition(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold text-[#203044]"
+                      >
+                        <option value="OUT_OF_ORDER">OUT_OF_ORDER - Khóa phòng hỏng &amp; Tạo Ticket bảo trì</option>
+                        <option value="DIRTY">DIRTY - Chuyển Dọn Vệ Sinh (Gán task Housekeeping)</option>
+                        <option value="INSPECTION_REQUIRED">INSPECTION_REQUIRED - Cần giám sát buồng phòng kiểm tra</option>
+                        <option value="MAINTENANCE">MAINTENANCE - Chờ sửa chữa kỹ thuật chuyên sâu</option>
+                      </select>
+                    </div>
+
+                    {/* Chính sách điều chỉnh giá */}
+                    <div>
+                      <label className="font-bold text-[#203044] block mb-1">Chính Sách Biểu Phí (Rate Policy):</label>
+                      <select
+                        value={rateAdjustment}
+                        onChange={(e) => setRateAdjustment(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold text-[#203044]"
+                      >
+                        <option value="KEEP_ORIGINAL">KEEP_ORIGINAL - Giữ giá gốc (Khách sạn chịu phí do sự cố)</option>
+                        <option value="REPRICE_REMAINDER">REPRICE_REMAINDER - Định giá lại cho số đêm còn lại</option>
+                        <option value="DISCOUNT">DISCOUNT - Giảm trừ phụ thu bồi thường</option>
+                        <option value="NONE">NONE - Không điều chỉnh giá</option>
+                      </select>
+                    </div>
+
+                    {/* Xác nhận của khách */}
+                    <div className="pt-2 border-t border-slate-100">
+                      <label className="font-bold text-[#203044] block mb-1.5">Xác Nhận Của Khách Hàng:</label>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="guestAck"
+                            checked={guestAcknowledgement === 'ACCEPTED'}
+                            onChange={() => setGuestAcknowledgement('ACCEPTED')}
+                            className="text-admin-primary focus:ring-admin-primary"
+                          />
+                          <span className="font-semibold text-emerald-700">Khách Đồng Ý</span>
+                        </label>
+
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="guestAck"
+                            checked={guestAcknowledgement === 'DECLINED'}
+                            onChange={() => setGuestAcknowledgement('DECLINED')}
+                            className="text-rose-600 focus:ring-rose-500"
+                          />
+                          <span className="font-semibold text-rose-700">Khách Từ Chối</span>
+                        </label>
+
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="guestAck"
+                            checked={guestAcknowledgement === 'NOT_REACHED'}
+                            onChange={() => setGuestAcknowledgement('NOT_REACHED')}
+                            className="text-slate-500 focus:ring-slate-400"
+                          />
+                          <span className="text-slate-600">Chưa Liên Hệ Được</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Tùy chọn bàn giao hành lý & khóa thẻ */}
+                    <div className="pt-2 border-t border-slate-100 space-y-2">
+                      <span className="font-bold text-[#203044] text-xs block">Tùy Chọn Bàn Giao:</span>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={bellhopDispatched}
+                          onChange={(e) => setBellhopDispatched(e.target.checked)}
+                          className="rounded border-slate-300 text-admin-primary"
+                        />
+                        <span className="font-semibold text-slate-700">Điều động Bellhop hỗ trợ chuyển đồ</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={voidCurrentKeys}
+                          onChange={(e) => setVoidCurrentKeys(e.target.checked)}
+                          className="rounded border-slate-300 text-admin-primary"
+                        />
+                        <span className="font-semibold text-slate-700">Thu hồi &amp; Hủy quyền thẻ phòng cũ</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={suppressMinibar}
+                          onChange={(e) => setSuppressMinibar(e.target.checked)}
+                          className="rounded border-slate-300 text-admin-primary"
+                        />
+                        <span className="text-slate-600">Tạm hoãn kiểm kê quầy bar mini phòng cũ</span>
+                      </label>
                     </div>
                   </div>
                 </div>
               )}
+
             </div>
 
-            {/* Khung 2: Biên bản điều chuyển phòng (Chế độ 02) */}
-            {activeMode === 'RELOCATE' && (
-              <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
-                <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600 flex items-center justify-center font-bold">
-                    <span className="material-symbols-outlined text-lg">sync_problem</span>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-[#203044]">Biên Bản Ca Trực &amp; Lý Do Đổi Phòng</h3>
-                    <p className="text-[11px] text-slate-500">Phiếu lệnh điều phối buồng phòng (Mục 02-B)</p>
-                  </div>
-                </div>
+            {/* ══════════════════════════════════════════════════════════════════════
+                CỘT PHẢI (7 CỘT): THEO CHẾ ĐỘ ĐANG CHỌN
+                ══════════════════════════════════════════════════════════════════════ */}
+            <div className="lg:col-span-7 space-y-6">
 
-                <div className="space-y-3.5 text-xs">
-                  <div>
-                    <label className="font-bold text-[#203044] block mb-1.5">Nguyên Nhân Đổi Phòng:</label>
-                    <select
-                      value={relocateReason}
-                      onChange={(e) => setRelocateReason(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold text-[#203044] focus:outline-none focus:ring-2 focus:ring-admin-primary"
-                    >
-                      <option value="Sự cố máy lạnh / Tiếng ồn điều hòa">Sự cố máy lạnh / Tiếng ồn hệ thống điều hòa</option>
-                      <option value="Sự cố áp lực nước / Ống nước">Sự cố áp lực nước / Đường ống dẫn nước</option>
-                      <option value="Trùng lịch đặt phòng kế tiếp">Trùng lịch đặt phòng kế tiếp khi gia hạn</option>
-                      <option value="Nâng cấp phòng thiện chí cho khách VIP">Nâng cấp phòng thiện chí cho khách VIP</option>
-                      <option value="Yêu cầu dọn dẹp buồng phòng chuyên sâu">Yêu cầu dọn dẹp buồng phòng chuyên sâu</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-[#203044] block mb-1.5">Ghi Chú Ca Trực &amp; Bộ Phận Kỹ Thuật:</label>
-                    <textarea
-                      rows={3}
-                      value={workOrderMemo}
-                      onChange={(e) => setWorkOrderMemo(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-[#203044] focus:outline-none focus:ring-2 focus:ring-admin-primary placeholder:text-slate-400"
-                      placeholder="Ghi rõ chi tiết sự cố và thỏa thuận với khách..."
-                    />
-                    <div className="text-[10px] text-slate-400 font-medium mt-1">
-                      * Tự động lưu trữ vào Phiếu Sự Cố #TCK-88102
-                    </div>
-                  </div>
-
-                  {/* Hành lý & Vận chuyển */}
-                  <div className="pt-2 border-t border-slate-100 space-y-2">
-                    <span className="font-bold text-[#203044] text-xs block">Chỉ Thị Vận Chuyển Hành Lý:</span>
-                    <label className="flex items-center gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={bellhopDispatched}
-                        onChange={(e) => {
-                          setBellhopDispatched(e.target.checked);
-                          if (e.target.checked) setGuestSelfTransfer(false);
-                        }}
-                        className="rounded border-slate-300 text-admin-primary focus:ring-admin-primary"
-                      />
-                      <span className="font-semibold text-slate-700">Điều động nhân viên hành lý hỗ trợ chuyển đồ</span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={guestSelfTransfer}
-                        onChange={(e) => {
-                          setGuestSelfTransfer(e.target.checked);
-                          if (e.target.checked) setBellhopDispatched(false);
-                        }}
-                        className="rounded border-slate-300 text-admin-primary focus:ring-admin-primary"
-                      />
-                      <span className="text-slate-600">Khách tự chuyển phòng (chỉ bàn giao thẻ khóa mới tại quầy)</span>
-                    </label>
-                  </div>
-
-                  {/* Ràng buộc thẻ khóa & Kho phòng */}
-                  <div className="pt-2 border-t border-slate-100 space-y-2">
-                    <span className="font-bold text-[#203044] text-xs block">Ràng Buộc Thẻ Khóa &amp; Trạng Thái Phòng:</span>
-                    <label className="flex items-center gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={voidCurrentKeys}
-                        onChange={(e) => setVoidCurrentKeys(e.target.checked)}
-                        className="rounded border-slate-300 text-admin-primary focus:ring-admin-primary"
-                      />
-                      <span className="font-semibold text-slate-700">Vô hiệu hóa thẻ phòng cũ ngay sau khi phát thẻ phòng mới</span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={flagRoomDirtyMaintenance}
-                        onChange={(e) => setFlagRoomDirtyMaintenance(e.target.checked)}
-                        className="rounded border-slate-300 text-admin-primary focus:ring-admin-primary"
-                      />
-                      <span className="font-semibold text-slate-700">Đánh dấu phòng cũ là Cần Dọn Dẹp / Bảo Trì</span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={suppressMinibar}
-                        onChange={(e) => setSuppressMinibar(e.target.checked)}
-                        className="rounded border-slate-300 text-admin-primary focus:ring-admin-primary"
-                      />
-                      <span className="text-slate-600">Tạm hoãn kiểm kê quầy bar mini cho đến khi bàn giao chìa khóa cũ</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          </div>
-
-          {/* ══════════════════════════════════════════════════════════════════════
-              CỘT PHẢI (7 CỘT): THEO CHẾ ĐỘ ĐANG CHỌN
-              ══════════════════════════════════════════════════════════════════════ */}
-          <div className="lg:col-span-7 space-y-6">
-
-            {/* ─────────────────────────────────────────────────────────────────
-                CHẾ ĐỘ 01: GIA HẠN LƯU TRÚ & KIỂM TRA XUNG ĐỘT
-                ───────────────────────────────────────────────────────────────── */}
-            {activeMode === 'EXTEND' && (
-              <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-admin-primary/15 text-admin-primary flex items-center justify-center font-bold">
-                      <span className="material-symbols-outlined text-xl">event_upcoming</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-base text-[#203044]">Thông Số Gia Hạn Lưu Trú</h3>
-                      <p className="text-xs text-slate-500">Kiểm tra xung đột phòng và tính biểu phí tự động</p>
-                    </div>
-                  </div>
-
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#ffd985]/30 text-[#855f13] border border-[#ffd985]">
-                    TÍNH PHỤ THU TỰ ĐỘNG
-                  </span>
-                </div>
-
-                {/* Timeline chọn ngày gia hạn */}
-                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Lịch Trình Trả Phòng Mới
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 text-sm">
-                      <span className="line-through text-slate-400 font-semibold">
-                        {fmtDateDisplay(stayDossier?.currentCheckout || stayDossier?.CheckOutDate)}
-                      </span>
-                      <span className="material-symbols-outlined text-slate-400 text-base">arrow_forward</span>
-                      <span className="px-3 py-1.5 rounded-xl font-bold text-base bg-admin-primary/15 text-emerald-800 border border-admin-primary/30">
-                        {fmtDateDisplay(customCheckoutDate)}
-                      </span>
-                      <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-[#203044] text-white">
-                        +{additionalNights} Đêm
-                      </span>
+              {/* ─────────────────────────────────────────────────────────────────
+                  CHẾ ĐỘ 01: GIA HẠN LƯU TRÚ (Spec 9)
+                  ───────────────────────────────────────────────────────────────── */}
+              {activeMode === 'EXTEND' && (
+                <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-admin-primary/15 text-admin-primary flex items-center justify-center font-bold">
+                        <span className="material-symbols-outlined text-xl">event_upcoming</span>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-base text-[#203044]">Thông Số Gia Hạn Lưu Trú</h3>
+                        <p className="text-xs text-slate-500">Kiểm tra xung đột phòng và tính biểu phí tự động</p>
+                      </div>
                     </div>
 
-                    {/* Bộ nút bấm thêm ngày nhanh */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAddDays(-1)}
-                        disabled={additionalNights <= 1}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-all"
-                      >
-                        -1 Ngày
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAddDays(1)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          additionalNights === 1
-                            ? 'bg-admin-primary text-[#002114] shadow-sm font-extrabold'
-                            : 'border border-slate-200 bg-white hover:bg-slate-100'
-                        }`}
-                      >
-                        +1 Ngày
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAddDays(2)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          additionalNights === 2
-                            ? 'bg-admin-primary text-[#002114] shadow-sm font-extrabold'
-                            : 'border border-slate-200 bg-white hover:bg-slate-100'
-                        }`}
-                      >
-                        +2 Ngày {additionalNights === 2 ? '{Đã Chọn}' : ''}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAddDays(3)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          additionalNights === 3
-                            ? 'bg-admin-primary text-[#002114] shadow-sm font-extrabold'
-                            : 'border border-slate-200 bg-white hover:bg-slate-100'
-                        }`}
-                      >
-                        +3 Ngày
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Bộ chọn ngày trên lịch */}
-                  <div className="pt-3 border-t border-slate-200/70 flex items-center gap-3">
-                    <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
-                      Hoặc chọn ngày cụ thể trên lịch:
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#ffd985]/30 text-[#855f13] border border-[#ffd985]">
+                      TÍNH PHỤ THU TỰ ĐỘNG
                     </span>
-                    <input
-                      type="date"
-                      value={customCheckoutDate}
-                      onChange={handleCustomDateChange}
-                      min={stayDossier?.currentCheckout || stayDossier?.CheckOutDate || ''}
-                      className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-[#203044] focus:outline-none focus:ring-2 focus:ring-admin-primary shadow-inner"
-                    />
                   </div>
-                </div>
 
-                {/* ─── KẾT QUẢ KIỂM TRA XUNG ĐỘT LỊCH THỜI GIAN THỰC ─────────── */}
-                <div>
-                  {previewLoading ? (
-                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500 font-semibold flex items-center justify-center gap-2">
-                      <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
-                      Đang kiểm tra lịch trống và thời gian dọn phòng (Turnaround buffer) với khách kế tiếp...
+                  {/* Timeline chọn ngày gia hạn */}
+                  <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      Lịch Trình Trả Phòng Mới
                     </div>
-                  ) : conflictError ? (
-                    <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200 space-y-3">
-                      <div className="flex items-center gap-2.5 text-rose-800 font-bold text-sm">
-                        <span className="material-symbols-outlined text-rose-600 text-xl">warning</span>
-                        <span>PHÁT HIỆN XUNG ĐỘT LỊCH PHÒNG // KHÔNG THỂ GIA HẠN TRÊN PHÒNG HIỆN TẠI</span>
-                      </div>
 
-                      <p className="text-xs text-rose-700 leading-relaxed font-medium">
-                        {conflictError.message}
-                      </p>
-
-                      {/* Danh sách các booking kế tiếp xung đột */}
-                      {conflictError.data?.conflicts?.length > 0 && (
-                        <div className="bg-white/80 rounded-xl p-3 border border-rose-200 space-y-1.5 text-xs text-rose-950 font-sans">
-                          <span className="font-bold text-rose-900 block">Lượt khách kế tiếp đã đặt trước trên phòng này:</span>
-                          {conflictError.data.conflicts.map((c, idx) => (
-                            <div key={idx} className="flex justify-between border-b border-rose-100 last:border-none pb-1">
-                              <span>Mã đơn: <strong className="font-mono">#{c.confirmationCode}</strong> ({c.maskedGuestName})</span>
-                              <span>Ngày nhận phòng: <strong className="text-rose-700">{fmtDateDisplay(c.checkInDate)}</strong></span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {conflictError.data?.maxSafeCheckoutAt && (
-                        <div className="text-xs text-slate-700 font-medium">
-                          Thời điểm gia hạn an toàn tối đa có thể giữ trên phòng này: <strong className="text-rose-700">{fmtDateDisplay(conflictError.data.maxSafeCheckoutAt)}</strong>
-                        </div>
-                      )}
-
-                      {/* Nút hành động giải quyết xung đột bằng chuyển phòng */}
-                      <div className="pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setActiveMode('RELOCATE')}
-                          className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-base">swap_horiz</span>
-                          <span>CHUYỂN SANG CHẾ ĐỘ 02: ĐỔI SANG PHÒNG KHÁC CHO KHÁCH</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-700 flex items-center justify-center flex-shrink-0">
-                          <span className="material-symbols-outlined text-2xl">verified</span>
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-emerald-950 uppercase tracking-wide flex items-center gap-2">
-                            <span>XÁC NHẬN KHẢ DỤNG: PHÒNG ĐỦ ĐIỀU KIỆN GIA HẠN</span>
-                            {previewData?.approvalStatus === 'PENDING' && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                                CẦN GIÁM SÁT DUYỆT (&gt;7 NGÀY)
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-emerald-700">
-                            Phòng trống và đảm bảo đủ 2 giờ dọn phòng (Turnaround buffer) cho lượt khách kế tiếp theo quy định.
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end md:self-auto">
-                        <button
-                          type="button"
-                          onClick={() => runExtensionPreview(additionalNights, customCheckoutDate)}
-                          className="px-3 py-1 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 flex items-center gap-1 cursor-pointer transition-all shadow-sm"
-                          title="Tính lại báo giá"
-                        >
-                          <span className="material-symbols-outlined text-sm">refresh</span>
-                          <span>Tính lại</span>
-                        </button>
-                        <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-600 text-white shadow-sm whitespace-nowrap">
-                          ĐỦ ĐIỀU KIỆN
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="line-through text-slate-400 font-semibold">
+                          {fmtDateDisplay(stayDossier?.currentCheckout || stayDossier?.CheckOutDate)}
                         </span>
+                        <span className="material-symbols-outlined text-slate-400 text-base">arrow_forward</span>
+                        <span className="px-3 py-1.5 rounded-xl font-bold text-base bg-admin-primary/15 text-emerald-800 border border-admin-primary/30">
+                          {fmtDateDisplay(customCheckoutDate)}
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-[#203044] text-white">
+                          +{additionalNights} Đêm
+                        </span>
+                      </div>
+
+                      {/* Bộ nút bấm thêm ngày nhanh */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAddDays(1)}
+                          className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold hover:bg-slate-100 transition-all cursor-pointer shadow-sm"
+                        >
+                          +1 Đêm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAddDays(2)}
+                          className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold hover:bg-slate-100 transition-all cursor-pointer shadow-sm"
+                        >
+                          +2 Đêm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAddDays(3)}
+                          className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold hover:bg-slate-100 transition-all cursor-pointer shadow-sm"
+                        >
+                          +3 Đêm
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                        Hoặc chọn trực tiếp ngày Checkout mới trên lịch:
+                      </label>
+                      <input
+                        type="date"
+                        value={customCheckoutDate}
+                        onChange={handleCustomDateChange}
+                        className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-[#203044] focus:outline-none focus:ring-2 focus:ring-admin-primary"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Cảnh báo xung đột phòng */}
+                  {conflictError && (
+                    <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-3">
+                      <span className="material-symbols-outlined text-rose-600 text-xl shrink-0">block</span>
+                      <div className="space-y-1">
+                        <strong className="block font-bold">Xung đột lịch đặt phòng:</strong>
+                        <span>{conflictError}</span>
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setActiveMode('RELOCATE')}
+                            className="px-3 py-1.5 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition-colors cursor-pointer shadow-sm"
+                          >
+                            Chuyển sang Chế độ Đổi Phòng
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bảng tính phụ thu chi tiết */}
+                  {previewData && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <span>Bảng Tính Phụ Thu Lưu Trú (Spec 9)</span>
+                        <span className="font-mono text-admin-primary">#{previewData.quoteId}</span>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Giá phòng cơ sở (+{previewData.additionalNights} đêm):</span>
+                          <strong className="text-[#203044] font-mono">{fmtMoney(previewData.baseAmount)}</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Thuế GTGT ({previewData.taxRate || 12}%):</span>
+                          <strong className="text-[#203044] font-mono">+{fmtMoney(previewData.taxAmount)}</strong>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t border-slate-200 text-sm">
+                          <span className="font-bold text-[#203044]">Tổng Khoản Phí Ghi Nhận Folio:</span>
+                          <span className="font-serif font-black text-emerald-700 text-base">
+                            +{fmtMoney(previewData.netFolioAdjustment)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
+              )}
 
-                {/* ─── BẢNG TÍNH PHỤ THU TỰ ĐỘNG (CALCULATED TARIFF MODEL) ─────── */}
-                <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-[#fafaf8] border border-slate-200 space-y-3.5 text-xs">
-                  <div className="flex justify-between items-center text-slate-600 pb-2 border-b border-slate-200/70">
-                    <span className="font-medium">Tiền phòng gia hạn thêm:</span>
-                    <strong className="text-[#203044] font-mono text-sm">
-                      {additionalNights} Đêm × {fmtMoney(previewData?.nightlyRate || stayDossier?.BasePrice || 1500000)} = {fmtMoney(previewData?.additionalRoomCharge || 0)}
-                    </strong>
+              {/* ─────────────────────────────────────────────────────────────────
+                  CHẾ ĐỘ 02: MA TRẬN PHÒNG THAY THẾ (Spec 10)
+                  ───────────────────────────────────────────────────────────────── */}
+              {activeMode === 'RELOCATE' && (
+                <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-[#b9a277]/20 text-[#a68e64] flex items-center justify-center font-bold">
+                        <span className="material-symbols-outlined text-xl">grid_view</span>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-base text-[#203044]">Ma Trận Phòng Khả Dụng Để Đổi</h3>
+                        <p className="text-xs text-slate-500">Kho phòng thời gian thực kết nối buồng phòng &amp; lễ tân</p>
+                      </div>
+                    </div>
+
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                      KHO PHÒNG TRỰC TIẾP
+                    </span>
                   </div>
 
-                  <div className="flex justify-between items-center text-slate-600 pb-2 border-b border-slate-200/70">
-                    <span className="font-medium">Thuế GTGT &amp; Phí quản lý khu nghỉ dưỡng (12%):</span>
-                    <strong className="text-[#203044] font-mono">
-                      {fmtMoney(previewData?.taxAmount || 0)}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between items-center text-slate-600 pb-2 border-b border-slate-200/70">
-                    <span className="font-medium">Mã biểu phí áp dụng:</span>
-                    <strong className="text-slate-700 font-mono">
-                      {previewData?.targetRateTier || 'BIỂU PHÍ TIÊU CHUẨN'}
-                    </strong>
-                  </div>
-
-                  {/* Tổng phụ thu hạch toán */}
-                  <div className="flex justify-between items-center p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[#203044]">
+                  {/* Bộ lọc phòng thay thế */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div>
-                      <span className="font-black text-sm block">TỔNG PHỤ THU GIA HẠN (HẠCH TOÁN HÓA ĐƠN):</span>
-                      <span className="text-[11px] text-slate-500">Tự động hạch toán vào hóa đơn chính #01 của khách</span>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Lọc Hạng Phòng</label>
+                      <select
+                        value={roomClassFilter}
+                        onChange={(e) => setRoomClassFilter(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-semibold text-[#203044]"
+                      >
+                        <option value="ALL">Tất Cả Hạng Phòng Khả Dụng</option>
+                        <option value="1">Standard (Tiêu chuẩn)</option>
+                        <option value="2">Deluxe (Cao cấp)</option>
+                        <option value="3">Executive Suite (Thượng hạng)</option>
+                      </select>
                     </div>
-                    <strong className="text-xl font-serif font-black text-emerald-700 font-mono">
-                      +{fmtMoney(previewData?.netFolioAdjustment || 0)}
-                    </strong>
-                  </div>
 
-                  <div className="text-[11px] text-slate-400 font-medium flex justify-between pt-1">
-                    <span>* Thẻ bảo lãnh thanh toán lưu trong hồ sơ: Visa Đuôi •••• 9021</span>
-                    <span>Hóa đơn điện tử tự động đồng bộ theo chuẩn thuế GTGT</span>
-                  </div>
-                </div>
-
-              </div>
-            )}
-
-            {/* ─────────────────────────────────────────────────────────────────
-                CHẾ ĐỘ 02: MA TRẬN PHÒNG THAY THẾ ĐỂ ĐỔI
-                ───────────────────────────────────────────────────────────────── */}
-            {activeMode === 'RELOCATE' && (
-              <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-[#b9a277]/20 text-[#a68e64] flex items-center justify-center font-bold">
-                      <span className="material-symbols-outlined text-xl">grid_view</span>
-                    </div>
                     <div>
-                      <h3 className="font-bold text-base text-[#203044]">Ma Trận Phòng Khả Dụng Để Đổi</h3>
-                      <p className="text-xs text-slate-500">Kho phòng thời gian thực kết nối buồng phòng</p>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Lọc Theo Tầng</label>
+                      <select
+                        value={floorFilter}
+                        onChange={(e) => setFloorFilter(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-semibold text-[#203044]"
+                      >
+                        <option value="ALL">Tất Cả Các Tầng</option>
+                        <option value="1">Tầng 01</option>
+                        <option value="2">Tầng 02</option>
+                        <option value="3">Tầng 03</option>
+                        <option value="4">Tầng 04</option>
+                      </select>
                     </div>
                   </div>
 
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                    KHO PHÒNG TRỰC TIẾP
-                  </span>
-                </div>
-
-                {/* Bộ lọc phòng thay thế */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Lọc Hạng Phòng</label>
-                    <select
-                      value={roomClassFilter}
-                      onChange={(e) => setRoomClassFilter(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-semibold text-[#203044]"
-                    >
-                      <option value="ALL">Tất Cả Hạng Phòng Khả Dụng</option>
-                      <option value="1">Phòng Tiêu Chuẩn (Standard King)</option>
-                      <option value="2">Phòng Cao Cấp Hướng Biển (Deluxe)</option>
-                      <option value="3">Phòng Suite Thượng Hạng (Executive)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Lọc Theo Tầng</label>
-                    <select
-                      value={floorFilter}
-                      onChange={(e) => setFloorFilter(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-semibold text-[#203044]"
-                    >
-                      <option value="ALL">Tất Cả Các Tầng</option>
-                      <option value="4">Tầng 04</option>
-                      <option value="8">Tầng 08</option>
-                      <option value="15">Tầng 15</option>
-                      <option value="18">Tầng 18</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Tình Trạng Buồng Phòng</label>
-                    <div className="p-2 rounded-xl bg-slate-100 text-slate-700 font-bold border border-slate-200 text-xs text-center">
-                      Đã Dọn Sạch &amp; Đã Kiểm Tra
+                  {/* Danh sách phòng có thể đổi sang */}
+                  {loadingRooms ? (
+                    <div className="py-12 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
+                      Đang quét kho phòng trống sạch khả dụng...
                     </div>
-                  </div>
-                </div>
+                  ) : replacementRooms.length === 0 ? (
+                    <div className="p-8 border border-dashed border-slate-300 rounded-2xl text-center text-xs text-slate-500 font-semibold">
+                      Không tìm thấy phòng trống sạch phù hợp với tiêu chí lọc.
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                      {replacementRooms.map((rm) => {
+                        const targetId = rm.RoomId || rm.roomId;
+                        const targetNum = rm.RoomNumber || rm.roomNumber;
+                        const isSelected = (selectedTargetRoom?.RoomId || selectedTargetRoom?.roomId) === targetId;
 
-                {/* Danh sách phòng có thể đổi sang */}
-                {loadingRooms ? (
-                  <div className="py-12 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                    <span className="material-symbols-outlined animate-spin text-admin-primary">progress_activity</span>
-                    Đang quét kho phòng trống sạch khả dụng...
-                  </div>
-                ) : replacementRooms.length === 0 ? (
-                  <div className="p-8 border border-dashed border-slate-300 rounded-2xl text-center text-xs text-slate-500 font-semibold">
-                    Không tìm thấy phòng trống sạch phù hợp với tiêu chí lọc.
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                    {replacementRooms.map((rm) => {
-                      const isSelected = selectedTargetRoom?.RoomId === rm.RoomId;
-                      return (
-                        <div
-                          key={rm.RoomId}
-                          onClick={() => setSelectedTargetRoom(rm)}
-                          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-admin-primary/10 border-admin-primary shadow-md ring-2 ring-admin-primary'
-                              : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
-                            <div className="flex items-center gap-2.5">
-                              <span className="text-base font-serif font-black text-[#203044]">
-                                Phòng {rm.RoomNumber}
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                • Tầng {rm.Floor}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              {isSelected && (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#203044] text-white">
-                                  ĐÃ CHỌN
+                        return (
+                          <div
+                            key={targetId}
+                            onClick={() => setSelectedTargetRoom(rm)}
+                            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-admin-primary/10 border-admin-primary shadow-md ring-2 ring-admin-primary'
+                                : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-base font-serif font-black text-[#203044]">
+                                  Phòng {targetNum}
                                 </span>
-                              )}
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                ĐÃ KIỂM TRA // SẴN SÀNG
-                              </span>
-                            </div>
-                          </div>
+                                <span className="text-xs text-slate-500">
+                                  • Tầng {rm.Floor || rm.floor}
+                                </span>
+                              </div>
 
-                          <div className="grid grid-cols-3 gap-2 text-xs">
-                            <div>
-                              <span className="text-slate-400 font-medium block text-[11px]">Hạng Phòng</span>
-                              <strong className="text-[#203044]">{rm.CategoryType}</strong>
+                              <div className="flex items-center gap-2">
+                                {isSelected && (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#203044] text-white">
+                                    ĐÃ CHỌN
+                                  </span>
+                                )}
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {rm.readinessStatus === 'READY' ? 'SẴN SÀNG' : 'CẦN VỆ SINH'}
+                                </span>
+                              </div>
                             </div>
-                            <div>
-                              <span className="text-slate-400 font-medium block text-[11px]">Phân Loại Đổi</span>
-                              <strong className="text-admin-primary">{rm.classification}</strong>
-                            </div>
-                            <div>
-                              <span className="text-slate-400 font-medium block text-[11px]">Chênh Lệch Giá</span>
-                              <strong className={rm.tariffDifferential > 0 ? 'text-rose-600' : 'text-[#203044]'}>
-                                {fmtMoney(rm.BasePrice)} / Đêm ({rm.tariffDifferential >= 0 ? '+' : ''}{fmtMoney(rm.tariffDifferential)})
-                              </strong>
+
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div>
+                                <span className="text-slate-400 font-medium block text-[11px]">Hạng Phòng</span>
+                                <strong className="text-[#203044]">{rm.CategoryType || rm.categoryType}</strong>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-medium block text-[11px]">Phân Loại Đổi</span>
+                                <strong className="text-admin-primary">{rm.classification}</strong>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-medium block text-[11px]">Chênh Lệch Giá</span>
+                                <strong className={(rm.tariffDifferential || rm.tariffDiff) > 0 ? 'text-rose-600' : 'text-[#203044]'}>
+                                  {fmtMoney(rm.BasePrice || rm.basePrice)} / Đêm ({(rm.tariffDifferential || rm.tariffDiff) >= 0 ? '+' : ''}{fmtMoney(rm.tariffDifferential || rm.tariffDiff || 0)})
+                                </strong>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
 
           </div>
-
-        </div>
+        )}
 
         {/* ─── THANH THỰC THI CHÍNH Ở ĐÁY TRANG ──────────────────────────────── */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-lg sticky bottom-4 z-40">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {activeMode !== 'MONITOR' && (
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-lg sticky bottom-4 z-40">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 
-            {/* Tóm tắt hành động */}
-            <div>
-              <div className="flex items-center gap-2 text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">
-                <span className="material-symbols-outlined text-sm text-admin-primary">receipt_long</span>
-                <span>Tóm Tắt Thực Thi Nghiệp Vụ</span>
+              {/* Tóm tắt hành động */}
+              <div>
+                <div className="flex items-center gap-2 text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">
+                  <span className="material-symbols-outlined text-sm text-admin-primary">receipt_long</span>
+                  <span>Tóm Tắt Thực Thi Nghiệp Vụ</span>
+                </div>
+                <div className="text-sm md:text-base font-bold text-[#203044]">
+                  {activeMode === 'EXTEND' ? (
+                    <>
+                      Gia hạn phòng <strong className="text-admin-primary">{stayDossier?.RoomNumber || '---'}</strong> thêm{' '}
+                      <strong>+{additionalNights} đêm</strong> (đến {fmtDateDisplay(customCheckoutDate)}) • Phụ thu:{' '}
+                      <strong className="text-emerald-700 font-mono">+{fmtMoney(previewData?.netFolioAdjustment || 0)}</strong>
+                    </>
+                  ) : (
+                    <>
+                      Chuyển khách từ Phòng <strong>{stayDossier?.RoomNumber || '---'}</strong> sang Phòng{' '}
+                      <strong className="text-admin-primary">{selectedTargetRoom?.RoomNumber || selectedTargetRoom?.roomNumber || '---'}</strong> • Chênh lệch đơn giá:{' '}
+                      <strong className="text-emerald-700 font-mono">{fmtMoney(selectedTargetRoom?.tariffDifferential || selectedTargetRoom?.tariffDiff || 0)}</strong>
+                    </>
+                  )}
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  Dữ liệu sẽ được khóa và đồng bộ tự động vào hồ sơ Stays &amp; Bookings ngay sau khi xác nhận.
+                </div>
               </div>
-              <div className="text-sm md:text-base font-bold text-[#203044]">
+
+              {/* Các nút bấm hành động */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleEncodeKeys}
+                  className="px-4 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-base">contactless</span>
+                  <span>Đầu Ghi Thẻ RFID</span>
+                </button>
+
                 {activeMode === 'EXTEND' ? (
-                  <>
-                    Gia hạn phòng <strong className="text-admin-primary">{stayDossier?.RoomNumber || '---'}</strong> thêm{' '}
-                    <strong>+{additionalNights} đêm</strong> (đến {fmtDateDisplay(customCheckoutDate)}) • Phụ thu:{' '}
-                    <strong className="text-emerald-700 font-mono">+{fmtMoney(previewData?.netFolioAdjustment || 0)}</strong>
-                  </>
+                  <button
+                    type="button"
+                    disabled={submitting || !previewData || Boolean(conflictError)}
+                    onClick={handleConfirmExtension}
+                    className="px-6 py-3 rounded-2xl bg-admin-primary hover:bg-emerald-600 disabled:bg-slate-300 text-white font-bold text-xs shadow-lg shadow-admin-primary/20 transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-base">check_circle</span>
+                    <span>{submitting ? 'Đang Xử Lý...' : 'Xác Nhận Gia Hạn'}</span>
+                  </button>
                 ) : (
-                  <>
-                    Chuyển khách từ Phòng <strong>{stayDossier?.RoomNumber || '---'}</strong> sang Phòng{' '}
-                    <strong className="text-admin-primary">{selectedTargetRoom?.RoomNumber || '---'}</strong> • Chênh lệch đơn giá:{' '}
-                    <strong className="text-emerald-700 font-mono">{fmtMoney(selectedTargetRoom?.tariffDifferential || 0)}</strong>
-                  </>
+                  <button
+                    type="button"
+                    disabled={submitting || !selectedTargetRoom}
+                    onClick={handleConfirmRelocate}
+                    className="px-6 py-3 rounded-2xl bg-admin-primary hover:bg-emerald-600 disabled:bg-slate-300 text-white font-bold text-xs shadow-lg shadow-admin-primary/20 transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-base">swap_horizontal_circle</span>
+                    <span>{submitting ? 'Đang Chuyển Phòng...' : 'Xác Nhận Đổi Phòng'}</span>
+                  </button>
                 )}
               </div>
-              <div className="text-xs text-slate-400 mt-0.5">
-                Dữ liệu sẽ được khóa và đồng bộ tự động vào hồ sơ Stays &amp; Bookings ngay sau khi xác nhận.
-              </div>
+
             </div>
-
-            {/* Bộ nút bấm hành động */}
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/admin/le-tan')}
-                className="px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-[#203044] text-xs font-bold transition-all cursor-pointer"
-              >
-                Hủy Thao Tác
-              </button>
-
-              <button
-                type="button"
-                onClick={handleEncodeKeys}
-                className="px-4 py-2.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-[#203044] text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-base text-admin-primary">key</span>
-                <span>Mã Hóa Thẻ RFID</span>
-              </button>
-
-              {activeMode === 'EXTEND' ? (
-                <button
-                  type="button"
-                  disabled={submitting || !previewData || Boolean(conflictError)}
-                  onClick={handleConfirmExtension}
-                  className="px-6 py-2.5 rounded-xl bg-admin-primary hover:bg-emerald-600 text-white font-bold text-xs md:text-sm tracking-wide shadow-md shadow-admin-primary/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-lg">check_circle</span>
-                  <span>{submitting ? 'ĐANG CẬP NHẬT...' : 'XÁC NHẬN GIA HẠN & CẬP NHẬT HÓA ĐƠN'}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={submitting || !selectedTargetRoom}
-                  onClick={handleConfirmRelocate}
-                  className="px-6 py-2.5 rounded-xl bg-admin-primary hover:bg-emerald-600 text-white font-bold text-xs md:text-sm tracking-wide shadow-md shadow-admin-primary/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-lg">swap_horiz</span>
-                  <span>{submitting ? 'ĐANG CHUYỂN PHÒNG...' : 'XÁC NHẬN ĐỔI PHÒNG & CẬP NHẬT HÓA ĐƠN'}</span>
-                </button>
-              )}
-            </div>
-
           </div>
-        </div>
+        )}
 
-        {/* ─── CỬA SỔ MÃ HÓA THẺ TỪ RFID / KEY ENCODER ───────────────────────── */}
+        {/* ─── MODAL MÃ HÓA THẺ TỪ RFID / NFC ─────────────────────────────────── */}
         {showKeyModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 border border-slate-200 animate-in zoom-in-95">
@@ -1170,7 +1377,7 @@ export default function ExtendStayAndMove() {
                 <div className="flex justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
                   <span className="text-slate-500">Phòng Được Ghi Thẻ:</span>
                   <strong className="text-[#203044] font-bold">
-                    Phòng {activeMode === 'RELOCATE' ? selectedTargetRoom?.RoomNumber || stayDossier?.RoomNumber : stayDossier?.RoomNumber}
+                    Phòng {activeMode === 'RELOCATE' ? selectedTargetRoom?.RoomNumber || selectedTargetRoom?.roomNumber || stayDossier?.RoomNumber : stayDossier?.RoomNumber}
                   </strong>
                 </div>
                 <div className="flex justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
