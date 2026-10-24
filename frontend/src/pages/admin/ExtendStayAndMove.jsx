@@ -217,11 +217,14 @@ export default function ExtendStayAndMove() {
     if (!selectedStayId || !previewData) return;
     setSubmitting(true);
 
+    const idempotencyKey = `IDEMP-${selectedStayId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const payload = {
       quoteId: previewData.quoteId,
       requestedCheckoutAt: previewData.requestedCheckout,
       additionalNights: previewData.additionalNights,
       totalAmount: previewData.netFolioAdjustment,
+      version: previewData.version || stayDossier?.Version || 1,
+      idempotencyKey,
       memo: `Gia hạn +${previewData.additionalNights} đêm`,
     };
 
@@ -852,24 +855,40 @@ export default function ExtendStayAndMove() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-700 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-700 flex items-center justify-center flex-shrink-0">
                           <span className="material-symbols-outlined text-2xl">verified</span>
                         </div>
                         <div>
-                          <div className="text-xs font-bold text-emerald-950 uppercase tracking-wide">
-                            XÁC NHẬN KHẢ DỤNG: PHÒNG ĐỦ ĐIỀU KIỆN GIA HẠN
+                          <div className="text-xs font-bold text-emerald-950 uppercase tracking-wide flex items-center gap-2">
+                            <span>XÁC NHẬN KHẢ DỤNG: PHÒNG ĐỦ ĐIỀU KIỆN GIA HẠN</span>
+                            {previewData?.approvalStatus === 'PENDING' && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                CẦN GIÁM SÁT DUYỆT (&gt;7 NGÀY)
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] text-emerald-700">
-                            Phòng trống và đảm bảo đủ thời gian dọn phòng cho lượt khách kế tiếp theo quy định.
+                            Phòng trống và đảm bảo đủ 2 giờ dọn phòng (Turnaround buffer) cho lượt khách kế tiếp theo quy định.
                           </div>
                         </div>
                       </div>
 
-                      <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-600 text-white shadow-sm">
-                        ĐỦ ĐIỀU KIỆN
-                      </span>
+                      <div className="flex items-center gap-2 self-end md:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => runExtensionPreview(additionalNights, customCheckoutDate)}
+                          className="px-3 py-1 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                          title="Tính lại báo giá"
+                        >
+                          <span className="material-symbols-outlined text-sm">refresh</span>
+                          <span>Tính lại</span>
+                        </button>
+                        <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-600 text-white shadow-sm whitespace-nowrap">
+                          ĐỦ ĐIỀU KIỆN
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
