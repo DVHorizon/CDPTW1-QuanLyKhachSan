@@ -15,6 +15,7 @@ import RoomManagement from './pages/RoomManagement';
 import StaffManagement from './pages/StaffManagement';
 import RoomService from './pages/client/RoomService';
 import Profile from './pages/client/Profile';
+import MyBookings from './pages/client/MyBookings';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
 import FnbOrderHistory from './pages/admin/fnb/FnbOrderHistory';
@@ -76,6 +77,9 @@ function App() {
             <Route path="/fnb/dat-ban" element={<TableReservation />} />
             <Route path="/dat-ban" element={<TableReservation />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/my-bookings" element={<MyBookings />} />
+            <Route path="/me/bookings" element={<MyBookings />} />
+            <Route path="/lich-su-dat-phong" element={<MyBookings />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/login" element={<Auth />} />
             <Route path="/register" element={<Auth />} />
