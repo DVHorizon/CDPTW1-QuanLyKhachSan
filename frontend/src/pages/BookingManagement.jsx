@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import AdminLayout from '../components/admin/layout/AdminLayout';
 import { useAuth } from '../context/AuthContext';
 import BookingChargesModal from '../components/admin/BookingChargesModal';
@@ -1007,19 +1007,16 @@ export default function BookingManagement() {
                           {fmtCurrency(b.totalAmount)}
                         </td>
 
-                        {/* Cột Thao tác: Xem Bảng Kê Chi Phí C6 */}
+                        {/* Cột Thao tác: Xem Bảng Kê Chi Phí C6 (Màn 25) */}
                         <td className="py-3.5 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setChargesModalBookingId(b.bookingId);
-                            }}
-                            className="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-100/60 transition-colors cursor-pointer border border-transparent hover:border-blue-200"
-                            title="Xem bảng kê chi phí lưu trú (Folio)"
+                          <Link
+                            to={`/admin/charges/${b.bookingId}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-100/60 transition-colors inline-flex items-center justify-center border border-transparent hover:border-blue-200"
+                            title="Mở màn hình Bảng kê chi phí lưu trú (Màn 25)"
                           >
                             <span className="material-symbols-outlined text-lg block">receipt_long</span>
-                          </button>
+                          </Link>
                         </td>
                       </tr>
                     );
@@ -1458,16 +1455,25 @@ export default function BookingManagement() {
                     </div>
 
                     {/* Nút Xem Bảng Kê Chi Phí Lưu Trú C6 */}
-                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                    <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs text-slate-500">Xem chi tiết các khoản phát sinh:</span>
-                      <button
-                        type="button"
-                        onClick={() => setChargesModalBookingId(selectedBookingId)}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                      >
-                        <span className="material-symbols-outlined text-sm">receipt_long</span>
-                        <span>Xem Bảng Kê Chi Phí Lưu Trú (Folio)</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setChargesModalBookingId(selectedBookingId)}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-300"
+                        >
+                          <span className="material-symbols-outlined text-sm">open_in_new</span>
+                          <span>Xem Popup</span>
+                        </button>
+                        <Link
+                          to={`/admin/charges/${selectedBookingId}`}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                        >
+                          <span className="material-symbols-outlined text-sm">receipt_long</span>
+                          <span>Mở Màn Hình Bảng Kê Riêng (Màn 25)</span>
+                        </Link>
+                      </div>
                     </div>
 
                     {/* Các trường tài chính chi tiết (Giá gốc, Giảm giá, và Phê duyệt chỉ cho Admin) */}

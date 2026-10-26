@@ -34,6 +34,7 @@ import MockPaymentGateway from './pages/client/MockPaymentGateway';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ExtendStayAndMove from './pages/admin/ExtendStayAndMove';
 import MinibarManagement from './pages/admin/MinibarManagement';
+import BookingChargesFolio from './pages/admin/BookingChargesFolio';
 
 // tuyen/7 imports:
 import MarketingDashboard from './pages/admin/marketing/MarketingDashboard';
@@ -111,6 +112,16 @@ function App() {
             <Route path="/admin/guest-check-out" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
             <Route path="/admin/kiem-phong" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
             <Route path="/admin/tra-phong" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
+
+            {/* Phân hệ Tổng hợp chi phí lưu trú / Master Folio (FEAT-INVOICE-01 / C6) */}
+            <Route path="/admin/charges" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+            <Route path="/admin/charges/:bookingId" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+            <Route path="/admin/bang-ke-chi-phi" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+            <Route path="/admin/bang-ke-chi-phi/:bookingId" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+            <Route path="/admin/folio" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+            <Route path="/admin/folio/:bookingId" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+            <Route path="/admin/invoices/master" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+            <Route path="/admin/invoices/master/:bookingId" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
 
             {/* Phân hệ Quản lý Minibar phòng (FEAT-MINIBAR-01 / Spec 12) */}
             <Route path="/admin/minibar" element={<ProtectedRoute><MinibarManagement /></ProtectedRoute>} />
