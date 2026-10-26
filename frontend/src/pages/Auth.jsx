@@ -344,11 +344,6 @@ const Auth = () => {
                 </label>
               </div>
 
-              {/* Quick Demo Credentials Pill */}
-              <div className="p-2.5 rounded-xl bg-[#e5eeff]/70 border border-[#cbdbf5] text-[11.5px] text-[#203044]">
-                <span className="font-bold text-[#725b38]">Tài khoản thử nghiệm:</span> <code>guest_9@hoteldomain.vn</code> // Mật khẩu: <code>123456</code>
-              </div>
-
               {/* Primary CTA Button (Gold Accent) */}
               <button
                 type="submit"
