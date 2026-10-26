@@ -661,6 +661,19 @@ router.post('/stays/:stayId/inspections/:id/confirm', async (req, res) => {
           inspection.Subtotal
         ]
       );
+
+      // Cập nhật lại tổng tiền trên Invoice cha để đồng bộ sổ sách kế toán
+      const [sumRows] = await conn.query(
+        'SELECT SUM(TotalPrice) as totalSub FROM InvoiceDetails WHERE InvoiceId = ?',
+        [invoiceId]
+      );
+      const newSubtotal = Number(sumRows[0]?.totalSub || 0);
+      const newVat = Math.round(newSubtotal * 0.1);
+      const newTotal = newSubtotal + newVat;
+      await conn.query(
+        'UPDATE Invoices SET Subtotal = ?, VATAmount = ?, TotalAmount = ?, UpdatedAt = NOW() WHERE InvoiceId = ?',
+        [newSubtotal, newVat, newTotal, invoiceId]
+      );
     }
 
     // 6. Ghi Audit Log & Event

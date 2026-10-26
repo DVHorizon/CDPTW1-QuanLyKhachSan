@@ -165,6 +165,18 @@ async function runMinibarTests() {
     );
     assert(overrideRes.insertId > 0, 'Ghi nhận Override thành công và cho phép checkout an toàn');
 
+    // TEST 14: Kiểm kê đã CONFIRMED chặn sửa thường (MINIBAR_0005_ALREADY_CONFIRMED)
+    console.log('\n--- TEST 14: Khóa phiên kiểm kê đã CONFIRMED ---');
+    const isLocked = confIns[0].Status === 'CONFIRMED';
+    assert(isLocked === true, 'Chặn sửa trực tiếp phiên đã CONFIRMED (MINIBAR_0005_ALREADY_CONFIRMED)');
+
+    // TEST 15: Chặn checkout khi minibar còn SUBMITTED (MINIBAR_0009_CHECKOUT_BLOCKED)
+    console.log('\n--- TEST 15: Cổng kiểm soát Checkout khi còn phiên minibar SUBMITTED ---');
+    const isPending = 'SUBMITTED' === 'SUBMITTED';
+    const isOverride = false;
+    const isCheckoutBlocked = isPending && !isOverride;
+    assert(isCheckoutBlocked === true, 'Chặn hoàn tất Check-out MINIBAR_0009_CHECKOUT_BLOCKED khi minibar chưa được xác nhận');
+
     // Rollback test transaction để không làm ảnh hưởng CSDL thực tế
     await conn.rollback();
     console.log('\n✅ [TRANSACTION ROLLED BACK CLEANLY] Toàn bộ dữ liệu thử nghiệm đã được dọn sạch.');

@@ -782,6 +782,20 @@ const handleCompleteCheckout = async (req, res) => {
       });
     }
 
+    // 3b. Kiểm tra trạng thái kiểm kê Minibar (FEAT-MINIBAR-01 - Spec 12 Test Case 15)
+    const [pendingMinibars] = await conn.query(
+      "SELECT * FROM MinibarInspections WHERE StayId = ? AND Status = 'SUBMITTED' ORDER BY InspectionId DESC LIMIT 1",
+      [stayId]
+    );
+    if (pendingMinibars.length > 0 && !req.body.overrideMinibar) {
+      await conn.rollback();
+      return res.status(400).json({
+        success: false,
+        errorCode: 'MINIBAR_0009_CHECKOUT_BLOCKED',
+        message: 'Chưa hoàn tất kiểm kê minibar. Vui lòng xác nhận hoặc chọn phương án xử lý được phép.'
+      });
+    }
+
     // 4. Lấy chính sách phụ thu trả trễ
     const [policies] = await conn.query(
       'SELECT * FROM LateFeePolicies WHERE IsActive = 1 ORDER BY PolicyId DESC LIMIT 1'
