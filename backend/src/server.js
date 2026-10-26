@@ -98,7 +98,7 @@ app.use('/api/v1/operations', require('./modules/operations'));
 app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
 app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
 // FEAT-GUEST-05: Direct booking endpoint
-app.post('/bookings', require('./controllers/bookingEngineController').createOnlineBooking);
+app.post('/bookings', require('./middlewares/authMiddleware').verifyToken, require('./controllers/bookingEngineController').createOnlineBooking);
 
 // FEAT-GUEST-06: Direct automated real-time pricing calculation endpoint
 app.post('/bookings/calculate-pricing', require('./controllers/bookingEngineController').calculatePricing);

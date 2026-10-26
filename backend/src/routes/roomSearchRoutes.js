@@ -27,7 +27,7 @@ router.get('/branches', roomSearchController.getBranches);
 router.get('/suggest', roomSearchController.suggestRooms);
 
 // POST /api/v1/rooms/book (FEAT-GUEST-05: Online Booking Engine)
-router.post('/book', bookingEngineController.createOnlineBooking);
+router.post('/book', require('../middlewares/authMiddleware').verifyToken, bookingEngineController.createOnlineBooking);
 
 // GET /api/v1/rooms/:id
 router.get('/:id', roomSearchController.getRoomDetail);

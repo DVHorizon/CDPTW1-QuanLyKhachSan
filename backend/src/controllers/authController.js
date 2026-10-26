@@ -171,18 +171,18 @@ const login = async (req, res) => {
 
     const cleanIdentifier = identifier.trim();
 
-    // 1. Tìm tài khoản theo Email, Số điện thoại hoặc Username kèm thông tin Role & MembershipTier
+    // 1. Tìm tài khoản theo Email hoặc Số điện thoại kèm thông tin Role & MembershipTier
     const [users] = await pool.query(
-      `SELECT u.UserId, u.RoleId, u.Username, u.EmployeeCode, u.AvatarUrl, u.TierId, u.FullName, u.Email, u.Phone, 
-              u.PasswordHash, u.Status, u.MustChangePassword, u.IsDeleted, u.CreatedAt,
+      `SELECT u.UserId, u.RoleId, u.TierId, u.FullName, u.Email, u.Phone, 
+              u.PasswordHash, u.Status, u.IsDeleted, u.CreatedAt,
               r.RoleName,
               mt.TierName, mt.Benefits, mt.DiscountRate, mt.PointMultiplier
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
        LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
-       WHERE (u.Email = ? OR u.Phone = ? OR LOWER(u.Username) = ?) AND u.IsDeleted = 0
+       WHERE (u.Email = ? OR u.Phone = ?) AND u.IsDeleted = 0
        LIMIT 1`,
-      [cleanIdentifier.toLowerCase(), cleanIdentifier, cleanIdentifier.toLowerCase()]
+      [cleanIdentifier.toLowerCase(), cleanIdentifier]
     );
 
     if (users.length === 0) {
@@ -235,7 +235,6 @@ const login = async (req, res) => {
         userId: user.UserId,
         roleId: user.RoleId,
         roleName: user.RoleName || 'Guest',
-        username: user.Username,
         email: user.Email,
         fullName: user.FullName
       },
@@ -250,16 +249,12 @@ const login = async (req, res) => {
       token,
       user: {
         userId: user.UserId,
-        username: user.Username,
-        employeeCode: user.EmployeeCode,
-        avatarUrl: user.AvatarUrl,
         fullName: user.FullName,
         email: user.Email,
         phone: user.Phone,
         roleId: user.RoleId,
         roleName: user.RoleName || 'Guest',
         permissions,
-        mustChangePassword: Boolean(user.MustChangePassword),
         tierId: user.TierId,
         tierName: user.TierName || 'Standard',
         benefits: user.Benefits || '',
@@ -285,8 +280,8 @@ const getMe = async (req, res) => {
     const userId = req.user.userId;
 
     const [users] = await pool.query(
-      `SELECT u.UserId, u.RoleId, u.Username, u.EmployeeCode, u.AvatarUrl, u.TierId, u.FullName, u.Email, u.Phone, 
-              u.IdNumber, u.IdType, u.DateOfBirth, u.Gender, u.Status, u.MustChangePassword, u.CreatedAt,
+      `SELECT u.UserId, u.RoleId, u.TierId, u.FullName, u.Email, u.Phone, 
+              u.IdNumber, u.IdType, u.DateOfBirth, u.Gender, u.Status, u.CreatedAt,
               r.RoleName,
               mt.TierName, mt.Benefits, mt.DiscountRate, mt.PointMultiplier
        FROM Users u
@@ -326,9 +321,6 @@ const getMe = async (req, res) => {
       success: true,
       user: {
         userId: user.UserId,
-        username: user.Username,
-        employeeCode: user.EmployeeCode,
-        avatarUrl: user.AvatarUrl,
         fullName: user.FullName,
         email: user.Email,
         phone: user.Phone,
@@ -338,7 +330,6 @@ const getMe = async (req, res) => {
         roleId: user.RoleId,
         roleName: user.RoleName,
         permissions,
-        mustChangePassword: Boolean(user.MustChangePassword),
         tierId: user.TierId,
         tierName: user.TierName || 'Standard',
         benefits: user.Benefits,

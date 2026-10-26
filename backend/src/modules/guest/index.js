@@ -15,6 +15,7 @@ const roomSearchController = require('../../controllers/roomSearchController');
 const roomAvailabilityController = require('../../controllers/roomAvailabilityController');
 const bookingEngineController = require('../../controllers/bookingEngineController');
 const onlineDepositPaymentController = require('../../controllers/onlineDepositPaymentController');
+const { verifyToken } = require('../../middlewares/authMiddleware');
 
 // ─── TÍNH NĂNG 4: REAL-TIME AVAILABILITY & LOCK (FEAT-GUEST-04) ─────────────
 router.get('/rooms/availability',    roomAvailabilityController.checkRoomAvailability);
@@ -22,7 +23,7 @@ router.post('/rooms/lock',           roomAvailabilityController.lockRoomSession)
 router.delete('/rooms/lock/:sessionId', roomAvailabilityController.releaseRoomLock);
 
 // ─── TÍNH NĂNG 5: ĐẶT PHÒNG TRỰC TUYẾN (FEAT-GUEST-05) ──────────────────────
-router.post('/bookings',             bookingEngineController.createOnlineBooking);
+router.post('/bookings',             verifyToken, bookingEngineController.createOnlineBooking);
 
 // ─── TÍNH NĂNG 6: TỰ ĐỘNG TÍNH SỐ ĐÊM, PHỤ THU & TỔNG TIỀN PHÒNG (FEAT-GUEST-06 / A6) ───
 router.post('/bookings/calculate-pricing', bookingEngineController.calculatePricing);
@@ -34,7 +35,6 @@ router.post('/payments',             onlineDepositPaymentController.processDepos
 
 // ─── TÍNH NĂNG 9: XEM LỊCH SỬ ĐẶT PHÒNG & HỦY PHÒNG (FEAT-GUEST-09 / A9) ──────
 const bookingHistoryController = require('../../controllers/bookingHistoryController');
-const { verifyToken } = require('../../middlewares/authMiddleware');
 router.get('/me/bookings', verifyToken, bookingHistoryController.getMyBookings);
 router.get('/me/bookings/:bookingId', verifyToken, bookingHistoryController.getMyBookingDetail);
 router.patch('/me/bookings/:bookingId/cancel', verifyToken, bookingHistoryController.cancelMyBooking);

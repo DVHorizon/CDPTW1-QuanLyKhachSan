@@ -43,9 +43,15 @@ const Auth = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Nếu đã đăng nhập thành công, tự động chuyển hướng theo vai trò Database
+  // Nếu đã đăng nhập thành công, tự động chuyển hướng theo vai trò Database hoặc redirect query param
   useEffect(() => {
     if (isAuthenticated && user) {
+      const redirectPath = queryParams.get('redirect');
+      if (redirectPath) {
+        navigate(redirectPath);
+        return;
+      }
+
       const internalRoles = [1, 2, 3, 4];
       const isInternal = internalRoles.includes(user.roleId) || ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'].includes(user.roleName);
       if (isInternal) {
@@ -54,7 +60,7 @@ const Auth = () => {
         navigate('/');
       }
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, location.search]);
 
   // Đổi tab
   const switchTab = (tab) => {
@@ -180,66 +186,35 @@ const Auth = () => {
       {/* SINGLE CENTERED LUXURY MODAL CARD */}
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-[0_20px_50px_rgba(11,28,48,0.12)] border border-[#d3e4fe]/80 overflow-hidden relative z-10 animate-fade-in transition-all">
         
-        {/* Top Branding & Status Bar */}
-        <div className="px-6 pt-6 pb-4 border-b border-[#e5eeff] flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-[#fedeb2]/40 flex items-center justify-center text-[#725b38] border border-[#e0c298]/50 shadow-xs">
-              <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-                hotel_class
-              </span>
-            </div>
-            <div>
-              <span className="font-['Playfair_Display',Georgia,serif] text-lg font-bold text-[#0b1c30] tracking-wide block leading-tight">
-                Grand Horizon
-              </span>
-              <span className="text-[10px] font-bold text-[#725b38] tracking-[0.2em] uppercase block">
-                Resort &amp; Suites • Danang
-              </span>
-            </div>
-          </div>
+        {/* Top Branding Bar with Absolute Close Button */}
+        <div className="relative px-6 pt-7 pb-3 flex flex-col items-center justify-center text-center">
+          {/* Close Button back to Home */}
+          <Link
+            to="/"
+            className="absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center text-[#45464d] hover:text-[#0b1c30] hover:bg-[#e5eeff] transition-colors"
+            title="Đóng / Về trang chủ"
+          >
+            <span className="material-symbols-outlined text-xl">close</span>
+          </Link>
 
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center space-x-1.5 bg-[#e5eeff] text-[#069669] px-2.5 py-1 rounded-full text-xs font-semibold border border-[#069669]/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#68dba9] animate-pulse" />
-              <span>SSL 256-bit</span>
-            </div>
-
-            {/* Close Button back to Home */}
-            <Link
-              to="/"
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[#45464d] hover:text-[#0b1c30] hover:bg-[#e5eeff] transition-colors"
-              title="Đóng / Về trang chủ"
-            >
-              <span className="material-symbols-outlined text-xl">close</span>
-            </Link>
+          {/* Grand Horizon centered, large & colorful */}
+          <div className="flex flex-col items-center justify-center pt-2">
+            <h1 className="font-['Playfair_Display',Georgia,serif] text-3xl sm:text-4xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-[#725b38] via-[#a38048] to-[#584323] drop-shadow-xs">
+              Grand Horizon
+            </h1>
           </div>
         </div>
 
         {/* Modal Inner Body */}
-        <div className="px-6 py-6 sm:px-8 sm:py-8">
+        <div className="px-6 pb-6 pt-2 sm:px-8 sm:pb-8">
           
           {/* Header & Switch Tabs */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs uppercase tracking-widest text-[#725b38] font-bold">
-                {activeTab === 'recovery' ? 'Hỗ trợ tài khoản' : 'Hội viên cá nhân'}
-              </span>
-              <div className="sm:hidden flex items-center text-[#069669] text-[11px] font-semibold space-x-1 bg-[#d3e4fe]/50 px-2 py-0.5 rounded-full">
-                <span className="material-symbols-outlined text-xs">lock</span>
-                <span>Bảo mật SSL</span>
-              </div>
-            </div>
-
-            <h2 className="font-['Playfair_Display',Georgia,serif] text-2xl sm:text-[28px] font-bold text-[#0b1c30] mb-1.5">
+          <div className="mb-6 text-center">
+            <h2 className="font-['Playfair_Display',Georgia,serif] text-2xl sm:text-[28px] font-bold text-[#0b1c30] mb-3 text-center">
               {activeTab === 'login' && 'Đăng Nhập'}
-              {activeTab === 'register' && 'Đăng Ký Hội Viên'}
+              {activeTab === 'register' && 'Đăng Ký Tài Khoản'}
               {activeTab === 'recovery' && 'Khôi Phục Mật Khẩu'}
             </h2>
-            <p className="text-sm text-[#45464d]">
-              {activeTab === 'login' && 'Tạo tài khoản mới hoặc đăng nhập để truy cập hệ thống.'}
-              {activeTab === 'register' && 'Gia nhập Grand Horizon Elite để mở khóa quyền lợi nghỉ dưỡng đỉnh cao.'}
-              {activeTab === 'recovery' && 'Nhập email hoặc số điện thoại để nhận mã xác thực PIN bảo mật.'}
-            </p>
 
             {/* Toggle Pill Control (Login & Register) */}
             {activeTab !== 'recovery' && (
@@ -363,7 +338,7 @@ const Auth = () => {
 
               {/* Quick Demo Credentials Pill */}
               <div className="p-2.5 rounded-xl bg-[#e5eeff]/70 border border-[#cbdbf5] text-[11.5px] text-[#203044]">
-                <span className="font-bold text-[#725b38]">Tài khoản thử nghiệm:</span> <code>vip.guest@grandhorizon.com</code> // Mật khẩu: <code>123456</code>
+                <span className="font-bold text-[#725b38]">Tài khoản thử nghiệm:</span> <code>hoangnam.417@gmail.com</code> // Mật khẩu: <code>123456</code>
               </div>
 
               {/* Primary CTA Button (Gold Accent) */}
@@ -622,17 +597,6 @@ const Auth = () => {
             </form>
           )}
 
-
-          {/* Security Badge & Footer Details */}
-          <div className="mt-8 pt-4 text-center border-t border-[#e5eeff]">
-            <div className="inline-flex items-center space-x-2 text-[#45464d] text-xs">
-              <span className="material-symbols-outlined text-base text-[#725b38]">encrypted</span>
-              <span>Cam kết an toàn dữ liệu khách hàng theo chuẩn quốc tế PCI-DSS &amp; SSL</span>
-            </div>
-            <p className="text-xs text-[#45464d]/70 mt-2">
-              Grand Horizon Danang © 2026. Mọi quyền được bảo lưu.
-            </p>
-          </div>
         </div>
       </div>
     </div>

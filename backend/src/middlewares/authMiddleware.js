@@ -24,8 +24,8 @@ const verifyToken = async (req, res, next) => {
 
     // Kiểm tra trực tiếp trạng thái tài khoản trong Database
     const [rows] = await pool.query(
-      `SELECT u.UserId, u.RoleId, u.Username, u.FullName, u.Email, u.Phone, 
-              u.Status, u.IsDeleted, u.MustChangePassword,
+      `SELECT u.UserId, u.RoleId, u.FullName, u.Email, u.Phone, 
+              u.Status, u.IsDeleted,
               r.RoleName
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
@@ -58,12 +58,10 @@ const verifyToken = async (req, res, next) => {
       userId: dbUser.UserId,
       roleId: dbUser.RoleId,
       roleName: dbUser.RoleName || decoded.roleName || 'Guest',
-      username: dbUser.Username,
       fullName: dbUser.FullName,
       email: dbUser.Email,
       phone: dbUser.Phone,
-      status: dbUser.Status,
-      mustChangePassword: Boolean(dbUser.MustChangePassword)
+      status: dbUser.Status
     };
 
     next();
@@ -89,7 +87,7 @@ const optionalVerifyToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const [rows] = await pool.query(
-      `SELECT u.UserId, u.RoleId, u.Username, u.FullName, u.Email, u.Status, u.IsDeleted, r.RoleName
+      `SELECT u.UserId, u.RoleId, u.FullName, u.Email, u.Phone, u.Status, u.IsDeleted, r.RoleName
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
        WHERE u.UserId = ? AND u.IsDeleted = 0
@@ -102,9 +100,9 @@ const optionalVerifyToken = async (req, res, next) => {
         userId: rows[0].UserId,
         roleId: rows[0].RoleId,
         roleName: rows[0].RoleName,
-        username: rows[0].Username,
         fullName: rows[0].FullName,
-        email: rows[0].Email
+        email: rows[0].Email,
+        phone: rows[0].Phone
       };
     }
   } catch (_) {
