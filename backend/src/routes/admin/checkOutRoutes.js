@@ -928,24 +928,33 @@ const handleCompleteCheckout = async (req, res) => {
     );
 
     // Cập nhật Housekeeping assignment tự động
+    const [housekeeperRows] = await conn.query("SELECT UserId FROM Users WHERE RoleId = 4 LIMIT 1");
+    const housekeeperId = housekeeperRows.length > 0 ? housekeeperRows[0].UserId : 4;
     await conn.query(
-      `INSERT INTO HousekeepingAssignments (RoomId, StayId, Priority, Status, Note)
-       VALUES (?, ?, 1, 'Assigned', 'Dọn phòng sau Check-out. Telemetry dispatched tự động.')`,
-      [stay.RoomId, stayId]
-    ).catch(() => {});
+      `INSERT INTO HousekeepingAssignments (RoomId, UserId, StayId, Priority, Status, Note)
+       VALUES (?, ?, ?, 1, 'Assigned', 'Dọn phòng sau Check-out. Telemetry dispatched tự động.')`,
+      [stay.RoomId, housekeeperId, stayId]
+    ).catch((e) => console.error('Housekeeping assignment error:', e.message));
 
     // 12. Ghi Audit Log an toàn
     await conn.query(
-      `INSERT INTO AuditLogs (UserId, Action, TableName, RecordId, OldValue, NewValue, Note)
-       VALUES (?, 'CHECKOUT_GUEST', 'Stays', ?, ?, ?, ?)`,
+      `INSERT INTO AuditLogs (UserId, ActionType, TableName, RecordId, OldValues, NewValues, ActionTime, IpAddress)
+       VALUES (?, 'CHECKOUT_GUEST', 'Stays', ?, ?, ?, NOW(), ?)`,
       [
         stay.UserId || 1,
         stayId,
         JSON.stringify({ status: 'CheckedIn', roomStatus: 'Clean' }),
-        JSON.stringify({ status: 'CheckedOut', roomStatus: targetRoomStatus, invoiceId, finalBalanceDue, lateFee: lateCalc.lateFeeAmount }),
-        `Hoàn tất checkout phòng ${stay.RoomNumber}. Phương thức thanh toán: ${paymentMethod}`
+        JSON.stringify({
+          status: 'CheckedOut',
+          roomStatus: targetRoomStatus,
+          invoiceId,
+          finalBalanceDue,
+          lateFee: lateCalc.lateFeeAmount,
+          note: `Hoàn tất checkout phòng ${stay.RoomNumber}. Phương thức thanh toán: ${paymentMethod}`
+        }),
+        req.ip || '127.0.0.1'
       ]
-    ).catch(() => {});
+    ).catch((e) => console.error('AuditLog insert error:', e.message));
 
     await conn.commit();
 
@@ -1001,15 +1010,15 @@ const handleFolioAdjustment = async (req, res) => {
     }
 
     await pool.query(
-      `INSERT INTO AuditLogs (UserId, Action, TableName, RecordId, OldValue, NewValue, Note)
-       VALUES (1, 'FEE_OVERRIDE', 'FolioCharges', ?, ?, ?, ?)`,
+      `INSERT INTO AuditLogs (UserId, ActionType, TableName, RecordId, OldValues, NewValues, ActionTime, IpAddress)
+       VALUES (1, 'FEE_OVERRIDE', 'FolioCharges', ?, ?, ?, NOW(), ?)`,
       [
         stayId,
         JSON.stringify({ chargeType, amount: oldAmount }),
-        JSON.stringify({ chargeType, amount: newAmount, approver }),
-        `Lý do điều chỉnh/miễn phí: [${reasonCode}] ${note || ''}`
+        JSON.stringify({ chargeType, amount: newAmount, approver, reasonCode, note: note || '' }),
+        req.ip || '127.0.0.1'
       ]
-    ).catch(() => {});
+    ).catch((e) => console.error('Folio adjustment audit log error:', e.message));
 
     res.json({
       success: true,
