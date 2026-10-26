@@ -5,13 +5,18 @@ const http = require('http');
 const cors = require('cors');
 require('dotenv').config();
 
+const path = require('path');
 const { initSocket } = require('./sockets/socketHandler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+
+// Phục vụ tệp tĩnh ảnh CCCD, thẻ khách và chữ ký số
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // ─── Health check ──────────────────────────────────────────────────────────
 app.get('/', (req, res) => res.send('Grand Horizon Hotel Management Backend API is running!'));
@@ -54,7 +59,9 @@ app.use('/api/v1/rooms/:roomId/status', (req, res, next) => {
 app.use('/api/v1/allocation', require('./routes/admin/roomAllocationRoutes'));
 app.use('/api/allocation', require('./routes/admin/roomAllocationRoutes'));
 
-// Route Nghiệp vụ Check-in tại quầy (Front Desk Express Check-In Workflow)
+// Route Nghiệp vụ Check-in tại quầy (Front Desk Express Check-In Workflow - Spec 8)
+app.use('/api/v1/check-ins', require('./routes/admin/checkInRoutes'));
+app.use('/api/check-ins', require('./routes/admin/checkInRoutes'));
 app.use('/api/v1/check-in', require('./routes/admin/checkInRoutes'));
 app.use('/api/check-in', require('./routes/admin/checkInRoutes'));
 
@@ -62,8 +69,17 @@ app.use('/api/check-in', require('./routes/admin/checkInRoutes'));
 const checkOutRoutes = require('./routes/admin/checkOutRoutes');
 app.use('/api/v1/check-out', checkOutRoutes);
 app.use('/api/check-out', checkOutRoutes);
-app.use('/api/v1/stays', checkOutRoutes);
 app.use('/api/v1/folio', checkOutRoutes);
+
+// Route Gia hạn lưu trú & Đổi phòng (Stay Extension & Room Move Terminal - Spec 9 & Spec 10)
+const { router: roomMoveRouter } = require('./routes/admin/roomMoveRoutes');
+app.use('/api/v1/room-moves', roomMoveRouter);
+app.use('/api/room-moves', roomMoveRouter);
+app.use('/api/v1/stays', require('./routes/admin/stayExtensionRoutes'));
+app.use('/api/stays', require('./routes/admin/stayExtensionRoutes'));
+app.use('/api/v1/stay-extensions', require('./routes/admin/stayExtensionRoutes'));
+app.use('/api/stay-extensions', require('./routes/admin/stayExtensionRoutes'));
+app.use('/api/v1/stays', checkOutRoutes);
 
 // Route Quản lý người dùng & nhân viên (Spec 3 - FEAT-USER-01)
 app.use('/api/users', require('./routes/users'));

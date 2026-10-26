@@ -29,6 +29,10 @@ router.get('/suggest', roomSearchController.suggestRooms);
 // POST /api/v1/rooms/book (FEAT-GUEST-05: Online Booking Engine)
 router.post('/book', bookingEngineController.createOnlineBooking);
 
+// GET /api/v1/rooms/available - Spec FEAT-ROOMALLOC-01: Lấy danh sách phòng khả dụng
+const roomAllocCtrl = require('../controllers/admin/roomAllocationController');
+router.get('/available', roomAllocCtrl.getAvailableRooms);
+
 // GET /api/v1/rooms/:id
 router.get('/:id', roomSearchController.getRoomDetail);
 

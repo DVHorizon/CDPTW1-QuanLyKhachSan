@@ -209,10 +209,83 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+/**
+ * Middleware kiểm tra phân quyền tài khoản (RBAC) theo mã quyền (hỗ trợ single hoặc array)
+ * Ví dụ: requirePermissions('BOOKING_CONFIRM') hoặc requirePermissions(['BOOKING_CONFIRM', 'ROOM_ALLOCATION'])
+ */
+const requirePermissions = (requiredPermissions) => {
+  const perms = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
+
+  return async (req, res, next) => {
+    // 1. Kiểm tra xác thực token nếu req.user chưa được nạp
+    if (!req.user) {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({
+          success: false,
+          code: 'ERROR_0009_UNAUTHENTICATED',
+          message: 'Bạn cần đăng nhập để thực hiện chức năng này'
+        });
+      }
+
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+      } catch (error) {
+        return res.status(401).json({
+          success: false,
+          code: 'ERROR_0009_UNAUTHENTICATED',
+          message: 'Bạn cần đăng nhập để thực hiện chức năng này'
+        });
+      }
+    }
+
+    const { roleId, roleName } = req.user;
+
+    // Quản trị viên (Admin) luôn có toàn quyền
+    if (roleId === 1 || roleName === 'Admin') {
+      return next();
+    }
+
+    // 2. Kiểm tra quyền cụ thể trong CSDL
+    try {
+      const [rows] = await pool.query(
+        `SELECT p.PermissionName
+         FROM RolePermissions rp
+         JOIN Permissions p ON rp.PermissionId = p.PermissionId
+         WHERE rp.RoleId = ? AND p.PermissionName IN (?)`,
+        [roleId, perms]
+      );
+
+      const heldNames = rows.map((r) => r.PermissionName);
+      const hasAll = perms.every((p) => heldNames.includes(p));
+
+      if (!hasAll) {
+        return res.status(403).json({
+          success: false,
+          code: 'ERROR_0010_FORBIDDEN',
+          message: 'Bạn không có quyền thực hiện chức năng này'
+        });
+      }
+
+      next();
+    } catch (err) {
+      console.error('Lỗi kiểm tra quyền truy cập:', err);
+      return res.status(500).json({
+        success: false,
+        code: 'ERROR_0030_ALLOCATION_TRANSACTION',
+        message: 'Lỗi kiểm tra quyền hạn hệ thống'
+      });
+    }
+  };
+};
+
 module.exports = {
   verifyToken,
   optionalVerifyToken,
   requirePermission,
+  requirePermissions,
   requireInternalStaff,
   requireAdmin,
   JWT_SECRET

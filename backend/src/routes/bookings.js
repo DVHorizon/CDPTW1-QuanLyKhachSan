@@ -7,6 +7,8 @@ const ExcelJS = require('exceljs');
 const pool = require('../config/db');
 const bookingEngineController = require('../controllers/bookingEngineController');
 const voucherController = require('../controllers/voucherController');
+const { requirePermissions } = require('../middlewares/authMiddleware');
+const roomAllocCtrl = require('../controllers/admin/roomAllocationController');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'grand_horizon_secret_key_2026_luxury_hotel';
 
@@ -812,19 +814,36 @@ router.get('/', checkBookingPermission, async (req, res) => {
   }
 });
 
-// ─── GET /api/v1/bookings/:id — Chi Tiết Booking + Data Masking (Mục 3.10 & 3.11)
+// ─── GET /api/v1/bookings/:id — Chi Tiết Booking + Data Masking (Mục 3.10 & 3.11 & Spec 8)
 router.get('/:id', checkBookingPermission, async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingId = Number(id);
+    const cleanId = String(id || '').trim();
 
-    // Test Case 32: ID không hợp lệ hoặc số âm/0
-    if (!Number.isInteger(bookingId) || bookingId <= 0) {
+    if (!cleanId) {
       return res.status(404).json({
         success: false,
         code: 'ERROR_0024_NOT_FOUND',
         message: 'Không tìm thấy booking hoặc booking đã bị xóa',
       });
+    }
+
+    const isNumeric = /^-?\d+$/.test(cleanId);
+    let whereIdClause = 'b.ConfirmationCode = ?';
+    let queryParam = cleanId;
+
+    if (isNumeric) {
+      const numId = Number(cleanId);
+      // Test Case 32: ID không hợp lệ hoặc số âm/0
+      if (!Number.isInteger(numId) || numId <= 0) {
+        return res.status(404).json({
+          success: false,
+          code: 'ERROR_0024_NOT_FOUND',
+          message: 'Không tìm thấy booking hoặc booking đã bị xóa',
+        });
+      }
+      whereIdClause = '(b.BookingId = ? OR b.ConfirmationCode = ?)';
+      queryParam = numId;
     }
 
     // 1. Tải thông tin chính của booking
@@ -864,10 +883,11 @@ router.get('/:id', checkBookingPermission, async (req, res) => {
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
-      WHERE b.BookingId = ?
+      WHERE ${whereIdClause}
       LIMIT 1
     `;
-    const [bRows] = await pool.query(bookingQuery, [bookingId]);
+    const queryArgs = isNumeric ? [queryParam, cleanId] : [queryParam];
+    const [bRows] = await pool.query(bookingQuery, queryArgs);
 
     // Test Case 32: Không tìm thấy hoặc đã bị xóa mềm (IsDeleted = 1)
     if (!bRows.length || bRows[0].IsDeleted === 1 || bRows[0].IsDeleted === true) {
@@ -1079,6 +1099,302 @@ router.get('/phong-trong', async (req, res) => {
     });
   } catch (err) {
     console.error('GET /api/bookings/phong-trong error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi máy chủ khi tải danh sách phòng trống: ' + err.message });
+  }
+});
+
+// ─── GET /api/bookings (Tìm kiếm, xem chi tiết, lọc theo ngày & trạng thái) ──
+router.get('/', async (req, res) => {
+  try {
+    const {
+      query,          // Tìm theo mã booking, tên, CCCD/hộ chiếu, SĐT, email, số phòng
+      date,           // Lọc theo ngày đến (YYYY-MM-DD)
+      roomType,       // Lọc theo RoomTypeId hoặc tên hạng phòng
+      source,         // Lọc theo BookingSource (DirectWeb, OTA, Corp, WalkIn, Phone)
+      status,         // Tab trạng thái: all | Pending | Confirmed | CheckedIn | DueIn | DueOut | Completed | Cancelled
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 20));
+    const offset = (pageNum - 1) * limitNum;
+    const todayStr = getTodayStr();
+
+    // ── Bộ lọc nền ──
+    const baseClauses = ['1=1'];
+    const baseParams = [];
+
+    if (query && String(query).trim()) {
+      const q = `%${String(query).trim()}%`;
+      baseClauses.push(`(
+        b.ConfirmationCode LIKE ? OR
+        COALESCE(bg.FullName, u.FullName) LIKE ? OR
+        COALESCE(bg.Phone, u.Phone) LIKE ? OR
+        COALESCE(bg.IdNumber, u.IdNumber) LIKE ? OR
+        COALESCE(bg.Email, u.Email) LIKE ? OR
+        r.RoomNumber LIKE ?
+      )`);
+      baseParams.push(q, q, q, q, q, q);
+    }
+
+    if (date && String(date).trim() && date !== 'all') {
+      const trimmedDate = String(date).trim();
+      if (!isValidDateStr(trimmedDate)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng chọn ngày hợp lệ (định dạng YYYY-MM-DD).',
+        });
+      }
+      baseClauses.push('DATE(b.CheckInDate) = ?');
+      baseParams.push(trimmedDate);
+    }
+
+    if (roomType && roomType !== 'all') {
+      baseClauses.push('(b.RoomTypeId = ? OR rt.TypeName = ?)');
+      baseParams.push(roomType, roomType);
+    }
+
+    if (source && source !== 'all') {
+      baseClauses.push('b.BookingSource = ?');
+      baseParams.push(source);
+    }
+
+    const baseWhereSql = baseClauses.join(' AND ');
+
+    // ── Điều kiện riêng của tab trạng thái đang chọn ──
+    const statusClauses = [];
+    const statusParams = [];
+
+    if (status && status !== 'all') {
+      if (status === 'DueIn') {
+        statusClauses.push("DATE(b.CheckInDate) = ? AND b.Status NOT IN ('Cancelled', 'NoShow', 'Completed')");
+        statusParams.push(todayStr);
+      } else if (status === 'DueOut') {
+        statusClauses.push("DATE(b.CheckOutDate) = ? AND b.Status IN ('CheckedIn', 'InHouse')");
+        statusParams.push(todayStr);
+      } else if (status === 'CheckedIn') {
+        statusClauses.push("(b.Status = 'CheckedIn' OR b.Status = 'InHouse')");
+      } else if (status === 'Cancelled') {
+        statusClauses.push("(b.Status = 'Cancelled' OR b.Status = 'NoShow')");
+      } else if (status === 'Completed') {
+        statusClauses.push("(b.Status = 'Completed' OR b.Status = 'CheckedOut')");
+      } else {
+        statusClauses.push('b.Status = ?');
+        statusParams.push(status);
+      }
+    }
+
+    const whereSql = [baseWhereSql, ...statusClauses].join(' AND ');
+    const params = [...baseParams, ...statusParams];
+
+    // ── Query đếm tổng số bản ghi ──
+    const countQuery = `
+      SELECT COUNT(DISTINCT b.BookingId) AS total
+      FROM Bookings b
+      LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
+      LEFT JOIN Users u ON b.UserId = u.UserId
+      LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
+      LEFT JOIN Stays s ON b.BookingId = s.BookingId
+      LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      WHERE ${whereSql}
+    `;
+    const [[{ total }]] = await pool.query(countQuery, params);
+
+    // ── Query lấy danh sách đặt phòng ──
+    const dataQuery = `
+      SELECT
+        b.BookingId,
+        b.ConfirmationCode,
+        CAST(b.CheckInDate AS CHAR)  AS CheckInDate,
+        CAST(b.CheckOutDate AS CHAR) AS CheckOutDate,
+        b.NumberOfNights,
+        b.Adults,
+        b.Children,
+        b.RoomQuantity,
+        b.TotalAmount,
+        b.DepositAmount,
+        b.Status,
+        b.BookingSource,
+        b.ConfirmationSentAt,
+        b.Note,
+        CAST(b.CreatedAt AS CHAR) AS CreatedAt,
+        CAST(b.UpdatedAt AS CHAR) AS UpdatedAt,
+        COALESCE(bg.FullName, u.FullName, 'Khách Vãng Lai') AS GuestName,
+        COALESCE(bg.Email, u.Email, '---') AS GuestEmail,
+        COALESCE(bg.Phone, u.Phone, '---') AS GuestPhone,
+        COALESCE(bg.IdNumber, u.IdNumber, '---') AS NationalId,
+        COALESCE(rt.TypeName, 'Hạng Phòng Tiêu Chuẩn') AS RoomTypeName,
+        rt.RoomTypeId,
+        r.RoomId,
+        r.RoomNumber,
+        r.Floor,
+        s.StayId,
+        s.Status AS StayStatus
+      FROM Bookings b
+      LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
+      LEFT JOIN Users u ON b.UserId = u.UserId
+      LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
+      LEFT JOIN Stays s ON b.BookingId = s.BookingId
+      LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      WHERE ${whereSql}
+      ORDER BY b.CheckInDate ASC, b.BookingId DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await pool.query(dataQuery, [...params, limitNum, offset]);
+
+    // ── Số đếm cho từng tab ──
+    const [tabCountsRows] = await pool.query(
+      `
+      SELECT
+        COUNT(DISTINCT b.BookingId) AS totalAll,
+        COUNT(DISTINCT CASE WHEN b.Status = 'Pending'  THEN b.BookingId END) AS totalPending,
+        COUNT(DISTINCT CASE WHEN b.Status = 'Confirmed' THEN b.BookingId END) AS totalConfirmed,
+        COUNT(DISTINCT CASE WHEN b.Status IN ('CheckedIn', 'InHouse') THEN b.BookingId END) AS totalCheckedIn,
+        COUNT(DISTINCT CASE WHEN DATE(b.CheckInDate) = ? AND b.Status NOT IN ('Cancelled','NoShow','Completed') THEN b.BookingId END) AS totalDueIn,
+        COUNT(DISTINCT CASE WHEN DATE(b.CheckOutDate) = ? AND b.Status IN ('CheckedIn','InHouse') THEN b.BookingId END) AS totalDueOut,
+        COUNT(DISTINCT CASE WHEN b.Status IN ('Completed','CheckedOut') THEN b.BookingId END) AS totalCompleted,
+        COUNT(DISTINCT CASE WHEN b.Status IN ('Cancelled','NoShow') THEN b.BookingId END) AS totalCancelled
+      FROM Bookings b
+      LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
+      LEFT JOIN Users u ON b.UserId = u.UserId
+      LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
+      LEFT JOIN Stays s ON b.BookingId = s.BookingId
+      LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      WHERE ${baseWhereSql}
+      `,
+      [todayStr, todayStr, ...baseParams]
+    );
+
+    const tc = tabCountsRows[0] || {};
+    const tabCounts = {
+      all: Number(tc.totalAll) || 0,
+      pending: Number(tc.totalPending) || 0,
+      confirmed: Number(tc.totalConfirmed) || 0,
+      checkedIn: Number(tc.totalCheckedIn) || 0,
+      dueIn: Number(tc.totalDueIn) || 0,
+      dueOut: Number(tc.totalDueOut) || 0,
+      completed: Number(tc.totalCompleted) || 0,
+      cancelled: Number(tc.totalCancelled) || 0,
+    };
+
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: Number(total) || 0,
+        totalPages: Math.ceil((Number(total) || 0) / limitNum) || 1,
+      },
+      tabCounts,
+      today: todayStr,
+    });
+  } catch (err) {
+    console.error('GET /api/bookings error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi máy chủ khi truy vấn danh sách đặt phòng: ' + err.message,
+    });
+  }
+});
+
+// ─── FEAT-ROOMALLOC-01: Booking Confirmation & Room Allocation Endpoints ────
+router.put('/:id/confirm', requirePermissions('BOOKING_CONFIRM'), roomAllocCtrl.confirmBooking);
+router.post('/:id/confirm', requirePermissions('BOOKING_CONFIRM'), roomAllocCtrl.confirmBooking);
+router.post('/:id/room-allocation', requirePermissions('ROOM_ALLOCATION'), roomAllocCtrl.allocateRooms);
+router.post(
+  '/:id/confirm-and-allocate',
+  requirePermissions(['BOOKING_CONFIRM', 'ROOM_ALLOCATION']),
+  roomAllocCtrl.confirmAndAllocate
+);
+router.delete('/:id/room-allocation', requirePermissions('ROOM_ALLOCATION'), roomAllocCtrl.deallocateRooms);
+
+// ─── GET /api/bookings/:id (Xem chi tiết một đặt phòng) ──────────────────────
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!/^\d+$/.test(String(id))) {
+      return res.status(400).json({ success: false, code: 'ERROR_0001_REQUIRED', message: 'Mã đặt phòng không hợp lệ.' });
+    }
+
+    const query = `
+      SELECT
+        b.*,
+        CAST(b.CheckInDate AS CHAR)  AS CheckInDate,
+        CAST(b.CheckOutDate AS CHAR) AS CheckOutDate,
+        CAST(b.CreatedAt AS CHAR)    AS CreatedAt,
+        CAST(b.UpdatedAt AS CHAR)    AS UpdatedAt,
+        CAST(b.ConfirmedAt AS CHAR)  AS ConfirmedAt,
+        CAST(b.AllocatedAt AS CHAR)  AS AllocatedAt,
+        CAST(b.ConfirmationSentAt AS CHAR) AS ConfirmationSentAt,
+        COALESCE(bg.FullName, u.FullName, 'Khách Vãng Lai') AS GuestName,
+        COALESCE(bg.Email, u.Email, '---') AS GuestEmail,
+        COALESCE(bg.Phone, u.Phone, '---') AS GuestPhone,
+        COALESCE(bg.IdNumber, u.IdNumber, '---') AS NationalId,
+        COALESCE(bg.IdType, u.IdType, 'CCCD') AS IdType,
+        COALESCE(rt.TypeName, 'Hạng Phòng Tiêu Chuẩn') AS RoomTypeName,
+        rt.BasePrice,
+        r.RoomId,
+        r.RoomNumber,
+        r.Floor,
+        s.StayId,
+        s.Status AS StayStatus,
+        CAST(COALESCE(s.ActualCheckIn, s.CheckInTime) AS CHAR)   AS CheckInTime,
+        CAST(COALESCE(s.ActualCheckOut, s.CheckOutTime) AS CHAR) AS CheckOutTime
+      FROM Bookings b
+      LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
+      LEFT JOIN Users u ON b.UserId = u.UserId
+      LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
+      LEFT JOIN BookingRoomAllocations bra ON b.BookingId = bra.BookingId
+      LEFT JOIN Stays s ON b.BookingId = s.BookingId
+      LEFT JOIN Rooms r ON COALESCE(bra.RoomId, s.RoomId) = r.RoomId
+      WHERE b.BookingId = ?
+      ORDER BY s.StayId DESC
+      LIMIT 1
+    `;
+
+    const [rows] = await pool.query(query, [id]);
+    if (!rows.length) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0022_BOOKING_NOT_FOUND',
+        isRecordDeleted: true,
+        message: 'Không tìm thấy booking',
+      });
+    }
+
+    // Lấy danh sách các phòng được gán
+    const [allocRows] = await pool.query(
+      `SELECT bra.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
+              bra.AllocationNote, CAST(bra.AllocatedAt AS CHAR) AS AllocatedAt
+       FROM BookingRoomAllocations bra
+       JOIN Rooms r ON bra.RoomId = r.RoomId
+       LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
+       WHERE bra.BookingId = ?`,
+      [id]
+    );
+
+    const bookingData = {
+      ...rows[0],
+      quantity: rows[0].RoomQuantity || 1,
+      bookingCode: rows[0].ConfirmationCode,
+      bookingStatus: rows[0].Status,
+      checkInDate: rows[0].CheckInDate,
+      checkOutDate: rows[0].CheckOutDate,
+      roomTypeId: rows[0].RoomTypeId,
+      roomTypeName: rows[0].RoomTypeName,
+      allocatedRooms: allocRows,
+      roomIds: allocRows.map((a) => a.RoomId),
+      confirmedBy: rows[0].ConfirmedBy,
+      confirmedAt: rows[0].ConfirmedAt,
+      allocatedAt: rows[0].AllocatedAt,
+    };
+
+    res.json({ success: true, data: bookingData });
+  } catch (err) {
+    console.error('GET /api/bookings/:id error:', err);
     res.status(500).json({ success: false, message: 'Lỗi máy chủ: ' + err.message });
   }
 });
