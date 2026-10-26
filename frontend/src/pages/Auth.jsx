@@ -187,29 +187,28 @@ const Auth = () => {
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-[0_20px_50px_rgba(11,28,48,0.12)] border border-[#d3e4fe]/80 overflow-hidden relative z-10 animate-fade-in transition-all">
         
         {/* Top Branding & Status Bar */}
-        <div className="px-6 pt-6 pb-4 border-b border-[#e5eeff] flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-[#fedeb2]/40 flex items-center justify-center text-[#725b38] border border-[#e0c298]/50 shadow-xs">
-              <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+        <div className="px-6 pt-7 pb-4 border-b border-[#e5eeff] relative">
+          {/* Close Button back to Home positioned absolute top-right */}
+          <Link
+            to="/"
+            className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-[#45464d] hover:text-[#0b1c30] hover:bg-[#e5eeff] transition-colors"
+            title="Đóng / Về trang chủ"
+          >
+            <span className="material-symbols-outlined text-xl">close</span>
+          </Link>
+
+          {/* Centered Brand Icon & Large Gold Name */}
+          <div className="flex flex-col items-center justify-center text-center space-y-2">
+            <div className="w-12 h-12 rounded-full bg-[#fedeb2]/40 flex items-center justify-center text-[#937243] border border-[#e0c298]/60 shadow-sm">
+              <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>
                 hotel_class
               </span>
             </div>
             <div>
-              <span className="font-['Playfair_Display',Georgia,serif] text-lg font-bold text-[#0b1c30] tracking-wide block leading-tight">
+              <span className="font-['Playfair_Display',Georgia,serif] text-2xl sm:text-3xl font-extrabold text-[#937243] tracking-wide block leading-tight">
                 Grand Horizon
               </span>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Close Button back to Home */}
-            <Link
-              to="/"
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[#45464d] hover:text-[#0b1c30] hover:bg-[#e5eeff] transition-colors"
-              title="Đóng / Về trang chủ"
-            >
-              <span className="material-symbols-outlined text-xl">close</span>
-            </Link>
           </div>
         </div>
 
@@ -217,7 +216,7 @@ const Auth = () => {
         <div className="px-6 py-6 sm:px-8 sm:py-8">
           
           {/* Header & Switch Tabs */}
-          <div className="mb-6">
+          <div className="mb-6 text-center">
             <h2 className="font-['Playfair_Display',Georgia,serif] text-2xl sm:text-[28px] font-bold text-[#0b1c30] mb-1.5">
               {activeTab === 'login' && 'Đăng Nhập'}
               {activeTab === 'register' && 'Đăng Ký Hội Viên'}
