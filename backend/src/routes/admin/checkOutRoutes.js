@@ -791,6 +791,15 @@ const handleCompleteCheckout = async (req, res) => {
       ? minibarRows.reduce((sum, m) => sum + Number(m.TotalAmount || 0), 0)
       : DEFAULT_MINIBAR_ITEMS.reduce((sum, i) => sum + (i.defaultQty * i.unitPrice), 0);
 
+    // Lấy các đơn F&B gộp vào tiền phòng (RoomInvoice)
+    const [fnbOrders] = await conn.query(
+      `SELECT FoodOrderId, TotalAmount, PaymentMode, Status
+       FROM FoodOrders
+       WHERE StayId = ? AND PaymentMode = 'RoomInvoice' AND Status != 'Cancelled'`,
+      [stayId]
+    );
+    const fnbTotal = fnbOrders.reduce((sum, o) => sum + Number(o.TotalAmount || 0), 0);
+
     // 7. Cập nhật hóa đơn Invoice & InvoiceDetail
     const [existInvoices] = await conn.query(
       'SELECT * FROM Invoices WHERE StayId = ? ORDER BY InvoiceId DESC LIMIT 1',
@@ -805,7 +814,7 @@ const handleCompleteCheckout = async (req, res) => {
     const roomChargeTotal = roomRate * nights;
     const resortFee = 150000 * nights;
 
-    const subtotal = roomChargeTotal + resortFee + minibarTotal + lateCalc.lateFeeAmount + approvedDamageTotal + linenDamageFee + keycardPenalty;
+    const subtotal = roomChargeTotal + resortFee + minibarTotal + fnbTotal + lateCalc.lateFeeAmount + approvedDamageTotal + linenDamageFee + keycardPenalty;
     const vatRate = Number(policy.TaxRate || 10);
     const vatAmount = Math.round(subtotal * (vatRate / 100));
     const totalAmount = subtotal + vatAmount;
@@ -845,6 +854,16 @@ const handleCompleteCheckout = async (req, res) => {
       { type: 'ResortFee', desc: `Phí tiện ích & dịch vụ nghỉ dưỡng (${nights} đêm)`, qty: nights, unit: 150000, total: resortFee },
       { type: 'Minibar', desc: `Tiêu dùng minibar & đồ uống tại phòng`, qty: 1, unit: minibarTotal, total: minibarTotal }
     ];
+
+    if (fnbTotal > 0) {
+      details.push({
+        type: 'FoodOrder',
+        desc: `Dịch vụ gọi món tại phòng F&B (Gộp hóa đơn phòng - ${fnbOrders.length} đơn)`,
+        qty: fnbOrders.length,
+        unit: fnbTotal,
+        total: fnbTotal
+      });
+    }
 
     if (lateCalc.lateFeeAmount > 0) {
       details.push({

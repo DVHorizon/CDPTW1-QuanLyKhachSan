@@ -74,7 +74,16 @@ const MenuManagement = () => {
 
   const openAddModal = () => {
     setEditingItem(null);
-    setFormData({ ItemName: '', CategoryId: 1, Price: 0, Status: 'Available', Description: '', ImageUrl: '' });
+    setFormData({ 
+      ItemName: '', 
+      CategoryId: 1, 
+      Price: 0, 
+      Status: 'Available', 
+      Description: '', 
+      ImageUrl: '',
+      Allergens: '',
+      Ingredients: ''
+    });
     setIsModalOpen(true);
   };
 
