@@ -18,6 +18,7 @@ import Profile from './pages/client/Profile';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
 import FnbOrderHistory from './pages/admin/fnb/FnbOrderHistory';
+import TableMap from './pages/admin/fnb/TableMap';
 import GuestOrderHistory from './pages/client/GuestOrderHistory';
 import TableReservation from './pages/client/TableReservation';
 import LoyaltyManagement from './pages/LoyaltyManagement';
@@ -115,6 +116,9 @@ function App() {
             <Route path="/admin/fnb/dispatch" element={<ProtectedRoute><OrderDispatchHub /></ProtectedRoute>} />
             <Route path="/admin/fnb/room-service" element={<ProtectedRoute><RoomService /></ProtectedRoute>} />
             <Route path="/admin/fnb/history" element={<ProtectedRoute><FnbOrderHistory /></ProtectedRoute>} />
+            <Route path="/admin/fnb/table-map" element={<ProtectedRoute><TableMap /></ProtectedRoute>} />
+            <Route path="/admin/fnb/tables" element={<ProtectedRoute><TableMap /></ProtectedRoute>} />
+            <Route path="/admin/so-do-ban" element={<ProtectedRoute><TableMap /></ProtectedRoute>} />
             <Route path="/admin/services" element={<ProtectedRoute><ServiceManagement /></ProtectedRoute>} />
             <Route path="/admin/services/dispatch" element={<ProtectedRoute><ServiceDispatchTerminal /></ProtectedRoute>} />
             <Route path="/admin/services/orders" element={<ProtectedRoute><ServiceOrdersKanban /></ProtectedRoute>} />

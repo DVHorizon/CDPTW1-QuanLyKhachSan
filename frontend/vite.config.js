@@ -15,6 +15,14 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_PROXY_TARGET || (process.env.CHOKIDAR_USEPOLLING ? 'http://backend:5000' : 'http://localhost:5000'),
         changeOrigin: true,
+        secure: false,
+        ws: true,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            // Không ngắt app nếu backend đang restart
+            console.warn('[vite proxy warning]:', err.message);
+          });
+        },
       },
     },
   },

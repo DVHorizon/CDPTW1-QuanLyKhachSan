@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import GuestSidebar from "../../components/layout/GuestSidebar";
 import GuestHeader from "../../components/layout/GuestHeader";
 
@@ -80,7 +80,7 @@ const MEAL_PERIOD_TIME_SLOTS = {
 };
 
 export default function TableReservation() {
-  const [selectedDate, setSelectedDate] = useState("18");
+  const [selectedDate, setSelectedDate] = useState(() => String(new Date().getDate()));
   const [mealPeriod, setMealPeriod] = useState("dinner");
   const [selectedTime, setSelectedTime] = useState("19:00");
   const [tableType, setTableType] = useState("family");
@@ -184,13 +184,38 @@ export default function TableReservation() {
     fetchMyReservations();
   }, [currentUser]);
 
+  // Tạo danh sách 6 ngày liên tiếp tính từ hôm nay
+  const dynamicDateOptions = useMemo(() => {
+    const list = [];
+    const now = new Date();
+    const dayNames = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() + i);
+      const dateNum = String(d.getDate());
+      list.push({
+        fullDate: d,
+        date: dateNum,
+        day: i === 0 ? "Hôm nay" : (i === 1 ? "Ngày mai" : dayNames[d.getDay()]),
+        note: i === 0 ? "Còn bàn" : (i === 1 ? "Còn bàn" : "Còn trống")
+      });
+    }
+    return list;
+  }, []);
+
   // Hàm tính toán targetDate chuẩn ISO
   const getTargetDateTime = (dateStr, timeStr) => {
     const now = new Date();
-    let targetYear = now.getFullYear();
-    let targetMonth = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(dateStr).padStart(2, "0");
-    return `${targetYear}-${targetMonth}-${day}T${timeStr}:00.000Z`;
+    let target = new Date(now);
+    const matchedOption = dynamicDateOptions.find(o => o.date === String(dateStr));
+    if (matchedOption) {
+      target = new Date(matchedOption.fullDate);
+    } else {
+      target.setDate(parseInt(dateStr, 10));
+    }
+    const [hh, mm] = (timeStr || "19:00").split(":");
+    target.setHours(parseInt(hh, 10) || 19, parseInt(mm, 10) || 0, 0, 0);
+    return target.toISOString();
   };
 
   // Lấy số lượng bàn khả dụng từ Database theo ngày, giờ và số người
@@ -199,7 +224,7 @@ export default function TableReservation() {
     try {
       const targetDate = getTargetDateTime(selectedDate, selectedTime);
       const res = await fetch(
-        `http://localhost:5000/api/v1/table-reservations/available-tables?reservationTime=${targetDate}&guestCount=${guestCount}`
+        `/api/v1/table-reservations/available-tables?reservationTime=${targetDate}&guestCount=${guestCount}`
       );
       const json = await res.json();
       if (res.ok && json.data) {
@@ -520,14 +545,7 @@ export default function TableReservation() {
                     Chọn Ngày Đến Thưởng Thức (Tháng {new Date().getMonth() + 1}/{new Date().getFullYear()})
                   </label>
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    {[
-                      { day: "Hôm nay", date: "16", note: "Còn bàn" },
-                      { day: "T.Bảy", date: "17", note: "Còn bàn" },
-                      { day: "C.Nhật", date: "18", note: "Được chọn nhiều" },
-                      { day: "T.Hai", date: "19", note: "Còn trống" },
-                      { day: "T.Ba", date: "20", note: "Còn trống" },
-                      { day: "T.Tư", date: "21", note: "Còn trống" },
-                    ].map((d) => (
+                    {dynamicDateOptions.map((d) => (
                       <button
                         key={d.date}
                         type="button"
