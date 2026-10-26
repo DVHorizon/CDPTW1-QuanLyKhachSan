@@ -110,3 +110,156 @@ export const suggestRoomsApi = async (q) => {
   }
 };
 
+/**
+ * Kiểm tra tình trạng phòng trống
+ * POST /api/v1/rooms/check-availability
+ */
+export const checkRoomAvailabilityApi = async (payload) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/rooms/check-availability`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi check availability:', err);
+    return { success: false, message: err.message };
+  }
+};
+
+/**
+ * Khóa phòng tạm thời (Room lock session)
+ * POST /api/v1/rooms/lock
+ */
+export const lockRoomSessionApi = async (payload) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/rooms/lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi lock room session:', err);
+    return { success: false, message: err.message };
+  }
+};
+
+/**
+ * Nhả khóa phòng
+ * POST /api/v1/rooms/release-lock
+ */
+export const releaseRoomLockApi = async (payload) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/rooms/release-lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi release room lock:', err);
+    return { success: false, message: err.message };
+  }
+};
+
+/**
+ * Tạo booking mới
+ * POST /api/v1/bookings
+ */
+export const createBookingApi = async (payload) => {
+  try {
+    const token = typeof window !== 'undefined' ? (localStorage.getItem('hotel_token') || localStorage.getItem('token')) : null;
+    const res = await fetch(`${API_BASE_URL}/v1/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi create booking:', err);
+    return { success: false, message: err.message };
+  }
+};
+
+/**
+ * Tính toán giá phòng & phụ thu
+ * POST /api/v1/bookings/calculate-pricing
+ */
+export const calculatePricingApi = async (payload) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/bookings/calculate-pricing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi tính giá:', err);
+    return { success: false, message: err.message };
+  }
+};
+
+/**
+ * Kiểm tra mã giảm giá (voucher)
+ * POST /api/v1/promotions/validate
+ */
+export const validateVoucherApi = async (code, totalAmount) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/promotions/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, totalAmount }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi validate voucher:', err);
+    return { success: false, message: err.message };
+  }
+};
+
+/**
+ * Lấy chi tiết đặt phòng thanh toán cọc
+ * GET /api/v1/bookings/:id
+ */
+export const getBookingDetailsApi = async (bookingId) => {
+  try {
+    const token = typeof window !== 'undefined' ? (localStorage.getItem('hotel_token') || localStorage.getItem('token')) : null;
+    const res = await fetch(`${API_BASE_URL}/v1/bookings/${bookingId}`, {
+      headers: {
+        'Accept': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi fetch booking detail:', err);
+    return { success: false, message: err.message };
+  }
+};
+
+/**
+ * Xử lý thanh toán cọc booking (FEAT-PAYMENT-01)
+ * POST /api/v1/payments
+ */
+export const processDepositPaymentApi = async (payload) => {
+  try {
+    const token = typeof window !== 'undefined' ? (localStorage.getItem('hotel_token') || localStorage.getItem('token')) : null;
+    const res = await fetch(`${API_BASE_URL}/v1/payments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi process payment:', err);
+    return { success: false, message: err.message };
+  }
+};

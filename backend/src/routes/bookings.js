@@ -7,10 +7,14 @@ const ExcelJS = require('exceljs');
 const pool = require('../config/db');
 const bookingEngineController = require('../controllers/bookingEngineController');
 const voucherController = require('../controllers/voucherController');
-const { requirePermissions } = require('../middlewares/authMiddleware');
+const { requirePermissions, verifyToken } = require('../middlewares/authMiddleware');
 const roomAllocCtrl = require('../controllers/admin/roomAllocationController');
+const bookingChargesController = require('../modules/services/controllers/bookingChargesController');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'grand_horizon_secret_key_2026_luxury_hotel';
+
+// ─── TÍNH NĂNG C6: TỰ ĐỘNG GOM CHI PHÍ LƯU TRÚ (FEAT-INVOICE-01 / C6) ───
+router.get('/:bookingId/charges', verifyToken, bookingChargesController.getBookingCharges);
 
 // ─── TÍNH NĂNG 6: TỰ ĐỘNG TÍNH SỐ ĐÊM, PHỤ THU & TỔNG TIỀN PHÒNG (FEAT-GUEST-06 / A6) ───
 router.post('/calculate-pricing', bookingEngineController.calculatePricing);

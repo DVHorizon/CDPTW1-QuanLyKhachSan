@@ -7,7 +7,22 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "migrate": "sequelize-cli db:migrate",
-    "seed": "node src/seeders/seedAll.js"
+    "seed": "node src/seeders/seedRunner.js",
+    "seed:fast": "node src/seeders/seedRunner.js --count=1000",
+    "seed:dev": "node src/seeders/seedRunner.js --count=10000",
+    "seed:full": "node src/seeders/seedRunner.js --count=100000",
+    "seed:legacy": "node src/seeders/seedAll.js",
+    "seed:stays": "node src/seeders/seedInHouseStays.js",
+    "verify:db": "node src/seeders/verifyTables.js",
+    "test:pricing": "node tests/test_feat_guest_06_pricing_calculation.js",
+    "test:voucher": "node tests/test_feat_guest_07_voucher_redemption.js",
+    "test:booking": "node tests/test_feat_guest_05_booking_engine.js",
+    "test:deposit": "node tests/test_feat_guest_08_deposit_payment.js",
+    "test:service-step0": "node tests/test_feat_service_01_step0.js",
+    "test:service-status": "node tests/test_feat_service_04_status.js",
+    "test:payment-c5": "node tests/test_feat_payment_01_c5.js",
+    "test:charges-c6": "node tests/test_feat_invoice_01_c6.js",
+    "test:all": "node tests/test_feat_guest_06_pricing_calculation.js && node tests/test_feat_guest_07_voucher_redemption.js && node tests/test_feat_guest_05_booking_engine.js && node tests/test_feat_guest_08_deposit_payment.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
