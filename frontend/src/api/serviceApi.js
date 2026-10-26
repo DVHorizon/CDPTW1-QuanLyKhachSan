@@ -7,7 +7,10 @@
 const BASE_URL = 'http://localhost:5000/api/v1/services';
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+  const token =
+    localStorage.getItem('hotel_token') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('authToken');
   const headers = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -23,8 +26,12 @@ export const fetchServicesApi = async (params = {}) => {
   if (params.page) query.append('page', params.page);
   if (params.pageSize) query.append('pageSize', params.pageSize);
   if (params.search) query.append('search', params.search);
-  if (params.categoryId && params.categoryId !== 'All') query.append('categoryId', params.categoryId);
+  const targetGroup = params.group !== undefined ? params.group : params.categoryId;
+  if (targetGroup && targetGroup !== 'All') query.append('group', targetGroup);
   if (params.status && params.status !== 'All') query.append('status', params.status);
+  if (params.minPrice !== undefined && params.minPrice !== '') query.append('minPrice', params.minPrice);
+  if (params.maxPrice !== undefined && params.maxPrice !== '') query.append('maxPrice', params.maxPrice);
+  if (params.sortBy) query.append('sortBy', params.sortBy);
 
   const url = `${BASE_URL}${query.toString() ? '?' + query.toString() : ''}`;
   const res = await fetch(url, { headers: getAuthHeaders() });
@@ -126,14 +133,91 @@ export const reactivateServiceApi = async (id) => {
 };
 
 /**
- * 7. Kích hoạt đồng bộ sang trạm POS
+ * 2b. Thêm mới nhóm dịch vụ (POST /api/v1/services/categories)
  */
-export const syncPosApi = async () => {
-  const res = await fetch(`${BASE_URL}/sync-pos`, {
+export const createCategoryApi = async (categoryData) => {
+  const res = await fetch(`${BASE_URL}/categories`, {
     method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(categoryData),
+  });
+  const data = await res.json();
+  if (!res.ok) throw data;
+  return data;
+};
+
+// ─── FEAT-SERVICE-03: ĐẶT DỊCH VỤ & SERVICE ORDERS ───────────────────────────
+const ORDERS_BASE_URL = 'http://localhost:5000/api/v1/service-orders';
+
+/**
+ * 8. Lấy danh sách các phòng đang lưu trú (CheckedIn hoặc Extended) cho Lễ tân
+ */
+export const fetchActiveStaysApi = async () => {
+  const res = await fetch(`${ORDERS_BASE_URL}/active-stays`, {
     headers: getAuthHeaders(),
   });
   const data = await res.json();
   if (!res.ok) throw data;
   return data;
 };
+
+/**
+ * 9. Lấy thông tin lượt lưu trú của khách hàng đang đăng nhập
+ */
+export const fetchMyActiveStayApi = async () => {
+  const res = await fetch(`${ORDERS_BASE_URL}/my-stay`, {
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw data;
+  return data;
+};
+
+/**
+ * 10. Tạo đơn đặt dịch vụ (Service Order)
+ */
+export const createServiceOrderApi = async (orderPayload) => {
+  const res = await fetch(ORDERS_BASE_URL, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(orderPayload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw data;
+  return data;
+};
+
+/**
+ * 11. Lấy danh sách đơn đặt dịch vụ
+ */
+export const fetchServiceOrdersApi = async (params = {}) => {
+  const query = new URLSearchParams();
+  if (params.stayId) query.append('stayId', params.stayId);
+  if (params.status && params.status !== 'All') query.append('status', params.status);
+
+  const url = `${ORDERS_BASE_URL}${query.toString() ? '?' + query.toString() : ''}`;
+  const res = await fetch(url, {
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw data;
+  return data;
+};
+
+/**
+ * 12. Cập nhật tiến độ đơn dịch vụ (FEAT-SERVICE-04 / C4)
+ * PATCH /api/v1/service-orders/:orderId/status
+ * @param {number|string} orderId
+ * @param {object} payload { newStatus: 'InProgress' | 'Completed' | 'Cancelled', cancelReason?: string }
+ */
+export const updateServiceOrderStatusApi = async (orderId, payload) => {
+  const res = await fetch(`${ORDERS_BASE_URL}/${orderId}/status`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw data;
+  return data;
+};
+

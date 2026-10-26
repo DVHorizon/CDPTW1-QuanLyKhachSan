@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { loginUser, registerUser, fetchCurrentUser } from '../api/authApi';
+import { loginUser, registerUser, fetchCurrentUser, loginWithGoogle, loginWithFacebook } from '../api/authApi';
 
 const AuthContext = createContext(null);
 
@@ -8,19 +8,27 @@ export const AuthProvider = ({ children }) => {
     return localStorage.getItem('hotel_token') || null;
   });
 
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('hotel_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const [isLoading, setIsLoading] = useState(true);
 
-  // Đồng bộ hóa trạng thái tài khoản trực tiếp từ database khi khởi chạy
+  // Đồng bộ hóa trạng thái tài khoản khi khởi chạy
   useEffect(() => {
     const verifyUser = async () => {
       if (token) {
         const freshUser = await fetchCurrentUser(token);
         if (freshUser) {
           setUser(freshUser);
+          localStorage.setItem('hotel_user', JSON.stringify(freshUser));
         } else {
-          // Token không còn hợp lệ trong database
+          // Token không còn hợp lệ
           handleLogout();
         }
       }
@@ -36,6 +44,7 @@ export const AuthProvider = ({ children }) => {
       setToken(response.token);
       setUser(response.user);
       localStorage.setItem('hotel_token', response.token);
+      localStorage.setItem('hotel_user', JSON.stringify(response.user));
     }
     return response;
   };
@@ -46,6 +55,29 @@ export const AuthProvider = ({ children }) => {
       setToken(response.token);
       setUser(response.user);
       localStorage.setItem('hotel_token', response.token);
+      localStorage.setItem('hotel_user', JSON.stringify(response.user));
+    }
+    return response;
+  };
+
+  const handleGoogleLogin = async (payload) => {
+    const response = await loginWithGoogle(payload);
+    if (response.success && response.token) {
+      setToken(response.token);
+      setUser(response.user);
+      localStorage.setItem('hotel_token', response.token);
+      localStorage.setItem('hotel_user', JSON.stringify(response.user));
+    }
+    return response;
+  };
+
+  const handleFacebookLogin = async (payload) => {
+    const response = await loginWithFacebook(payload);
+    if (response.success && response.token) {
+      setToken(response.token);
+      setUser(response.user);
+      localStorage.setItem('hotel_token', response.token);
+      localStorage.setItem('hotel_user', JSON.stringify(response.user));
     }
     return response;
   };
@@ -57,10 +89,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('hotel_user');
   };
 
-  const updateUser = (updatedUser) => {
-    setUser(updatedUser);
-  };
-
   const value = {
     user,
     token,
@@ -68,8 +96,9 @@ export const AuthProvider = ({ children }) => {
     isLoading,
     login: handleLogin,
     register: handleRegister,
-    logout: handleLogout,
-    updateUser
+    loginGoogle: handleGoogleLogin,
+    loginFacebook: handleFacebookLogin,
+    logout: handleLogout
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

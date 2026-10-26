@@ -34,12 +34,10 @@ exports.getMenuItems = async (req, res) => {
       ];
     }
 
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
     const items = await MenuItem.findAll({
       where: whereClause,
       include: MenuCategory,
-      order: [['MenuItemId', 'ASC']],
-      limit
+      order: [['MenuItemId', 'DESC']]
     });
 
     if (items.length === 0) {

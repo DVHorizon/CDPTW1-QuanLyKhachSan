@@ -15,10 +15,6 @@ module.exports = (sequelize) => {
       type: DataTypes.INTEGER,
       allowNull: true
     },
-    FoodOrderId: {
-      type: DataTypes.INTEGER,
-      allowNull: true
-    },
     UserId: {
       type: DataTypes.INTEGER,
       allowNull: true

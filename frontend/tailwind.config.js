@@ -111,7 +111,6 @@ export default {
         "admin-primary": PALETTE.admin.primary,
         "admin-primary-container": PALETTE.admin.container,
         "on-admin-primary": PALETTE.neutral.white,
-        "on-admin-primary-container": PALETTE.neutral.white,
 
         // --- 4. SYSTEM STATUS & TERTIARY ---
         "error": PALETTE.status.error,
@@ -128,7 +127,7 @@ export default {
         "on-tertiary-fixed-variant": "#005137",
         "surface-dim": "#cbdbf5",
         "surface-variant": "#d3e4fe",
-
+        
         // --- 5. GRAND HORIZON PMS APP TOKENS ---
         "pms-bg-start": PALETTE.pms.bgStart,
         "pms-bg-end": PALETTE.pms.bgEnd,
@@ -154,9 +153,9 @@ export default {
         sans: FONT_SANS,
         serif: FONT_SERIF,
         primary: FONT_SANS,
-        display: FONT_SANS,
+        display: FONT_SERIF,
 
-        // Semantic font aliases (Tương thích Admin PMS - Sử dụng font thường Plus Jakarta Sans)
+        // Semantic font aliases (Tương thích Admin PMS)
         "body-sm": FONT_SANS,
         "body-md": FONT_SANS,
         "body-lg": FONT_SANS,
@@ -165,13 +164,13 @@ export default {
         "label-lg": FONT_SANS,
         "title-md": FONT_SANS,
         "title-lg": FONT_SANS,
-        "headline-sm": FONT_SANS,
-        "headline-md": FONT_SANS,
-        "headline-lg": FONT_SANS,
-        "display-sm": FONT_SANS,
-        "display-lg": FONT_SANS,
-        "display-sm-mobile": FONT_SANS,
-        "display-lg-mobile": FONT_SANS
+        "headline-sm": FONT_SERIF,
+        "headline-md": FONT_SERIF,
+        "headline-lg": FONT_SERIF,
+        "display-sm": FONT_SERIF,
+        "display-lg": FONT_SERIF,
+        "display-sm-mobile": FONT_SERIF,
+        "display-lg-mobile": FONT_SERIF
       },
 
       fontSize: {
