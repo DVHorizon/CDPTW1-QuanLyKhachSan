@@ -5,44 +5,22 @@
  * 👤 OWNER: Bảo — Guest Portal
  * Mount tại: /api/v1/guest
  *
- * Bao gồm: Search, Room Availability, Booking, Review, Wishlist, Home, Newsletter, Compare
+ * Bao gồm: Search, Booking, Review, Wishlist, Home, Newsletter, Compare
  */
 
 const express = require('express');
 const router = express.Router();
 
+// Search & Room browsing — dùng lại roomSearchController hiện có
 const roomSearchController = require('../../controllers/roomSearchController');
-const roomAvailabilityController = require('../../controllers/roomAvailabilityController');
-const bookingEngineController = require('../../controllers/bookingEngineController');
-const onlineDepositPaymentController = require('../../controllers/onlineDepositPaymentController');
+router.get('/rooms/search',  roomSearchController.searchRooms);
+router.get('/rooms/suggest', roomSearchController.suggestRooms);
+router.get('/rooms/:id',     roomSearchController.getRoomDetail);
+router.get('/branches',      roomSearchController.getBranches);
 
-// ─── TÍNH NĂNG 4: REAL-TIME AVAILABILITY & LOCK (FEAT-GUEST-04) ─────────────
-router.get('/rooms/availability',    roomAvailabilityController.checkRoomAvailability);
-router.post('/rooms/lock',           roomAvailabilityController.lockRoomSession);
-router.delete('/rooms/lock/:sessionId', roomAvailabilityController.releaseRoomLock);
-
-// ─── TÍNH NĂNG 5: ĐẶT PHÒNG TRỰC TUYẾN (FEAT-GUEST-05) ──────────────────────
-router.post('/bookings',             verifyToken, bookingEngineController.createOnlineBooking);
-
-// ─── TÍNH NĂNG 6: TỰ ĐỘNG TÍNH SỐ ĐÊM, PHỤ THU & TỔNG TIỀN PHÒNG (FEAT-GUEST-06 / A6) ───
-router.post('/bookings/calculate-pricing', bookingEngineController.calculatePricing);
-
-// ─── TÍNH NĂNG 8: THANH TOÁN TIỀN CỌC TRỰC TUYẾN (FEAT-GUEST-08) ────────────
-router.get('/bookings/:id',          onlineDepositPaymentController.getBookingDetails);
-router.post('/bookings/:bookingId/deposit', onlineDepositPaymentController.processDepositPayment);
-router.post('/payments',             onlineDepositPaymentController.processDepositPayment);
-
-// ─── TÍNH NĂNG 9: XEM LỊCH SỬ ĐẶT PHÒNG & HỦY PHÒNG (FEAT-GUEST-09 / A9) ──────
-const bookingHistoryController = require('../../controllers/bookingHistoryController');
-const { verifyToken } = require('../../middlewares/authMiddleware');
-router.get('/me/bookings', verifyToken, bookingHistoryController.getMyBookings);
-router.get('/me/bookings/:bookingId', verifyToken, bookingHistoryController.getMyBookingDetail);
-router.patch('/me/bookings/:bookingId/cancel', verifyToken, bookingHistoryController.cancelMyBooking);
-
-// ─── TÌM KIẾM & XEM PHÒNG ──────────────────────────────────────────────────
-router.get('/rooms/search',          roomSearchController.searchRooms);
-router.get('/rooms/suggest',         roomSearchController.suggestRooms);
-router.get('/rooms/:id',             roomSearchController.getRoomDetail);
-router.get('/branches',              roomSearchController.getBranches);
+// router.use('/bookings',   require('./routes/bookingRoutes'));   // TODO: Bảo
+// router.use('/reviews',    require('./routes/reviewRoutes'));    // TODO: Bảo
+// router.use('/wishlist',   require('./routes/wishlistRoutes')); // TODO: Bảo
+// router.use('/newsletter', require('./routes/homeRoutes'));      // TODO: Bảo
 
 module.exports = router;
