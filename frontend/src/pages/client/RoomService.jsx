@@ -20,12 +20,8 @@ const RoomService = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [createdOrder, setCreatedOrder] = useState(null);
 
-  // Delivery Parameters State
-  const [deliveryTimeMode, setDeliveryTimeMode] = useState('immediate'); // 'immediate' | 'scheduled'
-  const [scheduledTime, setScheduledTime] = useState('19:30');
-  const [serviceStyle, setServiceStyle] = useState('trolley'); // 'trolley' | 'door_tray'
-  const [guestCount, setGuestCount] = useState(2);
-  const [conciergeNotes, setConciergeNotes] = useState('Chuẩn bị 2 ly pha lê Bordeaux cao cấp.\nTuyệt đối không dùng hạt mè rắc bánh mì và salad.');
+  // Ghi chú đơn hàng (FoodOrder.Note)
+  const [orderNote, setOrderNote] = useState('');
 
   // Dynamic Database Menu State
   const [categories, setCategories] = useState([]);
@@ -283,7 +279,8 @@ const RoomService = () => {
             note: i.note || ''
           })),
           userId: user?.id || user?.UserId || user?.userId || undefined,
-          paymentMode
+          paymentMode,
+          note: orderNote.trim() || undefined
         })
       });
 
@@ -397,8 +394,8 @@ const RoomService = () => {
                   </span>
                 </div>
                 <div className="flex items-start gap-space-md pt-space-xs">
-                  <div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-admin-primary flex-shrink-0 shadow-inner">
-                    <span className="font-headline-lg text-headline-sm font-bold">
+                  <div className="min-w-[48px] px-2.5 py-2 rounded-xl bg-surface-container-high flex items-center justify-center text-admin-primary flex-shrink-0 shadow-inner">
+                    <span className="font-headline-sm text-label-md font-bold text-center tracking-tight">
                       {selectedStay?.roomNumber || '804'}
                     </span>
                   </div>
@@ -416,163 +413,24 @@ const RoomService = () => {
                     </div>
                   </div>
                 </div>
-                {/* Thông tin hạn mức & Tài chính */}
-                <div className="bg-surface-container-low rounded-lg p-space-md space-y-space-xs">
-                  <div className="flex items-center justify-between text-body-sm font-body-sm">
-                    <span className="text-on-surface-variant flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px] text-secondary">credit_card</span>
-                      Visa Ký Quỹ
-                    </span>
-                    <span className="font-semibold text-on-surface">**** 4092</span>
-                  </div>
-                  <div className="flex items-center justify-between text-body-sm font-body-sm">
-                    <span className="text-on-surface-variant">Hạn mức khả dụng</span>
-                    <span className="font-bold text-admin-primary">30.000.000 đ</span>
-                  </div>
-                  <div className="w-full bg-surface-variant h-1.5 rounded-full overflow-hidden mt-1">
-                    <div className="bg-admin-primary h-full rounded-full" style={{ width: '22%' }}></div>
-                  </div>
-                  <div className="flex justify-between items-center pt-0.5">
-                    <span className="font-label-sm text-label-sm text-outline">Đã tiêu: 6.600.000 đ</span>
-                    <span className="font-label-sm text-label-sm text-outline">Quyền ghi nợ: Mở</span>
-                  </div>
-                </div>
-                {/* Cảnh báo Y tế & Dị ứng nghiêm ngặt */}
-                <div className="bg-error-container/30 rounded-lg p-space-md space-y-space-xs">
-                  <div className="flex items-center gap-space-xs text-error font-label-sm text-label-sm font-bold">
-                    <span className="material-symbols-outlined text-[18px]">warning</span>
-                    CẢNH BÁO DỊ ỨNG THỰC PHẨM
-                  </div>
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    <span className="px-space-xs py-0.5 rounded bg-error/15 text-error font-label-sm text-label-sm font-semibold">
-                      Giáp xác / Tôm cua (Shellfish)
-                    </span>
-                    <span className="px-space-xs py-0.5 rounded bg-error/15 text-error font-label-sm text-label-sm font-semibold">
-                      Hạt mè (Sesame seed)
-                    </span>
-                  </div>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant pt-1 leading-snug">
-                    • Bếp trưởng cần ký xác nhận miễn nhiễm chéo trước khi đóng gói ra xe đẩy.
-                  </p>
-                </div>
-              </div>
-              {/* Thông số giao món & Setup bàn */}
-              <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm space-y-space-md">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Thông Số Giao Hàng</span>
-                  <span className="material-symbols-outlined text-admin-primary text-[18px]">nest_clock_farsight_analog</span>
-                </div>
-                {/* Khung giờ giao */}
-                <div className="space-y-space-xs">
-                  <label className="font-label-sm text-label-sm text-on-surface-variant block">Thời gian giao món</label>
-                  <div className="grid grid-cols-2 gap-space-xs">
-                    <button 
-                      type="button"
-                      onClick={() => setDeliveryTimeMode('immediate')}
-                      className={`py-space-xs px-space-sm rounded-lg font-label-sm text-label-sm text-center font-bold transition-all ${
-                        deliveryTimeMode === 'immediate'
-                          ? 'bg-admin-primary text-on-admin-primary shadow-sm'
-                          : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                      }`}
-                    >
-                      Ngay tức thì (25-35p)
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setDeliveryTimeMode('scheduled')}
-                      className={`py-space-xs px-space-sm rounded-lg font-label-sm text-label-sm text-center font-bold transition-all ${
-                        deliveryTimeMode === 'scheduled'
-                          ? 'bg-admin-primary text-on-admin-primary shadow-sm'
-                          : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                      }`}
-                    >
-                      Hẹn giờ: {scheduledTime}
-                    </button>
-                  </div>
-                  {deliveryTimeMode === 'scheduled' && (
-                    <div className="pt-1 flex items-center gap-2">
-                      <span className="text-xs text-on-surface-variant">Chọn giờ:</span>
-                      <input 
-                        type="time" 
-                        value={scheduledTime}
-                        onChange={(e) => setScheduledTime(e.target.value)}
-                        className="bg-surface-container-low px-2 py-1 rounded text-xs font-semibold text-on-surface border border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-admin-primary"
-                      />
-                    </div>
-                  )}
-                </div>
-                {/* Hình thức dọn bàn */}
-                <div className="space-y-space-xs">
-                  <label className="font-label-sm text-label-sm text-on-surface-variant block">Hình thức phục vụ</label>
-                  <div className="grid grid-cols-2 gap-space-xs">
-                    <div 
-                      onClick={() => setServiceStyle('trolley')}
-                      className={`p-space-xs rounded-lg flex items-center gap-space-xs cursor-pointer transition-all border ${
-                        serviceStyle === 'trolley'
-                          ? 'bg-admin-primary/10 border-admin-primary text-admin-primary shadow-sm'
-                          : 'bg-surface-container border-transparent text-on-surface-variant opacity-75 hover:opacity-100'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">table_restaurant</span>
-                      <div className="flex flex-col text-left">
-                        <span className="font-label-sm text-label-sm font-bold">Bàn xe đẩy</span>
-                        <span className="text-[10px] text-on-surface-variant">Khăn trắng 5 sao</span>
-                      </div>
-                    </div>
-                    <div 
-                      onClick={() => setServiceStyle('door_tray')}
-                      className={`p-space-xs rounded-lg flex items-center gap-space-xs cursor-pointer transition-all border ${
-                        serviceStyle === 'door_tray'
-                          ? 'bg-admin-primary/10 border-admin-primary text-admin-primary shadow-sm'
-                          : 'bg-surface-container border-transparent text-on-surface-variant opacity-75 hover:opacity-100'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">inventory_2</span>
-                      <div className="flex flex-col text-left">
-                        <span className="font-label-sm text-label-sm font-semibold">Khay tại cửa</span>
-                        <span className="text-[10px] text-on-surface-variant">Không tiếp xúc</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {/* Số lượng khách & Ghi chú quản gia */}
-                <div className="space-y-space-xs">
+                {/* Ghi chú đơn hàng cho Bếp (Lưu vào FoodOrders.Note) */}
+                <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-label-sm text-label-sm text-on-surface-variant">Số lượng khách dùng</span>
-                    <div className="flex items-center gap-space-sm bg-surface-container-low px-space-sm py-1 rounded-lg">
-                      <button 
-                        type="button"
-                        onClick={() => setGuestCount(prev => Math.max(1, prev - 1))}
-                        className="text-on-surface-variant hover:text-admin-primary font-bold px-1"
-                        title="Giảm 1 khách"
-                      >
-                        -
-                      </button>
-                      <span className="font-label-md text-label-md text-on-surface font-bold px-1">
-                        {guestCount < 10 ? `0${guestCount}` : guestCount}
-                      </span>
-                      <button 
-                        type="button"
-                        onClick={() => setGuestCount(prev => Math.min(20, prev + 1))}
-                        className="text-on-surface-variant hover:text-admin-primary font-bold px-1"
-                        title="Tăng 1 khách"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="pt-space-xs space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="font-label-sm text-label-sm text-outline">Ghi chú điều phối tiền sảnh</span>
+                    <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px] text-admin-primary">edit_note</span>
+                      Ghi Chú Đơn Hàng Cho Bếp
+                    </span>
                   </div>
                   <textarea 
                     rows="3"
-                    value={conciergeNotes}
-                    onChange={(e) => setConciergeNotes(e.target.value)}
-                    placeholder="Nhập ghi chú phục vụ phòng..."
-                    className="w-full bg-surface-container-low p-space-sm rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-admin-primary resize-none"
+                    value={orderNote}
+                    onChange={(e) => setOrderNote(e.target.value)}
+                    placeholder="Nhập ghi chú yêu cầu chế biến (VD: Không hành, sốt để riêng, mang thêm dao nĩa...)"
+                    className="w-full bg-surface-container-low p-space-sm rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-admin-primary resize-none placeholder:text-outline"
                   />
+                  <p className="text-[11px] text-on-surface-variant">
+                    Ghi chú sẽ được chuyển thẳng đến màn hình điều phối bếp (KDS) và lưu trữ trên hóa đơn.
+                  </p>
                 </div>
               </div>
             </div>
@@ -721,6 +579,12 @@ const RoomService = () => {
                                   {item.KitchenStation}
                                 </span>
                               )}
+                              {item.Allergens && (
+                                <span className="px-1.5 py-0.5 rounded bg-error/10 text-[10px] text-error font-medium flex items-center gap-0.5" title={`Dị ứng: ${item.Allergens}`}>
+                                  <span className="material-symbols-outlined text-[12px]">warning</span>
+                                  {item.Allergens}
+                                </span>
+                              )}
                             </div>
 
                             {/* Nút Thêm Món / Hiển thị số lượng đã chọn */}
@@ -759,6 +623,14 @@ const RoomService = () => {
                     </div>
                     <span className="font-label-sm text-label-sm text-admin-primary font-bold">Tùy biến phục vụ</span>
                   </div>
+
+                  {/* Cảnh báo dị ứng thực tế từ DB nếu món có khai báo Allergens */}
+                  {selectedMenuItem.Allergens && (
+                    <div className="bg-error/10 border border-error/20 rounded-lg p-space-xs flex items-center gap-space-xs text-error font-label-sm text-label-sm">
+                      <span className="material-symbols-outlined text-[18px]">warning</span>
+                      <span><strong>Cảnh báo dị ứng từ bếp:</strong> Món này chứa thành phần {selectedMenuItem.Allergens}</span>
+                    </div>
+                  )}
 
                   {/* Options Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-space-xs">

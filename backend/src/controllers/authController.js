@@ -171,18 +171,18 @@ const login = async (req, res) => {
 
     const cleanIdentifier = identifier.trim();
 
-    // 1. Tìm tài khoản theo Email, Số điện thoại hoặc Username kèm thông tin Role & MembershipTier
+    // 1. Tìm tài khoản theo Email hoặc Số điện thoại kèm thông tin Role & MembershipTier
     const [users] = await pool.query(
-      `SELECT u.UserId, u.RoleId, u.Username, u.EmployeeCode, u.AvatarUrl, u.TierId, u.FullName, u.Email, u.Phone, 
-              u.PasswordHash, u.Status, u.MustChangePassword, u.IsDeleted, u.CreatedAt,
+      `SELECT u.UserId, u.RoleId, u.TierId, u.FullName, u.Email, u.Phone, 
+              u.PasswordHash, u.Status, u.CreatedAt,
               r.RoleName,
               mt.TierName, mt.Benefits, mt.DiscountRate, mt.PointMultiplier
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
        LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
-       WHERE (u.Email = ? OR u.Phone = ? OR LOWER(u.Username) = ?) AND u.IsDeleted = 0
+       WHERE (u.Email = ? OR u.Phone = ?)
        LIMIT 1`,
-      [cleanIdentifier.toLowerCase(), cleanIdentifier, cleanIdentifier.toLowerCase()]
+      [cleanIdentifier.toLowerCase(), cleanIdentifier]
     );
 
     if (users.length === 0) {
@@ -194,12 +194,11 @@ const login = async (req, res) => {
 
     const user = users[0];
 
-    // 2. Kiểm tra trạng thái tài khoản (Spec 3 - Quy tắc 3.7: Báo tài khoản bị khóa)
-    if (user.Status === 'Locked' || user.Status === 'Revoked' || user.Status === 'Inactive') {
+    // 2. Kiểm tra trạng thái tài khoản
+    if (user.Status !== 'Active') {
       return res.status(403).json({
         success: false,
-        code: 'ERROR_0010_FORBIDDEN',
-        message: 'Tài khoản của bạn đã bị khóa, vui lòng liên hệ quản trị viên'
+        message: 'Tài khoản của quý khách hiện đang bị tạm khóa. Vui lòng liên hệ Hotline (+84 236 888 9999).'
       });
     }
 
@@ -212,30 +211,12 @@ const login = async (req, res) => {
       });
     }
 
-    // Lấy danh sách quyền hạn thực tế từ database
-    let permissions = [];
-    if (user.RoleId === 1 || user.RoleName === 'Admin') {
-      // Admin có toàn quyền
-      const [allPerms] = await pool.query('SELECT PermissionName FROM Permissions');
-      permissions = allPerms.map(p => p.PermissionName);
-    } else {
-      const [rolePerms] = await pool.query(
-        `SELECT p.PermissionName 
-         FROM RolePermissions rp 
-         JOIN Permissions p ON rp.PermissionId = p.PermissionId 
-         WHERE rp.RoleId = ?`,
-        [user.RoleId]
-      );
-      permissions = rolePerms.map(p => p.PermissionName);
-    }
-
     // 4. Khởi tạo JWT Token
     const token = jwt.sign(
       {
         userId: user.UserId,
         roleId: user.RoleId,
         roleName: user.RoleName || 'Guest',
-        username: user.Username,
         email: user.Email,
         fullName: user.FullName
       },
@@ -250,16 +231,11 @@ const login = async (req, res) => {
       token,
       user: {
         userId: user.UserId,
-        username: user.Username,
-        employeeCode: user.EmployeeCode,
-        avatarUrl: user.AvatarUrl,
         fullName: user.FullName,
         email: user.Email,
         phone: user.Phone,
         roleId: user.RoleId,
         roleName: user.RoleName || 'Guest',
-        permissions,
-        mustChangePassword: Boolean(user.MustChangePassword),
         tierId: user.TierId,
         tierName: user.TierName || 'Standard',
         benefits: user.Benefits || '',
@@ -285,14 +261,14 @@ const getMe = async (req, res) => {
     const userId = req.user.userId;
 
     const [users] = await pool.query(
-      `SELECT u.UserId, u.RoleId, u.Username, u.EmployeeCode, u.AvatarUrl, u.TierId, u.FullName, u.Email, u.Phone, 
-              u.IdNumber, u.IdType, u.DateOfBirth, u.Gender, u.Status, u.MustChangePassword, u.CreatedAt,
+      `SELECT u.UserId, u.RoleId, u.TierId, u.FullName, u.Email, u.Phone, 
+              u.IdNumber, u.IdType, u.DateOfBirth, u.Gender, u.Status, u.CreatedAt,
               r.RoleName,
               mt.TierName, mt.Benefits, mt.DiscountRate, mt.PointMultiplier
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
        LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
-       WHERE u.UserId = ? AND u.IsDeleted = 0
+       WHERE u.UserId = ?
        LIMIT 1`,
       [userId]
     );
@@ -306,29 +282,10 @@ const getMe = async (req, res) => {
 
     const user = users[0];
 
-    // Lấy danh sách quyền hạn thực tế
-    let permissions = [];
-    if (user.RoleId === 1 || user.RoleName === 'Admin') {
-      const [allPerms] = await pool.query('SELECT PermissionName FROM Permissions');
-      permissions = allPerms.map(p => p.PermissionName);
-    } else {
-      const [rolePerms] = await pool.query(
-        `SELECT p.PermissionName 
-         FROM RolePermissions rp 
-         JOIN Permissions p ON rp.PermissionId = p.PermissionId 
-         WHERE rp.RoleId = ?`,
-        [user.RoleId]
-      );
-      permissions = rolePerms.map(p => p.PermissionName);
-    }
-
     return res.status(200).json({
       success: true,
       user: {
         userId: user.UserId,
-        username: user.Username,
-        employeeCode: user.EmployeeCode,
-        avatarUrl: user.AvatarUrl,
         fullName: user.FullName,
         email: user.Email,
         phone: user.Phone,
@@ -337,8 +294,6 @@ const getMe = async (req, res) => {
         gender: user.Gender,
         roleId: user.RoleId,
         roleName: user.RoleName,
-        permissions,
-        mustChangePassword: Boolean(user.MustChangePassword),
         tierId: user.TierId,
         tierName: user.TierName || 'Standard',
         benefits: user.Benefits,
@@ -659,68 +614,10 @@ const facebookLogin = async (req, res) => {
   }
 };
 
-/**
- * Cập nhật thông tin người dùng hiện tại đang đăng nhập
- * PUT /api/v1/auth/me
- */
-const updateMe = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { fullName, phone, idNumber, idType, dateOfBirth, gender } = req.body;
-
-    if (!fullName || !fullName.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Họ và tên không được để trống.'
-      });
-    }
-
-    const cleanFullName = fullName.trim();
-    const cleanPhone = phone ? phone.trim() : null;
-    const cleanIdNumber = idNumber ? idNumber.trim() : null;
-    const cleanIdType = idType ? idType.trim() : null;
-    const cleanDateOfBirth = dateOfBirth ? dateOfBirth : null;
-    const cleanGender = gender ? gender.trim() : null;
-
-    // Check if phone already used by someone else
-    if (cleanPhone) {
-      const [existingPhone] = await pool.query(
-        'SELECT UserId FROM Users WHERE Phone = ? AND UserId != ? LIMIT 1',
-        [cleanPhone, userId]
-      );
-      if (existingPhone.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Số điện thoại này đã được liên kết với một tài khoản khác.'
-        });
-      }
-    }
-
-    await pool.query(
-      `UPDATE Users 
-       SET FullName = ?, Phone = ?, IdNumber = ?, IdType = ?, DateOfBirth = ?, Gender = ?, UpdatedAt = NOW()
-       WHERE UserId = ?`,
-      [cleanFullName, cleanPhone, cleanIdNumber, cleanIdType, cleanDateOfBirth, cleanGender, userId]
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: 'Cập nhật hồ sơ thành công.'
-    });
-  } catch (error) {
-    console.error('Lỗi API updateMe:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi máy chủ khi cập nhật hồ sơ: ' + error.message
-    });
-  }
-};
-
 module.exports = {
   register,
   login,
   getMe,
-  updateMe,
   googleLogin,
   facebookLogin
 };

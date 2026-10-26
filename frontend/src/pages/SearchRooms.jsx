@@ -4,7 +4,6 @@ import MainLayout from '../layouts/MainLayout';
 import RoomDetailModal from '../components/modals/RoomDetailModal';
 import QuickBookingModal from '../components/modals/QuickBookingModal';
 import { searchRoomsApi, getBranchesApi, suggestRoomsApi } from '../api/roomApi';
-import { useSocket } from '../context/SocketContext';
 
 // Helper format VND
 const formatVND = (num) => {
@@ -39,7 +38,6 @@ const formatDisplayDate = (dStr) => {
 };
 
 export default function SearchRooms() {
-  const { subscribe } = useSocket();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -54,29 +52,20 @@ export default function SearchRooms() {
   const [totalGuests, setTotalGuests] = useState(parseInt(searchParams.get('totalGuests'), 10) || 2);
   const [roomsCount, setRoomsCount] = useState(parseInt(searchParams.get('roomsCount'), 10) || 1);
   const [keyword, setKeyword] = useState(searchParams.get('keyword') || '');
-  const [debouncedKeyword, setDebouncedKeyword] = useState(keyword);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedKeyword(keyword);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [keyword]);
 
   // Filter states
   const [priceMax, setPriceMax] = useState(25000000);
-  const [debouncedPriceMax, setDebouncedPriceMax] = useState(priceMax);
-  
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedPriceMax(priceMax);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [priceMax]);
-
-  const [selectedRoomTypes, setSelectedRoomTypes] = useState([]);
+  const [selectedRoomTypes, setSelectedRoomTypes] = useState([
+    'Villa Riêng Tư',
+    'Suite Cao Cấp',
+    'Deluxe Hướng Biển'
+  ]);
   const [selectedView, setSelectedView] = useState('all');
-  const [selectedAmenities, setSelectedAmenities] = useState([]);
+  const [selectedAmenities, setSelectedAmenities] = useState([
+    'Hồ bơi riêng (Private Pool)',
+    'Ban công ngắm hoàng hôn',
+    'Bữa sáng Buffet kèm theo'
+  ]);
   const [selectedRating, setSelectedRating] = useState('all');
   const [sortBy, setSortBy] = useState('price_asc');
 
@@ -84,8 +73,6 @@ export default function SearchRooms() {
   const [branches, setBranches] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const roomsPerPage = 5;
   const [errorMessage, setErrorMessage] = useState('');
   const [validationError, setValidationError] = useState('');
   const [searchEngineMeta, setSearchEngineMeta] = useState(null);
@@ -93,24 +80,6 @@ export default function SearchRooms() {
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
-
-  // Trạng thái cuộn trang để xử lý sticky header/search bar
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        setIsHeaderVisible(false);
-      } else {
-        setIsHeaderVisible(true);
-      }
-      setLastScrollY(currentScrollY);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
 
   // Suggester Autocomplete state (hỗ trợ hiển thị gợi ý từ 1-2 ký tự)
   const [suggestions, setSuggestions] = useState(null);
@@ -127,8 +96,7 @@ export default function SearchRooms() {
 
     const timer = setTimeout(async () => {
       try {
-        const res = await suggestRoomsApi(keyword);
-        const data = res?.data || res;
+        const data = await suggestRoomsApi(keyword);
         if (data && data.totalCount > 0) {
           setSuggestions(data);
           setShowSuggestions(true);
@@ -192,7 +160,6 @@ export default function SearchRooms() {
   const executeSearch = async (overrideParams = {}) => {
     setValidationError('');
     setErrorMessage('');
-    setCurrentPage(1);
 
     const targetCheckIn = overrideParams.checkInDate || checkInDate;
     const targetCheckOut = overrideParams.checkOutDate || checkOutDate;
@@ -238,7 +205,7 @@ export default function SearchRooms() {
       checkOutDate: targetCheckOut,
       totalGuests: overrideParams.totalGuests || totalGuests,
       keyword: targetKeyword,
-      priceMax: debouncedPriceMax,
+      priceMax,
       roomTypes: selectedRoomTypes,
       view: selectedView,
       amenities: selectedAmenities,
@@ -277,32 +244,10 @@ export default function SearchRooms() {
     }
   };
 
-  // Tự động tìm kiếm lần đầu khi mount và khi bộ lọc / từ khóa thay đổi
+  // Tự động tìm kiếm lần đầu khi mount
   useEffect(() => {
     executeSearch();
-  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, debouncedPriceMax, debouncedKeyword]);
-
-  // Lắng nghe sự kiện WebSocket Realtime để đồng bộ kho phòng trống tức thì
-  useEffect(() => {
-    const handleRoomEvent = () => {
-      // Tự động cập nhật lại kết quả tìm kiếm khi có phòng thay đổi trạng thái hoặc có người đặt
-      executeSearch();
-    };
-
-    const unsubStatus = subscribe('ROOM_STATUS_CHANGED', handleRoomEvent);
-    const unsubBatch = subscribe('ROOMS_BATCH_UPDATED', handleRoomEvent);
-    const unsubLockAcq = subscribe('ROOM_LOCK_ACQUIRED', handleRoomEvent);
-    const unsubLockRel = subscribe('ROOM_LOCK_RELEASED', handleRoomEvent);
-    const unsubBooking = subscribe('BOOKING_CREATED', handleRoomEvent);
-
-    return () => {
-      unsubStatus();
-      unsubBatch();
-      unsubLockAcq();
-      unsubLockRel();
-      unsubBooking();
-    };
-  }, [subscribe]);
+  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, priceMax]);
 
   // Xử lý Wishlist
   const toggleWishlist = (roomId) => {
@@ -337,17 +282,6 @@ export default function SearchRooms() {
   const currentBranchObj = branches.find(b => String(b.BranchId) === String(branchId));
   const currentBranchName = currentBranchObj ? currentBranchObj.BranchName : 'Grand Horizon Phú Quốc';
 
-  // Pagination logic
-  const indexOfLastRoom = currentPage * roomsPerPage;
-  const indexOfFirstRoom = indexOfLastRoom - roomsPerPage;
-  const currentRooms = rooms.slice(indexOfFirstRoom, indexOfLastRoom);
-  const totalPages = Math.ceil(rooms.length / roomsPerPage);
-
-  const handlePageChange = (pageNumber) => {
-    setCurrentPage(pageNumber);
-    window.scrollTo({ top: 300, behavior: 'smooth' });
-  };
-
   return (
     <MainLayout
       wishlistCount={wishlist.length}
@@ -358,14 +292,14 @@ export default function SearchRooms() {
       <div className="flex flex-col w-full">
 
         {/* ══════════════════════════════════════════════════════════════
-            DYNAMIC SEARCH STRIP
+            DYNAMIC SEARCH STRIP (STICKY TOP-20)
         ══════════════════════════════════════════════════════════════ */}
-        <section className={`sticky z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-md py-space-md px-margin border-b border-[#dedad0]/50 transition-all duration-300 ${isHeaderVisible ? 'top-20' : 'top-0'}`}>
+        <section className="sticky top-20 z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-md py-space-md px-margin border-b border-[#dedad0]/50">
           <div className="max-w-[1440px] mx-auto flex flex-col gap-space-sm">
-
+            
             {/* Thanh tìm kiếm chính */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-md items-center">
-
+              
               {/* 1. Destination / Khu nghỉ dưỡng */}
               <div className="lg:col-span-3 flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-low rounded-xl border border-transparent hover:border-secondary/30 transition-colors">
                 <span className="material-symbols-outlined text-secondary text-[24px]">location_on</span>
@@ -411,7 +345,7 @@ export default function SearchRooms() {
                           value={checkInDate}
                           onChange={(e) => handleCheckInChange(e.target.value)}
                           onClick={(e) => {
-                            try { e.target.showPicker(); } catch (_) { }
+                            try { e.target.showPicker(); } catch (_) {}
                           }}
                           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                           title="Chọn ngày nhận phòng (dd/mm/yyyy)"
@@ -428,7 +362,7 @@ export default function SearchRooms() {
                           value={checkOutDate}
                           onChange={(e) => handleCheckOutChange(e.target.value)}
                           onClick={(e) => {
-                            try { e.target.showPicker(); } catch (_) { }
+                            try { e.target.showPicker(); } catch (_) {}
                           }}
                           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                           title="Chọn ngày trả phòng (dd/mm/yyyy)"
@@ -443,7 +377,7 @@ export default function SearchRooms() {
               </div>
 
               {/* 3. Guest & Room Selector */}
-              <div
+              <div 
                 onClick={() => setGuestPickerOpen(!guestPickerOpen)}
                 className="lg:col-span-3 relative flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-low rounded-xl cursor-pointer hover:bg-surface-container transition-colors border border-transparent hover:border-secondary/30"
               >
@@ -458,7 +392,7 @@ export default function SearchRooms() {
 
                 {/* Popover chọn số khách */}
                 {guestPickerOpen && (
-                  <div
+                  <div 
                     onClick={(e) => e.stopPropagation()}
                     className="absolute top-full left-0 right-0 mt-2 p-4 bg-white rounded-xl shadow-xl border border-[#dedad0] z-50 flex flex-col gap-3"
                   >
@@ -517,10 +451,7 @@ export default function SearchRooms() {
               <div className="lg:col-span-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowSuggestions(false);
-                    executeSearch({ keyword });
-                  }}
+                  onClick={() => executeSearch()}
                   disabled={loading}
                   className="w-full h-12 flex items-center justify-center gap-space-xs bg-primary text-on-primary rounded-xl font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm active:scale-98 disabled:opacity-50"
                 >
@@ -533,41 +464,31 @@ export default function SearchRooms() {
             </div>
 
             {/* Keyword Input & Search Engine indicator strip */}
-            <div className="flex flex-col gap-2.5 pt-3 mt-1 border-t border-[#dedad0]/80">
-              <div
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-space-sm pt-1 border-t border-dashed border-[#dedad0]/60">
+              <div 
                 ref={searchInputContainerRef}
-                className="relative w-full"
+                className="relative w-full sm:w-auto flex-1"
               >
-                <div className="group flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-secondary/35 hover:border-secondary shadow-xs hover:shadow-md focus-within:ring-2 focus-within:ring-secondary/20 focus-within:border-secondary transition-all">
-                  <div className="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary shrink-0 group-focus-within:bg-secondary group-focus-within:text-white transition-colors">
-                    <span className="material-symbols-outlined text-[20px]">manage_search</span>
-                  </div>
-                  
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <span className="text-[10px] uppercase font-bold text-secondary/80 tracking-wider">
-                      Tìm kiếm theo từ khóa thông minh
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Nhập tên phòng, tiện ích (Deluxe, Villa, Hồ bơi, Jacuzzi, Buffet, Bãi biển...)"
-                      value={keyword}
-                      onChange={(e) => setKeyword(e.target.value)}
-                      onFocus={() => {
-                        if (suggestions && suggestions.totalCount > 0) setShowSuggestions(true);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          setShowSuggestions(false);
-                          executeSearch({ keyword });
-                        } else if (e.key === 'Escape') {
-                          setShowSuggestions(false);
-                        }
-                      }}
-                      className="bg-transparent text-sm w-full text-on-surface font-semibold focus:outline-none placeholder:text-outline/60 placeholder:font-normal"
-                    />
-                  </div>
-
+                <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-lg border border-transparent focus-within:border-secondary/40">
+                  <span className="material-symbols-outlined text-[18px] text-secondary">manage_search</span>
+                  <input
+                    type="text"
+                    placeholder="Tìm theo từ khóa (Deluxe, Villa, Hồ bơi, Bãi biển, Jacuzzi, Buffet...)"
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    onFocus={() => {
+                      if (suggestions && suggestions.totalCount > 0) setShowSuggestions(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setShowSuggestions(false);
+                        executeSearch();
+                      } else if (e.key === 'Escape') {
+                        setShowSuggestions(false);
+                      }
+                    }}
+                    className="bg-transparent text-xs w-full text-on-surface focus:outline-none placeholder:text-outline"
+                  />
                   {keyword && (
                     <button
                       type="button"
@@ -577,24 +498,11 @@ export default function SearchRooms() {
                         setShowSuggestions(false);
                         executeSearch({ keyword: '' });
                       }}
-                      className="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high text-outline hover:text-on-surface flex items-center justify-center transition-colors shrink-0"
-                      title="Xóa từ khóa"
+                      className="text-outline hover:text-on-surface"
                     >
                       <span className="material-symbols-outlined text-[16px]">close</span>
                     </button>
                   )}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSuggestions(false);
-                      executeSearch({ keyword });
-                    }}
-                    className="px-4 py-2 bg-secondary text-white rounded-lg text-xs font-bold hover:bg-primary transition-all flex items-center gap-1.5 shrink-0 shadow-sm active:scale-95 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">search</span>
-                    <span>Tìm</span>
-                  </button>
                 </div>
 
                 {/* Autocomplete Suggestions Dropdown (Hiển thị ngay khi gõ từ 1-2 ký tự) */}
@@ -703,50 +611,21 @@ export default function SearchRooms() {
                 )}
               </div>
 
-              {/* Quick Keyword Pills (Gợi ý tìm nhanh một chạm) */}
-              <div className="flex items-center gap-2 pt-0.5 flex-wrap text-xs">
-                <span className="font-semibold text-outline text-[11px] uppercase tracking-wider flex items-center gap-1 shrink-0">
-                  <span className="material-symbols-outlined text-[15px] text-secondary">local_fire_department</span>
-                  Gợi ý tìm nhanh:
-                </span>
-                {[
-                  { label: 'Deluxe', kw: 'Deluxe' },
-                  { label: 'Villa Biệt Thự', kw: 'Villa' },
-                  { label: 'Hồ Bơi Riêng', kw: 'Hồ bơi' },
-                  { label: 'Bồn Tắm Jacuzzi', kw: 'Jacuzzi' },
-                  { label: 'Kèm Buffet Sáng', kw: 'Buffet' },
-                  { label: 'Trực Diện Biển', kw: 'Biển' }
-                ].map((tag) => (
-                  <button
-                    key={tag.kw}
-                    type="button"
-                    onClick={() => {
-                      setKeyword(tag.kw);
-                      executeSearch({ keyword: tag.kw });
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer shadow-2xs ${
-                      keyword.toLowerCase() === tag.kw.toLowerCase()
-                        ? 'bg-secondary text-white border-secondary shadow-sm scale-105'
-                        : 'bg-white hover:bg-secondary/10 hover:border-secondary/40 text-on-surface border-[#dedad0]/80'
-                    }`}
-                  >
-                    {tag.label}
-                  </button>
-                ))}
-                {keyword && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setKeyword('');
-                      executeSearch({ keyword: '' });
-                    }}
-                    className="text-[11px] text-error hover:underline font-semibold ml-1 cursor-pointer flex items-center gap-0.5"
-                  >
-                    <span className="material-symbols-outlined text-[13px]">refresh</span>
-                    <span>Xóa bộ lọc</span>
-                  </button>
-                )}
-              </div>
+              {/* Search Engine Badge */}
+              {searchEngineMeta && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-[11px] text-on-tertiary-container font-semibold bg-[#e8f7f0] px-3 py-1 rounded-full shrink-0 border border-[#b7eb8f]/40">
+                    <span className="material-symbols-outlined text-[15px]">neurology</span>
+                    <span>Search Engine: {searchEngineMeta.engine} ({searchEngineMeta.executionTimeMs}ms)</span>
+                  </div>
+                  {searchEngineMeta.isFullWidthInput && (
+                    <div className="flex items-center gap-1 text-[11px] text-[#d48806] font-semibold bg-[#fffbe6] border border-[#ffe58f] px-2.5 py-1 rounded-full shrink-0 animate-fade-in">
+                      <span className="material-symbols-outlined text-[14px]">translate</span>
+                      <span>Full-width (全角): "{searchEngineMeta.query}" ➔ Half-width: "{searchEngineMeta.normalizedQuery}"</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Thông báo lỗi validation nguyên văn */}
@@ -763,7 +642,7 @@ export default function SearchRooms() {
             MAIN CONTENT LAYOUT (2-COLUMN RESPONSIVE)
         ══════════════════════════════════════════════════════════════ */}
         <div className="w-full px-margin py-space-xl max-w-[1440px] mx-auto">
-
+          
           {/* Breadcrumb & Editorial Sub-header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-space-lg gap-space-sm">
             <div>
@@ -787,7 +666,7 @@ export default function SearchRooms() {
 
           {/* 2-Column Responsive Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
-
+            
             {/* ─── LEFT SIDEBAR FILTERS (25% -> 3 of 12 cols) ─── */}
             <aside className="lg:col-span-3 flex flex-col gap-space-lg bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-[#dedad0]/40">
               <div className="flex items-center justify-between pb-space-sm border-b border-surface-container">
@@ -871,10 +750,11 @@ export default function SearchRooms() {
                       key={v.id}
                       type="button"
                       onClick={() => setSelectedView(v.id)}
-                      className={`px-space-md py-space-xs rounded-full font-label-md text-label-md transition-colors ${selectedView === v.id
+                      className={`px-space-md py-space-xs rounded-full font-label-md text-label-md transition-colors ${
+                        selectedView === v.id
                           ? 'bg-secondary text-on-secondary shadow-sm font-bold'
                           : 'bg-surface-container-low text-on-surface hover:bg-surface-container'
-                        }`}
+                      }`}
                     >
                       {v.label}
                     </button>
@@ -975,7 +855,7 @@ export default function SearchRooms() {
 
             {/* ─── RIGHT RESULTS CONTENT (75% -> 9 of 12 cols) ─── */}
             <main className="lg:col-span-9 flex flex-col gap-space-lg">
-
+              
               {/* Results Header & Sort Controls */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-space-md bg-surface-container-lowest rounded-xl shadow-sm gap-space-sm border border-[#dedad0]/40">
                 <div className="flex items-center gap-space-xs flex-wrap">
@@ -1004,30 +884,33 @@ export default function SearchRooms() {
                     <button
                       type="button"
                       onClick={() => setSortBy('price_asc')}
-                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${sortBy === 'price_asc'
+                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${
+                        sortBy === 'price_asc'
                           ? 'bg-surface-container-lowest text-secondary shadow-sm font-bold'
                           : 'text-on-surface-variant hover:text-on-surface'
-                        }`}
+                      }`}
                     >
                       Giá tốt nhất
                     </button>
                     <button
                       type="button"
                       onClick={() => setSortBy('rating_desc')}
-                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${sortBy === 'rating_desc'
+                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${
+                        sortBy === 'rating_desc'
                           ? 'bg-surface-container-lowest text-secondary shadow-sm font-bold'
                           : 'text-on-surface-variant hover:text-on-surface'
-                        }`}
+                      }`}
                     >
                       Đánh giá cao
                     </button>
                     <button
                       type="button"
                       onClick={() => setSortBy('popular')}
-                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${sortBy === 'popular'
+                      className={`px-space-sm py-1 rounded font-label-md text-label-md transition-colors ${
+                        sortBy === 'popular'
                           ? 'bg-surface-container-lowest text-secondary shadow-sm font-bold'
                           : 'text-on-surface-variant hover:text-on-surface'
-                        }`}
+                      }`}
                     >
                       Phổ biến nhất
                     </button>
@@ -1057,7 +940,7 @@ export default function SearchRooms() {
 
               {/* Danh sách phòng dạng thẻ ngang (Horizontal Cards) */}
               <div className="flex flex-col gap-space-lg">
-                {currentRooms.map((room) => {
+                {rooms.map((room) => {
                   const isSaved = wishlist.includes(room.RoomTypeId);
                   return (
                     <article
@@ -1091,8 +974,9 @@ export default function SearchRooms() {
                         <button
                           type="button"
                           onClick={() => toggleWishlist(room.RoomTypeId)}
-                          className={`absolute bottom-4 right-4 w-9 h-9 rounded-full bg-surface-container-lowest/90 flex items-center justify-center transition-colors shadow-sm ${isSaved ? 'text-red-500' : 'text-on-surface hover:text-secondary'
-                            }`}
+                          className={`absolute bottom-4 right-4 w-9 h-9 rounded-full bg-surface-container-lowest/90 flex items-center justify-center transition-colors shadow-sm ${
+                            isSaved ? 'text-red-500' : 'text-on-surface hover:text-secondary'
+                          }`}
                         >
                           <span className="material-symbols-outlined text-[18px]">
                             {isSaved ? 'favorite' : 'favorite_border'}
@@ -1124,10 +1008,7 @@ export default function SearchRooms() {
                           </div>
 
                           {/* Room Name & Description */}
-                          <h3
-                            onClick={() => navigate(`/rooms/${room.RoomTypeId}`)}
-                            className="font-headline-md text-headline-md text-on-surface group-hover:text-secondary transition-colors cursor-pointer"
-                          >
+                          <h3 className="font-headline-md text-headline-md text-on-surface group-hover:text-secondary transition-colors">
                             {room.TypeName}
                           </h3>
                           <p className="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">
@@ -1207,15 +1088,15 @@ export default function SearchRooms() {
                           <div className="flex items-center gap-space-sm">
                             <button
                               type="button"
-                              onClick={() => navigate(`/rooms/${room.RoomTypeId}`)}
+                              onClick={() => setSelectedRoomForDetail(room)}
                               className="hidden sm:inline-flex items-center justify-center px-space-md py-3 rounded-xl bg-surface-container-low text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors border border-[#dedad0]/40"
                             >
                               Chi Tiết Phòng
                             </button>
                             <button
                               type="button"
-                              onClick={() => navigate(`/dat-phong?roomTypeId=${room.RoomTypeId}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}&units=${roomsCount}&adults=${totalGuests}`)}
-                              className="px-space-xl py-3 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm flex items-center gap-space-xs cursor-pointer"
+                              onClick={() => setSelectedRoomForBooking(room)}
+                              className="px-space-xl py-3 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm flex items-center gap-space-xs"
                             >
                               <span>Chọn Phòng</span>
                               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
@@ -1231,57 +1112,40 @@ export default function SearchRooms() {
               {/* Pagination & Direct Assistance Strip */}
               <div className="flex flex-col md:flex-row items-center justify-between gap-space-md pt-space-md border-t border-[#dedad0]/40">
                 {/* Page Selectors */}
-                {totalPages > 1 ? (
-                  <div className="flex items-center gap-space-xs">
-                    <button
-                      type="button"
-                      disabled={currentPage === 1}
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      className="h-10 px-3 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface flex items-center justify-center gap-1 shadow-sm disabled:opacity-40 disabled:hover:bg-surface-container-lowest transition-colors font-label-md"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">chevron_left</span>
-                      <span className="hidden sm:inline">Trang trước</span>
-                    </button>
-
-                    {[...Array(totalPages)].map((_, index) => {
-                      const pageNum = index + 1;
-                      if (totalPages > 5) {
-                        if (pageNum !== 1 && pageNum !== totalPages && Math.abs(currentPage - pageNum) > 1) {
-                          if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                            return <span key={`ellipsis-${pageNum}`} className="px-space-xs text-outline">...</span>;
-                          }
-                          return null;
-                        }
-                      }
-
-                      return (
-                        <button
-                          key={pageNum}
-                          type="button"
-                          onClick={() => handlePageChange(pageNum)}
-                          className={`w-10 h-10 rounded-xl font-label-lg text-label-lg shadow-sm transition-colors ${currentPage === pageNum
-                              ? 'bg-primary text-on-primary font-bold'
-                              : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container'
-                            }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-
-                    <button
-                      type="button"
-                      disabled={currentPage === totalPages}
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      className="h-10 px-3 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface flex items-center justify-center gap-1 shadow-sm disabled:opacity-40 disabled:hover:bg-surface-container-lowest transition-colors font-label-md"
-                    >
-                      <span className="hidden sm:inline">Trang sau</span>
-                      <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div></div>
-                )}
+                <div className="flex items-center gap-space-xs">
+                  <button
+                    type="button"
+                    disabled
+                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface-variant flex items-center justify-center shadow-sm disabled:opacity-40"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="w-10 h-10 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg shadow-sm font-bold"
+                  >
+                    1
+                  </button>
+                  <button
+                    type="button"
+                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors shadow-sm"
+                  >
+                    2
+                  </button>
+                  <button
+                    type="button"
+                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors shadow-sm"
+                  >
+                    3
+                  </button>
+                  <span className="px-space-xs text-outline">...</span>
+                  <button
+                    type="button"
+                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                  </button>
+                </div>
 
                 {/* Direct Concierge Help Desk Callout */}
                 <div className="flex items-center gap-space-md bg-surface-container-lowest px-space-lg py-space-sm rounded-xl shadow-sm border border-[#dedad0]/40">

@@ -722,9 +722,18 @@ export default function CheckOutDesk() {
                         KIỂM PHÒNG &amp; TIÊU DÙNG MINIBAR
                       </h3>
                     </div>
-                    <span className="text-[11px] text-[#8a8782] uppercase font-mono">
-                      MÃ PHÂN HỆ: AUD-{stay.RoomNumber}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        to={`/admin/minibar/${selectedStayId}`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#fbf8f2] hover:bg-[#dedad0]/40 border border-[#dedad0] text-[11px] font-bold text-[#b9a277] cursor-pointer transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">kitchen</span>
+                        Mở Bảng Kiểm Minibar (Spec 12)
+                      </Link>
+                      <span className="text-[11px] text-[#8a8782] uppercase font-mono">
+                        MÃ PHÂN HỆ: AUD-{stay.RoomNumber}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Thanh Xác Thực Chữ Ký Buồng Phòng */}

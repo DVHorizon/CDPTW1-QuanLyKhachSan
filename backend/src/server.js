@@ -12,8 +12,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Phục vụ tệp tĩnh ảnh CCCD, thẻ khách và chữ ký số
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
@@ -71,6 +71,15 @@ app.use('/api/v1/check-out', checkOutRoutes);
 app.use('/api/check-out', checkOutRoutes);
 app.use('/api/v1/folio', checkOutRoutes);
 
+// Route Quản lý Minibar phòng (FEAT-MINIBAR-01 - Spec 12)
+const minibarRoutes = require('./routes/admin/minibarRoutes');
+app.use('/api/v1/minibar', minibarRoutes);
+app.use('/api/minibar', minibarRoutes);
+app.use('/api/v1/stays/:stayId/minibar', (req, res, next) => {
+  req.url = `/stays/${req.params.stayId}${req.url === '/' ? '' : req.url}`;
+  return minibarRoutes(req, res, next);
+});
+
 // Route Gia hạn lưu trú & Đổi phòng (Stay Extension & Room Move Terminal - Spec 9 & Spec 10)
 const { router: roomMoveRouter } = require('./routes/admin/roomMoveRoutes');
 app.use('/api/v1/room-moves', roomMoveRouter);
@@ -86,6 +95,25 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/v1/users', require('./routes/users'));
 app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/v1/roles', require('./routes/roleRoutes'));
+
+// ─── Operations & Smart Lock routes (tuyen/7) ─────────────────────────────
+// Route Audit Logs & Fraud Prevention
+app.use('/api/audit', require('./routes/auditLogRoutes'));
+
+// Route Tiếp Thị & Chăm Sóc Khách Hàng Đa Kênh (Marketing Automation)
+app.use('/api/marketing', require('./routes/marketingAutomationRoutes'));
+
+// Route Quản Lý Kho Đồ Tiêu Hao, Minibar & Luân Chuyển Đồ Vải (Inventory & Linen)
+app.use('/api/housekeeping/inventory', require('./routes/housekeepingInventoryRoutes'));
+
+// Route Tiếp Nhận Sự Cố & Bảo Trì Kỹ Thuật Buồng Phòng (Engineering & Maintenance Ticketing)
+app.use('/api/maintenance', require('./routes/maintenanceRoutes'));
+
+// Route Quản Lý Đồ Thất Lạc & Bỏ Quên (Lost & Found Management)
+app.use('/api/housekeeping/lost-and-found', require('./routes/lostAndFoundRoutes'));
+
+// Route Khóa Cửa Điện Tử Thông Minh IoT (E-Key & Smart Lock Management)
+app.use('/api/smart-lock', require('./routes/smartLockRoutes'));
 
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
@@ -150,9 +178,15 @@ try {
   console.warn('⚠️ WebSocket init warning:', wsErr.message);
 }
 
+const { AuditLog } = require('./models');
+
 // ─── Start server ──────────────────────────────────────────────────────────
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`✅ Backend server with WebSocket running on port ${PORT}`);
   console.log(`   Modules: /api/v1/{guest|pms|services|fnb|operations}`);
   console.log(`   Legacy:  /api/{loai-phong|phong|v1/auth|rooms|users}`);
+  if (AuditLog && AuditLog.initDatabaseTriggers) {
+    await AuditLog.initDatabaseTriggers();
+    console.log('[Security] Đã kích hoạt Triggers bảo vệ bất biến (WORM) cho Audit Log.');
+  }
 });

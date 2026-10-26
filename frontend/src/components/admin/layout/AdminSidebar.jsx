@@ -15,7 +15,19 @@ const ALL_NAV_ITEMS = [
   { icon: "how_to_reg", label: "Check-in Tại Quầy (Express)", to: "/admin/check-in", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "more_time", label: "Gia Hạn Lưu Trú & Đổi Phòng", to: "/admin/extend-stay", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "logout", label: "Check-Out & Kiểm Phòng", to: "/admin/check-out", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "kitchen", label: "Quản Lý Minibar Phòng", to: "/admin/minibar", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
+  
+  // tuyen/7 Operations, Smart Lock, Housekeeping & Maintenance
+  { icon: "inventory_2", label: "Kho Đồ Tiêu Hao & Minibar", to: "/admin/housekeeping/inventory", allowedRoles: ['Admin', 'Housekeeping', 'Receptionist'] },
+  { icon: "dry_cleaning", label: "Đồ Vải & Chu Kỳ Giặt Ủi", to: "/admin/housekeeping/linen", allowedRoles: ['Admin', 'Housekeeping'] },
+  { icon: "search_hands_free", label: "Đồ Thất Lạc & Bỏ Quên", to: "/admin/housekeeping/lost-and-found", allowedRoles: ['Admin', 'Housekeeping', 'Receptionist'] },
+  { icon: "engineering", label: "Bảo Trì & Kỹ Thuật", to: "/admin/engineering", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
+  { icon: "key", label: "Khóa Thông Minh & E-Key", to: "/admin/security/smart-lock", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "security", label: "Kiểm Soát Nội Bộ & Nhật Ký", to: "/admin/audit-logs", allowedRoles: ['Admin'] },
+  { icon: "event_available", label: "Điều Độ Lịch Trực Ca", to: "/admin/roster", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "campaign", label: "Tiếp Thị & CSKH (Marketing)", to: "/admin/marketing", allowedRoles: ['Admin', 'Receptionist'] },
+
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "event_available", label: "Tiếp Nhận & Đặt Dịch Vụ", to: "/admin/services/dispatch", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "pending_actions", label: "Tiến Độ Đơn Dịch Vụ", to: "/admin/services/orders", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },

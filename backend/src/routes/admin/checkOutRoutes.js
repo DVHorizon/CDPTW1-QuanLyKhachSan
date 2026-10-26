@@ -289,30 +289,58 @@ const handleCheckoutPreview = async (req, res) => {
     const pendingDamageCount = parsedDamageItems.filter(d => d.Status === 'SUBMITTED').length;
     const disputedDamageCount = parsedDamageItems.filter(d => d.Status === 'DISPUTED').length;
 
-    // 6. Lấy tiêu dùng Minibar
-    const [minibarUsages] = await pool.query(
-      `SELECT
-        mu.UsageId,
-        mu.ItemId,
-        mu.Quantity,
-        mu.UnitPrice,
-        mu.TotalAmount,
-        ii.ItemName,
-        ii.Unit
-       FROM MinibarUsages mu
-       LEFT JOIN InventoryItems ii ON mu.ItemId = ii.ItemId
-       WHERE mu.StayId = ?`,
+    // 6. Lấy tiêu dùng Minibar theo Spec 12 (FEAT-MINIBAR-01)
+    const [minibarInspections] = await pool.query(
+      "SELECT * FROM MinibarInspections WHERE StayId = ? ORDER BY InspectionId DESC LIMIT 1",
       [stayId]
     );
-
-    let activeMinibarList = DEFAULT_MINIBAR_ITEMS;
     let minibarTotal = 0;
+    let minibarInspectionData = null;
+    let activeMinibarList = DEFAULT_MINIBAR_ITEMS;
 
-    if (minibarUsages.length > 0) {
-      minibarTotal = minibarUsages.reduce((sum, m) => sum + Number(m.TotalAmount || 0), 0);
+    if (minibarInspections.length > 0) {
+      minibarInspectionData = minibarInspections[0];
+      minibarTotal = Number(minibarInspections[0].Subtotal || minibarInspections[0].TotalAmount || 0);
+      const [mbLines] = await pool.query(
+        "SELECT * FROM MinibarInspectionLines WHERE InspectionId = ?",
+        [minibarInspections[0].InspectionId]
+      );
+      if (mbLines.length > 0) {
+        activeMinibarList = mbLines.map((l) => ({
+          id: l.LineId,
+          productId: l.ProductId,
+          name: l.ProductName,
+          category: l.Category,
+          unit: l.Unit,
+          openingQty: Number(l.OpeningQty),
+          replenishedQty: Number(l.ReplenishedQty),
+          remainingQty: Number(l.RemainingQty),
+          defaultQty: Number(l.ConsumedQty),
+          unitPrice: Number(l.UnitPrice),
+          lineAmount: Number(l.LineAmount),
+          varianceReason: l.VarianceReason,
+          isException: Boolean(l.IsException),
+          status: l.Status
+        }));
+      }
     } else {
-      // Dùng danh mục mặc định chuẩn wireframe
-      minibarTotal = DEFAULT_MINIBAR_ITEMS.reduce((sum, item) => sum + (item.defaultQty * item.unitPrice), 0);
+      const [minibarUsages] = await pool.query(
+        `SELECT
+          mu.UsageId,
+          mu.ItemId,
+          mu.Quantity,
+          mu.UnitPrice,
+          mu.TotalAmount,
+          ii.ItemName,
+          ii.Unit
+         FROM MinibarUsages mu
+         LEFT JOIN InventoryItems ii ON mu.ItemId = ii.ItemId
+         WHERE mu.StayId = ?`,
+        [stayId]
+      );
+      if (minibarUsages.length > 0) {
+        minibarTotal = minibarUsages.reduce((sum, m) => sum + Number(m.TotalAmount || 0), 0);
+      }
     }
 
     // 7. Lấy các dịch vụ F&B và dịch vụ phòng phát sinh
@@ -386,6 +414,7 @@ const handleCheckoutPreview = async (req, res) => {
         },
         minibarItems: activeMinibarList,
         minibarTotal,
+        minibarInspection: minibarInspectionData,
         fnbOrders,
         fnbTotal,
         folioLedger: {
@@ -753,6 +782,20 @@ const handleCompleteCheckout = async (req, res) => {
       });
     }
 
+    // 3b. Kiểm tra trạng thái kiểm kê Minibar (FEAT-MINIBAR-01 - Spec 12 Test Case 15)
+    const [pendingMinibars] = await conn.query(
+      "SELECT * FROM MinibarInspections WHERE StayId = ? AND Status = 'SUBMITTED' ORDER BY InspectionId DESC LIMIT 1",
+      [stayId]
+    );
+    if (pendingMinibars.length > 0 && !req.body.overrideMinibar) {
+      await conn.rollback();
+      return res.status(400).json({
+        success: false,
+        errorCode: 'MINIBAR_0009_CHECKOUT_BLOCKED',
+        message: 'Chưa hoàn tất kiểm kê minibar. Vui lòng xác nhận hoặc chọn phương án xử lý được phép.'
+      });
+    }
+
     // 4. Lấy chính sách phụ thu trả trễ
     const [policies] = await conn.query(
       'SELECT * FROM LateFeePolicies WHERE IsActive = 1 ORDER BY PolicyId DESC LIMIT 1'
@@ -782,14 +825,34 @@ const handleCompleteCheckout = async (req, res) => {
     const keycardPenalty = inspection ? Number(inspection.KeycardLossPenalty || 0) : 0;
     const linenDamageFee = inspection ? Number(inspection.LinenDamageFee || 0) : 0;
 
-    // Lấy tiêu dùng minibar
-    const [minibarRows] = await conn.query(
-      'SELECT * FROM MinibarUsages WHERE StayId = ?',
+    // Lấy tiêu dùng minibar theo Spec 12 (FEAT-MINIBAR-01)
+    let minibarTotal = 0;
+    const [mbInspections] = await conn.query(
+      "SELECT * FROM MinibarInspections WHERE StayId = ? AND Status = 'CONFIRMED' ORDER BY InspectionId DESC LIMIT 1",
       [stayId]
     );
-    const minibarTotal = minibarRows.length > 0
-      ? minibarRows.reduce((sum, m) => sum + Number(m.TotalAmount || 0), 0)
-      : DEFAULT_MINIBAR_ITEMS.reduce((sum, i) => sum + (i.defaultQty * i.unitPrice), 0);
+    if (mbInspections.length > 0) {
+      minibarTotal = Number(mbInspections[0].Subtotal || mbInspections[0].TotalAmount || 0);
+    } else {
+      const [minibarRows] = await conn.query(
+        'SELECT * FROM MinibarUsages WHERE StayId = ?',
+        [stayId]
+      );
+      if (minibarRows.length > 0) {
+        minibarTotal = minibarRows.reduce((sum, m) => sum + Number(m.TotalAmount || 0), 0);
+      } else {
+        minibarTotal = DEFAULT_MINIBAR_ITEMS.reduce((sum, i) => sum + (i.defaultQty * i.unitPrice), 0);
+      }
+    }
+
+    // Lấy các đơn F&B gộp vào tiền phòng (RoomInvoice)
+    const [fnbOrders] = await conn.query(
+      `SELECT FoodOrderId, TotalAmount, PaymentMode, Status
+       FROM FoodOrders
+       WHERE StayId = ? AND PaymentMode = 'RoomInvoice' AND Status != 'Cancelled'`,
+      [stayId]
+    );
+    const fnbTotal = fnbOrders.reduce((sum, o) => sum + Number(o.TotalAmount || 0), 0);
 
     // 7. Cập nhật hóa đơn Invoice & InvoiceDetail
     const [existInvoices] = await conn.query(
@@ -805,7 +868,7 @@ const handleCompleteCheckout = async (req, res) => {
     const roomChargeTotal = roomRate * nights;
     const resortFee = 150000 * nights;
 
-    const subtotal = roomChargeTotal + resortFee + minibarTotal + lateCalc.lateFeeAmount + approvedDamageTotal + linenDamageFee + keycardPenalty;
+    const subtotal = roomChargeTotal + resortFee + minibarTotal + fnbTotal + lateCalc.lateFeeAmount + approvedDamageTotal + linenDamageFee + keycardPenalty;
     const vatRate = Number(policy.TaxRate || 10);
     const vatAmount = Math.round(subtotal * (vatRate / 100));
     const totalAmount = subtotal + vatAmount;
@@ -845,6 +908,16 @@ const handleCompleteCheckout = async (req, res) => {
       { type: 'ResortFee', desc: `Phí tiện ích & dịch vụ nghỉ dưỡng (${nights} đêm)`, qty: nights, unit: 150000, total: resortFee },
       { type: 'Minibar', desc: `Tiêu dùng minibar & đồ uống tại phòng`, qty: 1, unit: minibarTotal, total: minibarTotal }
     ];
+
+    if (fnbTotal > 0) {
+      details.push({
+        type: 'FoodOrder',
+        desc: `Dịch vụ gọi món tại phòng F&B (Gộp hóa đơn phòng - ${fnbOrders.length} đơn)`,
+        qty: fnbOrders.length,
+        unit: fnbTotal,
+        total: fnbTotal
+      });
+    }
 
     if (lateCalc.lateFeeAmount > 0) {
       details.push({
@@ -928,24 +1001,33 @@ const handleCompleteCheckout = async (req, res) => {
     );
 
     // Cập nhật Housekeeping assignment tự động
+    const [housekeeperRows] = await conn.query("SELECT UserId FROM Users WHERE RoleId = 4 LIMIT 1");
+    const housekeeperId = housekeeperRows.length > 0 ? housekeeperRows[0].UserId : 4;
     await conn.query(
-      `INSERT INTO HousekeepingAssignments (RoomId, StayId, Priority, Status, Note)
-       VALUES (?, ?, 1, 'Assigned', 'Dọn phòng sau Check-out. Telemetry dispatched tự động.')`,
-      [stay.RoomId, stayId]
-    ).catch(() => {});
+      `INSERT INTO HousekeepingAssignments (RoomId, UserId, StayId, Priority, Status, Note)
+       VALUES (?, ?, ?, 1, 'Assigned', 'Dọn phòng sau Check-out. Telemetry dispatched tự động.')`,
+      [stay.RoomId, housekeeperId, stayId]
+    ).catch((e) => console.error('Housekeeping assignment error:', e.message));
 
     // 12. Ghi Audit Log an toàn
     await conn.query(
-      `INSERT INTO AuditLogs (UserId, Action, TableName, RecordId, OldValue, NewValue, Note)
-       VALUES (?, 'CHECKOUT_GUEST', 'Stays', ?, ?, ?, ?)`,
+      `INSERT INTO AuditLogs (UserId, ActionType, TableName, RecordId, OldValues, NewValues, ActionTime, IpAddress)
+       VALUES (?, 'CHECKOUT_GUEST', 'Stays', ?, ?, ?, NOW(), ?)`,
       [
         stay.UserId || 1,
         stayId,
         JSON.stringify({ status: 'CheckedIn', roomStatus: 'Clean' }),
-        JSON.stringify({ status: 'CheckedOut', roomStatus: targetRoomStatus, invoiceId, finalBalanceDue, lateFee: lateCalc.lateFeeAmount }),
-        `Hoàn tất checkout phòng ${stay.RoomNumber}. Phương thức thanh toán: ${paymentMethod}`
+        JSON.stringify({
+          status: 'CheckedOut',
+          roomStatus: targetRoomStatus,
+          invoiceId,
+          finalBalanceDue,
+          lateFee: lateCalc.lateFeeAmount,
+          note: `Hoàn tất checkout phòng ${stay.RoomNumber}. Phương thức thanh toán: ${paymentMethod}`
+        }),
+        req.ip || '127.0.0.1'
       ]
-    ).catch(() => {});
+    ).catch((e) => console.error('AuditLog insert error:', e.message));
 
     await conn.commit();
 
@@ -1001,15 +1083,15 @@ const handleFolioAdjustment = async (req, res) => {
     }
 
     await pool.query(
-      `INSERT INTO AuditLogs (UserId, Action, TableName, RecordId, OldValue, NewValue, Note)
-       VALUES (1, 'FEE_OVERRIDE', 'FolioCharges', ?, ?, ?, ?)`,
+      `INSERT INTO AuditLogs (UserId, ActionType, TableName, RecordId, OldValues, NewValues, ActionTime, IpAddress)
+       VALUES (1, 'FEE_OVERRIDE', 'FolioCharges', ?, ?, ?, NOW(), ?)`,
       [
         stayId,
         JSON.stringify({ chargeType, amount: oldAmount }),
-        JSON.stringify({ chargeType, amount: newAmount, approver }),
-        `Lý do điều chỉnh/miễn phí: [${reasonCode}] ${note || ''}`
+        JSON.stringify({ chargeType, amount: newAmount, approver, reasonCode, note: note || '' }),
+        req.ip || '127.0.0.1'
       ]
-    ).catch(() => {});
+    ).catch((e) => console.error('Folio adjustment audit log error:', e.message));
 
     res.json({
       success: true,

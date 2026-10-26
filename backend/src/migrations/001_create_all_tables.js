@@ -10,15 +10,6 @@ module.exports = {
     // Tắt kiểm tra khóa ngoại để tạo bảng an toàn
     await queryInterface.sequelize.query('SET FOREIGN_KEY_CHECKS = 0;');
 
-    // Dọn dẹp sạch sẽ các bảng cũ bị lệch schema từ các nhánh khác (nếu có)
-    const [existingTables] = await queryInterface.sequelize.query('SHOW TABLES;');
-    for (const row of existingTables) {
-      const tableName = Object.values(row)[0];
-      if (tableName !== 'SequelizeMeta') {
-        await queryInterface.sequelize.query(`DROP TABLE IF EXISTS \`${tableName}\`;`);
-      }
-    }
-
     // 1. Roles
     await queryInterface.createTable('Roles', {
       RoleId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
@@ -379,11 +370,6 @@ module.exports = {
       Price: { type: Sequelize.DECIMAL(18, 2), allowNull: false },
       Description: { type: Sequelize.STRING(1000), allowNull: true },
       ImageUrl: { type: Sequelize.STRING(1000), allowNull: true },
-      SKU: { type: Sequelize.STRING(50), allowNull: true },
-      Ingredients: { type: Sequelize.STRING(1000), allowNull: true },
-      Allergens: { type: Sequelize.STRING(500), allowNull: true },
-      ServingTime: { type: Sequelize.STRING(100), allowNull: true },
-      KitchenStation: { type: Sequelize.STRING(100), allowNull: true },
       Status: { type: Sequelize.STRING(30), defaultValue: 'Available' },
       IsDeleted: { type: Sequelize.BOOLEAN, defaultValue: false },
       CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },

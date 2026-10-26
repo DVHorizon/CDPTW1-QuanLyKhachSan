@@ -24,8 +24,8 @@ const verifyToken = async (req, res, next) => {
 
     // Kiểm tra trực tiếp trạng thái tài khoản trong Database
     const [rows] = await pool.query(
-      `SELECT u.UserId, u.RoleId, u.Username, u.FullName, u.Email, u.Phone, 
-              u.Status, u.IsDeleted, u.MustChangePassword,
+      `SELECT u.UserId, u.RoleId, u.FullName, u.Email, u.Phone, 
+              u.Status, u.IsDeleted,
               r.RoleName
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
@@ -58,12 +58,10 @@ const verifyToken = async (req, res, next) => {
       userId: dbUser.UserId,
       roleId: dbUser.RoleId,
       roleName: dbUser.RoleName || decoded.roleName || 'Guest',
-      username: dbUser.Username,
       fullName: dbUser.FullName,
       email: dbUser.Email,
       phone: dbUser.Phone,
-      status: dbUser.Status,
-      mustChangePassword: Boolean(dbUser.MustChangePassword)
+      status: dbUser.Status
     };
 
     next();
@@ -89,7 +87,7 @@ const optionalVerifyToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const [rows] = await pool.query(
-      `SELECT u.UserId, u.RoleId, u.Username, u.FullName, u.Email, u.Status, u.IsDeleted, r.RoleName
+      `SELECT u.UserId, u.RoleId, u.FullName, u.Email, u.Phone, u.Status, u.IsDeleted, r.RoleName
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
        WHERE u.UserId = ? AND u.IsDeleted = 0
@@ -102,9 +100,9 @@ const optionalVerifyToken = async (req, res, next) => {
         userId: rows[0].UserId,
         roleId: rows[0].RoleId,
         roleName: rows[0].RoleName,
-        username: rows[0].Username,
         fullName: rows[0].FullName,
-        email: rows[0].Email
+        email: rows[0].Email,
+        phone: rows[0].Phone
       };
     }
   } catch (_) {
@@ -114,54 +112,80 @@ const optionalVerifyToken = async (req, res, next) => {
 };
 
 /**
- * Middleware kiểm tra quyền cụ thể theo ma trận Permission trong Database
- * Admin (RoleId 1 hoặc RoleName 'Admin') mặc định có toàn quyền.
+ * Middleware kiểm tra phân quyền tài khoản (RBAC) theo mã quyền
+ * Hỗ trợ cả 1 quyền hoặc mảng quyền: requirePermissions('BOOKING_CONFIRM') hoặc requirePermissions(['BOOKING_CONFIRM', 'ROOM_ALLOCATION'])
  */
-const requirePermission = (permissionName) => async (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      code: 'ERROR_0009_UNAUTHENTICATED',
-      message: 'Bạn cần đăng nhập để thực hiện chức năng này'
-    });
-  }
+const requirePermissions = (requiredPermissions) => {
+  const perms = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
 
-  // Quản trị viên hệ thống (Admin) có toàn quyền
-  if (req.user.roleId === 1 || req.user.roleName === 'Admin') {
-    return next();
-  }
+  return async (req, res, next) => {
+    if (!req.user) {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({
+          success: false,
+          code: 'ERROR_0009_UNAUTHENTICATED',
+          message: 'Bạn cần đăng nhập để thực hiện chức năng này'
+        });
+      }
 
-  try {
-    // Kiểm tra trong bảng RolePermissions liên kết với Permissions
-    const [perms] = await pool.query(
-      `SELECT p.PermissionName
-       FROM RolePermissions rp
-       JOIN Permissions p ON rp.PermissionId = p.PermissionId
-       WHERE rp.RoleId = ? AND p.PermissionName = ?
-       LIMIT 1`,
-      [req.user.roleId, permissionName]
-    );
-
-    if (perms.length === 0) {
-      return res.status(403).json({
-        success: false,
-        code: 'ERROR_0010_FORBIDDEN',
-        message: 'Bạn không có quyền thực hiện chức năng này'
-      });
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+      } catch (error) {
+        return res.status(401).json({
+          success: false,
+          code: 'ERROR_0009_UNAUTHENTICATED',
+          message: 'Bạn cần đăng nhập để thực hiện chức năng này'
+        });
+      }
     }
 
-    next();
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi kiểm tra quyền truy cập: ' + err.message
-    });
-  }
+    const { roleId, roleName } = req.user;
+
+    // Quản trị viên (Admin) luôn có toàn quyền
+    if (roleId === 1 || roleName === 'Admin') {
+      return next();
+    }
+
+    // Kiểm tra quyền cụ thể trong CSDL
+    try {
+      const [rows] = await pool.query(
+        `SELECT p.PermissionName
+         FROM RolePermissions rp
+         JOIN Permissions p ON rp.PermissionId = p.PermissionId
+         WHERE rp.RoleId = ? AND p.PermissionName IN (?)`,
+        [roleId, perms]
+      );
+
+      const heldNames = rows.map((r) => r.PermissionName);
+      const hasAll = perms.every((p) => heldNames.includes(p));
+
+      if (!hasAll) {
+        return res.status(403).json({
+          success: false,
+          code: 'ERROR_0010_FORBIDDEN',
+          message: 'Bạn không có quyền thực hiện chức năng này'
+        });
+      }
+
+      next();
+    } catch (err) {
+      console.error('Lỗi kiểm tra quyền truy cập:', err);
+      return res.status(500).json({
+        success: false,
+        code: 'ERROR_0030_ALLOCATION_TRANSACTION',
+        message: 'Lỗi kiểm tra quyền hạn hệ thống'
+      });
+    }
+  };
 };
+
+const requirePermission = requirePermissions;
 
 /**
  * Middleware chỉ cho phép các vai trò nhân viên nội bộ (Admin, Lễ tân, Bếp, Dọn phòng)
- * Chặn khách hàng thông thường (Guest / RoleId 5) truy cập API quản trị
  */
 const requireInternalStaff = (req, res, next) => {
   if (!req.user) {
@@ -209,83 +233,11 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-/**
- * Middleware kiểm tra phân quyền tài khoản (RBAC) theo mã quyền (hỗ trợ single hoặc array)
- * Ví dụ: requirePermissions('BOOKING_CONFIRM') hoặc requirePermissions(['BOOKING_CONFIRM', 'ROOM_ALLOCATION'])
- */
-const requirePermissions = (requiredPermissions) => {
-  const perms = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
-
-  return async (req, res, next) => {
-    // 1. Kiểm tra xác thực token nếu req.user chưa được nạp
-    if (!req.user) {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({
-          success: false,
-          code: 'ERROR_0009_UNAUTHENTICATED',
-          message: 'Bạn cần đăng nhập để thực hiện chức năng này'
-        });
-      }
-
-      const token = authHeader.split(' ')[1];
-      try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;
-      } catch (error) {
-        return res.status(401).json({
-          success: false,
-          code: 'ERROR_0009_UNAUTHENTICATED',
-          message: 'Bạn cần đăng nhập để thực hiện chức năng này'
-        });
-      }
-    }
-
-    const { roleId, roleName } = req.user;
-
-    // Quản trị viên (Admin) luôn có toàn quyền
-    if (roleId === 1 || roleName === 'Admin') {
-      return next();
-    }
-
-    // 2. Kiểm tra quyền cụ thể trong CSDL
-    try {
-      const [rows] = await pool.query(
-        `SELECT p.PermissionName
-         FROM RolePermissions rp
-         JOIN Permissions p ON rp.PermissionId = p.PermissionId
-         WHERE rp.RoleId = ? AND p.PermissionName IN (?)`,
-        [roleId, perms]
-      );
-
-      const heldNames = rows.map((r) => r.PermissionName);
-      const hasAll = perms.every((p) => heldNames.includes(p));
-
-      if (!hasAll) {
-        return res.status(403).json({
-          success: false,
-          code: 'ERROR_0010_FORBIDDEN',
-          message: 'Bạn không có quyền thực hiện chức năng này'
-        });
-      }
-
-      next();
-    } catch (err) {
-      console.error('Lỗi kiểm tra quyền truy cập:', err);
-      return res.status(500).json({
-        success: false,
-        code: 'ERROR_0030_ALLOCATION_TRANSACTION',
-        message: 'Lỗi kiểm tra quyền hạn hệ thống'
-      });
-    }
-  };
-};
-
 module.exports = {
   verifyToken,
   optionalVerifyToken,
-  requirePermission,
   requirePermissions,
+  requirePermission,
   requireInternalStaff,
   requireAdmin,
   JWT_SECRET

@@ -183,15 +183,15 @@ export const getRoomDetailApi = async (id) => {
  * GET /api/v1/rooms/suggest?q=...
  */
 export const suggestRoomsApi = async (q) => {
+  if (!q || !q.trim()) return null;
   try {
-    if (!q || !q.trim()) return { data: null };
     const res = await fetch(`${API_BASE_URL}/v1/rooms/suggest?q=${encodeURIComponent(q.trim())}`);
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) return null;
     const json = await res.json();
     return json.data || json;
   } catch (err) {
-    console.error('Lỗi khi fetch suggester:', err);
-    return { data: null };
+    console.error('Lỗi khi fetch gợi ý:', err);
+    return null;
   }
 };
 
@@ -413,5 +413,3 @@ export const applyVoucherToBookingApi = async (bookingId, voucherCode) => {
     };
   }
 };
-
-

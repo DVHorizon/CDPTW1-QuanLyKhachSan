@@ -41,7 +41,7 @@ exports.getActiveStays = async (req, res) => {
 exports.createRoomServiceOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    const { stayId, roomId, items, paymentMode, userId } = req.body;
+    const { stayId, roomId, items, paymentMode, userId, note } = req.body;
     const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId || userId;
 
     // 1. Kiểm tra phòng và lượt lưu trú
@@ -132,12 +132,63 @@ exports.createRoomServiceOrder = async (req, res) => {
       OrderType: 'RoomService',
       Status: 'Pending',
       TotalAmount: totalAmount,
-      PaymentMode: paymentMode
+      PaymentMode: paymentMode,
+      Note: note ? String(note).trim() : null
     }, { transaction });
 
     for (const detail of orderDetails) {
       detail.FoodOrderId = order.FoodOrderId;
       await FoodOrderDetail.create(detail, { transaction });
+    }
+
+    // Nếu chọn gộp vào hóa đơn phòng (RoomInvoice), tự động ghi nhận folio charge vào Invoice của lượt lưu trú
+    if (paymentMode === 'RoomInvoice') {
+      try {
+        let invoice = await Invoice.findOne({
+          where: { StayId: stay.StayId },
+          transaction
+        });
+
+        if (!invoice) {
+          const timestamp = Date.now();
+          const invoiceNumber = `INV-${stay.StayId}-${timestamp.toString().slice(-6)}`;
+          invoice = await Invoice.create({
+            StayId: stay.StayId,
+            BookingId: stay.BookingId,
+            InvoiceNumber: invoiceNumber,
+            Subtotal: 0.00,
+            VATRate: 10.00,
+            VATAmount: 0.00,
+            TotalAmount: 0.00,
+            Status: 'Unpaid'
+          }, { transaction });
+        }
+
+        // Tạo chi tiết khoản phí (folio charge) vào InvoiceDetails
+        const orderAmount = parseFloat(order.TotalAmount || 0);
+        await InvoiceDetail.create({
+          InvoiceId: invoice.InvoiceId,
+          ItemType: 'FoodOrder',
+          ItemId: order.FoodOrderId,
+          Description: `Khoản phí dịch vụ ăn uống F&B Đơn #${order.FoodOrderId} (${stay.Room?.RoomNumber ? `Phòng ${stay.Room.RoomNumber}` : 'Room Service'})`,
+          Quantity: 1.00,
+          UnitPrice: orderAmount,
+          TotalPrice: orderAmount
+        }, { transaction });
+
+        // Cập nhật tổng tiền Invoice
+        const currentSubtotal = parseFloat(invoice.Subtotal || 0) + orderAmount;
+        const vatRate = parseFloat(invoice.VATRate || 10.00);
+        const vatAmount = (currentSubtotal * vatRate) / 100;
+        const totalInvoice = currentSubtotal + vatAmount;
+
+        invoice.Subtotal = currentSubtotal;
+        invoice.VATAmount = vatAmount;
+        invoice.TotalAmount = totalInvoice;
+        await invoice.save({ transaction });
+      } catch (folioErr) {
+        console.warn('Lỗi tự động ghi nhận folio charge cho RoomInvoice:', folioErr.message);
+      }
     }
 
     await transaction.commit();
