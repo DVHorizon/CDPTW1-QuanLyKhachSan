@@ -33,6 +33,7 @@ import FnbReview from './pages/client/FnbReview';
 import MockPaymentGateway from './pages/client/MockPaymentGateway';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ExtendStayAndMove from './pages/admin/ExtendStayAndMove';
+import MinibarManagement from './pages/admin/MinibarManagement';
 
 
 function App() {
@@ -99,6 +100,12 @@ function App() {
             <Route path="/admin/guest-check-out" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
             <Route path="/admin/kiem-phong" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
             <Route path="/admin/tra-phong" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
+
+            {/* Phân hệ Quản lý Minibar phòng (FEAT-MINIBAR-01 / Spec 12) */}
+            <Route path="/admin/minibar" element={<ProtectedRoute><MinibarManagement /></ProtectedRoute>} />
+            <Route path="/admin/minibar/:stayId" element={<ProtectedRoute><MinibarManagement /></ProtectedRoute>} />
+            <Route path="/admin/quan-ly-minibar" element={<ProtectedRoute><MinibarManagement /></ProtectedRoute>} />
+            <Route path="/admin/quan-ly-minibar/:stayId" element={<ProtectedRoute><MinibarManagement /></ProtectedRoute>} />
             <Route path="/admin/room-availability" element={<ProtectedRoute><RoomAvailability /></ProtectedRoute>} />
             <Route path="/admin/so-do-phong" element={<ProtectedRoute><RoomStatusManagement /></ProtectedRoute>} />
             <Route path="/admin/room-status" element={<ProtectedRoute><RoomStatusManagement /></ProtectedRoute>} />

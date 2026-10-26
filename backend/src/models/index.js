@@ -31,6 +31,10 @@ const defineLateFeePolicy = require('./LateFeePolicy');
 const defineRoomInspectionReport = require('./RoomInspectionReport');
 const defineDamageItem = require('./DamageItem');
 const defineVoucher = require('./Voucher');
+const defineMinibarProduct = require('./MinibarProduct');
+const defineMinibarInspection = require('./MinibarInspection');
+const defineMinibarInspectionLine = require('./MinibarInspectionLine');
+const defineMinibarInspectionEvent = require('./MinibarInspectionEvent');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -62,6 +66,10 @@ const ServiceOrder = defineServiceOrder(sequelize);
 const LateFeePolicy = defineLateFeePolicy(sequelize);
 const RoomInspectionReport = defineRoomInspectionReport(sequelize);
 const DamageItem = defineDamageItem(sequelize);
+const MinibarProduct = defineMinibarProduct(sequelize);
+const MinibarInspection = defineMinibarInspection(sequelize);
+const MinibarInspectionLine = defineMinibarInspectionLine(sequelize);
+const MinibarInspectionEvent = defineMinibarInspectionEvent(sequelize);
 
 // Setup Relationships / Associations
 // 1. Role & User
@@ -197,8 +205,18 @@ DamageItem.belongsTo(RoomInspectionReport, { foreignKey: 'InspectionId', as: 'in
 Invoice.hasMany(Payment, { foreignKey: 'InvoiceId', as: 'payments' });
 Payment.belongsTo(Invoice, { foreignKey: 'InvoiceId', as: 'invoice' });
 
-User.hasMany(Payment, { foreignKey: 'UserId', as: 'payments' });
-Payment.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+// 19. Minibar Associations (FEAT-MINIBAR-01 - Spec 12)
+Stay.hasMany(MinibarInspection, { foreignKey: 'StayId', as: 'minibarInspections' });
+MinibarInspection.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
+
+MinibarInspection.hasMany(MinibarInspectionLine, { foreignKey: 'InspectionId', as: 'lines' });
+MinibarInspectionLine.belongsTo(MinibarInspection, { foreignKey: 'InspectionId', as: 'inspection' });
+
+MinibarInspectionLine.belongsTo(MinibarProduct, { foreignKey: 'ProductId', as: 'product' });
+MinibarProduct.hasMany(MinibarInspectionLine, { foreignKey: 'ProductId', as: 'inspectionLines' });
+
+MinibarInspection.hasMany(MinibarInspectionEvent, { foreignKey: 'InspectionId', as: 'events' });
+MinibarInspectionEvent.belongsTo(MinibarInspection, { foreignKey: 'InspectionId', as: 'inspection' });
 
 module.exports = {
   sequelize,
@@ -233,6 +251,10 @@ module.exports = {
   DamageItem,
   RoomStatusHistory,
   Voucher,
+  MinibarProduct,
+  MinibarInspection,
+  MinibarInspectionLine,
+  MinibarInspectionEvent,
 };
 
 

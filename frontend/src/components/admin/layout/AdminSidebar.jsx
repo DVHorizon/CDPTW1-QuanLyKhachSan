@@ -15,6 +15,7 @@ const ALL_NAV_ITEMS = [
   { icon: "how_to_reg", label: "Check-in Tại Quầy (Express)", to: "/admin/check-in", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "more_time", label: "Gia Hạn Lưu Trú & Đổi Phòng", to: "/admin/extend-stay", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "logout", label: "Check-Out & Kiểm Phòng", to: "/admin/check-out", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "kitchen", label: "Quản Lý Minibar Phòng", to: "/admin/minibar", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "event_available", label: "Tiếp Nhận & Đặt Dịch Vụ", to: "/admin/services/dispatch", allowedRoles: ['Admin', 'Receptionist'] },
