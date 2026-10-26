@@ -32,6 +32,13 @@ router.get('/bookings/:id',          onlineDepositPaymentController.getBookingDe
 router.post('/bookings/:bookingId/deposit', onlineDepositPaymentController.processDepositPayment);
 router.post('/payments',             onlineDepositPaymentController.processDepositPayment);
 
+// ─── TÍNH NĂNG 9: XEM LỊCH SỬ ĐẶT PHÒNG & HỦY PHÒNG (FEAT-GUEST-09 / A9) ──────
+const bookingHistoryController = require('../../controllers/bookingHistoryController');
+const { verifyToken } = require('../../middlewares/authMiddleware');
+router.get('/me/bookings', verifyToken, bookingHistoryController.getMyBookings);
+router.get('/me/bookings/:bookingId', verifyToken, bookingHistoryController.getMyBookingDetail);
+router.patch('/me/bookings/:bookingId/cancel', verifyToken, bookingHistoryController.cancelMyBooking);
+
 // ─── TÌM KIẾM & XEM PHÒNG ──────────────────────────────────────────────────
 router.get('/rooms/search',          roomSearchController.searchRooms);
 router.get('/rooms/suggest',         roomSearchController.suggestRooms);

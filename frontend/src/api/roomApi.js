@@ -414,4 +414,83 @@ export const applyVoucherToBookingApi = async (bookingId, voucherCode) => {
   }
 };
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * BOOKING HISTORY & CANCELLATION API (FEAT-GUEST-09 / A9)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Lấy lịch sử đặt phòng cá nhân
+ * GET /api/v1/me/bookings
+ * @param {Object} params { statusFilter, dateWindow, searchKeyword, page, limit }
+ * @param {string} token JWT token của người dùng
+ */
+export const getMyBookingsApi = async (params = {}, token = null) => {
+  try {
+    const authToken = token || localStorage.getItem('hotel_token');
+    const query = new URLSearchParams();
+    if (params.statusFilter) query.append('statusFilter', params.statusFilter);
+    if (params.dateWindow) query.append('dateWindow', params.dateWindow);
+    if (params.searchKeyword) query.append('searchKeyword', params.searchKeyword);
+    if (params.page) query.append('page', params.page);
+    if (params.limit) query.append('limit', params.limit);
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    let res = await fetch(`${API_BASE_URL}/v1/me/bookings?${query.toString()}`, { headers });
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/me/bookings?${query.toString()}`, { headers });
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi getMyBookingsApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ lịch sử đặt phòng.'
+    };
+  }
+};
+
+/**
+ * Hủy đặt phòng cá nhân theo quy định
+ * PATCH /api/v1/me/bookings/:bookingId/cancel
+ * @param {number|string} bookingId
+ * @param {Object} body { cancellationReason, mockServerTime }
+ * @param {string} token
+ */
+export const cancelMyBookingApi = async (bookingId, body = {}, token = null) => {
+  try {
+    const authToken = token || localStorage.getItem('hotel_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    let res = await fetch(`${API_BASE_URL}/v1/me/bookings/${bookingId}/cancel`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(body)
+    });
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/me/bookings/${bookingId}/cancel`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(body)
+      });
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi cancelMyBookingApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ thực hiện hủy đặt phòng.'
+    };
+  }
+};
+
+
 

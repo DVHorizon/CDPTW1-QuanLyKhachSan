@@ -117,6 +117,11 @@ app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController')
 app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 app.post('/payments', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 
+// FEAT-GUEST-09: Xem lịch sử đặt phòng & Hủy phòng (Mã truy vết: A9)
+app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));
+app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
+app.use('/me',        require('./routes/bookingHistoryRoutes'));
+
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 app.use(require('./shared/middlewares/errorHandler'));
 

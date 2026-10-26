@@ -304,6 +304,15 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                   </Link>
 
                   <Link
+                    to="/my-bookings"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-base text-[#b9a277]">calendar_month</span>
+                    <span>Lịch Sử Đặt Phòng</span>
+                  </Link>
+
+                  <Link
                     to="/fnb/history"
                     onClick={() => setIsUserMenuOpen(false)}
                     className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
@@ -467,6 +476,15 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                 >
                   <span className="material-symbols-outlined text-[18px] text-[#b9a277]">manage_accounts</span>
                   <span>Hồ Sơ Cá Nhân</span>
+                </Link>
+
+                <Link
+                  to="/my-bookings"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full py-2 px-3 rounded-lg bg-white border border-[#dedad0] text-[#203044] text-xs font-bold text-center flex items-center justify-center gap-2 mt-1"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-[#b9a277]">calendar_month</span>
+                  <span>Lịch Sử Đặt Phòng</span>
                 </Link>
 
                 {([1, 2, 3, 4].includes(user.roleId) || ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'].includes(user.roleName)) && (
