@@ -9,15 +9,12 @@
  * - MinibarInspectionEvents: Nhật ký sự kiện kiểm kê (Audit Log)
  */
 
-const pool = require('../config/db');
-
-async function up() {
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    const sequelize = queryInterface.sequelize;
 
     // 1. MinibarProducts
-    await conn.query(`
+    await sequelize.query(`
       CREATE TABLE IF NOT EXISTS MinibarProducts (
         ProductId INT AUTO_INCREMENT PRIMARY KEY,
         ProductCode VARCHAR(50) NOT NULL UNIQUE,
@@ -35,7 +32,7 @@ async function up() {
     `);
 
     // 2. MinibarInspections
-    await conn.query(`
+    await sequelize.query(`
       CREATE TABLE IF NOT EXISTS MinibarInspections (
         InspectionId INT AUTO_INCREMENT PRIMARY KEY,
         StayId INT NOT NULL,
@@ -66,7 +63,7 @@ async function up() {
     `);
 
     // 3. MinibarInspectionLines
-    await conn.query(`
+    await sequelize.query(`
       CREATE TABLE IF NOT EXISTS MinibarInspectionLines (
         LineId INT AUTO_INCREMENT PRIMARY KEY,
         InspectionId INT NOT NULL,
@@ -94,7 +91,7 @@ async function up() {
     `);
 
     // 4. MinibarInspectionEvents
-    await conn.query(`
+    await sequelize.query(`
       CREATE TABLE IF NOT EXISTS MinibarInspectionEvents (
         EventId INT AUTO_INCREMENT PRIMARY KEY,
         InspectionId INT NOT NULL,
@@ -112,8 +109,9 @@ async function up() {
     `);
 
     // Seed default standard luxury minibar products if table empty
-    const [countRows] = await conn.query('SELECT COUNT(*) as cnt FROM MinibarProducts');
-    if (countRows[0].cnt === 0) {
+    const [countRows] = await sequelize.query('SELECT COUNT(*) as cnt FROM MinibarProducts');
+    const cnt = countRows[0]?.cnt || 0;
+    if (cnt === 0) {
       const defaultProducts = [
         ['MB-EVIAN', 'Nước khoáng thiên nhiên Evian 750ml', 'Beverage', 'Chai', 80000, 2, 0],
         ['MB-COKE', 'Nước ngọt Coca-Cola lon 330ml', 'Beverage', 'Lon', 45000, 2, 0],
@@ -128,27 +126,22 @@ async function up() {
       ];
 
       for (const p of defaultProducts) {
-        await conn.query(`
+        await sequelize.query(`
           INSERT INTO MinibarProducts (ProductCode, ProductName, Category, Unit, UnitPrice, DefaultOpeningQty, IsComplimentary)
           VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, p);
+        `, { replacements: p });
       }
       console.log('✅ Đã nạp 10 sản phẩm Minibar tiêu chuẩn');
     }
 
-    await conn.commit();
     console.log('✅ Migration 009 hoàn tất: Đã tạo các bảng Minibar theo Spec 12');
-  } catch (err) {
-    await conn.rollback();
-    console.error('❌ Migration 009 lỗi:', err);
-    throw err;
-  } finally {
-    conn.release();
+  },
+
+  async down(queryInterface, Sequelize) {
+    const sequelize = queryInterface.sequelize;
+    await sequelize.query('DROP TABLE IF EXISTS MinibarInspectionEvents;');
+    await sequelize.query('DROP TABLE IF EXISTS MinibarInspectionLines;');
+    await sequelize.query('DROP TABLE IF EXISTS MinibarInspections;');
+    await sequelize.query('DROP TABLE IF EXISTS MinibarProducts;');
   }
-}
-
-if (require.main === module) {
-  up().then(() => process.exit(0)).catch(() => process.exit(1));
-}
-
-module.exports = { up };
+};

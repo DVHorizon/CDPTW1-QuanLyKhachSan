@@ -1,6 +1,92 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ROOM AVAILABILITY & BOOKING LOCK API (FEAT-GUEST-04 / A4)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Kiểm tra phòng trống real-time theo khoảng ngày
+ * GET /api/v1/rooms/availability
+ * @param {Object} params { roomTypeId, checkInDate, checkOutDate, quantity, lockSessionId }
+ */
+export const checkRoomAvailabilityApi = async ({ roomTypeId, checkInDate, checkOutDate, quantity = 1, lockSessionId = null }) => {
+  try {
+    const query = new URLSearchParams({
+      roomTypeId,
+      checkInDate,
+      checkOutDate,
+      quantity
+    });
+    if (lockSessionId) query.append('lockSessionId', lockSessionId);
+
+    let res = await fetch(`${API_BASE_URL}/v1/rooms/availability?${query.toString()}`);
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/availability?${query.toString()}`);
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi checkRoomAvailabilityApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ kiểm tra phòng trống.'
+    };
+  }
+};
+
+/**
+ * Giữ phòng tạm thời 15 phút chống Overbooking
+ * POST /api/v1/rooms/lock
+ * @param {Object} payload { roomTypeId, checkInDate, checkOutDate, quantity }
+ */
+export const lockRoomSessionApi = async ({ roomTypeId, checkInDate, checkOutDate, quantity = 1 }) => {
+  try {
+    let res = await fetch(`${API_BASE_URL}/v1/rooms/lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomTypeId, checkInDate, checkOutDate, quantity })
+    });
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/lock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomTypeId, checkInDate, checkOutDate, quantity })
+      });
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi lockRoomSessionApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ giữ phòng.'
+    };
+  }
+};
+
+/**
+ * Nhả phiên giữ phòng
+ * DELETE /api/v1/rooms/lock/:sessionId
+ */
+export const releaseRoomLockApi = async (sessionId) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/rooms/lock/${sessionId}`, {
+      method: 'DELETE'
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi releaseRoomLockApi:', err);
+    return { success: false };
+  }
+};
+
+/**
  * Gọi API Tìm kiếm phòng (FEAT-GUEST-02 / A2)
  * GET /api/v1/rooms/search
  * @param {Object} params { branchId, checkInDate, checkOutDate, totalGuests, keyword, priceMin, priceMax, roomTypes, view, amenities, rating, sortBy }
@@ -68,7 +154,6 @@ export const getBranchesApi = async () => {
     return json.data || [];
   } catch (err) {
     console.error('Lỗi khi fetch chi nhánh:', err);
-    // Fallback chi nhánh chuẩn của Grand Horizon
     return [
       { BranchId: 1, BranchName: 'Grand Horizon Phú Quốc', Address: 'Bãi Khem, Phú Quốc' },
       { BranchId: 2, BranchName: 'Grand Horizon Cam Ranh', Address: 'Bãi Dài, Cam Ranh' },
@@ -103,7 +188,7 @@ export const suggestRoomsApi = async (q) => {
     const res = await fetch(`${API_BASE_URL}/v1/rooms/suggest?q=${encodeURIComponent(q.trim())}`);
     if (!res.ok) return null;
     const json = await res.json();
-    return json.data;
+    return json.data || json;
   } catch (err) {
     console.error('Lỗi khi fetch gợi ý:', err);
     return null;
@@ -111,155 +196,298 @@ export const suggestRoomsApi = async (q) => {
 };
 
 /**
- * Kiểm tra tình trạng phòng trống
- * POST /api/v1/rooms/check-availability
- */
-export const checkRoomAvailabilityApi = async (payload) => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/rooms/check-availability`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return await res.json();
-  } catch (err) {
-    console.error('Lỗi check availability:', err);
-    return { success: false, message: err.message };
-  }
-};
-
-/**
- * Khóa phòng tạm thời (Room lock session)
- * POST /api/v1/rooms/lock
- */
-export const lockRoomSessionApi = async (payload) => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/rooms/lock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return await res.json();
-  } catch (err) {
-    console.error('Lỗi lock room session:', err);
-    return { success: false, message: err.message };
-  }
-};
-
-/**
- * Nhả khóa phòng
- * POST /api/v1/rooms/release-lock
- */
-export const releaseRoomLockApi = async (payload) => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/rooms/release-lock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return await res.json();
-  } catch (err) {
-    console.error('Lỗi release room lock:', err);
-    return { success: false, message: err.message };
-  }
-};
-
-/**
- * Tạo booking mới
- * POST /api/v1/bookings
+ * Tạo đơn đặt phòng chính thức (Thanh toán)
+ * POST /api/v1/guest/bookings or POST /api/v1/rooms/book
  */
 export const createBookingApi = async (payload) => {
   try {
-    const token = typeof window !== 'undefined' ? (localStorage.getItem('hotel_token') || localStorage.getItem('token')) : null;
-    const res = await fetch(`${API_BASE_URL}/v1/bookings`, {
+    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload)
     });
-    return await res.json();
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/v1/rooms/book`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/bookings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+    const data = await res.json();
+    return data;
   } catch (err) {
-    console.error('Lỗi create booking:', err);
-    return { success: false, message: err.message };
+    console.error('Lỗi createBookingApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ thanh toán đặt phòng.'
+    };
+  }
+};
+
+export const createOnlineBookingEngineApi = createBookingApi;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ONLINE DEPOSIT PAYMENT INTEGRATION (FEAT-GUEST-08 / A8)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Lấy chi tiết đơn đặt phòng phục vụ Màn hình 7
+ * GET /api/v1/guest/bookings/:id
+ */
+export const getBookingDetailsApi = async (id) => {
+  try {
+    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings/${id}`);
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/bookings/${id}`);
+    }
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi getBookingDetailsApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ lấy thông tin đơn đặt phòng.'
+    };
   }
 };
 
 /**
- * Tính toán giá phòng & phụ thu
- * POST /api/v1/bookings/calculate-pricing
+ * Xử lý thanh toán tiền cọc trực tuyến
+ * POST /api/v1/guest/bookings/:bookingId/deposit
+ */
+export const processDepositPaymentApi = async (bookingId, payload) => {
+  try {
+    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings/${bookingId}/deposit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/deposit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
+        },
+        body: JSON.stringify({ ...payload, bookingId })
+      });
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi processDepositPaymentApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến cổng thanh toán trực tuyến.'
+    };
+  }
+};
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PRICE & SURCHARGE CALCULATION API (FEAT-GUEST-06 / A6)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Tự động tính số đêm, phụ thu thêm người lớn/trẻ em và tổng tiền phòng
+ * POST /api/bookings/calculate-pricing
+ * @param {Object} payload { checkInDate, checkOutDate, baseRate, roomTypeId, adults, children, roomQuantity, selectedAddOns, taxesAndFeesRate, depositRate, isGoldMember }
  */
 export const calculatePricingApi = async (payload) => {
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/bookings/calculate-pricing`, {
+    let res = await fetch(`${API_BASE_URL}/bookings/calculate-pricing`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload)
     });
-    return await res.json();
+
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/v1/guest/bookings/calculate-pricing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const data = await res.json();
+    return data;
   } catch (err) {
-    console.error('Lỗi tính giá:', err);
-    return { success: false, message: err.message };
+    console.error('Lỗi calculatePricingApi:', err);
+    return {
+      success: false,
+      errorCode: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ tính toán giá phòng.'
+    };
   }
 };
 
 /**
- * Kiểm tra mã giảm giá (voucher)
- * POST /api/v1/promotions/validate
+ * FEAT-GUEST-07: Áp dụng mã giảm giá và voucher khuyến mãi (Mã truy vết: A7)
+ * POST /bookings/apply-voucher hoặc POST /api/v1/vouchers/validate
+ * @param {Object} payload { voucherCode, bookingTotal, currency }
  */
-export const validateVoucherApi = async (code, totalAmount) => {
+export const validateVoucherApi = async (payload) => {
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/promotions/validate`, {
+    let res = await fetch(`${API_BASE_URL}/bookings/apply-voucher`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, totalAmount }),
+      body: JSON.stringify(payload)
     });
-    return await res.json();
+
+    if (res.status === 404 && !res.headers.get('content-type')?.includes('json')) {
+      res = await fetch(`${API_BASE_URL}/v1/vouchers/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const data = await res.json();
+    return data;
   } catch (err) {
-    console.error('Lỗi validate voucher:', err);
-    return { success: false, message: err.message };
+    console.error('Lỗi validateVoucherApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ kiểm tra mã giảm giá.'
+    };
   }
 };
 
 /**
- * Lấy chi tiết đặt phòng thanh toán cọc
- * GET /api/v1/bookings/:id
+ * FEAT-GUEST-07: Áp dụng voucher vào đơn đặt phòng đã tạo
+ * POST /bookings/:bookingId/apply-voucher
  */
-export const getBookingDetailsApi = async (bookingId) => {
+export const applyVoucherToBookingApi = async (bookingId, voucherCode) => {
   try {
-    const token = typeof window !== 'undefined' ? (localStorage.getItem('hotel_token') || localStorage.getItem('token')) : null;
-    const res = await fetch(`${API_BASE_URL}/v1/bookings/${bookingId}`, {
-      headers: {
-        'Accept': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    return await res.json();
-  } catch (err) {
-    console.error('Lỗi fetch booking detail:', err);
-    return { success: false, message: err.message };
-  }
-};
-
-/**
- * Xử lý thanh toán cọc booking (FEAT-PAYMENT-01)
- * POST /api/v1/payments
- */
-export const processDepositPaymentApi = async (payload) => {
-  try {
-    const token = typeof window !== 'undefined' ? (localStorage.getItem('hotel_token') || localStorage.getItem('token')) : null;
-    const res = await fetch(`${API_BASE_URL}/v1/payments`, {
+    const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/apply-voucher`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ voucherCode })
     });
     return await res.json();
   } catch (err) {
-    console.error('Lỗi process payment:', err);
-    return { success: false, message: err.message };
+    console.error('Lỗi applyVoucherToBookingApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ áp dụng voucher.'
+    };
+  }
+};
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * BOOKING HISTORY & CANCELLATION API (FEAT-GUEST-09 / A9)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Lấy lịch sử đặt phòng cá nhân
+ * GET /api/v1/me/bookings
+ * @param {Object} params { statusFilter, dateWindow, searchKeyword, page, limit }
+ * @param {string} token JWT token của người dùng
+ */
+export const getMyBookingsApi = async (params = {}, token = null) => {
+  try {
+    const authToken = token || localStorage.getItem('hotel_token');
+    const query = new URLSearchParams();
+    if (params.statusFilter) query.append('statusFilter', params.statusFilter);
+    if (params.dateWindow) query.append('dateWindow', params.dateWindow);
+    if (params.searchKeyword) query.append('searchKeyword', params.searchKeyword);
+    if (params.page) query.append('page', params.page);
+    if (params.limit) query.append('limit', params.limit);
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    let res = await fetch(`${API_BASE_URL}/v1/me/bookings?${query.toString()}`, { headers });
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/me/bookings?${query.toString()}`, { headers });
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi getMyBookingsApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ lịch sử đặt phòng.'
+    };
+  }
+};
+
+/**
+ * Hủy đặt phòng cá nhân theo quy định
+ * PATCH /api/v1/me/bookings/:bookingId/cancel
+ * @param {number|string} bookingId
+ * @param {Object} body { cancellationReason, mockServerTime }
+ * @param {string} token
+ */
+export const cancelMyBookingApi = async (bookingId, body = {}, token = null) => {
+  try {
+    const authToken = token || localStorage.getItem('hotel_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    let res = await fetch(`${API_BASE_URL}/v1/me/bookings/${bookingId}/cancel`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(body)
+    });
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/me/bookings/${bookingId}/cancel`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(body)
+      });
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi cancelMyBookingApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ thực hiện hủy đặt phòng.'
+    };
   }
 };
