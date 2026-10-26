@@ -3,7 +3,6 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const ExcelJS = require('exceljs');
 const pool = require('../config/db');
 const bookingEngineController = require('../controllers/bookingEngineController');
 const voucherController = require('../controllers/voucherController');
