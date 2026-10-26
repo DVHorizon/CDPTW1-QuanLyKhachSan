@@ -180,6 +180,24 @@ function Home() {
     );
   };
 
+  // Chuyển hướng trực tiếp tới màn hình Đặt Phòng (Booking Engine)
+  const handleBookNow = (rt) => {
+    const guests = guestOption ? guestOption.split('-') : ['2', '0', '1'];
+    const adults = guests[0] || '2';
+    const children = guests[1] || '0';
+    const units = guests[2] || '1';
+
+    const params = new URLSearchParams();
+    params.set('roomTypeId', rt.RoomTypeId || rt.id || '1');
+    if (checkInDate) params.set('checkInDate', checkInDate);
+    if (checkOutDate) params.set('checkOutDate', checkOutDate);
+    params.set('adults', adults);
+    if (children && children !== '0') params.set('children', children);
+    params.set('units', units);
+
+    navigate(`/dat-phong?${params.toString()}`);
+  };
+
   // Lọc phòng theo danh mục
   const filteredRooms = homeData.featuredRoomTypes.filter(room => {
     if (activeCategory === 'all') return true;
@@ -468,7 +486,8 @@ function Home() {
                 return (
                   <div
                     key={rt.RoomTypeId}
-                    className="group bg-white rounded-2xl overflow-hidden shadow-[0_8px_30px_-15px_rgba(32,48,68,0.25)] hover:shadow-[0_20px_45px_-20px_rgba(32,48,68,0.45)] transition-all duration-300 flex flex-col justify-between border border-[#dedad0] hover:-translate-y-1 relative"
+                    onClick={() => navigate(`/rooms/${rt.RoomTypeId}`)}
+                    className="group bg-white rounded-2xl overflow-hidden shadow-[0_8px_30px_-15px_rgba(32,48,68,0.25)] hover:shadow-[0_20px_45px_-20px_rgba(32,48,68,0.45)] transition-all duration-300 flex flex-col justify-between border border-[#dedad0] hover:-translate-y-1 relative cursor-pointer"
                   >
                     {/* Image Thumbnail */}
                     <div className="relative w-full aspect-[16/10] overflow-hidden bg-[#203044]">
@@ -484,7 +503,10 @@ function Home() {
 
                       {/* Wishlist Heart Button */}
                       <button
-                        onClick={() => toggleWishlist(rt.RoomTypeId)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleWishlist(rt.RoomTypeId);
+                        }}
                         className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-[#203044] flex items-center justify-center transition-all shadow-md active:scale-90"
                         type="button"
                         aria-label="Yêu thích phòng"
@@ -562,18 +584,25 @@ function Home() {
 
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => setSelectedRoomForDetail(rt)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/rooms/${rt.RoomTypeId}`);
+                            }}
                             className="px-3 py-2 rounded-xl bg-[#fbf8f2] hover:bg-[#eae8df] text-[#203044] text-[12.5px] font-bold border border-[#dedad0] transition-colors"
                             type="button"
                           >
                             Chi Tiết
                           </button>
                           <button
-                            onClick={() => setSelectedRoomForBooking(rt)}
-                            className="px-4 py-2 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[12.5px] font-bold shadow-sm transition-all"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleBookNow(rt);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[12.5px] font-bold shadow-sm transition-all flex items-center gap-1 group-hover:shadow-md"
                             type="button"
                           >
-                            Đặt Ngay
+                            <span>Đặt Ngay</span>
+                            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                           </button>
                         </div>
                       </div>
