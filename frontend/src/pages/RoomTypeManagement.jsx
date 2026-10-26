@@ -1,1558 +1,1821 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import AdminLayout from '../components/admin/layout/AdminLayout';
-import { useAuth } from '../context/AuthContext';
 
-const API_BASE_URL = 'http://localhost:5000/api/v1/room-types';
+import AdminLayout from '../components/admin/layout/AdminLayout';
+import {
+  performSemanticSearch,
+  generateRagAnswer,
+  trackUserInteraction,
+} from '../utils/semanticRagSearch';
+
+
+
+// ─── Dữ Liệu Tùy Chọn Tiện Nghi (100% Tiếng Việt có dấu) ────────────────────
+
+
+
+const AMENITY_OPTIONS = [
+  { id: 'wifi', icon: 'wifi', label: 'Wi-Fi Tốc Độ Cao' },
+  { id: 'balcony', icon: 'deck', label: 'Ban Công View Biển' },
+  { id: 'bathtub', icon: 'bathtub', label: 'Bồn Tắm Nằm Thư Giãn' },
+  { id: 'minibar', icon: 'local_bar', label: 'Quầy Bar Mini Cao Cấp' },
+  { id: 'nespresso', icon: 'coffee', label: 'Máy Pha Cà Phê Nespresso' },
+  { id: 'ada', icon: 'accessible', label: 'Phòng Tắm Hỗ Trợ ADA (Người Khuyết Tật)' },
+  { id: 'pool', icon: 'pool', label: 'Hồ Bơi Vô Cực Riêng' },
+  { id: 'butler', icon: 'room_service', label: 'Dịch Vụ Quản Gia 24/7' },
+  { id: 'jacuzzi', icon: 'spa', label: 'Bồn Sục Jacuzzi / Spa' },
+  { id: 'kitchen', icon: 'kitchen', label: 'Bếp Mini / Gian Bếp Nhỏ' },
+  { id: 'safe', icon: 'lock', label: 'Két Sắt Điện Tử' },
+  { id: 'tv', icon: 'tv', label: 'Smart TV 4K 65 Inch' },
+  { id: 'ac', icon: 'ac_unit', label: 'Điều Hòa Không Khí Trung Tâm' },
+  { id: 'workspace', icon: 'desk', label: 'Khu Vực Bàn Làm Việc' },
+];
+
+// ─── Tùy Chọn Loại Giường ───────────────────────────────────────────────────
+const BEDDING_OPTIONS = [
+  '1 Giường King (2m x 2m)',
+  '1 Giường Queen (1.6m x 2m)',
+  '2 Giường Đôi (Double)',
+  '2 Giường Đơn (Twin)',
+  '1 Giường King + Giường Sofa',
+  '2 Giường King',
+  'Linh Hoạt / Tùy Chỉnh Theo Yêu Cầu',
+];
+
+// ─── Tùy Chọn Hướng Nhìn (View) ─────────────────────────────────────────────
+const VIEW_OPTIONS = [
+  'Hướng Biển (Ocean View)',
+  'Hướng Vườn (Garden View)',
+  'Hướng Thành Phố (City View)',
+  'Hướng Hồ Bơi (Pool View)',
+  'Hướng Núi (Mountain View)',
+  'Hai Mặt Thoáng (Dual Aspect)',
+  'Ban Công Riêng Biệt (Private Deck)',
+];
+
+// ─── Dữ Liệu Khởi Tạo Mẫu (Tiếng Việt Đầy Đủ) ──────────────────────────────
+const INITIAL_ROOM_TYPES = [
+  {
+    id: 1,
+    code: 'STD-DBL',
+    name: 'Phòng Tiêu Chuẩn 2 Giường Đôi - Hướng Phố',
+    subtitle: 'Tầng 2–5 // Hướng Phía Bắc',
+    status: 'active',
+    floors: 'Tầng 2–5',
+    maxAdults: 2,
+    maxChildren: 1,
+    area: 32,
+    bedding: '2 Giường Đôi (Double)',
+    view: 'Hướng Thành Phố (City View)',
+    keys: 40,
+    baseRate: 1500000,
+    amenities: ['wifi', 'ac', 'safe', 'tv'],
+    image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=600&q=80',
+    turnover: 30,
+    yieldMultiplier: 1.0,
+    description: 'Phòng tiêu chuẩn tiện nghi, thoáng mát, nhìn ra toàn cảnh đô thị năng động. Giá rẻ tiết kiệm, phù hợp chuyến công tác hoặc du lịch bình dân.',
+  },
+  {
+    id: 2,
+    code: 'DLX-OCN',
+    name: 'Phòng Deluxe Giường King Hướng Biển Kèm Ban Công',
+    subtitle: 'Đang Chọn // Ban Công Biển Riêng',
+    status: 'active',
+    floors: 'Tầng 6–9',
+    maxAdults: 2,
+    maxChildren: 1,
+    area: 48,
+    bedding: '1 Giường King (2m x 2m)',
+    view: 'Hướng Biển (Ocean View)',
+    keys: 48,
+    baseRate: 2800000,
+    amenities: ['wifi', 'balcony', 'bathtub', 'minibar', 'nespresso', 'ac', 'safe', 'tv'],
+    image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&q=80',
+    turnover: 35,
+    yieldMultiplier: 1.15,
+    description: 'Suite cao cấp với ban công riêng biệt và tầm nhìn trực diện biển panorama 180 độ. Trang bị bồn tắm nằm ngâm mình thư giãn ngắm hoàng hôn.',
+  },
+  {
+    id: 3,
+    code: 'EXC-PAN',
+    name: 'Phòng Executive Góc Hai Mặt Thoáng Kèm Bồn Sục',
+    subtitle: 'Tầng 6–8 // Hai Mặt Thoáng',
+    status: 'active',
+    floors: 'Tầng 6–8',
+    maxAdults: 2,
+    maxChildren: 2,
+    area: 58,
+    bedding: '1 Giường King + Giường Sofa',
+    view: 'Hai Mặt Thoáng (Dual Aspect)',
+    keys: 24,
+    baseRate: 3900000,
+    amenities: ['wifi', 'balcony', 'bathtub', 'minibar', 'nespresso', 'jacuzzi', 'workspace', 'ac', 'safe', 'tv'],
+    image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=600&q=80',
+    turnover: 40,
+    yieldMultiplier: 1.2,
+    description: 'Suite góc với không gian rộng mở, khu vực bàn làm việc doanh nhân và bồn sục jacuzzi thủy lực thư giãn. Phù hợp gia đình nhỏ hoặc khách công tác cao cấp.',
+  },
+  {
+    id: 4,
+    code: 'PNT-VIL',
+    name: 'Biệt Thự Penthouse Horizon Sky Villa Trên Không',
+    subtitle: 'Tầng Thượng Rooftop // Hồ Bơi Riêng',
+    status: 'active',
+    floors: 'Tầng Thượng Rooftop',
+    maxAdults: 4,
+    maxChildren: 2,
+    area: 110,
+    bedding: '2 Giường King',
+    view: 'Hướng Biển (Ocean View)',
+    keys: 8,
+    baseRate: 9500000,
+    amenities: ['wifi', 'balcony', 'bathtub', 'minibar', 'nespresso', 'pool', 'butler', 'jacuzzi', 'kitchen', 'ac', 'safe', 'tv', 'workspace'],
+    image: 'https://images.unsplash.com/photo-1631049552240-59c37f38802b?w=600&q=80',
+    turnover: 60,
+    yieldMultiplier: 1.3,
+    description: 'Biệt thự trên không sang trọng bậc nhất với hồ bơi vô cực riêng, gian bếp nhỏ tự nấu nướng và quản gia phục vụ 24/7. Hoàn hảo cho gia đình đông người và khách VIP.',
+  },
+  {
+    id: 5,
+    code: 'ACC-KNG',
+    name: 'Phòng Suite Hỗ Trợ Người Khuyết Tật (Tiêu Chuẩn ADA)',
+    subtitle: 'Tầng 1 // Phòng Tắm Roll-In Đạt Chuẩn',
+    status: 'active',
+    floors: 'Tầng 1',
+    maxAdults: 2,
+    maxChildren: 0,
+    area: 42,
+    bedding: '1 Giường King (2m x 2m)',
+    view: 'Hướng Vườn (Garden View)',
+    keys: 24,
+    baseRate: 2100000,
+    amenities: ['wifi', 'ada', 'ac', 'safe', 'tv', 'workspace'],
+    image: 'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=600&q=80',
+    turnover: 30,
+    yieldMultiplier: 1.0,
+    description: 'Phòng tiếp cận đặc biệt thiết kế đạt tiêu chuẩn ADA quốc tế tại tầng 1, không bậc thang, lối đi xe lăn rộng rãi và phòng tắm không rào cản.',
+  },
+];
 
 const EMPTY_FORM = {
-  typeName: '',
+  code: '',
+  name: '',
+  subtitle: '',
+  status: 'active',
+  floors: '',
+  maxAdults: 2,
+  maxChildren: 1,
+  area: '',
+  bedding: '1 Giường King (2m x 2m)',
+  view: 'Hướng Biển (Ocean View)',
+  keys: '',
+  baseRate: '',
+  amenities: [],
+  image: '',
+  turnover: 30,
+  yieldMultiplier: 1.0,
   description: '',
-  basePrice: '',
-  adultCapacity: 2,
-  childCapacity: 1,
-  images: [],
-  amenityIds: [],
-  status: 'Active',
 };
 
-// Định dạng tiền tệ VND có dấu phân cách
-const fmtVND = (n) =>
-  Number(n || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' ₫';
-
-// Xử lý icon tiện ích chuẩn Material Symbols (tránh truyền URL vào font ligature)
-const getSafeAmenityIcon = (rawIcon, name = '') => {
-  if (rawIcon && !rawIcon.startsWith('http') && !rawIcon.includes('/') && !rawIcon.includes('.')) {
-    return rawIcon;
-  }
-  const n = (name || '').toLowerCase();
-  if (n.includes('wifi') || n.includes('wi-fi') || n.includes('mạng')) return 'wifi';
-  if (n.includes('ban công') || n.includes('biển') || n.includes('view') || n.includes('hướng')) return 'deck';
-  if (n.includes('bồn tắm') || n.includes('jacuzzi') || n.includes('tắm')) return 'bathtub';
-  if (n.includes('bar') || n.includes('rượu') || n.includes('minibar')) return 'local_bar';
-  if (n.includes('cà phê') || n.includes('coffee') || n.includes('tea') || n.includes('trà')) return 'coffee';
-  if (n.includes('ada') || n.includes('xe lăn') || n.includes('khuyết tật')) return 'accessible';
-  if (n.includes('hồ bơi') || n.includes('bơi') || n.includes('pool')) return 'pool';
-  if (n.includes('quản gia') || n.includes('phục vụ') || n.includes('service')) return 'room_service';
-  if (n.includes('bếp') || n.includes('nấu') || n.includes('kitchen')) return 'kitchen';
-  if (n.includes('két sắt') || n.includes('khoá') || n.includes('an toàn')) return 'lock';
-  if (n.includes('tv') || n.includes('ti vi') || n.includes('tivi')) return 'tv';
-  if (n.includes('điều hòa') || n.includes('lạnh') || n.includes('lọc khí') || n.includes('ac')) return 'ac_unit';
-  return 'check_circle';
+// Định dạng tiền tệ VNĐ an toàn, không bị tràn số
+const fmtVND = (n) => {
+  const num = Number(n);
+  if (isNaN(num) || num === null || num === undefined) return '0 ₫';
+  return `${num.toLocaleString('vi-VN')} ₫`;
 };
 
+// Giới hạn giá trị nhập số tối đa (Test Case: <= 9,999,999,999)
+const MAX_ALLOWED_NUMBER = 9999999999;
+const MAX_KEYS = 99999;
+const MAX_AREA = 99999;
+
+const DIST_COLORS = [
+  'bg-admin-primary',
+  'bg-secondary',
+  'bg-tertiary-fixed-dim',
+  'bg-secondary-fixed-dim',
+  'bg-on-surface-variant',
+];
+
+const API_BASE_URL = 'http://localhost:5000/api/loai-phong';
+
+// Các câu hỏi gợi ý thông minh cho Semantic Search
+const QUICK_SEMANTIC_PROMPTS = [
+  { icon: 'waves', label: 'View biển có ban công', query: 'view biển có ban công' },
+  { icon: 'family_restroom', label: 'Gia đình 4 người', query: 'phòng cho gia đình 4 người' },
+  { icon: 'bathtub', label: 'Có bồn tắm nằm thư giãn', query: 'có bồn tắm ngâm mình view đẹp' },
+  { icon: 'diamond', label: 'Suite VIP cao cấp nhất', query: 'phòng vip sang trọng đắt nhất' },
+  { icon: 'savings', label: 'Giá tiết kiệm dưới 2.5 triệu', query: 'phòng giá rẻ dưới 2.5 triệu' },
+  { icon: 'accessible', label: 'Tiếp cận xe lăn ADA', query: 'phòng cho người khuyết tật xe lăn' },
+  { icon: 'countertops', label: 'Có bếp tự nấu ăn & hồ bơi', query: 'phòng có bếp tự nấu và hồ bơi' },
+];
+
+// =============================================================================
+// COMPONENT CHÍNH
+// =============================================================================
 const RoomTypeManagement = () => {
-  const { user, token } = useAuth();
-
-  // ─── Dữ liệu thật 100% từ MySQL (Không dùng mock data) ─────────────────────
-  const [roomTypes, setRoomTypes] = useState([]);
-  const [amenitiesList, setAmenitiesList] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // ─── Trạng thái kết nối CSDL MySQL & Cảnh báo mất kết nối ─────────────────
-  const [backendConnected, setBackendConnected] = useState(true);
-  const [connectionError, setConnectionError] = useState(null);
-  const [lastSyncedTime, setLastSyncedTime] = useState(null);
-
-  // ─── Thống kê số lượng phòng hoạt động & ngừng cung cấp ───────────────────
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    inactive: 0,
-    avgPrice: 0,
+  // Quản lý danh sách loại phòng với LocalStorage đồng bộ
+  const [roomTypes, setRoomTypes] = useState(() => {
+    try {
+      const saved = localStorage.getItem('qlks_room_types');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) { }
+    return INITIAL_ROOM_TYPES;
   });
 
-  // ─── Bộ lọc & Tìm kiếm ───────────────────────────────────────────────────
+  const [selectedId, setSelectedId] = useState(2);
+  const [form, setForm] = useState({ ...INITIAL_ROOM_TYPES[1] });
+  const [isNew, setIsNew] = useState(false);
   const [filterText, setFilterText] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all'); // all | Active | Inactive
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-
-  // ─── Form Modal Thêm/Sửa (Wireframe 6.2) ──────────────────────────────────
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({ ...EMPTY_FORM });
-  const [formErrors, setFormErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [newImageUrl, setNewImageUrl] = useState('');
-
-  // ─── Modal Xóa mềm ───────────────────────────────────────────────────────
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // ─── Toast thông báo ──────────────────────────────────────────────────────
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [toast, setToast] = useState(null);
+  const [imgUrl, setImgUrl] = useState(INITIAL_ROOM_TYPES[1].image);
+  const [formErrors, setFormErrors] = useState({});
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [backendConnected, setBackendConnected] = useState(false);
+  const [showTestPanel, setShowTestPanel] = useState(false);
+  const [showRagAnswer, setShowRagAnswer] = useState(true);
+  const tableScrollRef = useRef(null);
 
-  const canManage = useMemo(() => {
-    const roleName = user?.roleName || user?.role?.RoleName || '';
-    return roleName.toLowerCase() === 'admin' || !user;
-  }, [user]);
-
-  const showToast = (msg, type = 'success', code = '') => {
-    setToast({ msg, type, code });
-    setTimeout(() => setToast(null), 4500);
-  };
-
-  // ─── TẢI DỮ LIỆU THẬT & KIỂM TRA KẾT NỐI MYSQL ────────────────────────────
-  const fetchAllData = async () => {
-    setIsLoading(true);
-    setConnectionError(null);
-
-    try {
-      const authHeaderVal = token ? `Bearer ${token}` : 'Bearer test_admin_jwt_token';
-
-      // 1. Tải danh sách Loại phòng từ MySQL
-      const res = await fetch(API_BASE_URL, {
-        headers: { Authorization: authHeaderVal },
-      });
-
-      if (!res.ok) {
-        throw new Error(`Máy chủ phản hồi mã lỗi ${res.status}: ${res.statusText}`);
-      }
-
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        setRoomTypes(json.data);
-        setBackendConnected(true);
-        setConnectionError(null);
-        setLastSyncedTime(new Date().toLocaleTimeString('vi-VN'));
-
-        // Cập nhật thống kê từ server hoặc tự tính từ dữ liệu thật
-        const realTotal = json.data.length;
-        const realActive = json.data.filter(
-          (r) => r.status === 'Active' || r.status === 'active'
-        ).length;
-        const realInactive = realTotal - realActive;
-        const avgPrice =
-          realTotal > 0
-            ? json.data.reduce((sum, r) => sum + Number(r.basePrice || 0), 0) / realTotal
-            : 0;
-
-        setStats({
-          total: json.stats?.total ?? realTotal,
-          active: json.stats?.active ?? realActive,
-          inactive: json.stats?.inactive ?? realInactive,
-          avgPrice: Math.round(avgPrice),
-        });
-      } else {
-        throw new Error(json.message || 'Dữ liệu trả về không hợp lệ');
-      }
-
-      // 2. Tải danh mục tiện ích thật từ MySQL
-      try {
-        const amenRes = await fetch(`${API_BASE_URL}/amenities`);
-        if (amenRes.ok) {
-          const amenJson = await amenRes.json();
-          if (amenJson.success && Array.isArray(amenJson.data)) {
-            setAmenitiesList(amenJson.data);
-          }
-        }
-      } catch (_) {}
-    } catch (err) {
-      console.error('Lỗi kết nối CSDL MySQL:', err);
-      setBackendConnected(false);
-      setConnectionError(
-        'MẤT KẾT NỐI TỚI CƠ SỞ DỮ LIỆU MYSQL! Vui lòng kiểm tra Docker container (hotel_backend, hotel_mysql) hoặc dịch vụ mạng.'
-      );
-      showToast(
-        'Mất kết nối tới CSDL MySQL! Không thể đồng bộ dữ liệu.',
-        'error',
-        'ERR_MYSQL_DISCONNECTED'
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Lăn chuột trên bảng thì cuộn ngang
   useEffect(() => {
-    fetchAllData();
+    const el = tableScrollRef.current;
+    if (!el) return;
 
-    // Tự động kiểm tra lại kết nối định kỳ mỗi 30 giây
-    const interval = setInterval(() => {
-      fetch(`${API_BASE_URL}?limit=1`)
-        .then((r) => {
-          if (r.ok) {
-            setBackendConnected(true);
-            setConnectionError(null);
-          } else {
-            setBackendConnected(false);
-          }
-        })
-        .catch(() => {
-          setBackendConnected(false);
-        });
-    }, 30000);
+    const onWheel = (e) => {
+      // Bảng không tràn thì không làm gì
+      if (el.scrollWidth <= el.clientWidth) return;
+      // Nếu đã là cuộn ngang (touchpad, Shift + lăn) thì để trình duyệt tự xử lý
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
 
-    return () => clearInterval(interval);
+      const atStart = el.scrollLeft <= 0 && e.deltaY < 0;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1 && e.deltaY > 0;
+      // Tới mép thì cho trang cuộn dọc bình thường
+      if (atStart || atEnd) return;
+
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
-  // ─── TÍNH TOÁN SỨC CHỨA TỰ ĐỘNG (adultCapacity + childCapacity) ───────────
-  const computedMaxOccupancy = useMemo(() => {
-    const a = Number(formData.adultCapacity) || 0;
-    const c = Number(formData.childCapacity) || 0;
-    return a + c;
-  }, [formData.adultCapacity, formData.childCapacity]);
-
-  // ─── TÌM KIẾM VÀ PHÂN TRANG 10 DÒNG/TRANG (Wireframe 6.1) ─────────────────
-  const filteredList = useMemo(() => {
-    return roomTypes
-      .filter((r) => {
-        const nameMatch = (r.typeName || r.name || '')
-          .toLowerCase()
-          .includes(filterText.trim().toLowerCase());
-        const statusMatch =
-          filterStatus === 'all' ||
-          (filterStatus === 'Active' && (r.status === 'Active' || r.status === 'active')) ||
-          (filterStatus === 'Inactive' && (r.status === 'Inactive' || r.status === 'inactive'));
-        return nameMatch && statusMatch;
-      })
-      .sort((a, b) => (a.typeName || a.name || '').localeCompare(b.typeName || b.name || ''));
-  }, [roomTypes, filterText, filterStatus]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredList.length / itemsPerPage));
-  const paginatedList = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredList.slice(start, start + itemsPerPage);
-  }, [filteredList, currentPage]);
-
+  // Lưu vào localStorage khi danh sách thay đổi
   useEffect(() => {
-    setCurrentPage(1);
-  }, [filterText, filterStatus]);
+    try {
+      localStorage.setItem('qlks_room_types', JSON.stringify(roomTypes));
+    } catch (_) { }
+  }, [roomTypes]);
 
-  // ─── VALIDATE FORM (Mục 3 & 5.2 Spec) ─────────────────────────────────────
-  const validateField = (field, val, allData = formData) => {
-    let err = '';
-    if (field === 'typeName') {
-      const trimmed = String(val || '').trim();
-      if (!trimmed) {
-        err = 'Tên loại phòng không được để trống';
-      } else if (trimmed.length < 2) {
-        err = 'Tên loại phòng phải có ít nhất 2 ký tự';
-      } else if (trimmed.length > 100) {
-        err = 'Tên loại phòng không được vượt quá 100 ký tự';
-      } else {
-        const isDuplicate = roomTypes.some(
-          (r) =>
-            (r.typeName || r.name || '').trim().toLowerCase() === trimmed.toLowerCase() &&
-            (!isEditMode || (r.id !== editingId && r.RoomTypeId !== editingId))
-        );
-        if (isDuplicate) {
-          err = 'Tên loại phòng đã được sử dụng, vui lòng chọn tên khác';
+  // Thử kết nối backend API khi tải trang
+  useEffect(() => {
+    fetchFromBackend();
+  }, []);
+
+  const fetchFromBackend = async () => {
+    setIsSyncing(true);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch(API_BASE_URL, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          const mapped = data.data.map((r) => ({
+            id: r.id,
+            code: r.ma_loai,
+            name: r.ten_loai,
+            subtitle: r.tang_vi_tri ? `Tầng: ${r.tang_vi_tri}` : '',
+            status: r.trang_thai,
+            floors: r.tang_vi_tri || '',
+            maxAdults: r.toi_da_nguoi_lon || 2,
+            maxChildren: r.toi_da_tre_em || 1,
+            area: r.dien_tich || 0,
+            bedding: r.loai_giuong || '1 Giường King (2m x 2m)',
+            view: r.huong_view || 'Hướng Biển (Ocean View)',
+            keys: r.so_phong_ton_kho || 0,
+            baseRate: Number(r.gia_co_ban) || 0,
+            amenities: Array.isArray(r.tien_ich) ? r.tien_ich : [],
+            image: r.hinh_anh || '',
+            turnover: r.thoi_gian_don_phong || 30,
+            yieldMultiplier: Number(r.he_so_cuoi_tuan) || 1.0,
+            description: r.mo_ta || '',
+          }));
+          setRoomTypes(mapped);
+          setBackendConnected(true);
+          showToast('Đã đồng bộ dữ liệu từ Cơ sở dữ liệu MySQL!', 'success');
         }
       }
+    } catch (_) {
+      setBackendConnected(false);
+    } finally {
+      setIsSyncing(false);
     }
-
-    if (field === 'description') {
-      if (val && String(val).length > 1000) {
-        err = 'Mô tả không được vượt quá 1000 ký tự';
-      }
-    }
-
-    if (field === 'basePrice') {
-      if (val === '' || val === null || val === undefined) {
-        err = 'Giá cơ bản không được để trống';
-      } else {
-        const num = Number(val);
-        if (isNaN(num) || num <= 0 || num > 999999999.99) {
-          err = 'Giá cơ bản phải là số lớn hơn 0';
-        }
-      }
-    }
-
-    if (field === 'adultCapacity') {
-      const num = Number(val);
-      if (val === '' || val === null || val === undefined || isNaN(num) || !Number.isInteger(num) || num < 1 || num > 10) {
-        err = 'Số người lớn tối đa phải là số nguyên từ 1 đến 10';
-      }
-    }
-
-    if (field === 'childCapacity') {
-      const num = Number(val);
-      if (val === '' || val === null || val === undefined || isNaN(num) || !Number.isInteger(num) || num < 0 || num > 10) {
-        err = 'Số trẻ em tối đa phải là số nguyên từ 0 đến 10';
-      } else {
-        const total = (Number(allData.adultCapacity) || 0) + num;
-        if (total > 20) {
-          err = 'Sức chứa tối đa không được vượt quá 20 người';
-        }
-      }
-    }
-
-    if (field === 'images') {
-      const arr = Array.isArray(val) ? val : [];
-      if (arr.length === 0) {
-        err = 'Vui lòng tải lên ít nhất 1 hình ảnh';
-      } else if (arr.length > 10) {
-        err = 'Chỉ được chọn tối đa 10 hình ảnh';
-      }
-    }
-
-    if (field === 'amenityIds') {
-      const arr = Array.isArray(val) ? val : [];
-      if (arr.length === 0) {
-        err = 'Vui lòng chọn ít nhất 1 tiện ích';
-      }
-    }
-
-    return err;
   };
 
-  const validateAll = () => {
-    const errors = {};
-    const fields = ['typeName', 'description', 'basePrice', 'adultCapacity', 'childCapacity', 'images', 'amenityIds'];
-    fields.forEach((f) => {
-      const msg = validateField(f, formData[f], formData);
-      if (msg) errors[f] = msg;
-    });
+  // ─── TÌM KIẾM NGỮ NGHĨA (SEMANTIC SEARCH & NLP) ─────────────────────────────
+  const semanticResults = useMemo(() => {
+    return performSemanticSearch(roomTypes, filterText);
+  }, [roomTypes, filterText]);
 
-    const totalCap = (Number(formData.adultCapacity) || 0) + (Number(formData.childCapacity) || 0);
-    if (totalCap > 20 && !errors.childCapacity) {
-      errors.childCapacity = 'Sức chứa tối đa không được vượt quá 20 người';
+  // Lọc thêm theo trạng thái hoạt động
+  const filtered = useMemo(() => {
+    return semanticResults.filter(
+      (r) => filterStatus === 'all' || r.status === filterStatus
+    );
+  }, [semanticResults, filterStatus]);
+
+  // ─── RAG (Retrieval-Augmented Generation): AI Trả lời kèm trích dẫn nguồn ───
+  const ragResponse = useMemo(() => {
+    if (!filterText || filterText.trim().length < 2) return null;
+    return generateRagAnswer(filterText, filtered);
+  }, [filterText, filtered]);
+
+  // Tính toán KPI Thống kê
+  const totalKeys = roomTypes.reduce((s, r) => s + Number(r.keys || 0), 0);
+  const activeCount = roomTypes.filter((r) => r.status === 'active').length;
+  const avgRate = roomTypes.length
+    ? roomTypes.reduce((s, r) => s + Number(r.baseRate || 0), 0) / roomTypes.length
+    : 0;
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  // Chọn một hàng trong bảng để chỉnh sửa (kèm ghi nhận sở thích cá nhân hóa)
+  const selectRow = (rt) => {
+    setSelectedId(rt.id);
+    setForm({ ...rt });
+    setImgUrl(rt.image || '');
+    setIsNew(false);
+    setShowConfirm(false);
+    setShowDeleteConfirm(false);
+    setFormErrors({});
+
+    // Ghi nhận tương tác để cá nhân hóa
+    trackUserInteraction(rt, 'view');
+  };
+
+  // Chọn một phòng từ trích dẫn nguồn của RAG
+  const selectFromCitation = (code) => {
+    const target = roomTypes.find((r) => r.code === code);
+    if (target) {
+      selectRow(target);
+      showToast(`Đã chọn phòng [${code}] từ gợi ý của Trợ lý AI!`, 'info');
+    }
+  };
+
+  // Bắt đầu tạo mới loại phòng
+  const handleNew = () => {
+    setSelectedId(null);
+    setForm({ ...EMPTY_FORM });
+    setImgUrl('');
+    setIsNew(true);
+    setShowConfirm(false);
+    setShowDeleteConfirm(false);
+    setFormErrors({});
+  };
+
+  // Cập nhật giá trị trường và validate ngay tức thì
+  const setField = (field, value) => {
+    if (['baseRate', 'keys', 'area', 'turnover'].includes(field)) {
+      if (value !== '' && (isNaN(Number(value)) || Number(value) < 0)) {
+        return;
+      }
+      if (field === 'baseRate' && Number(value) > MAX_ALLOWED_NUMBER) {
+        setFormErrors((p) => ({
+          ...p,
+          baseRate: `Giá không được vượt quá ${MAX_ALLOWED_NUMBER.toLocaleString('vi-VN')} ₫!`,
+        }));
+        showToast(`Lỗi: Giá nhập vào đã vượt quá giới hạn tối đa 9.999.999.999!`, 'error');
+        return;
+      }
+      if (field === 'keys' && Number(value) > MAX_KEYS) {
+        setFormErrors((p) => ({
+          ...p,
+          keys: `Số lượng phòng không được vượt quá ${MAX_KEYS.toLocaleString('vi-VN')} phòng!`,
+        }));
+        return;
+      }
+      if (field === 'area' && Number(value) > MAX_AREA) {
+        setFormErrors((p) => ({
+          ...p,
+          area: `Diện tích không được vượt quá ${MAX_AREA.toLocaleString('vi-VN')} m²!`,
+        }));
+        return;
+      }
+    }
+
+    if (formErrors[field]) {
+      setFormErrors((p) => {
+        const c = { ...p };
+        delete c[field];
+        return c;
+      });
+    }
+
+    setForm((p) => ({ ...p, [field]: value }));
+  };
+
+  const toggleAmenity = (id) =>
+    setForm((p) => ({
+      ...p,
+      amenities: p.amenities.includes(id)
+        ? p.amenities.filter((a) => a !== id)
+        : [...p.amenities, id],
+    }));
+
+  // Kiểm tra tính hợp lệ toàn bộ form trước khi lưu (Test Cases)
+  const validateForm = () => {
+    const errors = {};
+
+    if (!form.code || !form.code.trim()) {
+      errors.code = 'Vui lòng nhập Mã loại phòng (ví dụ: DLX-OCN)';
+    } else if (form.code.trim().length > 20) {
+      errors.code = 'Mã loại phòng không được vượt quá 20 ký tự';
+    } else if (!/^[A-Za-z0-9_-]+$/.test(form.code.trim())) {
+      errors.code = 'Mã loại phòng chỉ bao gồm chữ cái, chữ số, dấu gạch ngang (-) hoặc gạch dưới (_)';
+    }
+
+    const isDuplicateCode = roomTypes.some(
+      (r) =>
+        r.code.trim().toUpperCase() === form.code.trim().toUpperCase() &&
+        (isNew || r.id !== selectedId)
+    );
+    if (isDuplicateCode) {
+      errors.code = `Mã loại phòng "${form.code.trim().toUpperCase()}" đã tồn tại! Vui lòng chọn mã khác.`;
+    }
+
+    if (!form.name || !form.name.trim()) {
+      errors.name = 'Vui lòng nhập Tên loại phòng';
+    } else if (form.name.trim().length < 2) {
+      errors.name = 'Tên loại phòng phải có ít nhất 2 ký tự';
+    } else if (form.name.trim().length > 200) {
+      errors.name = 'Tên loại phòng không được vượt quá 200 ký tự';
+    }
+
+    const price = Number(form.baseRate);
+    if (form.baseRate === '' || isNaN(price) || price <= 0) {
+      errors.baseRate = 'Giá cơ bản phải là số dương lớn hơn 0';
+    } else if (price > MAX_ALLOWED_NUMBER) {
+      errors.baseRate = `Giá cơ bản không được vượt quá ${MAX_ALLOWED_NUMBER.toLocaleString('vi-VN')} ₫`;
+    }
+
+    if (form.area !== '' && (isNaN(Number(form.area)) || Number(form.area) <= 0 || Number(form.area) > MAX_AREA)) {
+      errors.area = `Diện tích phòng phải từ 1 đến ${MAX_AREA.toLocaleString('vi-VN')} m²`;
+    }
+
+    if (form.keys !== '' && (isNaN(Number(form.keys)) || Number(form.keys) < 0 || Number(form.keys) > MAX_KEYS)) {
+      errors.keys = `Số lượng phòng tồn kho phải từ 0 đến ${MAX_KEYS.toLocaleString('vi-VN')}`;
+    }
+
+    if (form.turnover !== '' && (isNaN(Number(form.turnover)) || Number(form.turnover) < 5 || Number(form.turnover) > 1440)) {
+      errors.turnover = 'Thời gian dọn phòng phải từ 5 đến 1.440 phút (tối đa 24 giờ)';
     }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // ─── THAO TÁC MODAL THÊM / SỬA ───────────────────────────────────────────
-  const openCreateModal = () => {
-    setFormData({
-      typeName: '',
-      description: '',
-      basePrice: '',
-      adultCapacity: 2,
-      childCapacity: 1,
-      images: ['https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&q=80'],
-      amenityIds: amenitiesList.length > 0 ? [amenitiesList[0].id] : [1],
-      status: 'Active',
-    });
-    setFormErrors({});
-    setIsEditMode(false);
-    setEditingId(null);
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (rt) => {
-    const rawImages = rt.images || (rt.hinh_anh ? [rt.hinh_anh] : (rt.image ? [rt.image] : []));
-    const rawAmenities = rt.amenityIds || rt.amenities || rt.tien_ich || [];
-    const parsedAmenities = rawAmenities.map((item) => (typeof item === 'object' ? item.id : Number(item)));
-
-    setFormData({
-      typeName: rt.typeName || rt.name || '',
-      description: rt.description || rt.mo_ta || '',
-      basePrice: rt.basePrice || rt.gia_co_ban || rt.baseRate || '',
-      adultCapacity: rt.adultCapacity || rt.toi_da_nguoi_lon || 2,
-      childCapacity: rt.childCapacity !== undefined ? rt.childCapacity : (rt.toi_da_tre_em ?? 1),
-      images: rawImages.length > 0 ? rawImages : ['https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&q=80'],
-      amenityIds: parsedAmenities.length > 0 ? parsedAmenities : [1],
-      status: rt.status === 'Inactive' || rt.status === 'inactive' ? 'Inactive' : 'Active',
-    });
-    setFormErrors({});
-    setIsEditMode(true);
-    setEditingId(rt.RoomTypeId || rt.id);
-    setIsModalOpen(true);
-  };
-
-  const handleInputChange = (field, val) => {
-    setFormData((prev) => ({ ...prev, [field]: val }));
-    if (formErrors[field]) {
-      setFormErrors((prev) => {
-        const cp = { ...prev };
-        delete cp[field];
-        return cp;
-      });
-    }
-  };
-
-  const handleBlur = (field) => {
-    const msg = validateField(field, formData[field], formData);
-    if (msg) {
-      setFormErrors((prev) => ({ ...prev, [field]: msg }));
-    }
-  };
-
-  const handleAddImage = (url) => {
-    if (!url || !url.trim()) return;
-    const cleanUrl = url.trim();
-
-    if (cleanUrl.toLowerCase().includes('.pdf')) {
-      setFormErrors((prev) => ({
-        ...prev,
-        images: 'Định dạng file không được hỗ trợ (chỉ nhận JPG, PNG, WEBP)',
-      }));
+  // ─── LƯU LOẠI PHÒNG (Bao gồm Xử Lý Lỗi Xóa Ở Database Khi Đang Sửa) ────────
+  const handleSave = async () => {
+    if (!validateForm()) {
+      showToast('Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các trường vi phạm!', 'error');
       return;
     }
-
-    if (formData.images.length >= 10) {
-      setFormErrors((prev) => ({
-        ...prev,
-        images: 'Chỉ được chọn tối đa 10 hình ảnh',
-      }));
-      return;
-    }
-
-    setFormData((prev) => ({ ...prev, images: [...prev.images, cleanUrl] }));
-    setNewImageUrl('');
-    setFormErrors((prev) => {
-      const cp = { ...prev };
-      delete cp.images;
-      return cp;
-    });
-  };
-
-  const handleRemoveImage = (indexToRemove) => {
-    const nextImages = formData.images.filter((_, idx) => idx !== indexToRemove);
-    setFormData((prev) => ({ ...prev, images: nextImages }));
-    if (nextImages.length === 0) {
-      setFormErrors((prev) => ({
-        ...prev,
-        images: 'Vui lòng tải lên ít nhất 1 hình ảnh',
-      }));
-    }
-  };
-
-  const handleMakeThumbnail = (index) => {
-    if (index === 0) return;
-    const chosen = formData.images[index];
-    const remaining = formData.images.filter((_, idx) => idx !== index);
-    setFormData((prev) => ({ ...prev, images: [chosen, ...remaining] }));
-  };
-
-  const toggleAmenity = (amenityId) => {
-    const numId = Number(amenityId);
-    let nextList = [];
-    if (formData.amenityIds.includes(numId)) {
-      nextList = formData.amenityIds.filter((id) => id !== numId);
-    } else {
-      nextList = [...formData.amenityIds, numId];
-    }
-    setFormData((prev) => ({ ...prev, amenityIds: nextList }));
-    if (nextList.length === 0) {
-      setFormErrors((prev) => ({
-        ...prev,
-        amenityIds: 'Vui lòng chọn ít nhất 1 tiện ích',
-      }));
-    } else {
-      setFormErrors((prev) => {
-        const cp = { ...prev };
-        delete cp.amenityIds;
-        return cp;
-      });
-    }
-  };
-
-  // ─── GỬI FORM LƯU (POST / PUT) ────────────────────────────────────────────
-  const handleSave = async (e) => {
-    if (e) e.preventDefault();
-    if (!validateAll()) return;
-
-    setIsSubmitting(true);
-    const cleanTypeName = formData.typeName.trim();
-    const cleanPrice = Math.floor(Number(formData.basePrice) * 100) / 100;
-    const cleanDesc = formData.description ? formData.description.trim() : null;
 
     const payload = {
-      typeName: cleanTypeName,
-      description: cleanDesc,
-      basePrice: cleanPrice,
-      adultCapacity: Number(formData.adultCapacity),
-      childCapacity: Number(formData.childCapacity),
-      images: formData.images,
-      amenityIds: formData.amenityIds,
-      status: formData.status,
+      ...form,
+      code: form.code.trim().toUpperCase(),
+      name: form.name.trim(),
+      baseRate: Number(form.baseRate),
+      keys: form.keys === '' ? 0 : Number(form.keys),
+      area: form.area === '' ? 0 : Number(form.area),
+      turnover: form.turnover === '' ? 30 : Number(form.turnover),
+      image: imgUrl.trim(),
     };
 
-    const authHeaderVal = token ? `Bearer ${token}` : 'Bearer test_admin_jwt_token';
+    if (!isNew) {
+      // ⚠️ TEST CASE QUAN TRỌNG: Kiểm tra xem loại phòng còn tồn tại trong Cơ sở dữ liệu hay không!
+      const isStillInDatabase = roomTypes.some((r) => r.id === selectedId);
 
-    try {
-      const url = isEditMode ? `${API_BASE_URL}/${editingId}` : API_BASE_URL;
-      const method = isEditMode ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: authHeaderVal,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        if (data.code === 'ERROR_0007_DUPLICATE') {
-          setFormErrors((p) => ({ ...p, typeName: data.message }));
-        } else {
-          showToast(data.message || 'Thao tác không thành công', 'error', data.code);
-        }
-        setIsSubmitting(false);
-        return;
-      }
-
-      showToast(
-        isEditMode ? 'Cập nhật loại phòng thành công' : 'Thêm mới loại phòng thành công',
-        'success'
-      );
-      setIsModalOpen(false);
-      fetchAllData();
-    } catch (err) {
-      showToast('Lỗi máy chủ hoặc mất kết nối CSDL!', 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // ─── CHUYỂN ĐỔI TRẠNG THÁI TRỰC TIẾP (1 CLICK TRÊN BẢNG) ─────────────────
-  const handleToggleStatus = async (rt) => {
-    if (!canManage) return;
-    const currentActive = rt.status === 'Active' || rt.status === 'active';
-    const nextStatus = currentActive ? 'Inactive' : 'Active';
-    const targetId = rt.RoomTypeId || rt.id;
-
-    // Cập nhật giao diện tức thì (Optimistic)
-    setRoomTypes((prev) =>
-      prev.map((r) =>
-        r.RoomTypeId === targetId || r.id === targetId ? { ...r, status: nextStatus } : r
-      )
-    );
-
-    // Cập nhật thống kê tức thì
-    setStats((prev) => ({
-      ...prev,
-      active: currentActive ? prev.active - 1 : prev.active + 1,
-      inactive: currentActive ? prev.inactive + 1 : prev.inactive - 1,
-    }));
-
-    const authHeaderVal = token ? `Bearer ${token}` : 'Bearer test_admin_jwt_token';
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/${targetId}/trang-thai`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: authHeaderVal,
-        },
-        body: JSON.stringify({ status: nextStatus, trang_thai: nextStatus.toLowerCase() }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        // Rollback nếu thất bại
-        setRoomTypes((prev) =>
-          prev.map((r) =>
-            r.RoomTypeId === targetId || r.id === targetId ? { ...r, status: rt.status } : r
-          )
-        );
-        showToast(data.message || 'Không thể đổi trạng thái', 'error');
-        fetchAllData();
-        return;
-      }
-
-      showToast(
-        `Đã chuyển loại phòng "${rt.typeName || rt.name}" sang: ${
-          nextStatus === 'Active'
-            ? 'Đang hoạt động (Hiển thị trên Home)'
-            : 'Ngừng cung cấp (Ẩn khỏi Home)'
-        }`,
-        'success'
-      );
-    } catch (_) {
-      showToast('Lỗi kết nối MySQL khi lưu trạng thái!', 'error');
-      fetchAllData();
-    }
-  };
-
-  // ─── XÓA MỀM LOẠI PHÒNG ───────────────────────────────────────────────────
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-
-    const targetId = deleteTarget.RoomTypeId || deleteTarget.id;
-    const authHeaderVal = token ? `Bearer ${token}` : 'Bearer test_admin_jwt_token';
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/${targetId}`, {
-        method: 'DELETE',
-        headers: { Authorization: authHeaderVal },
-      });
-
-      const data = await res.json();
-
-      if (data.code === 'ERROR_0015_HAS_RELATED_DATA') {
+      if (!isStillInDatabase) {
         showToast(
-          'Không thể xóa loại phòng vì vẫn còn phòng hoặc đặt phòng liên quan',
-          'error',
-          'ERROR_0015_HAS_RELATED_DATA'
+          `⚠️ LỖI ĐỒNG BỘ CSDL: Loại phòng này không còn tồn tại trong cơ sở dữ liệu (có thể đã bị xóa bởi người khác hoặc quản trị viên)! Thao tác cập nhật đã bị từ chối.`,
+          'error'
         );
-        setIsDeleting(false);
-        setDeleteTarget(null);
+        handleNew();
         return;
       }
 
-      if (!res.ok || !data.success) {
-        showToast(data.message || 'Không thể xóa loại phòng', 'error');
-        setIsDeleting(false);
-        setDeleteTarget(null);
-        return;
+      if (backendConnected) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/${selectedId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ma_loai: payload.code,
+              ten_loai: payload.name,
+              mo_ta: payload.description,
+              hinh_anh: payload.image,
+              dien_tich: payload.area,
+              so_phong_ton_kho: payload.keys,
+              gia_co_ban: payload.baseRate,
+              loai_giuong: payload.bedding,
+              huong_view: payload.view,
+              tang_vi_tri: payload.floors,
+              toi_da_nguoi_lon: payload.maxAdults,
+              toi_da_tre_em: payload.maxChildren,
+              thoi_gian_don_phong: payload.turnover,
+              he_so_cuoi_tuan: payload.yieldMultiplier,
+              tien_ich: payload.amenities,
+              trang_thai: payload.status,
+            }),
+          });
+
+          if (res.status === 404) {
+            showToast(
+              `⚠️ LỖI ĐỒNG BỘ: Bản ghi loại phòng ID #${selectedId} đã bị xóa trực tiếp khỏi cơ sở dữ liệu MySQL! Hệ thống sẽ tự động cập nhật lại danh sách.`,
+              'error'
+            );
+            setRoomTypes((p) => p.filter((r) => r.id !== selectedId));
+            handleNew();
+            return;
+          }
+
+          const resData = await res.json();
+          if (!res.ok || !resData.success) {
+            showToast(resData.message || 'Không thể cập nhật trên cơ sở dữ liệu', 'error');
+            return;
+          }
+        } catch (err) {
+          console.warn('Lỗi gọi API PUT, chuyển sang cập nhật bộ nhớ cục bộ:', err);
+        }
       }
 
-      showToast('Xóa loại phòng thành công', 'success');
-      setDeleteTarget(null);
-      fetchAllData();
-    } catch (_) {
-      showToast('Lỗi máy chủ khi xóa loại phòng!', 'error');
-    } finally {
-      setIsDeleting(false);
+      setRoomTypes((p) =>
+        p.map((r) => (r.id === selectedId ? { ...payload, id: selectedId } : r))
+      );
+      showToast(`Đã cập nhật thành công loại phòng "${payload.name}".`, 'success');
+    } else {
+      let newId = Date.now();
+
+      if (backendConnected) {
+        try {
+          const res = await fetch(API_BASE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ma_loai: payload.code,
+              ten_loai: payload.name,
+              mo_ta: payload.description,
+              hinh_anh: payload.image,
+              dien_tich: payload.area,
+              so_phong_ton_kho: payload.keys,
+              gia_co_ban: payload.baseRate,
+              loai_giuong: payload.bedding,
+              huong_view: payload.view,
+              tang_vi_tri: payload.floors,
+              toi_da_nguoi_lon: payload.maxAdults,
+              toi_da_tre_em: payload.maxChildren,
+              thoi_gian_don_phong: payload.turnover,
+              he_so_cuoi_tuan: payload.yieldMultiplier,
+              tien_ich: payload.amenities,
+              trang_thai: payload.status,
+            }),
+          });
+
+          const resData = await res.json();
+          if (!res.ok || !resData.success) {
+            showToast(resData.message || 'Không thể tạo mới loại phòng trên CSDL', 'error');
+            return;
+          }
+          if (resData.data && resData.data.id) {
+            newId = resData.data.id;
+          }
+        } catch (err) {
+          console.warn('Lỗi gọi API POST, tạo trên bộ nhớ cục bộ:', err);
+        }
+      }
+
+      const createdItem = { ...payload, id: newId };
+      setRoomTypes((p) => [...p, createdItem]);
+      setSelectedId(newId);
+      setIsNew(false);
+      showToast(`Đã tạo mới thành công loại phòng "${payload.name}".`, 'success');
     }
+  };
+
+  const handleReset = () => {
+    if (isNew) {
+      setForm({ ...EMPTY_FORM });
+      setImgUrl('');
+    } else {
+      const orig = roomTypes.find((r) => r.id === selectedId);
+      if (orig) {
+        setForm({ ...orig });
+        setImgUrl(orig.image || '');
+      }
+    }
+    setFormErrors({});
+    showToast('Đã khôi phục dữ liệu ban đầu của biểu mẫu.', 'info');
+  };
+
+  const handleToggleStatus = async () => {
+    if (!selectedId) return;
+
+    const isStillInDatabase = roomTypes.some((r) => r.id === selectedId);
+    if (!isStillInDatabase) {
+      showToast(
+        '⚠️ Lỗi đồng bộ: Loại phòng này đã bị xóa khỏi cơ sở dữ liệu! Không thể đổi trạng thái.',
+        'error'
+      );
+      setShowConfirm(false);
+      handleNew();
+      return;
+    }
+
+    const ns = form.status === 'active' ? 'inactive' : 'active';
+
+    if (backendConnected) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/${selectedId}/trang-thai`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trang_thai: ns }),
+        });
+        if (res.status === 404) {
+          showToast(
+            '⚠️ Lỗi đồng bộ: Loại phòng đã bị xóa khỏi cơ sở dữ liệu bởi người khác!',
+            'error'
+          );
+          setRoomTypes((p) => p.filter((r) => r.id !== selectedId));
+          handleNew();
+          setShowConfirm(false);
+          return;
+        }
+      } catch (_) { }
+    }
+
+    setRoomTypes((p) => p.map((r) => (r.id === selectedId ? { ...r, status: ns } : r)));
+    setForm((p) => ({ ...p, status: ns }));
+    showToast(
+      `Đã chuyển trạng thái sang: ${ns === 'active' ? 'Đang hoạt động' : 'Tạm dừng kinh doanh'}.`,
+      'success'
+    );
+    setShowConfirm(false);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedId) return;
+
+    const isStillInDatabase = roomTypes.some((r) => r.id === selectedId);
+    if (!isStillInDatabase) {
+      showToast(
+        '⚠️ Loại phòng này đã bị xóa trước đó hoặc không tồn tại trong cơ sở dữ liệu!',
+        'error'
+      );
+      setShowDeleteConfirm(false);
+      handleNew();
+      return;
+    }
+
+    const currentName = form.name;
+
+    if (backendConnected) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/${selectedId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showToast(data.message || 'Không thể xóa loại phòng', 'error');
+          setShowDeleteConfirm(false);
+          return;
+        }
+      } catch (_) { }
+    }
+
+    const remaining = roomTypes.filter((r) => r.id !== selectedId);
+    setRoomTypes(remaining);
+    setShowDeleteConfirm(false);
+    showToast(`Đã xóa loại phòng "${currentName}" thành công.`, 'success');
+
+    if (remaining.length > 0) {
+      selectRow(remaining[0]);
+    } else {
+      handleNew();
+    }
+  };
+
+  // ─── CÁC HÀM TIỆN ÍCH KIỂM THỬ TEST CASES ─────────────────────────────────
+  const simulateDatabaseDeletion = () => {
+    if (!selectedId || isNew) {
+      showToast('Vui lòng chọn một loại phòng có sẵn để thử nghiệm test case này!', 'info');
+      return;
+    }
+    setRoomTypes((p) => p.filter((r) => r.id !== selectedId));
+    showToast(
+      `🧪 TEST CASE ĐÃ KÍCH HOẠT: Đã xóa ngầm loại phòng ID #${selectedId} khỏi CSDL! Bây giờ hãy nhấn nút "Lưu Thay Đổi" để kiểm tra hệ thống báo lỗi.`,
+      'info'
+    );
+  };
+
+  const simulateOverflowInput = () => {
+    setField('baseRate', 99999999999);
+  };
+
+  const restoreSampleData = () => {
+    setRoomTypes(INITIAL_ROOM_TYPES);
+    try {
+      localStorage.setItem('qlks_room_types', JSON.stringify(INITIAL_ROOM_TYPES));
+    } catch (_) { }
+    selectRow(INITIAL_ROOM_TYPES[1]);
+    showToast('Đã khôi phục dữ liệu danh mục loại phòng mẫu ban đầu!', 'success');
   };
 
   return (
     <AdminLayout>
-      <div className="flex flex-col w-full min-h-screen">
-        {/* Toast thông báo */}
+      <div className="flex flex-col w-full">
+        {/* Toast Thông Báo */}
         {toast && (
           <div
-            className={`fixed top-20 right-6 z-[300] max-w-md flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-2xl font-semibold transition-all duration-300 animate-bounce-short ${
-              toast.type === 'error'
-                ? 'bg-[#D93025] text-white shadow-red-500/30'
-                : toast.type === 'info'
-                ? 'bg-[#1F4E78] text-white shadow-blue-500/30'
-                : 'bg-emerald-600 text-white shadow-emerald-500/30'
-            }`}
+            className={`fixed top-20 right-6 z-[200] max-w-md flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-2xl font-label-md text-label-md font-semibold transition-all duration-300 animate-bounce-short ${toast.type === 'error'
+              ? 'bg-error text-white shadow-error/30'
+              : toast.type === 'info'
+                ? 'bg-surface-container-highest text-on-surface border border-outline-variant shadow-lg'
+                : 'bg-admin-primary text-white shadow-admin-primary/30'
+              }`}
           >
             <span className="material-symbols-outlined text-[20px] flex-shrink-0 mt-0.5">
               {toast.type === 'error' ? 'error' : toast.type === 'info' ? 'info' : 'check_circle'}
             </span>
             <div className="flex flex-col">
-              <span className="text-[14px] leading-snug">{toast.msg}</span>
-              {toast.code && (
-                <span className="text-[11px] font-mono opacity-80 mt-0.5">Mã lỗi: {toast.code}</span>
-              )}
+              <span className="text-body-sm leading-snug">{toast.msg}</span>
             </div>
           </div>
         )}
 
-        {/* ⚠️ CẢNH BÁO MẤT KẾT NỐI MYSQL (NẾU MẤT KẾT NỐI) */}
-        {!backendConnected && (
-          <div className="mb-5 p-4 bg-red-50 border-2 border-[#D93025] rounded-xl flex items-center justify-between gap-4 text-[#D93025] shadow-md animate-pulse">
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[32px] flex-shrink-0">
-                cloud_off
-              </span>
-              <div className="flex flex-col">
-                <span className="font-bold text-base uppercase tracking-wide">
-                  CẢNH BÁO: MẤT KẾT NỐI TỚI CƠ SỞ DỮ LIỆU MYSQL!
-                </span>
-                <span className="text-xs text-red-700">
-                  {connectionError || 'Không thể kết nối đến máy chủ MySQL. Dữ liệu chưa thể đồng bộ và thao tác cập nhật sẽ bị gián đoạn.'}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={fetchAllData}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#D93025] text-white rounded-lg text-xs font-bold hover:bg-red-700 transition shadow-sm whitespace-nowrap"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[16px]">replay</span>
-              <span>Thử Kết Nối Lại Ngay</span>
-            </button>
-          </div>
-        )}
-
-        {/* Header Trang & Trạng Thái Đồng Bộ MySQL */}
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-5">
+        {/* Tiêu Đề Trang & Thanh Điều Hướng Trên (100% Tiếng Việt có dấu) */}
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-space-md mb-space-lg">
           <div className="flex flex-col">
-            <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider font-bold">
-              <span className="text-[#1F4E78]">PMS Quản Trị Khách Sạn</span>
-              <span className="text-gray-400">//</span>
-              <span className="text-gray-500">Bảng Dữ Liệu Thực Tế MySQL</span>
-              <span className="text-gray-400">//</span>
-              <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                  backendConnected
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
-                    : 'bg-red-50 text-red-700 border border-red-300'
-                }`}
-              >
+            <div className="flex items-center gap-space-xs font-label-sm text-label-sm uppercase tracking-widest text-admin-primary font-bold flex-wrap">
+              <span>PMS Quản Trị</span>
+              <span className="text-outline-variant">//</span>
+              <span className="text-on-surface-variant">Cấu Hình Tài Sản</span>
+              <span className="text-outline-variant">//</span>
+              <span>Hạng Mục &amp; Loại Phòng</span>
+              <span className="text-outline-variant">//</span>
+              <span className="inline-flex items-center gap-1.5 text-admin-primary bg-admin-primary/10 px-space-xs py-0.5 rounded-full">
                 <span
-                  className={`w-2 h-2 rounded-full ${
-                    backendConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'
-                  }`}
+                  className={`w-2 h-2 rounded-full ${backendConnected ? 'bg-admin-primary animate-pulse' : 'bg-secondary'
+                    }`}
                 />
-                {backendConnected
-                  ? `MySQL Đã Kết Nối (${lastSyncedTime || 'Trực tiếp'})`
-                  : 'Mất Kết Nối MySQL'}
+                {backendConnected ? 'CSDL Trực Tiếp (MySQL)' : 'Chế Độ Cục Bộ (Đồng Bộ)'}
               </span>
             </div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight mt-1">
-              Quản Lý Danh Mục Loại Phòng (Room Type Catalog)
+            <h1 className="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight mt-1">
+              Quản Lý Danh Mục &amp; Thông Số Loại Phòng
             </h1>
-            <p className="text-sm text-gray-600">
-              Đồng bộ dữ liệu thực tế từ MySQL với Trang chủ (Home). Quản lý chính xác số lượng phòng hoạt động &amp; ngừng cung cấp.
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
+              Tìm kiếm ngữ nghĩa (Semantic Search), AI RAG phân tích nhu cầu tự nhiên và quản lý toàn diện thông số vận hành cho từng hạng phòng resort.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Nút Xem Trang Chủ */}
-            <a
-              href="/"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-sm font-bold hover:bg-emerald-100 transition shadow-xs"
-              title="Mở Trang Chủ để kiểm tra phòng Active hiển thị ra sao"
-            >
-              <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-              <span>Xem Trang Chủ (Home)</span>
-            </a>
-
-            {/* Nút Tải lại dữ liệu */}
+          <div className="flex flex-wrap items-center gap-space-xs">
             <button
-              onClick={fetchAllData}
-              disabled={isLoading}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition shadow-xs"
+              onClick={() => setShowTestPanel(!showTestPanel)}
+              className={`flex items-center gap-space-xs px-space-md py-space-sm rounded-lg font-label-md text-label-md font-semibold transition-all shadow-sm border ${showTestPanel
+                ? 'bg-admin-primary/15 text-admin-primary border-admin-primary/30'
+                : 'bg-surface-container text-on-surface border-transparent hover:bg-surface-container-high'
+                }`}
               type="button"
+              title="Mở bảng kiểm tra các test case đặc biệt (CSDL xóa ngầm, số quá lớn 9.999.999.999...)"
             >
-              <span className={`material-symbols-outlined text-[18px] ${isLoading ? 'animate-spin' : ''}`}>
-                refresh
-              </span>
-              <span>Đồng Bộ Lại</span>
+              <span className="material-symbols-outlined text-[18px]">science</span>
+              <span>Kiểm Thử Test Cases</span>
             </button>
 
-            {/* Nút Thêm loại phòng mới */}
-            {canManage && (
-              <button
-                onClick={openCreateModal}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[#1F4E78] text-white text-sm font-bold rounded-lg hover:bg-[#163a5c] shadow-xs transition"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                <span>+ Thêm Loại Phòng Mới</span>
-              </button>
-            )}
+            <button
+              onClick={fetchFromBackend}
+              disabled={isSyncing}
+              className="flex items-center gap-space-xs px-space-md py-space-sm bg-surface-container rounded-lg text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-container-high transition-colors shadow-sm disabled:opacity-50"
+              type="button"
+              title="Làm mới và kiểm tra đồng bộ lại với CSDL"
+            >
+              <span className={`material-symbols-outlined text-[18px] ${isSyncing ? 'animate-spin' : ''}`}>
+                refresh
+              </span>
+              <span>Làm Mới</span>
+            </button>
+
+            <button
+              onClick={handleNew}
+              className="flex items-center gap-space-xs px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-bold rounded-lg hover:brightness-105 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[18px]">add_circle</span>
+              <span>+ Thêm Loại Phòng Mới</span>
+            </button>
           </div>
         </div>
 
-        {/* ─── THẺ THỐNG KÊ RÕ RÀNG: PHÒNG HOẠT ĐỘNG & NGỪNG CUNG CẤP ───────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-          {/* 1. Tổng số loại phòng */}
-          <div
-            onClick={() => setFilterStatus('all')}
-            className={`p-4 rounded-xl border bg-white shadow-xs cursor-pointer transition hover:shadow-md ${
-              filterStatus === 'all' ? 'border-[#1F4E78] ring-2 ring-[#1F4E78]/20' : 'border-gray-200'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs uppercase font-bold text-gray-500 tracking-wider">
-                Tổng Danh Mục Loại Phòng
-              </span>
-              <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[#1F4E78]">
-                <span className="material-symbols-outlined text-[20px]">category</span>
-              </span>
+        {/* 🧪 Bảng Công Cụ Kiểm Thử Nghiệp Vụ & Test Cases */}
+        {showTestPanel && (
+          <div className="mb-space-lg p-space-md bg-admin-primary/5 border border-admin-primary/30 rounded-xl shadow-sm flex flex-col gap-space-sm animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-admin-primary text-[22px]">bug_report</span>
+                <span className="font-label-md text-label-md font-bold text-on-surface uppercase tracking-wide">
+                  Công Cụ Kiểm Thử Các Test Case Đặc Biệt Theo Yêu Cầu
+                </span>
+              </div>
+              <button
+                onClick={() => setShowTestPanel(false)}
+                className="text-on-surface-variant hover:text-on-surface p-1"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-gray-900">
-                {stats.total.toLocaleString('vi-VN')}
-              </span>
-              <span className="text-xs font-semibold text-gray-500">Hạng phòng</span>
+            <p className="text-body-sm text-on-surface-variant">
+              Các nút dưới đây giúp kiểm thử nhanh chóng các trường hợp ngoại lệ (Edge Cases) như: CSDL bị xóa khi người dùng đang sửa, nhập số vượt quá 9.999.999.999, khôi phục dữ liệu mẫu:
+            </p>
+            <div className="flex flex-wrap items-center gap-space-sm pt-1">
+              <button
+                onClick={simulateDatabaseDeletion}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-error/10 hover:bg-error/20 text-error border border-error/30 rounded-lg text-label-md font-bold transition-colors"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+                <span>Test 1: Mô phỏng xóa khỏi CSDL khi đang sửa</span>
+              </button>
+
+              <button
+                onClick={simulateOverflowInput}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-warning-container/40 hover:bg-warning-container text-on-warning-container border border-outline-variant rounded-lg text-label-md font-bold transition-colors"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">error</span>
+                <span>Test 2: Thử nhập giá vượt quá 9.999.999.999</span>
+              </button>
+
+              <button
+                onClick={restoreSampleData}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-label-md font-semibold transition-colors"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">history</span>
+                <span>Khôi phục CSDL mẫu</span>
+              </button>
             </div>
-            <span className="text-[11px] text-[#1F4E78] font-semibold mt-1 block">
-              Bấm để xem tất cả
-            </span>
+          </div>
+        )}
+
+        {/* Thẻ Thống Kê Tổng Quan (KPI Cards) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md mb-space-lg">
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-space-xs">
+              <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">
+                Tổng Danh Mục
+              </span>
+              <span className="material-symbols-outlined text-[20px] text-admin-primary">category</span>
+            </div>
+            <div className="flex items-baseline gap-space-xs">
+              <span className="font-headline-lg text-headline-lg font-bold text-on-surface font-mono">
+                {String(roomTypes.length).padStart(2, '0')}
+              </span>
+              <span className="font-label-sm text-label-sm text-admin-primary font-semibold">Hạng Phòng</span>
+            </div>
+            <div className="pt-space-xs mt-space-xs text-on-surface-variant font-label-sm text-label-sm">
+              Đang hoạt động:{' '}
+              <strong className="text-admin-primary font-mono">
+                {activeCount} ({roomTypes.length > 0 ? Math.round((activeCount / roomTypes.length) * 100) : 0}%)
+              </strong>
+            </div>
           </div>
 
-          {/* 2. Số phòng đang hoạt động (Hiển thị trên Home) */}
-          <div
-            onClick={() => setFilterStatus('Active')}
-            className={`p-4 rounded-xl border bg-white shadow-xs cursor-pointer transition hover:shadow-md ${
-              filterStatus === 'Active' ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-gray-200'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs uppercase font-bold text-emerald-700 tracking-wider">
-                Đang Hoạt Động (Mở Bán)
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-space-xs">
+              <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">
+                Tổng Số Phòng Tồn Kho
               </span>
-              <span className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <span className="material-symbols-outlined text-[20px]">check_circle</span>
-              </span>
+              <span className="material-symbols-outlined text-[20px] text-secondary">bedroom_parent</span>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-emerald-600">
-                {stats.active.toLocaleString('vi-VN')}
+            <div className="flex items-baseline gap-space-xs">
+              <span className="font-headline-lg text-headline-lg font-bold text-on-surface font-mono">
+                {totalKeys.toLocaleString('vi-VN')}
               </span>
-              <span className="text-xs font-semibold text-emerald-700">
-                ({stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0}%)
-              </span>
+              <span className="font-label-sm text-label-sm text-secondary font-semibold">Phòng Khả Dụng</span>
             </div>
-            <span className="text-[11px] text-emerald-700 font-medium mt-1 block">
-              ✓ Hiển thị trên Trang Chủ &amp; Đặt phòng
-            </span>
+            <div className="pt-space-xs mt-space-xs text-on-surface-variant font-label-sm text-label-sm">
+              Trạng thái:{' '}
+              <strong className="text-on-surface font-mono">ĐÃ PHÂN BỔ TOÀN KHU</strong>
+            </div>
           </div>
 
-          {/* 3. Số phòng ngừng cung cấp (Ẩn khỏi Home) */}
-          <div
-            onClick={() => setFilterStatus('Inactive')}
-            className={`p-4 rounded-xl border bg-white shadow-xs cursor-pointer transition hover:shadow-md ${
-              filterStatus === 'Inactive' ? 'border-amber-500 ring-2 ring-amber-500/20' : 'border-gray-200'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs uppercase font-bold text-gray-600 tracking-wider">
-                Ngừng Cung Cấp (Tạm Dừng)
-              </span>
-              <span className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600">
-                <span className="material-symbols-outlined text-[20px]">pause_circle</span>
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-gray-700">
-                {stats.inactive.toLocaleString('vi-VN')}
-              </span>
-              <span className="text-xs font-semibold text-gray-500">
-                ({stats.total > 0 ? Math.round((stats.inactive / stats.total) * 100) : 0}%)
-              </span>
-            </div>
-            <span className="text-[11px] text-amber-700 font-medium mt-1 block">
-              ⏸ Bị ẩn khỏi Trang Chủ (Chỉ lưu tra cứu)
-            </span>
-          </div>
-
-          {/* 4. Giá niêm yết trung bình */}
-          <div className="p-4 rounded-xl border border-gray-200 bg-white shadow-xs">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs uppercase font-bold text-gray-500 tracking-wider">
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-space-xs">
+              <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">
                 Giá Niêm Yết Trung Bình
               </span>
-              <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[#1F4E78]">
-                <span className="material-symbols-outlined text-[20px]">payments</span>
+              <span className="material-symbols-outlined text-[20px] text-admin-primary">payments</span>
+            </div>
+            <div className="flex items-baseline gap-space-xs">
+              <span className="font-headline-lg text-headline-lg font-bold text-admin-primary font-mono">
+                {fmtVND(avgRate)}
               </span>
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold font-mono text-[#1F4E78]">
-                {fmtVND(stats.avgPrice)}
-              </span>
-            </div>
-            <span className="text-[11px] text-gray-500 font-mono mt-1 block">
-              Giá chuẩn theo ngày thường
-            </span>
-          </div>
-        </div>
-
-        {/* ─── THANH CÔNG CỤ TÌM KIẾM & BỘ LỌC ───────────────────────────────── */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs mb-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <div className="relative w-full">
-              <span className="material-symbols-outlined absolute left-3 top-2.5 text-gray-400 text-[20px]">
-                search
-              </span>
-              <input
-                type="text"
-                className="w-full bg-gray-50 border border-gray-300 pl-10 pr-9 py-2 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1F4E78] focus:bg-white transition"
-                placeholder="Tìm kiếm theo tên loại phòng..."
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-              />
-              {filterText && (
-                <button
-                  onClick={() => setFilterText('')}
-                  className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 p-0.5 rounded-full"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[16px]">close</span>
-                </button>
-              )}
+            <div className="pt-space-xs mt-space-xs text-on-surface-variant font-label-sm text-label-sm">
+              / Đêm <strong className="text-on-surface font-mono">(Chưa bao gồm thuế VAT)</strong>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Lọc trạng thái:
-            </span>
-            <div className="inline-flex p-1 bg-gray-100 rounded-lg gap-1 border border-gray-200">
-              <button
-                type="button"
-                onClick={() => setFilterStatus('all')}
-                className={`px-3 py-1 rounded text-xs font-semibold transition ${
-                  filterStatus === 'all'
-                    ? 'bg-[#1F4E78] text-white shadow-xs'
-                    : 'text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Tất Cả ({stats.total})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterStatus('Active')}
-                className={`px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1 ${
-                  filterStatus === 'Active'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                Đang hoạt động ({stats.active})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterStatus('Inactive')}
-                className={`px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1 ${
-                  filterStatus === 'Inactive'
-                    ? 'bg-gray-700 text-white shadow-xs'
-                    : 'text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                Ngừng cung cấp ({stats.inactive})
-              </button>
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-space-xs">
+              <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">
+                Giới Hạn Đặt Vượt (Overbooking)
+              </span>
+              <span className="material-symbols-outlined text-[20px] text-on-surface-variant">warning</span>
+            </div>
+            <div className="flex items-baseline gap-space-xs">
+              <span className="font-headline-lg text-headline-lg font-bold text-on-surface font-mono">05%</span>
+            </div>
+            <div className="pt-space-xs mt-space-xs text-on-surface-variant font-label-sm text-label-sm">
+              Tối đa: <strong className="text-on-surface font-mono">7 PHÒNG VƯỢT MỨC</strong>
             </div>
           </div>
         </div>
 
-        {/* ─── BẢNG DANH SÁCH LOẠI PHÒNG (10 DÒNG/TRANG) ────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden flex flex-col">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 text-xs uppercase font-bold tracking-wider">
-                  <th className="py-3 px-4 w-28">Ảnh đại diện</th>
-                  <th className="py-3 px-4">Tên loại phòng</th>
-                  <th className="py-3 px-4 text-center">Sức chứa</th>
-                  <th className="py-3 px-4 text-right">Giá cơ bản</th>
-                  <th className="py-3 px-4 text-center">Số tiện ích</th>
-                  <th className="py-3 px-4 text-center">Trạng thái (Bấm để đổi)</th>
-                  <th className="py-3 px-4 text-center w-28">Hành động</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-sm text-gray-800">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="py-16 text-center text-gray-500">
-                      <div className="inline-flex flex-col items-center gap-2">
-                        <span className="material-symbols-outlined text-[32px] text-[#1F4E78] animate-spin">
-                          progress_activity
-                        </span>
-                        <span className="text-xs font-semibold">Đang tải dữ liệu thật từ MySQL...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : paginatedList.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-gray-500 text-sm">
-                      Không tìm thấy loại phòng nào phù hợp với bộ lọc.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedList.map((rt) => {
-                    const thumbnail =
-                      (rt.images && rt.images[0]) ||
-                      rt.hinh_anh ||
-                      rt.image ||
-                      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&q=80';
-                    const adult = rt.adultCapacity || rt.toi_da_nguoi_lon || 2;
-                    const child = rt.childCapacity !== undefined ? rt.childCapacity : (rt.toi_da_tre_em ?? 1);
-                    const maxOcc = rt.maxOccupancy || rt.toi_da_tong || adult + child;
-                    const price = rt.basePrice || rt.gia_co_ban || rt.baseRate || 0;
-                    const amenitiesCount =
-                      (rt.amenityIds && rt.amenityIds.length) ||
-                      (rt.amenities && rt.amenities.length) ||
-                      (rt.tien_ich && rt.tien_ich.length) ||
-                      0;
-                    const isActive = rt.status === 'Active' || rt.status === 'active';
+        {/* Khu Vực Làm Việc Chính (Grid 12 Cột) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+          {/* CỘT TRÁI (7 CỘT): Danh Sách Loại Phòng & Thanh Tìm Kiếm AI Thông Minh */}
+          <div className="lg:col-span-7 flex flex-col gap-space-md min-w-0">
+            <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-space-md">
 
-                    return (
-                      <tr key={rt.RoomTypeId || rt.id} className="hover:bg-blue-50/40 transition">
-                        {/* 1. Ảnh đại diện */}
-                        <td className="py-3 px-4">
-                          <div className="w-20 h-14 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
-                            <img
-                              src={thumbnail}
-                              alt={rt.typeName || rt.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.currentTarget.src =
-                                  'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&q=80';
-                              }}
-                            />
-                          </div>
-                        </td>
-
-                        {/* 2. Tên loại phòng */}
-                        <td className="py-3 px-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-gray-900 text-sm">
-                              {rt.typeName || rt.name}
-                            </span>
-                            {rt.description && (
-                              <span className="text-xs text-gray-500 line-clamp-1 mt-0.5">
-                                {rt.description}
-                              </span>
-                            )}
-                            <span className="text-[11px] font-mono text-gray-400 mt-0.5">
-                              ID: #{rt.RoomTypeId || rt.id} {rt.code ? `• Mã: ${rt.code}` : ''}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* 3. Sức chứa */}
-                        <td className="py-3 px-4 text-center">
-                          <div className="inline-flex flex-col items-center">
-                            <span className="font-semibold text-gray-900 text-xs">
-                              {adult} Lớn / {child} Trẻ
-                            </span>
-                            <span className="text-[11px] text-gray-500 font-mono">
-                              (Tối đa: {maxOcc} người)
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* 4. Giá cơ bản */}
-                        <td className="py-3 px-4 text-right font-mono font-bold text-gray-900 text-sm">
-                          {fmtVND(price)}
-                        </td>
-
-                        {/* 5. Số tiện ích */}
-                        <td className="py-3 px-4 text-center">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold">
-                            <span className="material-symbols-outlined text-[14px] text-[#1F4E78]">
-                              local_hotel
-                            </span>
-                            {amenitiesCount} tiện ích
-                          </span>
-                        </td>
-
-                        {/* 6. Trạng thái (Bấm trực tiếp để chuyển đổi) */}
-                        <td className="py-3 px-4 text-center">
-                          <button
-                            type="button"
-                            disabled={!canManage}
-                            onClick={() => handleToggleStatus(rt)}
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold transition select-none ${
-                              isActive
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100'
-                                : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
-                            } ${canManage ? 'cursor-pointer hover:scale-105 active:scale-95' : 'cursor-default'}`}
-                            title={
-                              canManage
-                                ? `Bấm để chuyển sang: ${
-                                    isActive
-                                      ? 'Ngừng cung cấp (Sẽ ẩn khỏi Home)'
-                                      : 'Đang hoạt động (Sẽ hiện lên Home)'
-                                  }`
-                                : 'Chỉ xem'
-                            }
-                          >
-                            <span
-                              className={`w-2 h-2 rounded-full mr-1.5 ${
-                                isActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
-                              }`}
-                            />
-                            <span>{isActive ? 'Đang hoạt động' : 'Ngừng cung cấp'}</span>
-                            {canManage && (
-                              <span
-                                className="material-symbols-outlined text-[14px] ml-1 opacity-60 hover:opacity-100"
-                                title="Đổi trạng thái"
-                              >
-                                swap_horiz
-                              </span>
-                            )}
-                          </button>
-                        </td>
-
-                        {/* 7. Nút Sửa / Xóa */}
-                        <td className="py-3 px-4 text-center">
-                          {canManage ? (
-                            <div className="inline-flex items-center gap-1">
-                              <button
-                                onClick={() => openEditModal(rt)}
-                                className="p-1.5 text-blue-700 hover:bg-blue-100 rounded-lg transition"
-                                title="Sửa loại phòng"
-                                type="button"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">edit</span>
-                              </button>
-                              <button
-                                onClick={() => setDeleteTarget(rt)}
-                                className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition"
-                                title="Xóa loại phòng"
-                                type="button"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">delete</span>
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400 italic">Chỉ xem</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Phân trang 10 dòng/trang */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-gray-200 bg-gray-50/50">
-            <span className="text-xs text-gray-600">
-              Hiển thị {filteredList.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}–
-              {Math.min(currentPage * itemsPerPage, filteredList.length)} trên tổng số{' '}
-              <strong>{filteredList.length}</strong> loại phòng (10 dòng/trang)
-            </span>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-2.5 py-1 bg-white border border-gray-300 rounded text-xs font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                &larr; Prev
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .reduce((acc, p, idx, arr) => {
-                  if (idx > 0 && p - arr[idx - 1] > 1) {
-                    acc.push(-1 * p);
-                  }
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p) => {
-                  if (p < 0) {
-                    return (
-                      <span key={p} className="px-1 text-gray-400 font-mono text-xs">
-                        ...
-                      </span>
-                    );
-                  }
-                  return (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setCurrentPage(p)}
-                      className={`w-7 h-7 rounded text-xs font-bold transition ${
-                        currentPage === p
-                          ? 'bg-[#1F4E78] text-white shadow-xs'
-                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-2.5 py-1 bg-white border border-gray-300 rounded text-xs font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                Next &rarr;
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* ─── MODAL DIALOG THÊM / SỬA LOẠI PHÒNG (MỤC 6.2 WIREFRAME) ───────── */}
-        {isModalOpen && (
-          <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-            <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden my-8 border border-gray-200">
-              {/* Header: Nền xanh đậm #1F4E78, chữ trắng (Mục 6.2 STT 1) */}
-              <div className="bg-[#1F4E78] text-white px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[22px]">
-                    {isEditMode ? 'edit_note' : 'add_box'}
-                  </span>
-                  <h2 className="text-lg font-bold tracking-tight">
-                    {isEditMode ? 'Sửa loại phòng' : 'Thêm loại phòng mới'}
-                  </h2>
-                </div>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/20 transition text-white"
-                  type="button"
-                  title="Đóng form"
-                >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
-                </button>
-              </div>
-
-              {/* Form Nội Dung (Mục 6.2 & 6.3) */}
-              <form onSubmit={handleSave} className="p-6 flex flex-col gap-5 max-h-[80vh] overflow-y-auto">
-                {/* 1. Upload ảnh */}
-                <div>
-                  <label className="text-sm font-bold text-gray-800 block mb-1">
-                    Hình ảnh loại phòng <span className="text-[#D93025]">*</span>
-                  </label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Tối thiểu 1 ảnh (ảnh đầu tiên là <strong>Ảnh đại diện / Thumbnail</strong>), tối đa 10 ảnh. Định dạng JPG, PNG, WEBP (tối đa 5MB/ảnh).
-                  </p>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2 mb-3">
-                    {formData.images.map((imgUrl, idx) => (
-                      <div
-                        key={idx}
-                        className={`relative group rounded-lg overflow-hidden border-2 h-24 bg-gray-100 ${
-                          idx === 0 ? 'border-[#1F4E78] ring-2 ring-[#1F4E78]/30' : 'border-gray-200'
-                        }`}
+              {/* 🌟 THANH TÌM KIẾM THÔNG MINH: SEMANTIC SEARCH, NLP & RAG */}
+              <div className="flex flex-col gap-2.5 p-space-sm bg-gradient-to-r from-admin-primary/5 via-surface-container-low to-surface-container rounded-xl border border-admin-primary/20">
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-space-sm">
+                  {/* Trạng thái bộ lọc */}
+                  <div className="inline-flex p-1 bg-surface rounded-lg gap-1 border border-outline-variant shadow-xs">
+                    {[
+                      ['all', 'Tất Cả'],
+                      ['active', 'Hoạt Động'],
+                      ['inactive', 'Tạm Dừng'],
+                    ].map(([v, l]) => (
+                      <button
+                        key={v}
+                        onClick={() => setFilterStatus(v)}
+                        className={`px-space-sm py-1 rounded text-label-md font-label-md whitespace-nowrap transition-colors ${filterStatus === v
+                          ? 'bg-admin-primary text-white shadow-sm font-bold'
+                          : 'text-on-surface-variant hover:bg-surface-container-high'
+                          }`}
+                        type="button"
                       >
-                        <img
-                          src={imgUrl}
-                          alt={`Ảnh ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src =
-                              'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&q=80';
-                          }}
-                        />
-
-                        {idx === 0 && (
-                          <span className="absolute bottom-1 left-1 bg-[#1F4E78] text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-xs">
-                            Đại diện
-                          </span>
-                        )}
-
-                        {idx !== 0 && (
-                          <button
-                            type="button"
-                            onClick={() => handleMakeThumbnail(idx)}
-                            className="absolute bottom-1 left-1 bg-black/60 hover:bg-[#1F4E78] text-white text-[10px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition"
-                            title="Đặt làm ảnh đại diện"
-                          >
-                            Đại diện
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveImage(idx)}
-                          className="absolute top-1 right-1 w-5 h-5 bg-black/70 hover:bg-[#D93025] text-white rounded-full flex items-center justify-center transition"
-                          title="Xóa ảnh"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">close</span>
-                        </button>
-                      </div>
+                        {l}
+                      </button>
                     ))}
                   </div>
 
-                  <div className="flex gap-2">
+                  {/* Input Semantic Search */}
+                  <div className="relative flex-1">
+                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-[20px] text-admin-primary animate-pulse">
+                      auto_awesome
+                    </span>
                     <input
-                      type="text"
-                      value={newImageUrl}
-                      onChange={(e) => setNewImageUrl(e.target.value)}
-                      placeholder="Dán link ảnh (https://...) và bấm Thêm ảnh..."
-                      className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1F4E78]"
+                      className="w-full bg-surface pl-10 pr-9 py-2 rounded-xl text-body-sm font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-admin-primary border border-admin-primary/30 shadow-sm"
+                      placeholder="Tìm kiếm ngữ nghĩa (VD: 'view biển có ban công', 'phòng 4 người', 'giá dưới 3tr', 'ada')..."
+                      value={filterText}
+                      onChange={(e) => setFilterText(e.target.value)}
                     />
+                    {filterText && (
+                      <button
+                        onClick={() => setFilterText('')}
+                        className="absolute right-2.5 top-2.5 text-on-surface-variant hover:text-on-surface p-0.5 rounded-full hover:bg-surface-container-high"
+                        type="button"
+                        title="Xóa tìm kiếm"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Các câu hỏi gợi ý nhanh (Quick Semantic Prompts) */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-label-sm scrollbar-none">
+                  <span className="text-on-surface-variant text-[11px] font-semibold uppercase flex-shrink-0 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px] text-admin-primary">psychology</span>
+                    Gợi ý AI:
+                  </span>
+                  {QUICK_SEMANTIC_PROMPTS.map((item, idx) => (
                     <button
+                      key={idx}
                       type="button"
-                      onClick={() => handleAddImage(newImageUrl)}
-                      className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-bold rounded-lg transition"
+                      onClick={() => setFilterText(item.query)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all border ${filterText === item.query
+                        ? 'bg-admin-primary text-white border-admin-primary shadow-xs'
+                        : 'bg-surface hover:bg-surface-container-highest text-on-surface-variant border-outline-variant/60 hover:text-on-surface'
+                        }`}
                     >
-                      + Thêm URL
+                      <span className="material-symbols-outlined text-[13px]">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 🧠 HỘP TRẢ LỜI RAG (RETRIEVAL-AUGMENTED GENERATION - AI INSIGHT & REASONING) */}
+              {ragResponse && (
+                <div className="p-space-md rounded-xl bg-surface-container-lowest border border-admin-primary/30 shadow-md flex flex-col gap-2.5 animate-fadeIn">
+                  <div className="flex items-center justify-between border-b border-surface-container-high pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-admin-primary/10 flex items-center justify-center text-admin-primary">
+                        <span className="material-symbols-outlined text-[16px]">smart_toy</span>
+                      </div>
+                      <span className="font-label-md text-label-md font-bold text-on-surface">
+                        Trợ Lý AI Khách Sạn (RAG Assistant) • Phân Tích Dựa Trên Dữ Liệu Phòng
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => setShowRagAnswer(!showRagAnswer)}
+                      className="text-on-surface-variant hover:text-on-surface text-label-sm flex items-center gap-1"
+                      type="button"
+                    >
+                      <span>{showRagAnswer ? 'Thu gọn' : 'Xem chi tiết'}</span>
+                      <span className="material-symbols-outlined text-[16px]">
+                        {showRagAnswer ? 'expand_less' : 'expand_more'}
+                      </span>
                     </button>
                   </div>
 
-                  {formErrors.images && (
-                    <span className="text-[#D93025] text-[13px] font-semibold mt-1 block">
-                      {formErrors.images}
-                    </span>
+                  {showRagAnswer && (
+                    <div className="flex flex-col gap-2 text-body-sm text-on-surface leading-relaxed">
+                      {/* Thẻ nhận diện ý định */}
+                      {ragResponse.matchedConcepts.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] font-bold uppercase text-on-surface-variant">
+                            Ý định nhận diện:
+                          </span>
+                          {ragResponse.matchedConcepts.map((c, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded-md bg-admin-primary/10 text-admin-primary font-mono text-[11px] font-bold"
+                            >
+                              ✓ {c}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Nội dung trả lời tự nhiên */}
+                      <p className="whitespace-pre-line text-on-surface font-body-sm bg-surface-container-low p-3 rounded-lg border border-outline-variant/40">
+                        {ragResponse.answerText}
+                      </p>
+
+                      {/* Nguồn dẫn chứng (Citations - Click để chọn phòng) */}
+                      <div className="flex items-center gap-2 pt-1 flex-wrap">
+                        <span className="text-label-sm text-on-surface-variant font-semibold">
+                          📌 Trích dẫn nguồn (Bấm để xem &amp; sửa nhanh):
+                        </span>
+                        {ragResponse.citedRooms.map((cr) => (
+                          <button
+                            key={cr.id}
+                            type="button"
+                            onClick={() => selectFromCitation(cr.code)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-label-sm font-bold border transition-all ${cr.id === selectedId
+                              ? 'bg-admin-primary text-white border-admin-primary shadow-xs'
+                              : 'bg-surface hover:bg-surface-container-high text-on-surface border-outline-variant hover:border-admin-primary'
+                              }`}
+                          >
+                            <span className="font-mono text-admin-primary font-bold">[{cr.code}]</span>
+                            <span className="truncate max-w-[140px]">{cr.name}</span>
+                            <span className="text-secondary font-mono text-[11px]">
+                              ({cr.semanticScore}% khớp)
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
+              )}
 
-                {/* 2. Tên loại phòng */}
+              {/* Tiêu đề bảng danh mục */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider">
+                    Bảng Danh Mục Loại Phòng
+                  </span>
+                  <span className="bg-surface-container px-2 py-0.5 rounded font-mono text-[10px] text-on-surface-variant font-bold">
+                    {filtered.length} KẾT QUẢ KHỚP
+                  </span>
+                </div>
+                {filterText && (
+                  <span className="text-body-xs text-admin-primary font-medium flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">insights</span>
+                    Đã xếp hạng theo độ khớp ngữ nghĩa AI
+                  </span>
+                )}
+              </div>
+
+
+              {/* Bảng Hiển Thị (100% Tiếng Việt có dấu) */}
+
+
+              <div ref={tableScrollRef} className="overflow-x-auto pb-2">
+                <table className="w-full min-w-[950px] text-left">
+                  <thead>
+                    <tr className="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+                      <th className="py-2.5 px-3 rounded-l-lg">Mã / Tên Hạng Phòng</th>
+                      <th className="py-2.5 px-3 text-center">Độ Khớp AI</th>
+                      <th className="py-2.5 px-3 text-center">Sức Chứa</th>
+                      <th className="py-2.5 px-3 text-center">Loại Giường</th>
+                      <th className="py-2.5 px-3 text-center">Diện Tích</th>
+                      <th className="py-2.5 px-3 text-right">Giá Chuẩn / Đêm</th>
+                      <th className="py-2.5 px-3 text-center rounded-r-lg">Trạng Thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-body-sm font-body-sm divide-y divide-surface-container-high/60">
+                    {filtered.map((rt) => (
+                      <tr
+                        key={rt.id}
+                        onClick={() => selectRow(rt)}
+                        className={`hover:bg-surface-container-high/50 transition-colors cursor-pointer group ${rt.id === selectedId && !isNew ? 'bg-surface-container-high/40' : ''
+                          }`}
+                      >
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`w-1.5 h-8 rounded flex-shrink-0 ${rt.id === selectedId && !isNew ? 'bg-admin-primary' : 'bg-transparent'
+                                }`}
+                            />
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span
+                                  className={`font-body-md text-body-md font-bold truncate transition-colors ${rt.id === selectedId && !isNew
+                                    ? 'text-admin-primary'
+                                    : 'text-on-surface group-hover:text-admin-primary'
+                                    }`}
+                                >
+                                  {rt.name}
+                                </span>
+                                {rt.personalizationBoost && (
+                                  <span
+                                    className="px-1.5 py-0.2 rounded text-[10px] bg-secondary-fixed-dim/30 text-secondary font-bold"
+                                    title="Phòng này thường xuyên được bạn quan tâm"
+                                  >
+                                    ⭐ Gu của bạn
+                                  </span>
+                                )}
+                              </div>
+                              <span className="font-mono text-label-sm text-on-surface-variant truncate">
+                                {rt.code} &bull; {rt.subtitle || rt.floors || 'Toàn khu'}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Điểm tương thích ngữ nghĩa (Semantic Score) */}
+                        <td className="py-3 px-3 text-center">
+                          <div className="inline-flex flex-col items-center">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold ${rt.semanticScore >= 70
+                                ? 'bg-admin-primary/15 text-admin-primary'
+                                : rt.semanticScore >= 40
+                                  ? 'bg-secondary/15 text-secondary'
+                                  : 'bg-on-surface-variant/10 text-on-surface-variant'
+                                }`}
+                              title={rt.matchedReasons?.join('; ')}
+                            >
+                              {rt.semanticScore}%
+                            </span>
+                            {rt.matchedReasons && rt.matchedReasons[0] && (
+                              <span className="text-[10px] text-on-surface-variant truncate max-w-[90px]">
+                                {rt.matchedReasons[0]}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-3 text-center">
+                          <span className="font-mono font-semibold text-on-surface text-label-sm whitespace-nowrap">
+                            {rt.maxAdults} Lớn / {rt.maxChildren} Trẻ
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-3 text-center">
+                          <span className="text-on-surface-variant text-[11px] leading-tight block max-w-[120px] truncate mx-auto">
+                            {rt.bedding}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-3 text-center">
+                          <span className="font-mono font-semibold text-on-surface">{rt.area} m²</span>
+                        </td>
+
+                        <td className="py-3 px-3 text-right font-mono font-bold text-on-surface whitespace-nowrap">
+                          {fmtVND(rt.baseRate)}
+                        </td>
+
+                        <td className="py-3 px-3 text-center">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm font-bold whitespace-nowrap ${rt.status === 'active'
+                              ? 'bg-admin-primary/10 text-admin-primary'
+                              : 'bg-on-surface-variant/15 text-on-surface-variant'
+                              }`}
+                          >
+                            {rt.status === 'active' ? 'Hoạt Động' : 'Tạm Dừng'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {filtered.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-on-surface-variant font-body-sm">
+                          Không tìm thấy loại phòng nào phù hợp với câu hỏi hoặc bộ lọc của bạn.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-between pt-space-xs font-label-sm text-label-sm text-on-surface-variant">
+                <span>
+                  Hiển thị {filtered.length} / {roomTypes.length} loại phòng đã đăng ký
+                </span>
+                <span className="font-mono text-on-surface">CHẾ ĐỘ TỔNG HỢP PMS &bull; AI READY</span>
+              </div>
+            </div>
+
+            {/* Thanh Phân Bổ Sức Chứa Theo Danh Mục */}
+            <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm">
+              <div className="flex items-center justify-between mb-space-sm">
+                <span className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider">
+                  Phân Bổ Sức Chứa Theo Từng Hạng Phòng
+                </span>
+                <span className="font-mono text-label-sm text-on-surface font-bold">
+                  TỔNG CỘNG: {totalKeys.toLocaleString('vi-VN')} PHÒNG
+                </span>
+              </div>
+
+              <div className="flex rounded-lg overflow-hidden h-7 mb-space-sm gap-0.5 bg-surface-container">
+                {roomTypes.map((rt, i) => {
+                  const pct = totalKeys > 0 ? (Number(rt.keys) / totalKeys) * 100 : 0;
+                  return (
+                    <div
+                      key={rt.id}
+                      className={`${DIST_COLORS[i % DIST_COLORS.length]} flex items-center justify-center transition-all cursor-pointer hover:brightness-110`}
+                      style={{ width: `${pct}%` }}
+                      title={`${rt.code}: ${rt.keys} phòng (${Math.round(pct)}%)`}
+                      onClick={() => selectRow(rt)}
+                    >
+                      {pct > 8 && (
+                        <span className="font-mono text-[10px] text-white font-bold truncate px-1">
+                          {rt.code} ({rt.keys})
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap gap-space-sm">
+                {roomTypes.map((rt, i) => (
+                  <div
+                    key={rt.id}
+                    onClick={() => selectRow(rt)}
+                    className="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant cursor-pointer hover:text-on-surface"
+                  >
+                    <div className={`w-2.5 h-2.5 rounded-sm ${DIST_COLORS[i % DIST_COLORS.length]}`} />
+                    <span className="font-mono font-semibold">{rt.code}</span>
+                    <span className="text-[10px]">
+                      ({totalKeys > 0 ? Math.round((Number(rt.keys) / totalKeys) * 100) : 0}%)
+                    </span>
+                    {rt.id === selectedId && !isNew && (
+                      <span className="text-admin-primary font-bold">[ĐANG CHỌN]</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* CỘT PHẢI (5 CỘT): Biểu Mẫu Nhập Thông Số & Chỉnh Sửa */}
+          <div className="lg:col-span-5">
+            <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col gap-space-md">
+              {/* Tiêu Đề Biểu Mẫu */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-col min-w-0">
+                  <span className="font-label-sm text-label-sm font-mono text-admin-primary font-bold uppercase tracking-wider truncate">
+                    {isNew
+                      ? 'TẠO MỚI LOẠI PHÒNG'
+                      : `MÃ HẠNG: ${form.code || '---'} // ID HỆ THỐNG: ${selectedId ?? '---'}`}
+                  </span>
+                  <h2 className="font-headline-md text-headline-md font-bold text-on-surface mt-0.5">
+                    {isNew ? 'Phiếu Tạo Mới Loại Phòng' : 'Thông Số Kỹ Thuật Hạng Phòng'}
+                  </h2>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm font-bold whitespace-nowrap flex-shrink-0 ${isNew
+                    ? 'bg-admin-primary-container text-on-admin-primary'
+                    : 'bg-surface-container text-on-surface'
+                    }`}
+                >
+                  {isNew ? 'CHẾ ĐỘ: TẠO MỚI' : 'CHẾ ĐỘ: CHỈNH SỬA'}
+                </span>
+              </div>
+
+              {/* Ảnh Đại Diện Loại Phòng */}
+              <div>
+                <span className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider block mb-space-xs">
+                  Ảnh Đại Diện Hạng Phòng
+                </span>
+                <div className="relative w-full h-44 rounded-xl overflow-hidden bg-surface-container mb-2 group border border-outline-variant">
+                  {imgUrl ? (
+                    <img
+                      src={imgUrl}
+                      alt={form.name || 'Ảnh phòng'}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-on-surface-variant gap-2">
+                      <span className="material-symbols-outlined text-[48px]">image</span>
+                      <span className="font-label-sm text-label-sm">Chưa có ảnh hoặc liên kết không hợp lệ</span>
+                    </div>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 font-body-sm text-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                  placeholder="https://... (Dán liên kết URL hình ảnh hạng phòng tại đây)"
+                  value={imgUrl}
+                  onChange={(e) => {
+                    setImgUrl(e.target.value);
+                    setField('image', e.target.value);
+                  }}
+                />
+              </div>
+
+              {/* Mã Loại Phòng & Trạng Thái */}
+              <div className="grid grid-cols-2 gap-space-sm">
                 <div>
-                  <label className="text-sm font-bold text-gray-800 block mb-1">
-                    Tên loại phòng <span className="text-[#D93025]">*</span>
+                  <label className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider block mb-1">
+                    Mã Loại Phòng *
                   </label>
                   <input
                     type="text"
-                    value={formData.typeName}
-                    maxLength={100}
-                    onChange={(e) => handleInputChange('typeName', e.target.value)}
-                    onBlur={() => handleBlur('typeName')}
-                    placeholder="VD: Deluxe, Suite, Standard"
-                    className={`w-full bg-gray-50 border rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 ${
-                      formErrors.typeName
-                        ? 'border-[#D93025] focus:ring-[#D93025]'
-                        : 'border-gray-300 focus:ring-[#1F4E78]'
-                    }`}
+                    className={`w-full bg-surface border rounded-lg px-3 py-1.5 font-mono text-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 uppercase ${formErrors.code
+                      ? 'border-error focus:ring-error'
+                      : 'border-outline-variant focus:ring-admin-primary'
+                      }`}
+                    placeholder="VD: DLX-OCN"
+                    value={form.code}
+                    maxLength={20}
+                    onChange={(e) => setField('code', e.target.value.toUpperCase())}
                   />
-                  {formErrors.typeName && (
-                    <span className="text-[#D93025] text-[13px] font-semibold mt-1 block">
-                      {formErrors.typeName}
+                  {formErrors.code && (
+                    <span className="text-error text-body-xs font-semibold mt-1 block">
+                      {formErrors.code}
                     </span>
                   )}
                 </div>
 
-                {/* 3. Mô tả */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-sm font-bold text-gray-800">Mô tả</label>
-                    <span className="text-xs text-gray-500 font-mono">
-                      {formData.description ? formData.description.length : 0} / 1000 ký tự
-                    </span>
-                  </div>
-                  <textarea
-                    rows={4}
-                    maxLength={1000}
-                    value={formData.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    onBlur={() => handleBlur('description')}
-                    placeholder="Mô tả đặc điểm loại phòng (không bắt buộc)"
-                    className={`w-full bg-gray-50 border rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 resize-none ${
-                      formErrors.description
-                        ? 'border-[#D93025] focus:ring-[#D93025]'
-                        : 'border-gray-300 focus:ring-[#1F4E78]'
-                    }`}
-                  />
-                  {formErrors.description && (
-                    <span className="text-[#D93025] text-[13px] font-semibold mt-1 block">
-                      {formErrors.description}
-                    </span>
-                  )}
-                </div>
-
-                {/* 4. Giá cơ bản */}
-                <div>
-                  <label className="text-sm font-bold text-gray-800 block mb-1">
-                    Giá cơ bản (VND) <span className="text-[#D93025]">*</span>
+                  <label className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider block mb-1">
+                    Trạng Thái Kinh Doanh
                   </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={999999999.99}
-                    step="any"
-                    value={formData.basePrice}
-                    onChange={(e) => handleInputChange('basePrice', e.target.value)}
-                    onBlur={() => handleBlur('basePrice')}
-                    placeholder="VD: 1,500,000"
-                    className={`w-full bg-gray-50 border rounded-lg px-3 py-2 text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 ${
-                      formErrors.basePrice
-                        ? 'border-[#D93025] focus:ring-[#D93025]'
-                        : 'border-gray-300 focus:ring-[#1F4E78]'
+                  <select
+                    className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                    value={form.status}
+                    onChange={(e) => setField('status', e.target.value)}
+                  >
+                    <option value="active">Đang Hoạt Động (Kinh Doanh)</option>
+                    <option value="inactive">Tạm Dừng Kinh Doanh</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tên Hiển Thị Hạng Phòng */}
+              <div>
+                <label className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider block mb-1">
+                  Tên Hiển Thị Hạng Phòng *
+                </label>
+                <input
+                  type="text"
+                  maxLength={200}
+                  className={`w-full bg-surface border rounded-lg px-3 py-2 font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 ${formErrors.name
+                    ? 'border-error focus:ring-error'
+                    : 'border-outline-variant focus:ring-admin-primary'
                     }`}
-                  />
-                  {formData.basePrice && !isNaN(Number(formData.basePrice)) && (
-                    <span className="text-xs text-gray-500 font-mono mt-0.5 block">
-                      Hiển thị định dạng: <strong>{fmtVND(formData.basePrice)}</strong>
-                    </span>
-                  )}
-                  {formErrors.basePrice && (
-                    <span className="text-[#D93025] text-[13px] font-semibold mt-1 block">
-                      {formErrors.basePrice}
-                    </span>
-                  )}
-                </div>
+                  placeholder="VD: Phòng Deluxe Giường King Hướng Biển Kèm Ban Công"
+                  value={form.name}
+                  onChange={(e) => setField('name', e.target.value)}
+                />
+                {formErrors.name && (
+                  <span className="text-error text-body-xs font-semibold mt-1 block">
+                    {formErrors.name}
+                  </span>
+                )}
+              </div>
 
-                {/* 5. Sức chứa */}
-                <div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-bold text-gray-800 block mb-1">
-                        Số người lớn tối đa <span className="text-[#D93025]">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={formData.adultCapacity}
-                        onChange={(e) => handleInputChange('adultCapacity', e.target.value)}
-                        onBlur={() => handleBlur('adultCapacity')}
-                        className={`w-full bg-gray-50 border rounded-lg px-3 py-2 text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 ${
-                          formErrors.adultCapacity
-                            ? 'border-[#D93025] focus:ring-[#D93025]'
-                            : 'border-gray-300 focus:ring-[#1F4E78]'
+              {/* Mô Tả Chi Tiết */}
+              <div>
+                <label className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider block mb-1">
+                  Mô Tả Chi Tiết (Hiển thị cho Lễ Tân &amp; Hóa Đơn)
+                </label>
+                <textarea
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-body-sm text-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-admin-primary resize-none"
+                  placeholder="Mô tả tóm tắt về đặc điểm phòng, tiện nghi, ưu thế cho khách lưu trú..."
+                  rows={2}
+                  maxLength={2000}
+                  value={form.description}
+                  onChange={(e) => setField('description', e.target.value)}
+                />
+              </div>
+
+              {/* Diện Tích, Giá & Sức Chứa (Test Cases: Validate không vượt quá 9,999,999,999) */}
+              <div>
+                <span className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider block mb-space-xs">
+                  Diện Tích &amp; Bảng Giá Chuẩn
+                </span>
+                <div className="grid grid-cols-2 gap-space-sm">
+                  <div>
+                    <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                      Diện Tích (m²)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={MAX_AREA}
+                      className={`w-full bg-surface border rounded-lg px-3 py-1.5 font-mono text-body-sm text-on-surface focus:outline-none focus:ring-1 ${formErrors.area
+                        ? 'border-error focus:ring-error'
+                        : 'border-outline-variant focus:ring-admin-primary'
                         }`}
-                      />
-                      {formErrors.adultCapacity && (
-                        <span className="text-[#D93025] text-[13px] font-semibold mt-1 block">
-                          {formErrors.adultCapacity}
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-bold text-gray-800 block mb-1">
-                        Số trẻ em tối đa <span className="text-[#D93025]">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={10}
-                        value={formData.childCapacity}
-                        onChange={(e) => handleInputChange('childCapacity', e.target.value)}
-                        onBlur={() => handleBlur('childCapacity')}
-                        className={`w-full bg-gray-50 border rounded-lg px-3 py-2 text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 ${
-                          formErrors.childCapacity
-                            ? 'border-[#D93025] focus:ring-[#D93025]'
-                            : 'border-gray-300 focus:ring-[#1F4E78]'
-                        }`}
-                      />
-                      {formErrors.childCapacity && (
-                        <span className="text-[#D93025] text-[13px] font-semibold mt-1 block">
-                          {formErrors.childCapacity}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-2 p-2 bg-blue-50/60 border border-blue-200 rounded-lg flex items-center justify-between text-xs text-gray-700">
-                    <span className="font-medium">
-                      Sức chứa tối đa: <strong className="text-[#1F4E78] font-mono text-sm">{computedMaxOccupancy}</strong> người (người lớn + trẻ em)
-                    </span>
-                    <span className="text-[11px] text-gray-500 font-mono">(Tối đa 20 người)</span>
-                  </div>
-                </div>
-
-                {/* 6. Tiện ích */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-sm font-bold text-gray-800">
-                      Tiện ích <span className="text-[#D93025]">*</span>
-                    </label>
-                    <span className="text-xs text-gray-500 font-mono">
-                      Đã chọn: <strong>{formData.amenityIds.length}</strong> tiện ích
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-56 overflow-y-auto p-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                    {amenitiesList.map((a) => {
-                      const isChecked = formData.amenityIds.includes(Number(a.id));
-                      const iconName = getSafeAmenityIcon(a.icon, a.name);
-                      return (
-                        <label
-                          key={a.id}
-                          className={`flex items-center gap-2 p-2.5 rounded-lg cursor-pointer border text-xs font-medium transition select-none ${
-                            isChecked
-                              ? 'bg-blue-50 border-[#1F4E78] text-[#1F4E78] shadow-xs'
-                              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300'
-                          }`}
-                          title={a.name}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => toggleAmenity(a.id)}
-                            className="w-4 h-4 accent-[#1F4E78] rounded cursor-pointer flex-shrink-0"
-                          />
-                          <span className="material-symbols-outlined text-[18px] text-[#1F4E78] flex-shrink-0">
-                            {iconName}
-                          </span>
-                          <span className="truncate flex-1">{a.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {formErrors.amenityIds && (
-                    <span className="text-[#D93025] text-[13px] font-semibold mt-1 block">
-                      {formErrors.amenityIds}
-                    </span>
-                  )}
-                </div>
-
-                {/* 7. Trạng thái */}
-                <div>
-                  <label className="text-sm font-bold text-gray-800 block mb-1">Trạng thái</label>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-800">
-                      <input
-                        type="radio"
-                        name="status"
-                        value="Active"
-                        checked={formData.status === 'Active'}
-                        onChange={() => handleInputChange('status', 'Active')}
-                        className="w-4 h-4 accent-[#1F4E78]"
-                      />
-                      <span>Đang hoạt động (Active - Hiển thị trên Home)</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-800">
-                      <input
-                        type="radio"
-                        name="status"
-                        value="Inactive"
-                        checked={formData.status === 'Inactive'}
-                        onChange={() => handleInputChange('status', 'Inactive')}
-                        className="w-4 h-4 accent-[#1F4E78]"
-                      />
-                      <span>Ngừng cung cấp (Inactive - Ẩn khỏi Home)</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* 8. Hàng nút Hủy & Lưu */}
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-5 py-2.5 bg-white border border-[#999999] text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-100 transition shadow-xs"
-                  >
-                    Hủy
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-6 py-2.5 bg-[#1F4E78] text-white text-sm font-bold rounded-lg hover:bg-[#163a5c] disabled:opacity-50 transition shadow-xs flex items-center gap-1.5"
-                  >
-                    {isSubmitting && (
-                      <span className="material-symbols-outlined text-[16px] animate-spin">
-                        progress_activity
+                      placeholder="VD: 45"
+                      value={form.area}
+                      onChange={(e) => setField('area', e.target.value)}
+                    />
+                    {formErrors.area && (
+                      <span className="text-error text-body-xs font-semibold mt-1 block">
+                        {formErrors.area}
                       </span>
                     )}
-                    <span>Lưu</span>
-                  </button>
+                  </div>
+
+                  <div>
+                    <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                      Giá Chuẩn (VNĐ/Đêm) *
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={MAX_ALLOWED_NUMBER}
+                      className={`w-full bg-surface border rounded-lg px-3 py-1.5 font-mono text-body-sm text-on-surface focus:outline-none focus:ring-1 ${formErrors.baseRate
+                        ? 'border-error focus:ring-error'
+                        : 'border-outline-variant focus:ring-admin-primary'
+                        }`}
+                      placeholder="VD: 2500000"
+                      value={form.baseRate}
+                      onChange={(e) => setField('baseRate', e.target.value)}
+                    />
+                    {formErrors.baseRate && (
+                      <span className="text-error text-body-xs font-semibold mt-1 block">
+                        {formErrors.baseRate}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                      Số Lượng Người Lớn Tối Đa
+                    </label>
+                    <select
+                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                      value={form.maxAdults}
+                      onChange={(e) => setField('maxAdults', Number(e.target.value))}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
+                        <option key={n} value={n}>
+                          {n} Người Lớn
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                      Số Lượng Trẻ Em Tối Đa
+                    </label>
+                    <select
+                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                      value={form.maxChildren}
+                      onChange={(e) => setField('maxChildren', Number(e.target.value))}
+                    >
+                      {[0, 1, 2, 3, 4, 6].map((n) => (
+                        <option key={n} value={n}>
+                          {n === 0 ? 'Không Cho Phép' : `${n} Trẻ Em`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                      Quy Cách Giường
+                    </label>
+                    <select
+                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                      value={form.bedding}
+                      onChange={(e) => setField('bedding', e.target.value)}
+                    >
+                      {BEDDING_OPTIONS.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                      Số Phòng Tồn Kho (Khả Dụng)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={MAX_KEYS}
+                      className={`w-full bg-surface border rounded-lg px-3 py-1.5 font-mono text-body-sm text-on-surface focus:outline-none focus:ring-1 ${formErrors.keys
+                        ? 'border-error focus:ring-error'
+                        : 'border-outline-variant focus:ring-admin-primary'
+                        }`}
+                      placeholder="VD: 30"
+                      value={form.keys}
+                      onChange={(e) => setField('keys', e.target.value)}
+                    />
+                    {formErrors.keys && (
+                      <span className="text-error text-body-xs font-semibold mt-1 block">
+                        {formErrors.keys}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                      Tầng / Vị Trí Khu Vực
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 font-mono text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                      placeholder="VD: Tầng 6–9, Tầng Thượng"
+                      value={form.floors}
+                      maxLength={50}
+                      onChange={(e) => setField('floors', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                      Hướng Nhìn (Cảnh Quan)
+                    </label>
+                    <select
+                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                      value={form.view}
+                      onChange={(e) => setField('view', e.target.value)}
+                    >
+                      {VIEW_OPTIONS.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ─── HỘP THOẠI XÁC NHẬN XÓA LOẠI PHÒNG (Mục 3.9) ──────────────────── */}
-        {deleteTarget && (
-          <div className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden p-6 border border-gray-200">
-              <div className="flex items-center gap-3 text-red-600 mb-3">
-                <span className="material-symbols-outlined text-[32px]">warning</span>
-                <h3 className="text-lg font-bold text-gray-900">Xác Nhận Xóa Loại Phòng</h3>
               </div>
 
-              <p className="text-sm text-gray-700 leading-relaxed mb-6">
-                Bạn có chắc chắn muốn xóa loại phòng{' '}
-                <strong className="text-gray-900">
-                  [{deleteTarget.typeName || deleteTarget.name}]
-                </strong>
-                ? Hành động này có thể khôi phục trong vòng 30 ngày.
-              </p>
+              {/* Cài Đặt Giá & Doanh Thu */}
+              <div>
+                <span className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider block mb-space-xs">
+                  Cài Đặt Vận Hành &amp; Doanh Thu
+                </span>
+                <div className="grid grid-cols-2 gap-space-sm">
+                  <div>
+                    <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                      Thời Gian Dọn Phòng (Phút)
+                    </label>
+                    <input
+                      type="number"
+                      min={5}
+                      max={1440}
+                      className={`w-full bg-surface border rounded-lg px-3 py-1.5 font-mono text-body-sm text-on-surface focus:outline-none focus:ring-1 ${formErrors.turnover
+                        ? 'border-error focus:ring-error'
+                        : 'border-outline-variant focus:ring-admin-primary'
+                        }`}
+                      value={form.turnover}
+                      onChange={(e) => setField('turnover', e.target.value)}
+                    />
+                    {formErrors.turnover && (
+                      <span className="text-error text-body-xs font-semibold mt-1 block">
+                        {formErrors.turnover}
+                      </span>
+                    )}
+                  </div>
 
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(null)}
-                  disabled={isDeleting}
-                  className="px-4 py-2 bg-white border border-[#999999] text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-100 transition"
-                >
-                  Hủy
-                </button>
+                  <div>
+                    <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                      Hệ Số Giá Cuối Tuần
+                      <span className="font-mono text-admin-primary ml-1">
+                        {form.yieldMultiplier > 1
+                          ? `+${Math.round((form.yieldMultiplier - 1) * 100)}%`
+                          : ''}
+                      </span>
+                    </label>
+                    <select
+                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                      value={form.yieldMultiplier}
+                      onChange={(e) => setField('yieldMultiplier', Number(e.target.value))}
+                    >
+                      <option value={1.0}>1.00x Giá Ngày Thường (Chuẩn)</option>
+                      <option value={1.1}>1.10x Cuối Tuần (+10%)</option>
+                      <option value={1.15}>1.15x Cuối Tuần (+15%)</option>
+                      <option value={1.2}>1.20x Cuối Tuần (+20%)</option>
+                      <option value={1.25}>1.25x Cuối Tuần (+25%)</option>
+                      <option value={1.3}>1.30x Cuối Tuần (+30%)</option>
+                      <option value={1.5}>1.50x Mùa Cao Điểm (+50%)</option>
+                    </select>
+                  </div>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleConfirmDelete}
-                  disabled={isDeleting}
-                  className="px-5 py-2 bg-[#D93025] text-white text-sm font-bold rounded-lg hover:bg-red-700 transition flex items-center gap-1.5 shadow-sm"
-                >
-                  {isDeleting && (
-                    <span className="material-symbols-outlined text-[16px] animate-spin">
-                      progress_activity
+                {form.baseRate && !isNaN(Number(form.baseRate)) && (
+                  <div className="mt-space-xs bg-admin-primary/5 border border-admin-primary/20 rounded-lg p-space-sm flex items-center justify-between">
+                    <span className="font-label-sm text-label-sm text-on-surface-variant">
+                      Giá Cuối Tuần Dự Kiến (Xem trước):
                     </span>
-                  )}
-                  <span>Xác nhận xóa</span>
+                    <span className="font-mono font-bold text-admin-primary text-body-md">
+                      {fmtVND(Number(form.baseRate) * Number(form.yieldMultiplier))} / đêm
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Gói Tiện Ích Tiêu Chuẩn */}
+              <div>
+                <div className="flex items-center justify-between mb-space-xs">
+                  <span className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider">
+                    Gói Tiện Ích Phòng Tiêu Chuẩn
+                  </span>
+                  <span className="font-mono text-label-sm text-admin-primary font-bold">
+                    {form.amenities.length}/{AMENITY_OPTIONS.length} Đã Chọn
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-1">
+                  {AMENITY_OPTIONS.map((a) => {
+                    const checked = form.amenities.includes(a.id);
+                    return (
+                      <label
+                        key={a.id}
+                        className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors border ${checked
+                          ? 'bg-admin-primary/10 border-admin-primary/30'
+                          : 'bg-surface-container hover:bg-surface-container-high border-transparent'
+                          }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="accent-admin-primary w-3.5 h-3.5 rounded flex-shrink-0"
+                          checked={checked}
+                          onChange={() => toggleAmenity(a.id)}
+                        />
+                        <span
+                          className={`material-symbols-outlined text-[14px] flex-shrink-0 ${checked ? 'text-admin-primary' : 'text-on-surface-variant'
+                            }`}
+                        >
+                          {a.icon}
+                        </span>
+                        <span
+                          className={`font-body-sm text-body-sm leading-tight select-none ${checked ? 'text-on-surface font-semibold' : 'text-on-surface-variant'
+                            }`}
+                        >
+                          {a.label}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Các Nút Thao Tác Biểu Mẫu */}
+              <div className="flex flex-col sm:flex-row items-stretch gap-space-xs pt-space-md border-t border-surface-container-high">
+                <button
+                  onClick={handleSave}
+                  className="flex-1 flex items-center justify-center gap-space-xs px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-bold rounded-lg hover:brightness-105 shadow-sm transition-all"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[18px]">save</span>
+                  <span>{isNew ? 'Tạo Loại Phòng Mới' : 'Lưu Thay Đổi'}</span>
+                </button>
+
+                <button
+                  onClick={handleReset}
+                  className="flex items-center justify-center gap-space-xs px-space-md py-space-sm bg-surface-container text-on-surface font-label-md text-label-md font-semibold rounded-lg hover:bg-surface-container-high transition-colors"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+                  <span>Đặt Lại</span>
                 </button>
               </div>
+
+              {/* Khu Vực Tạm Dừng / Kích Hoạt Lại & Xóa Loại Phòng (Chế độ sửa) */}
+              {!isNew && selectedId && (
+                <div className="border-t border-surface-container-high pt-space-sm flex flex-col gap-space-xs">
+                  {!showConfirm ? (
+                    <button
+                      onClick={() => {
+                        setShowConfirm(true);
+                        setShowDeleteConfirm(false);
+                      }}
+                      className="w-full text-center font-label-sm text-label-sm font-bold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors py-1.5 rounded-lg border border-outline-variant"
+                      type="button"
+                    >
+                      {form.status === 'active'
+                        ? '⏸ Tạm Dừng Kinh Doanh Hạng Phòng Này'
+                        : '▶️ Kích Hoạt Lại Hạng Phòng Này'}
+                    </button>
+                  ) : (
+                    <div className="bg-surface-container-high rounded-lg p-space-sm flex flex-col gap-space-xs border border-outline-variant animate-fadeIn">
+                      <span className="font-label-sm text-label-sm font-bold text-on-surface">
+                        Xác nhận {form.status === 'active' ? 'tạm dừng kinh doanh' : 'kích hoạt lại'} loại phòng "
+                        {form.name}"?
+                      </span>
+                      <div className="flex gap-space-xs">
+                        <button
+                          onClick={handleToggleStatus}
+                          className="flex-1 py-1.5 bg-admin-primary text-white font-label-sm text-label-sm font-bold rounded-lg hover:brightness-110 transition"
+                          type="button"
+                        >
+                          Xác Nhận
+                        </button>
+
+                        <button
+                          onClick={() => setShowConfirm(false)}
+                          className="flex-1 py-1.5 bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold rounded-lg hover:bg-surface-container-highest transition"
+                          type="button"
+                        >
+                          Hủy Bỏ
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!showDeleteConfirm ? (
+                    <button
+                      onClick={() => {
+                        setShowDeleteConfirm(true);
+                        setShowConfirm(false);
+                      }}
+                      className="w-full text-center font-label-sm text-label-sm font-bold text-error hover:text-white hover:bg-error transition-colors py-1.5 rounded-lg border border-error/30"
+                      type="button"
+                    >
+                      🗑️ Xóa Loại Phòng Khỏi Cơ Sở Dữ Liệu
+                    </button>
+                  ) : (
+                    <div className="bg-error-container rounded-lg p-space-sm flex flex-col gap-space-xs border border-error/40 animate-fadeIn">
+                      <span className="font-label-sm text-label-sm font-bold text-on-error-container">
+                        CẢNH BÁO: Bạn có chắc chắn muốn xóa vĩnh viễn loại phòng "{form.name}" ({form.code}) khỏi cơ sở dữ liệu không?
+                      </span>
+                      <div className="flex gap-space-xs">
+                        <button
+                          onClick={handleDelete}
+                          className="flex-1 py-1.5 bg-error text-white font-label-sm text-label-sm font-bold rounded-lg hover:brightness-110 transition shadow-sm"
+                          type="button"
+                        >
+                          Xác Nhận Xóa
+                        </button>
+                        <button
+                          onClick={() => setShowDeleteConfirm(false)}
+                          className="flex-1 py-1.5 bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold rounded-lg hover:bg-surface-container-high transition"
+                          type="button"
+                        >
+                          Hủy Bỏ
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </AdminLayout>
   );

@@ -34,6 +34,17 @@ import MockPaymentGateway from './pages/client/MockPaymentGateway';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ExtendStayAndMove from './pages/admin/ExtendStayAndMove';
 
+// tuyen/7 imports:
+import MarketingDashboard from './pages/admin/marketing/MarketingDashboard';
+import CampaignComposer from './pages/admin/marketing/CampaignComposer';
+import ConsumablesInventory from './pages/admin/housekeeping/ConsumablesInventory';
+import LinenManagement from './pages/admin/housekeeping/LinenManagement';
+import LostAndFoundManagement from './pages/admin/housekeeping/LostAndFoundManagement';
+import SmartLockManagement from './pages/admin/security/SmartLockManagement';
+import MaintenanceDashboard from './pages/admin/engineering/MaintenanceDashboard';
+import MaintenanceTicketCreate from './pages/admin/engineering/MaintenanceTicketCreate';
+import AuditLogs from './pages/AuditLogs';
+import RosterShifts from './pages/RosterShifts';
 
 function App() {
   return (
@@ -120,6 +131,25 @@ function App() {
             <Route path="/admin/services/orders" element={<ProtectedRoute><ServiceOrdersKanban /></ProtectedRoute>} />
             <Route path="/admin/services/kanban" element={<ProtectedRoute><ServiceOrdersKanban /></ProtectedRoute>} />
             <Route path="/admin/loyalty" element={<ProtectedRoute><LoyaltyManagement /></ProtectedRoute>} />
+
+            {/* tuyen/7 Operations, Smart Lock, Housekeeping & Maintenance Routes */}
+            <Route path="/admin/marketing" element={<ProtectedRoute><MarketingDashboard /></ProtectedRoute>} />
+            <Route path="/admin/marketing/new" element={<ProtectedRoute><CampaignComposer /></ProtectedRoute>} />
+            <Route path="/admin/housekeeping" element={<ProtectedRoute><ConsumablesInventory /></ProtectedRoute>} />
+            <Route path="/admin/housekeeping/inventory" element={<ProtectedRoute><ConsumablesInventory /></ProtectedRoute>} />
+            <Route path="/admin/housekeeping/linen" element={<ProtectedRoute><LinenManagement /></ProtectedRoute>} />
+            <Route path="/admin/housekeeping/lost-and-found" element={<ProtectedRoute><LostAndFoundManagement /></ProtectedRoute>} />
+            <Route path="/admin/lost-and-found" element={<ProtectedRoute><LostAndFoundManagement /></ProtectedRoute>} />
+            <Route path="/admin/engineering" element={<ProtectedRoute><MaintenanceDashboard /></ProtectedRoute>} />
+            <Route path="/admin/engineering/new" element={<ProtectedRoute><MaintenanceTicketCreate /></ProtectedRoute>} />
+            <Route path="/admin/security/smart-lock" element={<ProtectedRoute><SmartLockManagement /></ProtectedRoute>} />
+            <Route path="/admin/smart-lock" element={<ProtectedRoute><SmartLockManagement /></ProtectedRoute>} />
+            <Route path="/admin/ekey" element={<ProtectedRoute><SmartLockManagement /></ProtectedRoute>} />
+            <Route path="/admin/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
+            <Route path="/admin/roster" element={<ProtectedRoute><RosterShifts /></ProtectedRoute>} />
+            <Route path="/admin/shifts" element={<ProtectedRoute><RosterShifts /></ProtectedRoute>} />
+            <Route path="/admin/dieu-do-ca" element={<ProtectedRoute><RosterShifts /></ProtectedRoute>} />
+
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Router>

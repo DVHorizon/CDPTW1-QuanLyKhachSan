@@ -114,37 +114,10 @@ const MenuForm = ({
               </select>
             </div>
           </div>
-
-          {/* Cảnh báo dị ứng (Allergens) & Nguyên liệu thực tế từ DB */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md pt-2">
-            <div className="flex flex-col gap-1">
-              <span className="text-body-sm font-body-sm text-on-surface-variant flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px] text-error">warning</span>
-                Chất Gây Dị Ứng (Allergens)
-              </span>
-              <input 
-                type="text" 
-                placeholder="VD: Giáp xác, Đậu phộng, Gluten..." 
-                value={formData.Allergens || ''} 
-                onChange={e => setFormData({...formData, Allergens: e.target.value})}
-                className="text-body-sm text-on-surface bg-surface border border-outline-variant rounded-lg px-3 py-2 focus:border-admin-primary outline-none w-full shadow-inner"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-body-sm font-body-sm text-on-surface-variant">Nguyên Liệu Chính</span>
-              <input 
-                type="text" 
-                placeholder="VD: Bò Wagyu A5, Bơ lạt, Nấm Truffle..." 
-                value={formData.Ingredients || ''} 
-                onChange={e => setFormData({...formData, Ingredients: e.target.value})}
-                className="text-body-sm text-on-surface bg-surface border border-outline-variant rounded-lg px-3 py-2 focus:border-admin-primary outline-none w-full shadow-inner"
-              />
-            </div>
-          </div>
           
           <div className="flex items-center justify-between pt-space-xs mt-space-sm border-t border-surface-container-highest font-label-sm text-label-sm text-on-surface-variant">
+            <span>Phụ thu In-room Dining: <strong className="text-on-surface">+15% Service Tray</strong></span>
             <span>Thuế &amp; Phí: <strong className="text-on-surface">VAT 8% + Phí PV 5%</strong></span>
-            <span className="text-[11px] text-outline">Đồng bộ theo tiêu chuẩn menu F&amp;B</span>
           </div>
         </div>
         

@@ -1,69 +1,71 @@
-const AuditLog = require('../models/AuditLog');
-const FraudAlert = require('../models/FraudAlert');
-const { Op } = require('sequelize');
+const { AuditLog } = require('../models');
+const FraudDetectionService = require('../services/fraudDetectionService');
 
 /**
- * Middleware để ghi nhận vết hành vi (Audit Log) cho các hành động nhạy cảm
- * @param {string} action - Tên hành động (vd: UPDATE_ROOM_PRICE, DELETE_BILL)
- * @param {string} entityName - Tên đối tượng bị tác động (vd: Room, Bill)
+ * Middleware Interceptor tự động ghi vết hành vi (System Audit Log)
+ * @param {string} action - Mã hành động nghiệp vụ (vd: UPDATE_ROOM_PRICE, DELETE_BILL, MANUAL_OVERRIDE)
+ * @param {string} entityName - Tên đối tượng tác động (vd: Room, Booking, Invoice, StaffAccount)
  */
 const auditLogInterceptor = (action, entityName) => {
   return async (req, res, next) => {
-    // Lưu lại hàm res.send/res.json để can thiệp sau khi xử lý xong
+    // Lưu lại hàm res.send và res.json nguyên bản
     const originalSend = res.send;
+    const originalJson = res.json;
 
-    res.send = async function (body) {
-      // Chỉ log nếu request thành công
+    let hasLogged = false;
+
+    // Helper tạo Audit Log sau khi xử lý nghiệp vụ thành công
+    const recordAuditLog = async () => {
+      if (hasLogged) return;
+      hasLogged = true;
+
+      // Chỉ ghi nhận log khi request trả về mã thành công HTTP 2xx
       if (res.statusCode >= 200 && res.statusCode < 300) {
         try {
-          let oldValues = req.auditOldValues || null;
-          let newValues = req.body || null;
-          let entityId = req.params.id || req.body.id || null;
-          let userId = req.user?.id || null;
-          let reason = req.body.reason || null;
+          const oldValues = req.auditOldValues || null;
+          const newValues = req.body || null;
+          const entityId = req.params.id || req.body?.id || null;
+          const userId = req.user?.id || req.body?.user_id || (req.headers['x-user-id'] ? Number(req.headers['x-user-id']) : null);
+          const reason = req.body?.reason || req.query?.reason || null;
+          const ipAddress = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip || '127.0.0.1';
+          const userAgent = req.headers['user-agent'] || 'Unknown';
 
-          // Tạo log
-          await AuditLog.create({
+          const auditData = {
             user_id: userId,
             action: action,
             entity_name: entityName,
-            entity_id: entityId,
+            entity_id: entityId ? Number(entityId) : null,
             old_values: oldValues,
             new_values: newValues,
-            ip_address: req.ip,
-            user_agent: req.headers['user-agent'],
+            ip_address: typeof ipAddress === 'string' ? ipAddress.replace(/^.*:/, '') : '127.0.0.1',
+            user_agent: userAgent,
             reason: reason,
+          };
+
+          // 1. Ghi nhận nhật ký kiểm toán (Append-only)
+          const createdLog = await AuditLog.create(auditData);
+
+          // 2. Kích hoạt engine quét cảnh báo gian lận bất thường
+          FraudDetectionService.analyzeAction(auditData).catch(err => {
+            console.error('Lỗi phân tích gian lận ngầm:', err.message);
           });
 
-          // Kiểm tra và cảnh báo gian lận (Fraud Detection)
-          // Vd: Nếu 1 user thực hiện quá 5 hành động nhạy cảm trong vòng 10 phút
-          if (userId) {
-            const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-            const suspiciousCount = await AuditLog.count({
-              where: {
-                user_id: userId,
-                createdAt: {
-                  [Op.gte]: tenMinutesAgo,
-                },
-              },
-            });
-
-            if (suspiciousCount >= 5) {
-              await FraudAlert.create({
-                user_id: userId,
-                alert_type: 'EXCESSIVE_SENSITIVE_ACTIONS',
-                severity: 'HIGH',
-                description: `Người dùng (ID: ${userId}) đã thực hiện ${suspiciousCount} hành động nhạy cảm trong 10 phút qua. Cần kiểm tra ngay.`,
-              });
-            }
-          }
-
         } catch (error) {
-          console.error('Audit Log Error:', error);
+          console.error('Audit Log Interceptor Error:', error.message);
         }
       }
-      
-      return originalSend.call(this, body);
+    };
+
+    res.send = function (body) {
+      recordAuditLog().finally(() => {
+        originalSend.call(this, body);
+      });
+    };
+
+    res.json = function (jsonBody) {
+      recordAuditLog().finally(() => {
+        originalJson.call(this, jsonBody);
+      });
     };
 
     next();
