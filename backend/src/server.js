@@ -71,6 +71,15 @@ app.use('/api/v1/check-out', checkOutRoutes);
 app.use('/api/check-out', checkOutRoutes);
 app.use('/api/v1/folio', checkOutRoutes);
 
+// Route Quản lý Minibar phòng (FEAT-MINIBAR-01 - Spec 12)
+const minibarRoutes = require('./routes/admin/minibarRoutes');
+app.use('/api/v1/minibar', minibarRoutes);
+app.use('/api/minibar', minibarRoutes);
+app.use('/api/v1/stays/:stayId/minibar', (req, res, next) => {
+  req.url = `/stays/${req.params.stayId}${req.url === '/' ? '' : req.url}`;
+  return minibarRoutes(req, res, next);
+});
+
 // Route Gia hạn lưu trú & Đổi phòng (Stay Extension & Room Move Terminal - Spec 9 & Spec 10)
 const { router: roomMoveRouter } = require('./routes/admin/roomMoveRoutes');
 app.use('/api/v1/room-moves', roomMoveRouter);
