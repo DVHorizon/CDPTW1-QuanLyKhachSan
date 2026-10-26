@@ -43,16 +43,24 @@ const Auth = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Nếu đã đăng nhập thành công, tự động chuyển hướng
+  // Nếu đã đăng nhập thành công, tự động chuyển hướng theo vai trò Database hoặc redirect query param
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.roleId === 1 || user.roleName === 'Admin') {
+      const redirectPath = queryParams.get('redirect');
+      if (redirectPath) {
+        navigate(redirectPath);
+        return;
+      }
+
+      const internalRoles = [1, 2, 3, 4];
+      const isInternal = internalRoles.includes(user.roleId) || ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'].includes(user.roleName);
+      if (isInternal) {
         navigate('/admin');
       } else {
         navigate('/');
       }
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, location.search]);
 
   // Đổi tab
   const switchTab = (tab) => {
@@ -68,7 +76,7 @@ const Auth = () => {
     setSuccessMessage('');
 
     if (!loginIdentifier.trim()) {
-      setErrorMessage('Vui lòng nhập Email hoặc Số điện thoại.');
+      setErrorMessage('Vui lòng nhập Email, Tên đăng nhập hoặc Số điện thoại.');
       return;
     }
     if (!loginPassword) {
@@ -82,7 +90,9 @@ const Auth = () => {
       if (res.success) {
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          if (res.user?.roleId === 1 || res.user?.roleName === 'Admin') {
+          const internalRoles = [1, 2, 3, 4];
+          const isInternal = internalRoles.includes(res.user?.roleId) || ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'].includes(res.user?.roleName);
+          if (isInternal) {
             navigate('/admin');
           } else {
             navigate('/');
@@ -188,18 +198,10 @@ const Auth = () => {
               <span className="font-['Playfair_Display',Georgia,serif] text-lg font-bold text-[#0b1c30] tracking-wide block leading-tight">
                 Grand Horizon
               </span>
-              <span className="text-[10px] font-bold text-[#725b38] tracking-[0.2em] uppercase block">
-                Resort &amp; Suites • Danang
-              </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center space-x-1.5 bg-[#e5eeff] text-[#069669] px-2.5 py-1 rounded-full text-xs font-semibold border border-[#069669]/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#68dba9] animate-pulse" />
-              <span>SSL 256-bit</span>
-            </div>
-
             {/* Close Button back to Home */}
             <Link
               to="/"
@@ -216,26 +218,11 @@ const Auth = () => {
           
           {/* Header & Switch Tabs */}
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs uppercase tracking-widest text-[#725b38] font-bold">
-                {activeTab === 'recovery' ? 'Hỗ trợ tài khoản' : 'Hội viên cá nhân'}
-              </span>
-              <div className="sm:hidden flex items-center text-[#069669] text-[11px] font-semibold space-x-1 bg-[#d3e4fe]/50 px-2 py-0.5 rounded-full">
-                <span className="material-symbols-outlined text-xs">lock</span>
-                <span>Bảo mật SSL</span>
-              </div>
-            </div>
-
             <h2 className="font-['Playfair_Display',Georgia,serif] text-2xl sm:text-[28px] font-bold text-[#0b1c30] mb-1.5">
               {activeTab === 'login' && 'Đăng Nhập'}
               {activeTab === 'register' && 'Đăng Ký Hội Viên'}
               {activeTab === 'recovery' && 'Khôi Phục Mật Khẩu'}
             </h2>
-            <p className="text-sm text-[#45464d]">
-              {activeTab === 'login' && 'Tạo tài khoản mới hoặc đăng nhập để truy cập hệ thống.'}
-              {activeTab === 'register' && 'Gia nhập Grand Horizon Elite để mở khóa quyền lợi nghỉ dưỡng đỉnh cao.'}
-              {activeTab === 'recovery' && 'Nhập email hoặc số điện thoại để nhận mã xác thực PIN bảo mật.'}
-            </p>
 
             {/* Toggle Pill Control (Login & Register) */}
             {activeTab !== 'recovery' && (
@@ -287,11 +274,11 @@ const Auth = () => {
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-[#0b1c30] mb-2">
-                  Email hoặc Số điện thoại
+                  Email, Tên đăng nhập hoặc Số điện thoại
                 </label>
                 <div className="relative flex items-center">
                   <span className="absolute left-4 text-[#45464d] material-symbols-outlined text-xl pointer-events-none">
-                    mail
+                    account_circle
                   </span>
                   <input
                     type="text"
@@ -299,7 +286,7 @@ const Auth = () => {
                     disabled={isLoading}
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="vip.guest@grandhorizon.com"
+                    placeholder="admin, receptionist hoặc email / số điện thoại"
                     className="w-full h-12 pl-12 pr-4 bg-white border border-[#d3e4fe] rounded-xl text-[#0b1c30] text-sm placeholder-[#76777d] focus:outline-none focus:border-[#725b38] focus:ring-2 focus:ring-[#725b38]/30 transition-all shadow-xs"
                   />
                 </div>
@@ -358,13 +345,8 @@ const Auth = () => {
               </div>
 
               {/* Quick Demo Credentials Pill */}
-              <div className="p-2.5 rounded-xl bg-[#e5eeff]/70 border border-[#cbdbf5] text-[11.5px] text-[#203044] space-y-1">
-                <div>
-                  <span className="font-bold text-[#725b38]">Khách hàng VIP:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-[#cbdbf5]/50">guest_9@hoteldomain.vn</code> // Mật khẩu: <code>123456</code>
-                </div>
-                <div>
-                  <span className="font-bold text-[#725b38]">Quản trị viên:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-[#cbdbf5]/50">admin@hoteldomain.vn</code> // Mật khẩu: <code>123456</code>
-                </div>
+              <div className="p-2.5 rounded-xl bg-[#e5eeff]/70 border border-[#cbdbf5] text-[11.5px] text-[#203044]">
+                <span className="font-bold text-[#725b38]">Tài khoản thử nghiệm:</span> <code>vip.guest@grandhorizon.com</code> // Mật khẩu: <code>123456</code>
               </div>
 
               {/* Primary CTA Button (Gold Accent) */}
@@ -622,18 +604,6 @@ const Auth = () => {
               </div>
             </form>
           )}
-
-
-          {/* Security Badge & Footer Details */}
-          <div className="mt-8 pt-4 text-center border-t border-[#e5eeff]">
-            <div className="inline-flex items-center space-x-2 text-[#45464d] text-xs">
-              <span className="material-symbols-outlined text-base text-[#725b38]">encrypted</span>
-              <span>Cam kết an toàn dữ liệu khách hàng theo chuẩn quốc tế PCI-DSS &amp; SSL</span>
-            </div>
-            <p className="text-xs text-[#45464d]/70 mt-2">
-              Grand Horizon Danang © 2026. Mọi quyền được bảo lưu.
-            </p>
-          </div>
         </div>
       </div>
     </div>
