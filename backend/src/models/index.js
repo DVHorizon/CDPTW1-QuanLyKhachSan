@@ -48,6 +48,7 @@ const defineLaundryBatch = require('./LaundryBatch');
 const defineMaintenanceTicket = require('./MaintenanceTicket');
 const defineLostAndFoundItem = require('./LostAndFoundItem');
 const defineSmartLockKey = require('./SmartLockKey');
+const defineMinibarUsage = require('./MinibarUsage');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -97,6 +98,7 @@ const LaundryBatch = defineLaundryBatch(sequelize);
 const MaintenanceTicket = defineMaintenanceTicket(sequelize);
 const LostAndFoundItem = defineLostAndFoundItem(sequelize);
 const SmartLockKey = defineSmartLockKey(sequelize);
+const MinibarUsage = defineMinibarUsage(sequelize);
 
 // Inventory Relationships
 InventoryItem.hasMany(InventoryBatch, { foreignKey: 'ItemId', as: 'batches' });
@@ -242,10 +244,12 @@ MinibarInspection.hasMany(MinibarInspectionLine, { foreignKey: 'InspectionId', a
 MinibarInspectionLine.belongsTo(MinibarInspection, { foreignKey: 'InspectionId', as: 'inspection' });
 
 MinibarInspectionLine.belongsTo(MinibarProduct, { foreignKey: 'ProductId', as: 'product' });
-MinibarProduct.hasMany(MinibarInspectionLine, { foreignKey: 'ProductId', as: 'inspectionLines' });
+User.hasMany(Payment, { foreignKey: 'UserId', as: 'payments' });
+Payment.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 
-MinibarInspection.hasMany(MinibarInspectionEvent, { foreignKey: 'InspectionId', as: 'events' });
-MinibarInspectionEvent.belongsTo(MinibarInspection, { foreignKey: 'InspectionId', as: 'inspection' });
+// 19. Minibar Associations (FEAT-INVOICE-01 / C6)
+Stay.hasMany(MinibarUsage, { foreignKey: 'StayId', as: 'minibarUsages' });
+MinibarUsage.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
 
 module.exports = {
   sequelize,
@@ -297,4 +301,6 @@ module.exports = {
   MinibarInspection,
   MinibarInspectionLine,
   MinibarInspectionEvent,
+  Voucher,
+  MinibarUsage,
 };
