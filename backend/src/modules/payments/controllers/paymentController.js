@@ -6,6 +6,7 @@
  * Cung cấp dịch vụ thanh toán dùng chung: Cash / Card / BankTransfer / VNPay / MoMo / VietQR
  */
 
+const { Op } = require('sequelize');
 const {
   Payment,
   Booking,
@@ -21,6 +22,9 @@ const {
   createGatewayTransaction,
   verifyWebhookSignature,
 } = require('../services/paymentGatewayService');
+
+// Quyết định D6: coi PAID_STATUSES = ['Paid', 'Success', 'Completed'] là đã thu
+const PAID_STATUSES = ['Paid', 'Success', 'Completed'];
 
 /**
  * 1. POST /api/v1/payments (alias /payments)
@@ -150,24 +154,24 @@ exports.createPayment = async (req, res) => {
         });
       }
 
-      // Kiểm tra số dư cọc còn lại
+      // Kiểm tra số dư booking còn lại (Quyết định D6 & D7)
       const paidPayments = await Payment.findAll({
-        where: { BookingId: targetBooking.BookingId, Status: 'Paid' },
+        where: {
+          BookingId: targetBooking.BookingId,
+          Status: { [Op.in]: PAID_STATUSES },
+        },
         transaction,
       });
       const totalPaid = paidPayments.reduce((sum, p) => sum + Number(p.Amount || 0), 0);
-      const targetDeposit =
-        Number(targetBooking.DepositAmount) > 0
-          ? Number(targetBooking.DepositAmount)
-          : Number(targetBooking.TotalAmount);
-      const remainingDeposit = Math.max(0, targetDeposit - totalPaid);
+      const bookingTotal = Number(targetBooking.TotalAmount || 0);
+      const remainingBalance = Math.max(0, bookingTotal - totalPaid);
 
-      if (numAmount > remainingDeposit) {
+      if (numAmount > remainingBalance) {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
           code: 'ERROR_0012_OUT_OF_RANGE',
-          message: 'Số tiền vượt quá số cọc còn phải thanh toán',
+          message: 'Số tiền vượt quá số dư còn phải thanh toán',
         });
       }
     } else {
@@ -220,9 +224,12 @@ exports.createPayment = async (req, res) => {
         });
       }
 
-      // Kiểm tra số dư hoá đơn còn lại
+      // Kiểm tra số dư hoá đơn còn lại (Quyết định D6)
       const paidPayments = await Payment.findAll({
-        where: { InvoiceId: targetInvoice.InvoiceId, Status: 'Paid' },
+        where: {
+          InvoiceId: targetInvoice.InvoiceId,
+          Status: { [Op.in]: PAID_STATUSES },
+        },
         transaction,
       });
       const totalPaid = paidPayments.reduce((sum, p) => sum + Number(p.Amount || 0), 0);
@@ -274,6 +281,9 @@ exports.createPayment = async (req, res) => {
             data: {
               ...existingPending.toJSON(),
               ...gwData,
+              paymentId: existingPending.PaymentId,
+              status: existingPending.Status,
+              transactionCode: existingPending.TransactionCode,
             },
           });
         }
@@ -304,7 +314,10 @@ exports.createPayment = async (req, res) => {
     if (!isOnline) {
       if (hasInvoice) {
         const allPaid = await Payment.findAll({
-          where: { InvoiceId: targetInvoice.InvoiceId, Status: 'Paid' },
+          where: {
+            InvoiceId: targetInvoice.InvoiceId,
+            Status: { [Op.in]: PAID_STATUSES },
+          },
           transaction,
         });
         const totalPaid = allPaid.reduce((sum, p) => sum + Number(p.Amount || 0), 0);
@@ -316,12 +329,8 @@ exports.createPayment = async (req, res) => {
         await targetInvoice.save({ transaction });
       }
 
-      if (hasBooking) {
-        if (targetBooking.Status === 'Pending') {
-          targetBooking.Status = 'Confirmed';
-          await targetBooking.save({ transaction });
-        }
-      }
+      // Quyết định C5 (ticket 03): Không tự đổi Booking.Status sang Confirmed trong Core Payment,
+      // để module Booking (A8) phụ trách vòng đời booking và broadcast websocket.
     }
 
     await transaction.commit();
@@ -347,6 +356,9 @@ exports.createPayment = async (req, res) => {
       data: {
         ...newPayment.toJSON(),
         ...gatewayResult,
+        paymentId: newPayment.PaymentId,
+        status: newPayment.Status,
+        transactionCode: newPayment.TransactionCode,
       },
     });
   } catch (error) {
@@ -393,7 +405,12 @@ exports.getPaymentStatus = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: payment,
+      data: {
+        ...payment.toJSON(),
+        paymentId: payment.PaymentId,
+        status: payment.Status,
+        transactionCode: payment.TransactionCode,
+      },
     });
   } catch (error) {
     console.error('Error in getPaymentStatus:', error);
@@ -493,7 +510,10 @@ exports.handleWebhook = async (req, res) => {
         const invoice = await Invoice.findByPk(payment.InvoiceId, { transaction });
         if (invoice) {
           const allPaid = await Payment.findAll({
-            where: { InvoiceId: invoice.InvoiceId, Status: 'Paid' },
+            where: {
+              InvoiceId: invoice.InvoiceId,
+              Status: { [Op.in]: PAID_STATUSES },
+            },
             transaction,
           });
           const totalPaid = allPaid.reduce((sum, p) => sum + Number(p.Amount || 0), 0);
@@ -506,13 +526,8 @@ exports.handleWebhook = async (req, res) => {
         }
       }
 
-      if (payment.BookingId) {
-        const booking = await Booking.findByPk(payment.BookingId, { transaction });
-        if (booking && booking.Status === 'Pending') {
-          booking.Status = 'Confirmed';
-          await booking.save({ transaction });
-        }
-      }
+      // Quyết định C5 (ticket 03): C5 chỉ ghi nhận Payment thành công,
+      // không tự động thay đổi Booking.Status để nhường quyền quản lý vòng đời cho module Booking (A8).
     }
 
     await transaction.commit();
@@ -542,7 +557,8 @@ exports.refundPayment = async (req, res) => {
 
   try {
     const userRole = req.user?.roleName || req.user?.role?.RoleName || req.user?.Role || '';
-    const isAuthorized = ['Admin', 'Manager', 'Accountant'].includes(userRole);
+    // Quyết định D5: Refund chỉ Admin. Hệ thống không có vai trò Kế toán.
+    const isAuthorized = userRole === 'Admin' || req.user?.roleId === 1;
 
     if (!isAuthorized) {
       await transaction.rollback();
