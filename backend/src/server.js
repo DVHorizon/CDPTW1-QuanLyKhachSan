@@ -147,7 +147,7 @@ app.use('/api/v1/operations', require('./modules/operations'));
 app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
 app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
 // FEAT-GUEST-05: Direct booking endpoint
-app.post('/bookings', require('./controllers/bookingEngineController').createOnlineBooking);
+app.post('/bookings', require('./middlewares/authMiddleware').verifyToken, require('./controllers/bookingEngineController').createOnlineBooking);
 
 // FEAT-GUEST-06: Direct automated real-time pricing calculation endpoint
 app.post('/bookings/calculate-pricing', require('./controllers/bookingEngineController').calculatePricing);
@@ -164,6 +164,11 @@ app.post('/api/bookings/:bookingId/apply-voucher', require('./controllers/vouche
 // FEAT-GUEST-08: Direct deposit payment & booking retrieval endpoints
 app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController').getBookingDetails);
 app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
+
+// FEAT-GUEST-09: Xem lịch sử đặt phòng & Hủy phòng (Mã truy vết: A9)
+app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));
+app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
+app.use('/me',        require('./routes/bookingHistoryRoutes'));
 
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 app.use(require('./shared/middlewares/errorHandler'));
