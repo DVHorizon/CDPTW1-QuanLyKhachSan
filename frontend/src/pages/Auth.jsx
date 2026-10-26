@@ -358,8 +358,13 @@ const Auth = () => {
               </div>
 
               {/* Quick Demo Credentials Pill */}
-              <div className="p-2.5 rounded-xl bg-[#e5eeff]/70 border border-[#cbdbf5] text-[11.5px] text-[#203044]">
-                <span className="font-bold text-[#725b38]">Tài khoản thử nghiệm:</span> <code>vip.guest@grandhorizon.com</code> // Mật khẩu: <code>123456</code>
+              <div className="p-2.5 rounded-xl bg-[#e5eeff]/70 border border-[#cbdbf5] text-[11.5px] text-[#203044] space-y-1">
+                <div>
+                  <span className="font-bold text-[#725b38]">Khách hàng VIP:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-[#cbdbf5]/50">guest_9@hoteldomain.vn</code> // Mật khẩu: <code>123456</code>
+                </div>
+                <div>
+                  <span className="font-bold text-[#725b38]">Quản trị viên:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-[#cbdbf5]/50">admin@hoteldomain.vn</code> // Mật khẩu: <code>123456</code>
+                </div>
               </div>
 
               {/* Primary CTA Button (Gold Accent) */}
