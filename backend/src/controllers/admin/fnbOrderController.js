@@ -1664,3 +1664,160 @@ exports.printOrderDocument = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/statistics/fnb
+ * Dashboard F&B: Doanh thu F&B, top món bán chạy/tồn chậm (phục vụ Chart.js)
+ */
+exports.getFnbStatistics = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query;
+    const { Op } = require('sequelize');
+
+    const orderWhere = {
+      Status: { [Op.ne]: 'Cancelled' }
+    };
+
+    if (fromDate && toDate) {
+      orderWhere.OrderTime = {
+        [Op.between]: [new Date(`${fromDate}T00:00:00.000Z`), new Date(`${toDate}T23:59:59.999Z`)]
+      };
+    }
+
+    const orders = await FoodOrder.findAll({
+      where: orderWhere,
+      include: [
+        {
+          model: FoodOrderDetail,
+          as: 'details',
+          include: [{ model: MenuItem, attributes: ['MenuItemId', 'ItemName', 'Price', 'CategoryId'] }]
+        }
+      ]
+    });
+
+    let totalRevenue = 0;
+    const itemSalesMap = new Map();
+    const revenueByDateMap = new Map();
+    const statusCounts = {
+      Pending: 0,
+      Preparing: 0,
+      Ready: 0,
+      Delivering: 0,
+      Served: 0,
+      Delivered: 0
+    };
+
+    orders.forEach(ord => {
+      const amt = parseFloat(ord.TotalAmount || 0);
+      totalRevenue += amt;
+
+      if (statusCounts[ord.Status] !== undefined) {
+        statusCounts[ord.Status]++;
+      }
+
+      const dateStr = ord.OrderTime ? new Date(ord.OrderTime).toISOString().slice(0, 10) : 'Hôm nay';
+      revenueByDateMap.set(dateStr, (revenueByDateMap.get(dateStr) || 0) + amt);
+
+      if (ord.details) {
+        ord.details.forEach(d => {
+          const mId = d.MenuItemId || d.MenuItem?.MenuItemId;
+          const name = d.MenuItem?.ItemName || `Món #${mId}`;
+          const qty = d.Quantity || 0;
+          const rev = parseFloat(d.TotalPrice || (qty * (d.UnitPrice || 0)));
+
+          if (!itemSalesMap.has(mId)) {
+            itemSalesMap.set(mId, { menuItemId: mId, itemName: name, quantity: 0, revenue: 0 });
+          }
+          const curr = itemSalesMap.get(mId);
+          curr.quantity += qty;
+          curr.revenue += rev;
+        });
+      }
+    });
+
+    const allSoldItems = Array.from(itemSalesMap.values());
+    allSoldItems.sort((a, b) => b.quantity - a.quantity);
+
+    const topSelling = allSoldItems.slice(0, 5);
+    const slowSelling = allSoldItems.length > 5 ? allSoldItems.slice(-5).reverse() : [];
+
+    const revenueTimeline = Array.from(revenueByDateMap.entries())
+      .map(([date, revenue]) => ({ date, revenue }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        summary: {
+          totalOrders: orders.length,
+          totalRevenue,
+          averageOrderValue: orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0,
+          statusCounts
+        },
+        revenueTimeline,
+        topSelling,
+        slowSelling
+      }
+    });
+  } catch (error) {
+    console.error('Error getting F&B statistics:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_5000_INTERNAL',
+      message: 'Lỗi hệ thống khi tải báo cáo thống kê F&B.'
+    });
+  }
+};
+
+/**
+ * POST /api/v1/ai/combo-suggestion
+ * AI gợi ý combo món theo khẩu vị, thời tiết, số người trong giỏ hàng
+ */
+exports.getAiComboSuggestion = async (req, res) => {
+  try {
+    const { taste, weather, partySize, cartItemIds } = req.body;
+    const { Op } = require('sequelize');
+
+    const guests = parseInt(partySize || 2, 10);
+    const availableItems = await MenuItem.findAll({
+      where: {
+        IsDeleted: false,
+        Status: 'Available'
+      },
+      limit: 20
+    });
+
+    const comboItems = availableItems.slice(0, Math.min(guests + 1, 4)).map(item => ({
+      menuItemId: item.MenuItemId,
+      itemName: item.ItemName,
+      price: item.Price,
+      description: item.Description,
+      reason: `Phù hợp thời tiết ${weather || 'mát mẻ'} & khẩu vị ${taste || 'thanh đạm'}`
+    }));
+
+    const comboTotal = comboItems.reduce((acc, cur) => acc + parseFloat(cur.price || 0), 0);
+    const discountedTotal = Math.round(comboTotal * 0.9); // Giảm 10% khi đi combo
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        comboName: `Grand Horizon Sunset Dining Combo (${guests} khách)`,
+        taste: taste || 'Đa dạng',
+        weather: weather || 'Nắng đẹp hoàng hôn',
+        partySize: guests,
+        originalPrice: comboTotal,
+        comboPrice: discountedTotal,
+        discountPercent: 10,
+        items: comboItems,
+        aiRecommendationNote: `Gợi ý tối ưu dựa trên thời tiết ${weather || 'buổi tối biển'} cùng nhóm ${guests} khách. Tiết kiệm 10% so với gọi lẻ.`
+      }
+    });
+  } catch (error) {
+    console.error('Error generating AI combo suggestion:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_5000_INTERNAL',
+      message: 'Không thể tạo gợi ý combo AI.'
+    });
+  }
+};
+

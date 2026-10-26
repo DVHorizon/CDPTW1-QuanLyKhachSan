@@ -34,11 +34,13 @@ function initSocket(server) {
         const urlObj = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
         const pathname = urlObj.pathname;
 
-        // Chấp nhận các path hợp lệ: /ws, /ws/rooms, /ws/fnb-orders, /ws/v1/kitchen-notifications
+        // Chấp nhận các path hợp lệ: /ws, /ws/rooms, /ws/tables, /ws/fnb-orders, /ws/v1/fnb-orders, /ws/v1/kitchen-notifications
         if (
           pathname === '/ws' ||
           pathname === '/ws/rooms' ||
+          pathname === '/ws/tables' ||
           pathname === '/ws/fnb-orders' ||
+          pathname === '/ws/v1/fnb-orders' ||
           pathname === '/ws/v1/kitchen-notifications'
         ) {
           // FEAT-FNB-12: Kiểm tra xác thực token cho /ws/v1/kitchen-notifications nếu có truyền token
@@ -188,7 +190,7 @@ function broadcastOrderStatus(order) {
 
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      if (!client.pathname || client.pathname === '/ws/fnb-orders' || client.pathname === '/ws') {
+      if (!client.pathname || client.pathname === '/ws/fnb-orders' || client.pathname === '/ws/v1/fnb-orders' || client.pathname === '/ws') {
         if (!client.subscribedOrderId || client.subscribedOrderId === order.FoodOrderId) {
           client.send(payload);
         }
@@ -238,6 +240,37 @@ function broadcastNewKitchenOrder(orderData) {
   console.log(`📢 [WebSocket] Broadcast new_fnb_order (#${orderData.foodOrderId} - ${orderData.location}) tới ${sentCount} clients.`);
 }
 
+/**
+ * FEAT-FNB-13 (A4.13): Đồng bộ trạng thái bàn real-time tới tất cả client mở sơ đồ bàn
+ * @param {Object} tableData Dữ liệu bàn thay đổi trạng thái
+ */
+function broadcastTableUpdate(tableData) {
+  if (!wss) return;
+
+  const payload = JSON.stringify({
+    event: 'table_status_changed',
+    type: 'TABLE_STATUS_CHANGED',
+    data: tableData,
+    timestamp: new Date().toISOString()
+  });
+
+  let sentCount = 0;
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1 /* WebSocket.OPEN */) {
+      if (
+        !client.pathname ||
+        client.pathname === '/ws/tables' ||
+        client.pathname === '/ws'
+      ) {
+        client.send(payload);
+        sentCount++;
+      }
+    }
+  });
+
+  console.log(`📢 [WebSocket] Broadcast table_status_changed (Table #${tableData.tableId} -> ${tableData.status}) tới ${sentCount} clients.`);
+}
+
 function getWss() {
   return wss;
 }
@@ -247,6 +280,7 @@ module.exports = {
   broadcastRoomEvent,
   broadcastOrderStatus,
   broadcastNewKitchenOrder,
+  broadcastTableUpdate,
   getWss
 };
 

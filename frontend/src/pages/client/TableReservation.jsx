@@ -125,7 +125,7 @@ export default function TableReservation() {
   useEffect(() => {
     const fetchActiveStays = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/v1/fnb-orders/active-stays");
+        const res = await fetch("/api/v1/fnb-orders/active-stays");
         const json = await res.json();
         if (res.ok && json.data && json.data.length > 0) {
           setActiveStays(json.data);
@@ -158,13 +158,24 @@ export default function TableReservation() {
   // Lấy danh sách lượt đặt bàn của mình từ Database
   const fetchMyReservations = async () => {
     try {
-      const token = localStorage.getItem("hotel_token");
-      let url = "http://localhost:5000/api/v1/table-reservations?view=client";
-      try {
-        const savedUser = JSON.parse(localStorage.getItem("hotel_user") || "{}");
-        const uid = currentUser?.id || currentUser?.UserId || currentUser?.userId || savedUser?.id || savedUser?.UserId || savedUser?.userId;
-        if (uid) url += `&userId=${uid}`;
-      } catch {}
+      const token = localStorage.getItem("hotel_token") || localStorage.getItem("token") || localStorage.getItem("accessToken");
+      let url = "/api/v1/table-reservations?view=client";
+      
+      let uid = currentUser?.id || currentUser?.UserId || currentUser?.userId;
+      if (!uid) {
+        try {
+          const savedUser = JSON.parse(localStorage.getItem("hotel_user") || "{}");
+          uid = savedUser?.id || savedUser?.UserId || savedUser?.userId;
+        } catch {}
+      }
+      if (!uid && selectedStay?.userId) {
+        uid = selectedStay.userId;
+      }
+      if (!uid) {
+        // Fallback user ID mặc định cho khách đang trải nghiệm
+        uid = 2;
+      }
+      if (uid) url += `&userId=${uid}`;
 
       const res = await fetch(url, {
         headers: {
@@ -182,7 +193,7 @@ export default function TableReservation() {
 
   useEffect(() => {
     fetchMyReservations();
-  }, [currentUser]);
+  }, [currentUser, selectedStay]);
 
   // Tạo danh sách 6 ngày liên tiếp tính từ hôm nay
   const dynamicDateOptions = useMemo(() => {
@@ -351,7 +362,7 @@ export default function TableReservation() {
     setLoading(true);
     setErrorMsg("");
     try {
-      const token = localStorage.getItem("hotel_token");
+      const token = localStorage.getItem("hotel_token") || localStorage.getItem("token") || localStorage.getItem("accessToken");
       let currentUserId = selectedStay?.userId || 1;
       try {
         const savedUser = JSON.parse(localStorage.getItem("hotel_user") || "{}");
@@ -362,7 +373,7 @@ export default function TableReservation() {
       const targetDate = getTargetDateTime(selectedDate, selectedTime);
       const dbLocation = getZoneDbLocation(seatingZone);
 
-      const response = await fetch("http://localhost:5000/api/v1/table-reservations", {
+      const response = await fetch("/api/v1/table-reservations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -456,15 +467,36 @@ export default function TableReservation() {
                     4.9/5.0 (Hơn 580 thực khách đánh giá cao)
                   </span>
                 </div>
-                <h1
-                  className="text-3xl sm:text-4xl text-white font-bold tracking-tight mb-2 drop-shadow-md"
-                  style={{ fontFamily: "'Playfair Display', serif" }}
-                >
-                  Nhà Hàng Biển Horizon Dining & Grill
-                </h1>
-                <p className="text-white/90 text-sm sm:text-base max-w-3xl drop-shadow mb-4">
-                  Thưởng vị ẩm thực bờ biển nguyên bản hòa quyện cùng mỹ vị Á - Âu đỉnh cao. Tận hưởng khoảnh khắc hoàng hôn tráng lệ trong không gian ngập tràn thanh âm của sóng biển ngọc lục bảo.
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h1
+                      className="text-3xl sm:text-4xl text-white font-bold tracking-tight mb-2 drop-shadow-md"
+                      style={{ fontFamily: "'Playfair Display', serif" }}
+                    >
+                      Nhà Hàng Biển Horizon Dining & Grill
+                    </h1>
+                    <p className="text-white/90 text-sm sm:text-base max-w-3xl drop-shadow">
+                      Thưởng vị ẩm thực bờ biển nguyên bản hòa quyện cùng mỹ vị Á - Âu đỉnh cao. Tận hưởng khoảnh khắc hoàng hôn tráng lệ trong không gian ngập tràn thanh âm của sóng biển ngọc lục bảo.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchMyReservations();
+                      setShowHistoryDrawer(true);
+                    }}
+                    className="cursor-pointer px-4 py-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-md font-semibold text-xs flex items-center gap-2 shadow-lg transition-all active:scale-95 shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-[18px] text-emerald-300">bookmark_added</span>
+                    <span>Lịch Sử Đặt Bàn Của Quý Khách</span>
+                    {myReservations.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[11px] font-bold">
+                        {myReservations.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
 
                 {/* Culinary Fast Facts Strip */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10">
@@ -1368,15 +1400,13 @@ export default function TableReservation() {
                 <div className="flex flex-col gap-2.5">
                   <button
                     type="button"
-                    disabled={loading || availableData.availableCount === 0}
+                    disabled={loading}
                     onClick={handleConfirmReservation}
-                    className="w-full py-3.5 px-6 rounded-xl bg-emerald-600 text-white font-bold flex items-center justify-center gap-2 shadow-[0_0_16px_rgba(16,185,129,0.35)] hover:bg-emerald-700 active:scale-[0.99] transition-all disabled:opacity-50"
+                    className="w-full py-3.5 px-6 rounded-xl bg-emerald-600 text-white font-bold flex items-center justify-center gap-2 shadow-[0_0_16px_rgba(16,185,129,0.35)] hover:bg-emerald-700 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[20px]">restaurant</span>
                     {loading
                       ? "Đang xử lý đặt bàn..."
-                      : availableData.availableCount === 0
-                      ? "Hết bàn trong khung giờ này"
                       : "Xác Nhận Đặt Bàn Ngay"}
                   </button>
                   <button

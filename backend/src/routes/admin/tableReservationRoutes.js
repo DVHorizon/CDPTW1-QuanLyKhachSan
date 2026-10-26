@@ -8,6 +8,11 @@ const { verifyToken, optionalVerifyToken } = require('../../middlewares/authMidd
 // 1. Sơ đồ / danh sách bàn trống theo khung giờ
 router.get('/available-tables', optionalVerifyToken, tableReservationController.getAvailableTables);
 
+// 1b. FEAT-FNB-13 (A4.13): Sơ đồ bàn ăn trực quan (Table Map)
+router.get('/table-map', optionalVerifyToken, tableReservationController.getTableMapOverview);
+router.get('/table-map/:tableId', optionalVerifyToken, tableReservationController.getTableDetail);
+router.post('/table-map/action', verifyToken, tableReservationController.handleTableAction);
+
 // 2. Tạo lượt đặt bàn trước tại nhà hàng (FEAT-FNB-09: A4.9)
 router.post('/', optionalVerifyToken, tableReservationController.createReservation);
 
