@@ -60,7 +60,7 @@ router.get('/arrivals', async (req, res) => {
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
       WHERE ${statusFilter}
-        AND b.IsDeleted = 0
+        AND b.Status != 'Cancelled'
       ORDER BY b.BookingId DESC
       LIMIT ?
     `;
@@ -131,7 +131,7 @@ router.get('/lookup', async (req, res) => {
          OR b.BookingId = ?
          OR bg.Phone = ?
          OR bg.IdNumber = ?)
-        AND b.IsDeleted = 0
+        AND b.Status != 'Cancelled'
       LIMIT 1
     `;
 

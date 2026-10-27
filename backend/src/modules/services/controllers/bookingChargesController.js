@@ -45,11 +45,13 @@ function calculateStayNights(stay, defaultNights) {
  */
 exports.getBookingCharges = async (req, res) => {
   try {
-    const userRole = req.user?.roleName || req.user?.role?.RoleName || req.user?.Role || '';
-    const isStaffOrAdmin = ['Admin', 'Receptionist', 'Staff', 'Manager', 'Accountant'].includes(userRole);
+    const userRole = String(req.user?.roleName || req.user?.role?.RoleName || req.user?.Role || '').toLowerCase();
+    const roleId = Number(req.user?.roleId || 0);
+    const isStaffOrAdmin = [1, 2, 3, 4].includes(roleId) ||
+      ['admin', 'receptionist', 'staff', 'manager', 'accountant'].includes(userRole);
 
     // 1. Phân quyền: Chỉ nhân viên nội bộ (role !== 'Guest') được gọi (Mục 1.4.a)
-    if (!isStaffOrAdmin || userRole === 'Guest') {
+    if (!isStaffOrAdmin || userRole === 'guest') {
       return res.status(403).json({
         success: false,
         code: 'ERROR_0010_FORBIDDEN',

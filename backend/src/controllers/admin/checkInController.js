@@ -180,7 +180,7 @@ async function findBookingByCodeOrId(codeOrId, connOrPool = pool) {
     LEFT JOIN Stays s ON b.BookingId = s.BookingId
     LEFT JOIN Rooms r ON s.RoomId = r.RoomId
     WHERE (b.ConfirmationCode = ? ${isNum ? 'OR b.BookingId = ?' : ''})
-      AND b.IsDeleted = 0
+      AND b.Status != 'Cancelled'
     ORDER BY b.BookingId DESC
     LIMIT 1
   `;
