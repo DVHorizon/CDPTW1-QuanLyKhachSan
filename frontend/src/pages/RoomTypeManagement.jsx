@@ -214,7 +214,16 @@ const QUICK_SEMANTIC_PROMPTS = [
 // =============================================================================
 const RoomTypeManagement = () => {
   // Quản lý danh sách loại phòng với LocalStorage đồng bộ
-  const [roomTypes, setRoomTypes] = useState(INITIAL_ROOM_TYPES);
+  const [roomTypes, setRoomTypes] = useState(() => {
+    try {
+      const saved = localStorage.getItem('qlks_room_types');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) { }
+    return INITIAL_ROOM_TYPES;
+  });
 
   const [selectedId, setSelectedId] = useState(2);
   const [form, setForm] = useState({ ...INITIAL_ROOM_TYPES[1] });
@@ -230,10 +239,6 @@ const RoomTypeManagement = () => {
   const [backendConnected, setBackendConnected] = useState(false);
   const [showTestPanel, setShowTestPanel] = useState(false);
   const [showRagAnswer, setShowRagAnswer] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-  // Modal thông báo lỗi khi bị xóa bảng hoặc bản ghi trong Database kèm nút tải lại trang
-  const [syncErrorModal, setSyncErrorModal] = useState(null);
   const tableScrollRef = useRef(null);
 
   // Lăn chuột trên bảng thì cuộn ngang
@@ -267,10 +272,8 @@ const RoomTypeManagement = () => {
     } catch (_) { }
   }, [roomTypes]);
 
-  // Luôn fetch từ Backend khi tải trang (ưu tiên DB hơn localStorage)
+  // Thử kết nối backend API khi tải trang
   useEffect(() => {
-    // Xóa cache cũ để tránh hiển thị dữ liệu mẫu thay vì dữ liệu thật từ DB
-    localStorage.removeItem('qlks_room_types');
     fetchFromBackend();
   }, []);
 
@@ -278,7 +281,7 @@ const RoomTypeManagement = () => {
     setIsSyncing(true);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
       const res = await fetch(API_BASE_URL, { signal: controller.signal });
       clearTimeout(timeoutId);
 
@@ -289,7 +292,7 @@ const RoomTypeManagement = () => {
             id: r.id,
             code: r.ma_loai,
             name: r.ten_loai,
-            subtitle: r.tang_vi_tri ? `Tầng: ${r.tang_vi_tri}` : (r.huong_view || ''),
+            subtitle: r.tang_vi_tri ? `Tầng: ${r.tang_vi_tri}` : '',
             status: r.trang_thai,
             floors: r.tang_vi_tri || '',
             maxAdults: r.toi_da_nguoi_lon || 2,
@@ -307,21 +310,6 @@ const RoomTypeManagement = () => {
           }));
           setRoomTypes(mapped);
           setBackendConnected(true);
-          // Đồng bộ form với bản ghi đầu tiên nếu bản ghi đang chọn không tồn tại trong DB
-          setSelectedId((prev) => {
-            const found = mapped.find((m) => m.id === prev);
-            if (found) {
-              setForm({ ...found });
-              setImgUrl(found.image || '');
-              return prev;
-            }
-            if (mapped[0]) {
-              setForm({ ...mapped[0] });
-              setImgUrl(mapped[0].image || '');
-              return mapped[0].id;
-            }
-            return prev;
-          });
           showToast('Đã đồng bộ dữ liệu từ Cơ sở dữ liệu MySQL!', 'success');
         }
       }
@@ -343,25 +331,6 @@ const RoomTypeManagement = () => {
       (r) => filterStatus === 'all' || r.status === filterStatus
     );
   }, [semanticResults, filterStatus]);
-
-  // Phân trang: chỉ hiển thị 10 dòng/trang
-  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
-  const paginatedList = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filtered.slice(start, start + itemsPerPage);
-  }, [filtered, currentPage, itemsPerPage]);
-
-  // Reset về trang 1 khi từ khóa tìm kiếm hoặc trạng thái lọc thay đổi
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterText, filterStatus]);
-
-  // Đảm bảo currentPage không vượt quá totalPages
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [totalPages, currentPage]);
 
   // ─── RAG (Retrieval-Augmented Generation): AI Trả lời kèm trích dẫn nguồn ───
   const ragResponse = useMemo(() => {
@@ -573,31 +542,16 @@ const RoomTypeManagement = () => {
           });
 
           if (res.status === 404) {
-            setSyncErrorModal({
-              title: 'CẢNH BÁO: DỮ LIỆU ĐÃ BỊ XÓA KHỎI DATABASE!',
-              message: `Trong lúc bạn đang thao tác chỉnh sửa, loại phòng [${payload.code} - ${payload.name}] (ID #${selectedId}) đã bị người khác hoặc tiến trình khác xóa khỏi cơ sở dữ liệu! Thao tác lưu không thể thực hiện.`,
-              actionText: 'Tải Lại Dữ Liệu & Danh Sách',
-              onAction: () => {
-                setSyncErrorModal(null);
-                fetchFromBackend();
-              },
-            });
+            showToast(
+              `⚠️ LỖI ĐỒNG BỘ: Bản ghi loại phòng ID #${selectedId} đã bị xóa trực tiếp khỏi cơ sở dữ liệu MySQL! Hệ thống sẽ tự động cập nhật lại danh sách.`,
+              'error'
+            );
             setRoomTypes((p) => p.filter((r) => r.id !== selectedId));
             handleNew();
             return;
           }
 
           const resData = await res.json();
-          if (resData.isTableMissing) {
-            setSyncErrorModal({
-              title: 'LỖI CƠ SỞ DỮ LIỆU: BẢNG DỮ LIỆU ĐÃ BỊ XÓA!',
-              message: 'Bảng dữ liệu RoomTypes không còn tồn tại trong cơ sở dữ liệu MySQL (bảng đã bị DROP hoặc xóa). Vui lòng kiểm tra lại cấu trúc CSDL hoặc tải lại trang.',
-              actionText: 'Tải Lại Toàn Bộ Trang',
-              onAction: () => window.location.reload(),
-            });
-            return;
-          }
-
           if (!res.ok || !resData.success) {
             showToast(resData.message || 'Không thể cập nhật trên cơ sở dữ liệu', 'error');
             return;
@@ -610,10 +564,7 @@ const RoomTypeManagement = () => {
       setRoomTypes((p) =>
         p.map((r) => (r.id === selectedId ? { ...payload, id: selectedId } : r))
       );
-      showToast(`Đã cập nhật thành công loại phòng "${payload.name}" và đồng bộ CSDL!`, 'success');
-      if (backendConnected) {
-        fetchFromBackend();
-      }
+      showToast(`Đã cập nhật thành công loại phòng "${payload.name}".`, 'success');
     } else {
       let newId = Date.now();
 
@@ -656,15 +607,10 @@ const RoomTypeManagement = () => {
       }
 
       const createdItem = { ...payload, id: newId };
-      setRoomTypes((p) => [createdItem, ...p]);
+      setRoomTypes((p) => [...p, createdItem]);
       setSelectedId(newId);
-      setForm({ ...createdItem });
       setIsNew(false);
       showToast(`Đã tạo mới thành công loại phòng "${payload.name}".`, 'success');
-      // Đồng bộ lại với backend
-      if (backendConnected) {
-        fetchFromBackend();
-      }
     }
   };
 
@@ -707,15 +653,10 @@ const RoomTypeManagement = () => {
           body: JSON.stringify({ trang_thai: ns }),
         });
         if (res.status === 404) {
-          setSyncErrorModal({
-            title: 'CẢNH BÁO: LOẠI PHÒNG ĐÃ BỊ XÓA KHỎI DATABASE!',
-            message: `Loại phòng ID #${selectedId} đã bị người khác xóa trực tiếp trong cơ sở dữ liệu! Không thể cập nhật trạng thái. Vui lòng tải lại dữ liệu.`,
-            actionText: 'Tải Lại Danh Sách',
-            onAction: () => {
-              setSyncErrorModal(null);
-              fetchFromBackend();
-            },
-          });
+          showToast(
+            '⚠️ Lỗi đồng bộ: Loại phòng đã bị xóa khỏi cơ sở dữ liệu bởi người khác!',
+            'error'
+          );
           setRoomTypes((p) => p.filter((r) => r.id !== selectedId));
           handleNew();
           setShowConfirm(false);
@@ -752,21 +693,6 @@ const RoomTypeManagement = () => {
     if (backendConnected) {
       try {
         const res = await fetch(`${API_BASE_URL}/${selectedId}`, { method: 'DELETE' });
-        if (res.status === 404) {
-          setSyncErrorModal({
-            title: 'CẢNH BÁO: LOẠI PHÒNG ĐÃ BỊ XÓA TRƯỚC ĐÓ!',
-            message: `Loại phòng "${currentName}" (ID #${selectedId}) đã bị xóa khỏi cơ sở dữ liệu bởi quản trị viên hoặc tiến trình khác! Vui lòng tải lại danh sách.`,
-            actionText: 'Tải Lại Danh Sách',
-            onAction: () => {
-              setSyncErrorModal(null);
-              fetchFromBackend();
-            },
-          });
-          setShowDeleteConfirm(false);
-          setRoomTypes((p) => p.filter((r) => r.id !== selectedId));
-          handleNew();
-          return;
-        }
         const data = await res.json();
         if (!res.ok || !data.success) {
           showToast(data.message || 'Không thể xóa loại phòng', 'error');
@@ -779,11 +705,7 @@ const RoomTypeManagement = () => {
     const remaining = roomTypes.filter((r) => r.id !== selectedId);
     setRoomTypes(remaining);
     setShowDeleteConfirm(false);
-    showToast(`Đã xóa loại phòng "${currentName}" thành công và đồng bộ CSDL!`, 'success');
-
-    if (backendConnected) {
-      fetchFromBackend();
-    }
+    showToast(`Đã xóa loại phòng "${currentName}" thành công.`, 'success');
 
     if (remaining.length > 0) {
       selectRow(remaining[0]);
@@ -1221,7 +1143,7 @@ const RoomTypeManagement = () => {
                     </tr>
                   </thead>
                   <tbody className="text-body-sm font-body-sm divide-y divide-surface-container-high/60">
-                    {paginatedList.map((rt) => (
+                    {filtered.map((rt) => (
                       <tr
                         key={rt.id}
                         onClick={() => selectRow(rt)}
@@ -1326,72 +1248,11 @@ const RoomTypeManagement = () => {
                 </table>
               </div>
 
-              {/* Thanh Điều Hướng Phân Trang (Chỉ hiển thị 10 phòng / trang) */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-space-sm pt-space-xs border-t border-surface-container-high/60">
-                <div className="flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant">
-                  <span>
-                    Hiển thị {filtered.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filtered.length)} trên tổng số {filtered.length} loại phòng
-                  </span>
-                  <span className="font-mono text-outline-variant">•</span>
-                  <span className="font-mono text-admin-primary font-bold">10 mục/trang</span>
-                </div>
-
-                {totalPages > 1 && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                      title="Trang trước"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-                    </button>
-
-                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                      .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                      .reduce((acc, p, idx, arr) => {
-                        if (idx > 0 && p - arr[idx - 1] > 1) {
-                          acc.push(-1 * p); // Đánh dấu dấu ...
-                        }
-                        acc.push(p);
-                        return acc;
-                      }, [])
-                      .map((p) => {
-                        if (p < 0) {
-                          return (
-                            <span key={p} className="px-1 text-on-surface-variant font-mono text-label-sm">
-                              ...
-                            </span>
-                          );
-                        }
-                        return (
-                          <button
-                            key={p}
-                            type="button"
-                            onClick={() => setCurrentPage(p)}
-                            className={`w-8 h-8 rounded-lg font-mono text-label-sm font-bold transition-all ${
-                              currentPage === p
-                                ? 'bg-admin-primary text-white shadow-xs'
-                                : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        );
-                      })}
-
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                      title="Trang tiếp"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                    </button>
-                  </div>
-                )}
+              <div className="flex items-center justify-between pt-space-xs font-label-sm text-label-sm text-on-surface-variant">
+                <span>
+                  Hiển thị {filtered.length} / {roomTypes.length} loại phòng đã đăng ký
+                </span>
+                <span className="font-mono text-on-surface">CHẾ ĐỘ TỔNG HỢP PMS &bull; AI READY</span>
               </div>
             </div>
 
@@ -1955,63 +1816,6 @@ const RoomTypeManagement = () => {
             </div>
           </div>
         </div>
-
-        {/* 🚨 MODAL CẢNH BÁO: DỮ LIỆU/BẢNG ĐÃ BỊ XÓA KHỎI CƠ SỞ DỮ LIỆU */}
-        {syncErrorModal && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-            <div className="bg-surface-container-lowest w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border-2 border-error animate-bounce-short">
-              {/* Header cảnh báo đỏ */}
-              <div className="bg-error px-6 py-4 flex items-center gap-3 text-white">
-                <span className="material-symbols-outlined text-[28px] animate-pulse">
-                  warning
-                </span>
-                <div className="flex flex-col">
-                  <h3 className="font-title-lg text-title-lg font-bold leading-tight">
-                    {syncErrorModal.title}
-                  </h3>
-                  <span className="text-[12px] opacity-90 font-mono">PHÁT HIỆN THAY ĐỔI CSDL TRỰC TIẾP</span>
-                </div>
-              </div>
-
-              {/* Nội dung chi tiết */}
-              <div className="p-6 flex flex-col gap-4">
-                <p className="text-body-md text-on-surface leading-relaxed">
-                  {syncErrorModal.message}
-                </p>
-
-                <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/50 text-[13px] text-on-surface-variant flex items-start gap-2.5">
-                  <span className="material-symbols-outlined text-[18px] text-error flex-shrink-0 mt-0.5">
-                    info
-                  </span>
-                  <span>
-                    Để đảm bảo tính nhất quán dữ liệu của khách sạn, hệ thống đã tạm dừng thao tác lưu này. Vui lòng bấm nút bên dưới để tải lại dữ liệu mới nhất.
-                  </span>
-                </div>
-
-                {/* Các nút hành động */}
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setSyncErrorModal(null)}
-                    className="px-4 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors"
-                  >
-                    Bỏ Qua
-                  </button>
-                  <button
-                    type="button"
-                    onClick={syncErrorModal.onAction}
-                    className="px-5 py-2.5 rounded-xl bg-error hover:bg-error/90 text-white font-label-md text-label-md font-bold shadow-lg shadow-error/30 transition-all flex items-center gap-2 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[18px] animate-spin">
-                      refresh
-                    </span>
-                    <span>{syncErrorModal.actionText}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </AdminLayout>
   );

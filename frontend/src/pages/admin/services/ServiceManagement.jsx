@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
-import AdminLayout from "../components/admin/layout/AdminLayout";
+import { Link } from "react-router-dom";
+import AdminLayout from "../../../components/admin/layout/AdminLayout";
 import styles from "./ServiceManagement.module.css";
 import {
   fetchServicesApi,
@@ -8,8 +9,7 @@ import {
   updateServiceApi,
   deactivateServiceApi,
   reactivateServiceApi,
-  syncPosApi,
-} from "../api/serviceApi";
+} from "../../../api/serviceApi";
 
 // ─── DỮ LIỆU DANH MỤC MẪU BAN ĐẦU (FALLBACK) ──────────────────────────────────
 
@@ -193,7 +193,7 @@ const OverviewKpiCards = ({ services, categories }) => {
 
 // ─── HEADER SECTION ────────────────────────────────────────────────────────────
 
-const HeaderSection = ({ onAddNew, onExportExcel, onSyncPOS, isSyncing }) => (
+const HeaderSection = ({ onAddNew, onExportExcel }) => (
   <div className={styles.headerCard}>
     <div className={styles.headerInfo}>
       <span className={styles.headerSubtitle}>Module 22 • FEAT-SERVICE-01</span>
@@ -215,20 +215,15 @@ const HeaderSection = ({ onAddNew, onExportExcel, onSyncPOS, isSyncing }) => (
         <span>Xuất File Bảng Giá</span>
       </button>
 
-      <button
-        onClick={onSyncPOS}
-        disabled={isSyncing}
+      <Link
+        to="/admin/services/dispatch"
         className={`${styles.btn} ${styles.btnOutline}`}
-        style={isSyncing ? { opacity: 0.6, cursor: "not-allowed" } : {}}
-        type="button"
+        style={{ borderColor: "#047857", color: "#047857", fontWeight: 700, backgroundColor: "#ecfdf5" }}
+        title="Chuyển sang màn hình Tiếp Nhận Đặt Dịch Vụ & Điều Phối Lịch Trình (C3)"
       >
-        <span
-          className={`material-symbols-outlined text-[18px] ${isSyncing ? "animate-spin" : ""}`}
-        >
-          sync_alt
-        </span>
-        <span>{isSyncing ? "Đang Đồng Bộ..." : "Đồng Bộ Sang POS"}</span>
-      </button>
+        <span className="material-symbols-outlined text-[18px]">event_available</span>
+        <span>Đặt &amp; Điều Phối (C3)</span>
+      </Link>
 
       <button
         onClick={onAddNew}
@@ -249,7 +244,7 @@ const HeaderSection = ({ onAddNew, onExportExcel, onSyncPOS, isSyncing }) => (
 const ServiceListSection = ({
   services,
   categories,
-  selectedCode,
+  selectedId,
   onSelect,
   searchTerm,
   setSearchTerm,
@@ -598,13 +593,13 @@ const ServiceListSection = ({
           className={`${styles.serviceList} ${viewMode === "grid" ? styles.serviceGridMode : ""}`}
         >
           {paginatedServices.map((svc) => {
-            const isSelected = svc.ServiceCode === selectedCode;
+            const isSelected = svc.ServiceId === selectedId;
             const isActive = svc.Status === "Active";
 
             return (
               <div
-                key={svc.ServiceCode || svc.ServiceId}
-                onClick={() => onSelect(svc.ServiceCode)}
+                key={svc.ServiceId || svc.ServiceCode}
+                onClick={() => onSelect(svc.ServiceId)}
                 className={`${styles.serviceCard} ${isSelected ? styles.serviceCardSelected : ""}`}
               >
                 <div className={styles.cardHeader}>
@@ -970,7 +965,7 @@ const ServiceEditorSection = ({
 const ServiceManagement = () => {
   const [services, setServices] = useState(INITIAL_SERVICES);
   const [categories, setCategories] = useState(INITIAL_CATEGORIES);
-  const [selectedCode, setSelectedCode] = useState("SVC-SPA-001");
+  const [selectedId, setSelectedId] = useState(INITIAL_SERVICES[0]?.ServiceId || 1);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   // Bộ lọc & phân trang (FEAT-SERVICE-02)
@@ -988,8 +983,7 @@ const ServiceManagement = () => {
   const [formData, setFormData] = useState(INITIAL_SERVICES[0]);
   const [formErrors, setFormErrors] = useState({});
 
-  // Thông báo & POS sync
-  const [isSyncing, setIsSyncing] = useState(false);
+  // Thông báo
   const [notification, setNotification] = useState(null);
 
   const showToast = (message, type = "success") => {
@@ -1020,8 +1014,9 @@ const ServiceManagement = () => {
         svcRes.data.length > 0
       ) {
         setServices(svcRes.data);
-        setSelectedCode(svcRes.data[0].ServiceCode);
-        setFormData(svcRes.data[0]);
+        const first = svcRes.data[0];
+        setSelectedId(first.ServiceId);
+        setFormData(first);
       }
     } catch (err) {
       console.info("Đang sử dụng dữ liệu mặc định hệ thống:", err);
@@ -1032,10 +1027,10 @@ const ServiceManagement = () => {
     loadData();
   }, []);
 
-  const handleSelectService = (code) => {
-    const found = services.find((s) => s.ServiceCode === code);
+  const handleSelectService = (idOrCode) => {
+    const found = services.find((s) => s.ServiceId === idOrCode || s.ServiceCode === idOrCode);
     if (found) {
-      setSelectedCode(code);
+      setSelectedId(found.ServiceId);
       setFormData({ ...found });
       setIsCreatingNew(false);
       setFormErrors({});
@@ -1044,7 +1039,7 @@ const ServiceManagement = () => {
 
   const handleAddNew = () => {
     setIsCreatingNew(true);
-    setSelectedCode("");
+    setSelectedId(null);
     setFormData({
       ServiceCode: "",
       CategoryId: categories[0]?.CategoryId || 1,
@@ -1150,7 +1145,7 @@ const ServiceManagement = () => {
       } else {
         try {
           await updateServiceApi(
-            formData.ServiceCode || formData.ServiceId,
+            formData.ServiceId || formData.ServiceCode,
             formData,
           );
         } catch (apiErr) {
@@ -1161,11 +1156,11 @@ const ServiceManagement = () => {
         }
 
         const updated = services.map((s) =>
-          s.ServiceCode === formData.ServiceCode ? { ...formData } : s,
+          s.ServiceId === formData.ServiceId ? { ...formData } : s,
         );
         setServices(updated);
         showToast(
-          `Đã lưu cập nhật cho dịch vụ ${formData.ServiceCode}!`,
+          `Đã lưu cập nhật cho dịch vụ ${formData.ServiceName}!`,
           "success",
         );
       }
@@ -1181,7 +1176,7 @@ const ServiceManagement = () => {
       if (isCurrentlyActive) {
         try {
           await deactivateServiceApi(
-            formData.ServiceCode || formData.ServiceId,
+            formData.ServiceId || formData.ServiceCode,
           );
         } catch (apiErr) {
           if (apiErr.code) {
@@ -1193,17 +1188,17 @@ const ServiceManagement = () => {
         setFormData(updated);
         setServices((prev) =>
           prev.map((s) =>
-            s.ServiceCode === formData.ServiceCode ? updated : s,
+            s.ServiceId === formData.ServiceId ? updated : s,
           ),
         );
         showToast(
-          `Dịch vụ ${formData.ServiceCode} đã chuyển sang trạng thái: "Ngừng cung cấp"`,
+          `Dịch vụ ${formData.ServiceName} đã chuyển sang trạng thái: "Ngừng cung cấp"`,
           "warning",
         );
       } else {
         try {
           await reactivateServiceApi(
-            formData.ServiceCode || formData.ServiceId,
+            formData.ServiceId || formData.ServiceCode,
           );
         } catch (apiErr) {
           if (apiErr.code) {
@@ -1215,11 +1210,11 @@ const ServiceManagement = () => {
         setFormData(updated);
         setServices((prev) =>
           prev.map((s) =>
-            s.ServiceCode === formData.ServiceCode ? updated : s,
+            s.ServiceId === formData.ServiceId ? updated : s,
           ),
         );
         showToast(
-          `Dịch vụ ${formData.ServiceCode} đã kích hoạt thành công (Active)!`,
+          `Dịch vụ ${formData.ServiceName} đã kích hoạt thành công (Active)!`,
           "success",
         );
       }
@@ -1228,20 +1223,6 @@ const ServiceManagement = () => {
     }
   };
 
-  const handleSyncPOS = async () => {
-    setIsSyncing(true);
-    try {
-      const res = await syncPosApi();
-      showToast(res.message || "Đồng bộ giá sang POS thành công!", "success");
-    } catch (err) {
-      showToast(
-        err.message || "Đồng bộ giá sang POS thất bại — vui lòng thử lại.",
-        "error",
-      );
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   const handleExportExcel = () => {
     try {
@@ -1317,8 +1298,6 @@ const ServiceManagement = () => {
         <HeaderSection
           onAddNew={handleAddNew}
           onExportExcel={handleExportExcel}
-          onSyncPOS={handleSyncPOS}
-          isSyncing={isSyncing}
         />
 
         {/* 2. Chỉ số KPI */}
@@ -1329,7 +1308,7 @@ const ServiceManagement = () => {
           <ServiceListSection
             services={services}
             categories={categories}
-            selectedCode={selectedCode}
+            selectedId={selectedId}
             onSelect={handleSelectService}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}

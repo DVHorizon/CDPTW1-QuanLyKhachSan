@@ -12,20 +12,18 @@ const { verifyToken } = require('../../../middlewares/authMiddleware');
 const checkServicePermission = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // Nếu bật STRICT_AUTH thì bắt buộc 401
-    if (process.env.STRICT_AUTH === 'true') {
-      return res.status(401).json({
-        success: false,
-        code: 'ERROR_0009_UNAUTHENTICATED',
-        message: 'Bạn cần đăng nhập để thực hiện chức năng này',
-      });
-    }
-    return next();
+    return res.status(401).json({
+      success: false,
+      code: 'ERROR_0009_UNAUTHENTICATED',
+      message: 'Bạn cần đăng nhập để thực hiện chức năng này',
+    });
   }
 
   return verifyToken(req, res, () => {
     const role = req.user?.roleName || req.user?.role?.RoleName || req.user?.Role || '';
-    if (role && role !== 'Admin') {
+    const permissions = req.user?.permissions || [];
+    const hasServiceManage = permissions.includes('manage_services') || permissions.includes('SERVICE_MANAGE');
+    if (role !== 'Admin' && !hasServiceManage) {
       return res.status(403).json({
         success: false,
         code: 'ERROR_0010_FORBIDDEN',
@@ -39,11 +37,11 @@ const checkServicePermission = (req, res, next) => {
 // ─── ENDPOINTS QUẢN LÝ DỊCH VỤ ───────────────────────────────────────────────
 router.get('/', serviceController.getAllServices);
 router.get('/categories', serviceController.getCategories);
+router.post('/categories', checkServicePermission, serviceController.createCategory);
 
 router.post('/', checkServicePermission, serviceController.createService);
 router.put('/:id', checkServicePermission, serviceController.updateService);
 router.patch('/:id/deactivate', checkServicePermission, serviceController.deactivateService);
 router.patch('/:id/reactivate', checkServicePermission, serviceController.reactivateService);
-router.post('/sync-pos', checkServicePermission, serviceController.syncToPos);
 
 module.exports = router;

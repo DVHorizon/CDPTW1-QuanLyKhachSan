@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../../components/admin/layout/AdminLayout';
 import MenuForm from './MenuForm';
 
@@ -17,8 +17,6 @@ const MenuManagement = () => {
     itemName: '', sku: '', categoryId: 1, price: 0, status: 'Available', description: ''
   });
 
-  const searchInputRef = useRef(null);
-
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
   const totalPages = Math.ceil(menuItems.length / itemsPerPage);
@@ -26,18 +24,18 @@ const MenuManagement = () => {
 
   const fetchMenu = () => {
     setLoading(true);
-    let url = 'http://localhost:5000/api/v1/menu-items?limit=100';
+    let url = 'http://localhost:5000/api/v1/menu-items';
     const params = new URLSearchParams();
     if (keyword) params.append('keyword', keyword);
     if (selectedCategory) params.append('category', selectedCategory);
     if (servingTime) params.append('servingTime', servingTime);
     if (stockStatus) params.append('stockStatus', stockStatus);
-    if (params.toString()) url += `&${params.toString()}`;
+    if (params.toString()) url += `?${params.toString()}`;
 
     fetch(url)
       .then(res => res.json())
       .then(res => {
-        if (res.success && Array.isArray(res.data)) {
+        if (res.success) {
           setMenuItems(res.data);
         } else {
           setMenuItems([]);
@@ -51,24 +49,10 @@ const MenuManagement = () => {
       });
   };
 
-  // Lắng nghe phím tắt Ctrl+K hoặc ⌘K để focus nhanh vào ô tìm kiếm
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   useEffect(() => { 
     const timer = setTimeout(() => {
-      setCurrentPage(1); // Reset về trang 1 khi gõ tìm kiếm mới
       fetchMenu();
-    }, 300); // Debounce 300ms
+    }, 300); // Debounce search
     return () => clearTimeout(timer);
   }, [keyword, selectedCategory, servingTime, stockStatus]);
 
@@ -201,105 +185,72 @@ const MenuManagement = () => {
           </div>
         </div>
         {/*  Operational KPI Metric Grid (4 Cards)  */}
-        {/*  Operational KPI Metric Grid (4 Cards) - TÍNH TOÁN ĐỘNG THEO BỘ LỌC & TÌM KIẾM  */}
-        {(() => {
-          const totalItemsCount = menuItems.length;
-          const activeItems = menuItems.filter(i => i.Status === 'Available');
-          const outOfStockItems = menuItems.filter(i => i.Status !== 'Available');
-          
-          // Đếm theo nhóm trạm / danh mục
-          const hotCount = menuItems.filter(i => (i.KitchenStation || '').includes('Nóng') || i.CategoryId === 1).length;
-          const coldCount = menuItems.filter(i => (i.KitchenStation || '').includes('Lạnh') || i.CategoryId === 2).length;
-          const bakeryCount = menuItems.filter(i => (i.KitchenStation || '').includes('Bánh') || i.CategoryId === 3).length;
-          const barCount = menuItems.filter(i => (i.KitchenStation || '').includes('Bar') || i.CategoryId === 4).length;
-
-          // Biên lợi nhuận trung bình ước tính
-          const avgMargin = 70.0;
-          const avgFoodCost = (100 - avgMargin).toFixed(1);
-
-          return (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md mb-space-lg">
-              {/*  Card 1: Active SKUs  */}
-              <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between relative overflow-hidden">
-                <div className="flex items-center justify-between mb-space-xs">
-                  <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Món Đang Bán (Active SKUs)</span>
-                  <span className="material-symbols-outlined text-[20px] text-admin-primary">restaurant_menu</span>
-                </div>
-                <div className="flex items-baseline gap-space-xs">
-                  <span className="font-headline-lg text-headline-lg font-bold text-on-surface font-mono">{activeItems.length}</span>
-                  <span className="font-label-sm text-label-sm text-admin-primary font-semibold">/ {totalItemsCount} SKU Phù Hợp</span>
-                </div>
-                <div className="flex items-center gap-space-sm pt-space-xs mt-space-xs text-on-surface-variant font-body-sm text-body-sm bg-surface-container-low px-space-xs py-1 rounded-md">
-                  <span>Nóng: <strong className="text-on-surface font-mono">{hotCount}</strong></span>
-                  <span>•</span>
-                  <span>Lạnh: <strong className="text-on-surface font-mono">{coldCount}</strong></span>
-                  <span>•</span>
-                  <span>Bar: <strong className="text-on-surface font-mono">{barCount}</strong></span>
-                </div>
-              </div>
-
-              {/*  Card 2: Food Cost & Margin  */}
-              <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-space-xs">
-                  <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Biên Lợi Nhuận Gộp TB</span>
-                  <span className="material-symbols-outlined text-[20px] text-admin-primary-container">percent</span>
-                </div>
-                <div className="flex items-baseline gap-space-xs">
-                  <span className="font-headline-lg text-headline-lg font-bold text-admin-primary font-mono">{avgMargin.toFixed(1)}%</span>
-                  <span className="font-label-sm text-label-sm text-admin-primary bg-admin-primary/10 px-1 rounded font-semibold">+3.4% v/s KPI</span>
-                </div>
-                <div className="flex items-center justify-between pt-space-xs mt-space-xs font-body-sm text-body-sm text-on-surface-variant">
-                  <span>Food Cost định mức:</span>
-                  <span className="font-mono font-bold text-on-surface">{avgFoodCost}% (Chuẩn: 35%)</span>
-                </div>
-              </div>
-
-              {/*  Card 3: Out of Stock (86'd)  */}
-              <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-space-xs">
-                  <span className="font-label-sm text-label-sm uppercase tracking-wider text-tertiary font-bold">Tạm Khóa POS (86'd List)</span>
-                  <span className="material-symbols-outlined text-[20px] text-tertiary">do_not_disturb_on</span>
-                </div>
-                <div className="flex items-baseline gap-space-xs">
-                  <span className="font-headline-lg text-headline-lg font-bold text-tertiary font-mono">
-                    {outOfStockItems.length.toString().padStart(2, '0')}
-                  </span>
-                  <span className="font-label-sm text-label-sm text-tertiary font-medium">Món cạn nguyên liệu</span>
-                </div>
-                <div className="pt-space-xs mt-space-xs text-on-surface-variant font-label-sm text-label-sm truncate">
-                  {outOfStockItems.length > 0 ? (
-                    outOfStockItems.slice(0, 3).map((it, idx) => (
-                      <span key={it.MenuItemId}>
-                        <span className="text-on-surface font-semibold">{it.ItemName}</span>
-                        {idx < Math.min(outOfStockItems.length - 1, 2) ? ', ' : ''}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-outline italic">Không có món nào tạm khóa</span>
-                  )}
-                </div>
-              </div>
-
-              {/*  Card 4: KDS Stations  */}
-              <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-space-xs">
-                  <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">KDS Màn Hình Bếp Liên Động</span>
-                  <span className="material-symbols-outlined text-[20px] text-secondary">desktop_windows</span>
-                </div>
-                <div className="flex items-baseline gap-space-xs">
-                  <span className="font-headline-lg text-headline-lg font-bold text-on-surface font-mono">04/04</span>
-                  <span className="font-label-sm text-label-sm text-secondary font-semibold">Trạm Sẵn Sàng</span>
-                </div>
-                <div className="flex items-center gap-1 pt-space-xs mt-space-xs">
-                  <span className="px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-[10px] text-on-surface font-mono font-medium">Bếp Nóng ({hotCount})</span>
-                  <span className="px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-[10px] text-on-surface font-mono font-medium">Bếp Lạnh ({coldCount})</span>
-                  <span className="px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-[10px] text-on-surface font-mono font-medium">Bánh ({bakeryCount})</span>
-                  <span className="px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-[10px] text-on-surface font-mono font-medium">Bar ({barCount})</span>
-                </div>
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md mb-space-lg">
+          {/*  Card 1: Active SKUs  */}
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <div className="flex items-center justify-between mb-space-xs">
+              <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Món Đang Bán (Active SKUs)</span>
+              <span className="material-symbols-outlined text-[20px] text-admin-primary">restaurant_menu</span>
             </div>
-          );
-        })()}
+            <div className="flex items-baseline gap-space-xs">
+              <span className="font-headline-lg text-headline-lg font-bold text-on-surface font-mono">64</span>
+              <span className="font-label-sm text-label-sm text-admin-primary font-semibold">SKU Trực Tuyến</span>
+            </div>
+            <div className="flex items-center gap-space-sm pt-space-xs mt-space-xs text-on-surface-variant font-body-sm text-body-sm bg-surface-container-low px-space-xs py-1 rounded-md">
+              <span>Khai vị: <strong className="text-on-surface font-mono">14</strong></span>
+              <span>•</span>
+              <span>Chính: <strong className="text-on-surface font-mono">22</strong></span>
+              <span>•</span>
+              <span>Bar: <strong className="text-on-surface font-mono">28</strong></span>
+            </div>
+          </div>
+          {/*  Card 2: Food Cost & Margin  */}
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-space-xs">
+              <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Biên Lợi Nhuận Gộp TB</span>
+              <span className="material-symbols-outlined text-[20px] text-admin-primary-container">percent</span>
+            </div>
+            <div className="flex items-baseline gap-space-xs">
+              <span className="font-headline-lg text-headline-lg font-bold text-admin-primary font-mono">68.4%</span>
+              <span className="font-label-sm text-label-sm text-admin-primary bg-admin-primary/10 px-1 rounded font-semibold">+3.4% v/s KPI</span>
+            </div>
+            <div className="flex items-center justify-between pt-space-xs mt-space-xs font-body-sm text-body-sm text-on-surface-variant">
+              <span>Food Cost định mức:</span>
+              <span className="font-mono font-bold text-on-surface">31.6% (Chuẩn: 35%)</span>
+            </div>
+          </div>
+          {/*  Card 3: Out of Stock (86'd)  */}
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-space-xs">
+              <span className="font-label-sm text-label-sm uppercase tracking-wider text-tertiary font-bold">Tạm Khóa POS (86'd List)</span>
+              <span className="material-symbols-outlined text-[20px] text-tertiary">do_not_disturb_on</span>
+            </div>
+            <div className="flex items-baseline gap-space-xs">
+              <span className="font-headline-lg text-headline-lg font-bold text-tertiary font-mono">03</span>
+              <span className="font-label-sm text-label-sm text-tertiary font-medium">Món cạn nguyên liệu</span>
+            </div>
+            <div className="pt-space-xs mt-space-xs text-on-surface-variant font-label-sm text-label-sm truncate">
+              <span className="text-on-surface font-semibold">Wagyu A5</span>, <span className="text-on-surface font-semibold">Risotto Nấm Truffle</span>, <span className="text-on-surface font-semibold">Yuzu Tart</span>
+            </div>
+          </div>
+          {/*  Card 4: KDS Stations  */}
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-space-xs">
+              <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">KDS Màn Hình Bếp Liên Động</span>
+              <span className="material-symbols-outlined text-[20px] text-secondary">desktop_windows</span>
+            </div>
+            <div className="flex items-baseline gap-space-xs">
+              <span className="font-headline-lg text-headline-lg font-bold text-on-surface font-mono">04/04</span>
+              <span className="font-label-sm text-label-sm text-secondary font-semibold">Trạm Sẵn Sàng</span>
+            </div>
+            <div className="flex items-center gap-1 pt-space-xs mt-space-xs">
+              <span className="px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-[10px] text-on-surface font-mono font-medium">Bếp Nóng</span>
+              <span className="px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-[10px] text-on-surface font-mono font-medium">Bếp Lạnh</span>
+              <span className="px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-[10px] text-on-surface font-mono font-medium">Bếp Bánh</span>
+              <span className="px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-[10px] text-on-surface font-mono font-medium">Bar Quầy</span>
+            </div>
+          </div>
+        </div>
         {/*  Primary Workspace: Catalog Engine & Specification Drawer (Bento Split)  */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
           {/*  Left Matrix: Menu Filters & Catalog Master Table (7 Cols)  */}
@@ -354,29 +305,13 @@ const MenuManagement = () => {
                   <div className="relative flex-1 min-w-[250px]">
                     <span className="material-symbols-outlined absolute left-2.5 top-2 text-[18px] text-on-surface-variant">search</span>
                     <input 
-                      ref={searchInputRef}
-                      className="w-full bg-surface pl-8 pr-16 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary shadow-sm border border-surface-container" 
-                      placeholder="Tìm mã SKU, tên, dị ứng, nguyên liệu (VD: bwth, thnb)..." 
+                      className="w-full bg-surface pl-8 pr-12 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary shadow-sm border border-surface-container" 
+                      placeholder="Tìm mã SKU, tên, dị ứng, nguyên liệu..." 
                       type="text" 
                       value={keyword}
                       onChange={(e) => setKeyword(e.target.value)} 
                     />
-                    <div className="absolute right-2 top-2 flex items-center gap-1">
-                      {keyword && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setKeyword('');
-                            searchInputRef.current?.focus();
-                          }}
-                          className="w-4 h-4 rounded-full bg-outline-variant/30 hover:bg-outline-variant/60 flex items-center justify-center text-[10px] text-on-surface-variant cursor-pointer transition-colors"
-                          title="Xóa từ khóa"
-                        >
-                          ✕
-                        </button>
-                      )}
-                      <span className="font-mono text-[10px] text-outline-variant bg-surface-container px-1 rounded">⌘K</span>
-                    </div>
+                    <span className="absolute right-2 top-2 font-mono text-[10px] text-outline-variant bg-surface-container px-1 rounded">⌘K</span>
                   </div>
                 </div>
               </div>
@@ -397,7 +332,7 @@ const MenuManagement = () => {
 
                   <tbody className="text-body-sm font-body-sm divide-y divide-surface-container-high/60">
                     {loading ? (
-                      <tr><td colSpan="7" className="text-center py-6 text-on-surface-variant font-medium">Đang tìm kiếm món ăn...</td></tr>
+                      <tr><td colSpan="7" className="text-center py-4">Đang tải dữ liệu từ Backend...</td></tr>
                     ) : menuItems.length === 0 ? (
                       <tr>
                         <td colSpan="7" className="text-center py-8">
@@ -412,7 +347,7 @@ const MenuManagement = () => {
                                     ? 'Không có món ăn thuộc khung giờ đã chọn.'
                                     : stockStatus
                                       ? 'Không có món ăn phù hợp với tình trạng đã chọn.'
-                                      : 'Không thể tải danh sách món ăn.'}
+                                      : 'Chưa có món ăn nào trong CSDL'}
                             </span>
                             {(keyword || selectedCategory || servingTime || stockStatus) && (
                               <button
@@ -486,39 +421,15 @@ const MenuManagement = () => {
 
                 </table>
               </div>
-              {/*  Table Operational Footer Strip (Phân trang tương tác thực tế)  */}
+              {/*  Table Operational Footer Strip  */}
               <div className="flex items-center justify-between pt-space-xs font-label-sm text-label-sm text-on-surface-variant">
-                <span>
-                  Hiển thị {currentItems.length} / {menuItems.length} món trong thực đơn
-                </span>
+                <span>Hiển thị 5 / 64 món trong thực đơn hiện hành</span>
                 <div className="flex items-center gap-space-xs">
-                  <button 
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage <= 1}
-                    className={`w-7 h-7 rounded flex items-center justify-center transition-all ${
-                      currentPage <= 1 
-                        ? 'opacity-40 cursor-not-allowed bg-surface-container/60 text-outline' 
-                        : 'bg-surface-container hover:bg-surface-container-high text-on-surface cursor-pointer active:scale-95'
-                    }`} 
-                    type="button"
-                    title="Trang trước"
-                  >
+                  <button className="w-7 h-7 rounded flex items-center justify-center bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface" type="button">
                     <span className="material-symbols-outlined text-[16px]">chevron_left</span>
                   </button>
-                  <span className="font-mono font-semibold text-on-surface px-1">
-                    {currentPage} / {Math.max(totalPages, 1)}
-                  </span>
-                  <button 
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage >= totalPages || totalPages === 0}
-                    className={`w-7 h-7 rounded flex items-center justify-center transition-all ${
-                      currentPage >= totalPages || totalPages === 0
-                        ? 'opacity-40 cursor-not-allowed bg-surface-container/60 text-outline' 
-                        : 'bg-surface-container hover:bg-surface-container-high text-on-surface cursor-pointer active:scale-95'
-                    }`} 
-                    type="button"
-                    title="Trang sau"
-                  >
+                  <span className="font-mono font-semibold text-on-surface">1 / 13</span>
+                  <button className="w-7 h-7 rounded flex items-center justify-center bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface" type="button">
                     <span className="material-symbols-outlined text-[16px]">chevron_right</span>
                   </button>
                 </div>

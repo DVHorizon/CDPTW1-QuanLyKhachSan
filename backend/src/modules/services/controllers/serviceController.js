@@ -622,21 +622,86 @@ exports.reactivateService = async (req, res) => {
   }
 };
 
-// ─── 7. ĐỒNG BỘ POS (POST /api/v1/services/sync-pos) ───────────────────────────
-exports.syncToPos = async (req, res) => {
+// ─── 7. TẠO MỚI NHÓM DỊCH VỤ (POST /api/v1/services/categories) ─────────────────
+exports.createCategory = async (req, res) => {
   try {
-    const activeCount = await Service.count({ where: { Status: 'Active', IsDeleted: false } });
-    const now = new Date();
-    return res.status(200).json({
+    const { categoryName, CategoryName, description, Description } = req.body;
+    const rawName = categoryName !== undefined ? categoryName : CategoryName;
+    const rawDesc = description !== undefined ? description : Description;
+
+    if (!rawName || typeof rawName !== 'string' || !rawName.trim()) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        message: 'Tên nhóm dịch vụ là bắt buộc',
+        field: 'categoryName',
+      });
+    }
+
+    const trimmedName = rawName.trim();
+    if (trimmedName.length < 2) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0002_MIN_LENGTH',
+        message: 'Tên nhóm dịch vụ phải có ít nhất 2 ký tự',
+        field: 'categoryName',
+      });
+    }
+
+    if (trimmedName.length > 100) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0003_MAX_LENGTH',
+        message: 'Tên nhóm dịch vụ không được vượt quá 100 ký tự',
+        field: 'categoryName',
+      });
+    }
+
+    const trimmedDesc = rawDesc ? String(rawDesc).trim() : null;
+    if (trimmedDesc && trimmedDesc.length > 500) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0003_MAX_LENGTH',
+        message: 'Mô tả nhóm dịch vụ không được vượt quá 500 ký tự',
+        field: 'description',
+      });
+    }
+
+    // Kiểm tra trùng lặp không phân biệt hoa thường và không phân biệt dấu tiếng Việt
+    const existingCategories = await ServiceCategory.findAll({
+      where: { IsDeleted: false },
+    });
+    const normalizedInput = normalizeVietnamese(trimmedName);
+    const isDuplicate = existingCategories.some(
+      (cat) => normalizeVietnamese(cat.CategoryName) === normalizedInput
+    );
+
+    if (isDuplicate) {
+      return res.status(409).json({
+        success: false,
+        code: 'ERROR_0007_DUPLICATE',
+        message: 'Tên nhóm dịch vụ đã tồn tại trong hệ thống',
+        field: 'categoryName',
+      });
+    }
+
+    const newCategory = await ServiceCategory.create({
+      CategoryName: trimmedName,
+      Description: trimmedDesc,
+      Status: 'Active',
+      IsDeleted: false,
+    });
+
+    return res.status(201).json({
       success: true,
-      message: `Đồng bộ thành công ${activeCount} dịch vụ sang POS Terminal.`,
-      syncedAt: now.toISOString(),
-      timestamp: now.toTimeString().split(' ')[0],
+      code: 'SUCCESS_0001_CREATED',
+      message: 'Tạo mới nhóm dịch vụ thành công',
+      data: newCategory,
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: 'Đồng bộ giá sang POS thất bại — vui lòng thử lại.',
+      message: 'Lỗi khi tạo mới nhóm dịch vụ.',
       error: error.message,
     });
   }

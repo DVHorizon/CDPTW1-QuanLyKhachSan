@@ -3,8 +3,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../config/db');
+const { verifyToken, requirePermission } = require('../../middlewares/authMiddleware');
+const checkInController = require('../../controllers/admin/checkInController');
 
-// Tiện ích format
+// Tiện ích format ngày
 const toDateStr = (d) => {
   if (!d) return '';
   const dt = new Date(d);
@@ -13,8 +15,68 @@ const toDateStr = (d) => {
   return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
 };
 
-// ─── GET /api/v1/check-in/lookup ────────────────────────────────────────────
-// Tra cứu booking theo mã REF#, mã QR, hoặc tên khách
+// ─── SPEC 8: ENDPOINTS CHUẨN (FEAT-CHECKIN-01) ──────────────────────────────
+// 1. Quét & decode mã QR booking: POST /api/v1/check-ins/scan-qr
+router.post('/scan-qr', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.scanQrCode);
+
+// 2. Tra cứu booking theo mã: GET /api/v1/check-ins/bookings/:bookingCode
+router.get('/bookings/:bookingCode', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.getBookingByCode);
+
+// 3. Hoàn tất Check-in & lưu CCCD/Passport: POST /api/v1/check-ins (và alias /complete)
+router.post('/', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.processCheckIn);
+router.post('/complete', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.processCheckIn);
+
+// ─── CÁC ROUTE PHỤ TRỢ PMS & FRONT DESK TERMINAL (Backward Compatible) ──────
+// GET /arrivals: Lấy danh sách booking hôm nay/gần đây để lễ tân tra cứu nhanh
+router.get('/arrivals', async (req, res) => {
+  try {
+    const { limit = 20, status } = req.query;
+    let statusFilter = "b.Status IN ('Confirmed', 'Pending', 'CheckedIn')";
+    if (status) {
+      statusFilter = `b.Status = ${pool.escape(status)}`;
+    }
+
+    const sql = `
+      SELECT
+        b.BookingId,
+        b.ConfirmationCode,
+        CAST(b.CheckInDate AS CHAR)  AS CheckInDate,
+        CAST(b.CheckOutDate AS CHAR) AS CheckOutDate,
+        b.NumberOfNights,
+        b.TotalAmount,
+        b.DepositAmount,
+        b.Status AS BookingStatus,
+        COALESCE(bg.FullName, u.FullName, 'Khách hàng') AS GuestName,
+        COALESCE(bg.Phone, u.Phone, '') AS GuestPhone,
+        COALESCE(bg.IdNumber, u.IdNumber, '') AS IdNumber,
+        COALESCE(rt.TypeName, 'Phòng Tiêu Chuẩn') AS RoomTypeName,
+        r.RoomNumber,
+        r.RoomId,
+        r.Status AS RoomStatus
+      FROM Bookings b
+      LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
+      LEFT JOIN Users u ON b.UserId = u.UserId
+      LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
+      LEFT JOIN Stays s ON b.BookingId = s.BookingId
+      LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      WHERE ${statusFilter}
+        AND b.IsDeleted = 0
+      ORDER BY b.BookingId DESC
+      LIMIT ?
+    `;
+
+    const [rows] = await pool.query(sql, [Number(limit) || 20]);
+    res.json({
+      success: true,
+      data: rows,
+    });
+  } catch (err) {
+    console.error('GET /check-in/arrivals error:', err);
+    res.status(500).json({ success: false, message: 'Lỗi tải danh sách đặt phòng: ' + err.message });
+  }
+});
+
+// GET /lookup: Tra cứu thông tin đầy đủ cho Front Desk Terminal
 router.get('/lookup', async (req, res) => {
   try {
     const { query = '' } = req.query;
@@ -65,10 +127,11 @@ router.get('/lookup', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
-      WHERE b.ConfirmationCode = ?
+      WHERE (b.ConfirmationCode = ?
          OR b.BookingId = ?
          OR bg.Phone = ?
-         OR bg.IdNumber = ?
+         OR bg.IdNumber = ?)
+        AND b.IsDeleted = 0
       LIMIT 1
     `;
 
@@ -83,6 +146,27 @@ router.get('/lookup', async (req, res) => {
 
     const b = rows[0];
 
+    // Tự động tìm phòng khả dụng nếu booking chưa gán phòng trong Stays
+    if (!b.RoomId) {
+      const [availRooms] = await pool.query(
+        `SELECT RoomId, RoomNumber, Floor, Status
+         FROM Rooms
+         WHERE (RoomTypeId = ? OR ? IS NULL)
+           AND Status IN ('CleanAvailable', 'Available', 'Inspected')
+           AND IsDeleted = 0
+         ORDER BY Status = 'CleanAvailable' DESC, RoomNumber ASC
+         LIMIT 1`,
+        [b.RoomTypeId, b.RoomTypeId]
+      );
+      if (availRooms.length) {
+        b.RoomId = availRooms[0].RoomId;
+        b.RoomNumber = availRooms[0].RoomNumber;
+        b.Floor = availRooms[0].Floor;
+        b.RoomStatus = availRooms[0].Status;
+        b.autoAssigned = true;
+      }
+    }
+
     // Kiểm tra tính hợp lệ trạng thái booking
     if (b.BookingStatus === 'Cancelled') {
       return res.status(410).json({
@@ -92,10 +176,10 @@ router.get('/lookup', async (req, res) => {
       });
     }
 
-    if (b.BookingStatus === 'Completed' || b.StayStatus === 'CheckedOut') {
+    if (b.BookingStatus === 'Completed') {
       return res.status(400).json({
         success: false,
-        message: 'Đặt phòng này đã hoàn tất thủ tục trả phòng (Checked-Out).',
+        message: 'Đặt phòng này đã hoàn tất thủ tục trả phòng (Completed).',
       });
     }
 
@@ -106,11 +190,10 @@ router.get('/lookup', async (req, res) => {
     const totalFolio = Number(b.TotalAmount) || subtotal;
     const depositPaid = Number(b.DepositAmount) || Math.round(totalFolio * 0.20);
     const netBalanceDue = Math.max(0, totalFolio - depositPaid);
-    const securityPreAuthPerNight = 500000; // 500,000₫/đêm bảo đảm
+    const securityPreAuthPerNight = 500000;
     const securityPreAuthTotal = securityPreAuthPerNight * nights;
     const totalDueAtTerminal = netBalanceDue + securityPreAuthTotal;
 
-    // Giấy tờ OCR mặc định
     const docData = {
       docType: b.IdType && b.IdType.toLowerCase().includes('cccd') ? 'natl_id' : 'passport',
       legalFullName: b.GuestName,
@@ -122,7 +205,6 @@ router.get('/lookup', async (req, res) => {
       scannerImage: 'P-482190342_RAW.TIF',
     };
 
-    // Thông tin thẻ tín dụng lưu sẵn (Card on File - PCI DSS Masked)
     const cardOnFile = {
       brand: 'VISA',
       last4: '4092',
@@ -132,8 +214,7 @@ router.get('/lookup', async (req, res) => {
       terminalStatus: 'Sẵn Sàng (Standby / Ready)',
     };
 
-    // Kiểm tra trạng thái phòng sẵn sàng
-    const roomReady = b.RoomId && (b.RoomStatus === 'CleanAvailable' || b.RoomStatus === 'Inspected');
+    const roomReady = b.RoomId && (b.RoomStatus === 'CleanAvailable' || b.RoomStatus === 'Inspected' || b.autoAssigned);
 
     res.json({
       success: true,
@@ -157,8 +238,7 @@ router.get('/lookup', async (req, res) => {
   }
 });
 
-// ─── POST /api/v1/check-in/ocr-scan ─────────────────────────────────────────
-// Giả lập hoặc quét quang học OCR giấy tờ (CCCD / Passport / Bằng lái xe)
+// POST /ocr-scan: Giả lập OCR quét quang học
 router.post('/ocr-scan', async (req, res) => {
   try {
     const { docType = 'passport', customName = '', customId = '' } = req.body;
@@ -170,7 +250,6 @@ router.post('/ocr-scan', async (req, res) => {
       });
     }
 
-    // Dữ liệu mô phỏng theo loại giấy tờ
     let docNumber = customId;
     let fullName = customName;
     let issuingState = 'Việt Nam';
@@ -191,7 +270,6 @@ router.post('/ocr-scan', async (req, res) => {
       issuingState = 'Sở GTVT TP.HCM';
     }
 
-    // Giả lập độ tin cậy OCR cao
     const confidenceScore = Number((98.5 + Math.random() * 1.4).toFixed(1));
 
     res.json({
@@ -215,8 +293,7 @@ router.post('/ocr-scan', async (req, res) => {
   }
 });
 
-// ─── POST /api/v1/check-in/encode-keycard ────────────────────────────────────
-// Mã hóa thẻ từ vật lý RFID qua cổng phần cứng COM-3
+// POST /encode-keycard: Mã hóa thẻ từ RFID
 router.post('/encode-keycard', async (req, res) => {
   try {
     const { roomId, stayId, keycardCount = 2 } = req.body;
@@ -228,7 +305,6 @@ router.post('/encode-keycard', async (req, res) => {
       });
     }
 
-    // Kiểm tra trạng thái phòng vật lý
     const [rooms] = await pool.query(
       'SELECT RoomId, RoomNumber, Status FROM Rooms WHERE RoomId = ?',
       [roomId]
@@ -246,7 +322,6 @@ router.post('/encode-keycard', async (req, res) => {
       const cardUid = `RFID-GH-${room.RoomNumber}-${Date.now().toString().slice(-4)}-#${i}`;
       generatedCards.push(cardUid);
 
-      // Ghi log vào SmartLockLogs
       try {
         await pool.query(
           `INSERT INTO SmartLockLogs (RoomId, StayId, UserId, DigitalKey, ActionType, ActionTime, Status, DeviceId)
@@ -275,8 +350,7 @@ router.post('/encode-keycard', async (req, res) => {
   }
 });
 
-// ─── POST /api/v1/check-in/process-payment ──────────────────────────────────
-// Xử lý thanh toán POS Verifone & Tạm giữ cọc bảo đảm (Pre-Auth)
+// POST /process-payment: Xử lý thanh toán POS
 router.post('/process-payment', async (req, res) => {
   try {
     const { bookingId, amount, preAuthAmount, cardLast4 = '4092' } = req.body;
@@ -289,7 +363,6 @@ router.post('/process-payment', async (req, res) => {
     const preAuth = Number(preAuthAmount) || 0;
     const txCode = `POS-VERIFONE-${Date.now().toString().slice(-6)}`;
 
-    // Ghi nhận thanh toán vào bảng Payments
     try {
       await pool.query(
         `INSERT INTO Payments (BookingId, UserId, Amount, PaymentMethod, PaymentDate, TransactionCode, Status, GatewayResponse)
@@ -324,228 +397,6 @@ router.post('/process-payment', async (req, res) => {
   } catch (err) {
     console.error('POST /check-in/process-payment error:', err);
     res.status(500).json({ success: false, message: 'Thanh toán bị từ chối, vui lòng dùng thẻ khác: ' + err.message });
-  }
-});
-
-// ─── POST /api/v1/check-in/complete ─────────────────────────────────────────
-// Hoàn tất check-in, kích hoạt phòng và đồng bộ CSDL
-router.post('/complete', async (req, res) => {
-  const conn = await pool.getConnection();
-  try {
-    const {
-      bookingId,
-      roomId,
-      guestName,
-      idNumber,
-      idType = 'Passport',
-      dateOfBirth,
-      nationality = 'Việt Nam',
-      signatureData,
-      dispatchNfc = true,
-      keycardCount = 2,
-      paymentSettled = true,
-      termsAccepted = true,
-    } = req.body;
-
-    if (!bookingId) {
-      return res.status(400).json({ success: false, message: 'Thiếu mã đặt phòng.' });
-    }
-
-    if (!termsAccepted) {
-      return res.status(400).json({
-        success: false,
-        message: 'Khách hàng chưa đồng ý điều khoản lưu trú.',
-      });
-    }
-
-    if (!signatureData) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vui lòng để khách ký xác nhận trước khi hoàn tất.',
-      });
-    }
-
-    if (!idNumber || !guestName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Thông tin giấy tờ (Họ tên, số CCCD/Hộ chiếu) không được để trống.',
-      });
-    }
-
-    await conn.beginTransaction();
-
-    // 1. Kiểm tra booking còn tồn tại không (Chống concurrency deletion)
-    const [bookingRows] = await conn.query(
-      'SELECT BookingId, ConfirmationCode, Status, CheckInDate, CheckOutDate FROM Bookings WHERE BookingId = ? FOR UPDATE',
-      [bookingId]
-    );
-
-    if (!bookingRows.length) {
-      await conn.rollback();
-      return res.status(404).json({
-        success: false,
-        isRecordDeleted: true,
-        message: 'Đặt phòng này đã bị xóa bởi người dùng khác trong cơ sở dữ liệu. Vui lòng tải lại trang!',
-      });
-    }
-
-    const booking = bookingRows[0];
-    if (booking.Status === 'Cancelled') {
-      await conn.rollback();
-      return res.status(410).json({
-        success: false,
-        isRecordDeleted: true,
-        message: 'Đặt phòng này đã bị hủy bởi người dùng khác. Vui lòng tải lại trang!',
-      });
-    }
-
-    // 2. Kiểm tra hoặc lấy phòng
-    let targetRoomId = roomId;
-    if (!targetRoomId) {
-      const [stayCheck] = await conn.query(
-        'SELECT RoomId FROM Stays WHERE BookingId = ? ORDER BY StayId DESC LIMIT 1',
-        [bookingId]
-      );
-      if (stayCheck.length && stayCheck[0].RoomId) {
-        targetRoomId = stayCheck[0].RoomId;
-      }
-    }
-
-    if (!targetRoomId) {
-      await conn.rollback();
-      return res.status(400).json({
-        success: false,
-        message: 'Đặt phòng này chưa được gán số phòng cụ thể. Vui lòng gán phòng trước khi check-in.',
-      });
-    }
-
-    // Kiểm tra phòng vật lý
-    const [roomRows] = await conn.query(
-      'SELECT RoomId, RoomNumber, Status, IsDeleted FROM Rooms WHERE RoomId = ? FOR UPDATE',
-      [targetRoomId]
-    );
-
-    if (!roomRows.length || roomRows[0].IsDeleted) {
-      await conn.rollback();
-      return res.status(404).json({
-        success: false,
-        isRecordDeleted: true,
-        message: 'Phòng này không còn tồn tại trên hệ thống. Vui lòng chọn lại!',
-      });
-    }
-
-    const room = roomRows[0];
-
-    // 3. Cập nhật lượt lưu trú Stays
-    const [stayRows] = await conn.query(
-      'SELECT StayId FROM Stays WHERE BookingId = ? ORDER BY StayId DESC LIMIT 1',
-      [bookingId]
-    );
-
-    let stayId;
-    if (stayRows.length) {
-      stayId = stayRows[0].StayId;
-      await conn.query(
-        `UPDATE Stays SET
-          RoomId = ?,
-          Status = 'CheckedIn',
-          ActualCheckIn = NOW(),
-          CheckInTime = NOW(),
-          UpdatedAt = NOW()
-         WHERE StayId = ?`,
-        [targetRoomId, stayId]
-      );
-    } else {
-      const [newStay] = await conn.query(
-        `INSERT INTO Stays (BookingId, RoomId, Status, ActualCheckIn, CheckInTime, CreatedAt, UpdatedAt)
-         VALUES (?, ?, 'CheckedIn', NOW(), NOW(), NOW(), NOW())`,
-        [bookingId, targetRoomId]
-      );
-      stayId = newStay.insertId;
-    }
-
-    // 4. Cập nhật trạng thái phòng thành Occupied
-    await conn.query('UPDATE Rooms SET Status = ?, UpdatedAt = NOW() WHERE RoomId = ?', [
-      'Occupied',
-      targetRoomId,
-    ]);
-
-    // 5. Cập nhật trạng thái Booking thành CheckedIn
-    await conn.query('UPDATE Bookings SET Status = ?, UpdatedAt = NOW() WHERE BookingId = ?', [
-      'CheckedIn',
-      bookingId,
-    ]);
-
-    // 6. Cập nhật thông tin khách lưu trú BookingGuests
-    const [guestRows] = await conn.query(
-      'SELECT BookingGuestId FROM BookingGuests WHERE BookingId = ? AND IsPrimaryGuest = 1 LIMIT 1',
-      [bookingId]
-    );
-
-    if (guestRows.length) {
-      await conn.query(
-        `UPDATE BookingGuests SET
-          FullName = ?,
-          IdNumber = ?,
-          IdType = ?,
-          DateOfBirth = ?
-         WHERE BookingGuestId = ?`,
-        [guestName, idNumber, idType, dateOfBirth || null, guestRows[0].BookingGuestId]
-      );
-    } else {
-      await conn.query(
-        `INSERT INTO BookingGuests (BookingId, FullName, IdNumber, IdType, DateOfBirth, IsPrimaryGuest, CreatedAt)
-         VALUES (?, ?, ?, ?, ?, 1, NOW())`,
-        [bookingId, guestName, idNumber, idType, dateOfBirth || null]
-      );
-    }
-
-    // 7. Khai báo tạm trú PoliceDeclarations
-    try {
-      await conn.query(
-        `INSERT INTO PoliceDeclarations (StayId, GuestName, IdNumber, IdType, Nationality, DeclarationDate, Status)
-         VALUES (?, ?, ?, ?, ?, NOW(), 'Pending')`,
-        [stayId, guestName, idNumber, idType, nationality]
-      );
-    } catch (policeErr) {
-      console.warn('PoliceDeclaration insert warning:', policeErr.message);
-    }
-
-    // 8. Ghi AuditLog
-    await conn.query(
-      `INSERT INTO AuditLogs (UserId, ActionType, TableName, RecordId, NewValues, ActionTime, IpAddress)
-       VALUES (1, 'FRONT_DESK_EXPRESS_CHECKIN', 'Bookings', ?, ?, NOW(), '127.0.0.1')`,
-      [
-        bookingId,
-        JSON.stringify({
-          RoomId: targetRoomId,
-          RoomNumber: room.RoomNumber,
-          GuestName: guestName,
-          IdNumber: idNumber,
-          IdType: idType,
-          KeycardsEncoded: keycardCount,
-          DispatchNfc: dispatchNfc,
-          HasSignature: Boolean(signatureData),
-        }),
-      ]
-    );
-
-    await conn.commit();
-
-    res.json({
-      success: true,
-      message: `Đã hoàn tất thủ tục Check-In và kích hoạt Phòng ${room.RoomNumber} cho khách ${guestName}!`,
-      bookingId,
-      roomId: targetRoomId,
-      roomNumber: room.RoomNumber,
-      status: 'CheckedIn',
-    });
-  } catch (err) {
-    await conn.rollback();
-    console.error('POST /check-in/complete error:', err);
-    res.status(500).json({ success: false, message: 'Lỗi hoàn tất check-in: ' + err.message });
-  } finally {
-    conn.release();
   }
 });
 

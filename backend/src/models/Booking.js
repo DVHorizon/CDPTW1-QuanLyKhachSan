@@ -86,10 +86,6 @@ module.exports = (sequelize) => {
     ConfirmationSentAt: {
       type: DataTypes.DATE,
       allowNull: true
-    },
-    Note: {
-      type: DataTypes.STRING(500),
-      allowNull: true
     }
   }, {
     tableName: 'Bookings',

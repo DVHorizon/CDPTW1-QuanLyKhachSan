@@ -1,0 +1,1719 @@
+/* 
+ * frontend/src/pages/admin/services/ServiceDispatchTerminal.module.css
+ * Giao diện Luxury Concierge Service Dispatch & Scheduling Terminal (C3)
+ * Full Responsive (Mobile, Tablet, Laptop, Desktop) - Không bao giờ tràn ngang hay đẩy vỡ màn hình
+ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  color: #0f172a;
+  gap: 1.25rem;
+  padding-bottom: 5rem;
+  position: relative;
+  overflow-x: hidden;
+}
+
+@media (max-width: 640px) {
+  .container {
+    gap: 0.875rem;
+    padding-bottom: 6.5rem;
+  }
+}
+
+/* ─── TOAST NOTIFICATION ─── */
+.toast {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 9999;
+  padding: 0.875rem 1.25rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: calc(100vw - 2.5rem);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.toastSuccess {
+  background-color: #ecfdf5;
+  border-color: #10b981;
+  color: #065f46;
+}
+
+.toastError {
+  background-color: #fff1f2;
+  border-color: #f43f5e;
+  color: #9f1239;
+}
+
+/* ─── TERMINAL HEADER BANNER ─── */
+.headerBanner {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .headerBanner {
+    padding: 1rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.875rem;
+  }
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .headerLeft {
+    gap: 0.75rem;
+  }
+}
+
+.headerIconBox {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(4, 120, 87, 0.25);
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .headerIconBox {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.625rem;
+  }
+}
+
+.headerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #047857;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background-color: #ecfdf5;
+  padding: 0.2rem 0.625rem;
+  border-radius: 9999px;
+  border: 1px solid #a7f3d0;
+  margin-bottom: 0.25rem;
+  max-width: 100%;
+}
+
+@media (max-width: 480px) {
+  .headerBadge {
+    font-size: 0.625rem;
+    padding: 0.15rem 0.5rem;
+  }
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+.headerTitle {
+  font-size: 1.1875rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  margin: 0;
+  line-height: 1.3;
+}
+
+@media (max-width: 640px) {
+  .headerTitle {
+    font-size: 1.0625rem;
+  }
+}
+
+.headerSubtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  margin-top: 0.125rem;
+}
+
+@media (max-width: 640px) {
+  .headerSubtitle {
+    font-size: 0.6875rem;
+  }
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .headerRight {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+.dateBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.actionBtnOutline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.actionBtnOutline:hover {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+@media (max-width: 480px) {
+  .dateBadge,
+  .actionBtnOutline {
+    padding: 0.4375rem 0.625rem;
+    font-size: 0.6875rem;
+  }
+}
+
+/* ─── DYNAMIC RESPONSIVE GRID ─── */
+/* Cấu hình Container Query: Giúp layout co giãn theo ĐÚNG KHÔNG GIAN THỰC TẾ của Terminal
+   (Tự động thích ứng dù Admin Sidebar đang mở 288px hay thu gọn 80px, không bị phụ thuộc cứng vào Viewport) */
+.container {
+  container-type: inline-size;
+  container-name: terminal;
+}
+
+/* 1. MẶC ĐỊNH CHO MÀN HÌNH NHỎ & MOBILE (< 992px): 1 CỘT XẾP CHỒNG HOÀN TOÀN */
+.terminalGrid {
+  display: grid;
+  grid-template-columns: 100%;
+  grid-template-areas:
+    "guest"
+    "services"
+    "cart";
+  gap: 1rem;
+  align-items: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* 2. LAPTOP & MÀN HÌNH TẦM TRUNG (Viewport 992px -> 1535px, hoặc Container 760px -> 1179px):
+   BỐ CỤC 2 CỘT THÔNG MINH - KHÔNG BAO GIỜ BỊ ĐẨY VỠ MÀN HÌNH:
+   - Cột Trái (services): minmax(0, 1fr) - không gian rộng rãi để duyệt món & danh mục
+   - Cột Phải (guest ở trên, cart ở dưới): minmax(290px, 330px) - khách & giỏ hàng gọn gàng */
+@media (min-width: 992px) and (max-width: 1535px) {
+  .terminalGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(290px, 330px);
+    grid-template-areas:
+      "services guest"
+      "services cart";
+    gap: 1rem;
+  }
+}
+
+/* 3. DESKTOP MÀN RỘNG (Viewport >= 1536px, hoặc Container >= 1180px):
+   ĐẦY ĐỦ KHÔNG GIAN ĐỂ MỞ 3 CỘT SONG SONG:
+   - Cột 1 (Guest): minmax(260px, 290px)
+   - Cột 2 (Services): minmax(360px, 1fr)
+   - Cột 3 (Cart): minmax(280px, 320px)
+   -> Tổng min-width chỉ ~900px, đảm bảo luôn vừa khít trong không gian >= 1180px,
+      100% KHÔNG BAO GIỜ BỊ ĐẨY NHAU RA KHỎI MÀN HÌNH! */
+@media (min-width: 1536px) {
+  .terminalGrid {
+    grid-template-columns: minmax(260px, 290px) minmax(360px, 1fr) minmax(280px, 320px);
+    grid-template-areas: "guest services cart";
+    gap: 1rem;
+  }
+}
+
+/* 4. CONTAINER QUERIES NÂNG CAO (Ưu tiên theo kích thước thực tế của vùng làm việc): */
+@container terminal (min-width: 1180px) {
+  .terminalGrid {
+    grid-template-columns: minmax(260px, 290px) minmax(360px, 1fr) minmax(280px, 320px);
+    grid-template-areas: "guest services cart";
+    gap: 1rem;
+  }
+}
+
+@container terminal (max-width: 1179px) and (min-width: 760px) {
+  .terminalGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(290px, 330px);
+    grid-template-areas:
+      "services guest"
+      "services cart";
+    gap: 1rem;
+  }
+}
+
+@container terminal (max-width: 759px) {
+  .terminalGrid {
+    grid-template-columns: 100%;
+    grid-template-areas:
+      "guest"
+      "services"
+      "cart";
+    gap: 0.875rem;
+  }
+}
+
+/* ─── GRID AREA ASSIGNMENTS ─── */
+.guestCol {
+  grid-area: guest;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.servicesCol {
+  grid-area: services;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.cartCol {
+  grid-area: cart;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Sticky cố định chỉ khi container >= 1180px hoặc viewport >= 1536px */
+@media (min-width: 1536px) {
+  .guestCol,
+  .cartCol {
+    position: sticky;
+    top: 5rem;
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  .guestCol::-webkit-scrollbar,
+  .cartCol::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .guestCol::-webkit-scrollbar-thumb,
+  .cartCol::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 4px;
+  }
+}
+
+/* ─── COLUMN CARD CONTAINER ─── */
+.columnCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
+  min-width: 0; /* CRITICAL: Ngăn con bên trong ép cột phình to */
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .columnCard {
+    padding: 1rem;
+    gap: 0.875rem;
+    border-radius: 0.75rem;
+  }
+}
+
+.columnHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 0.75rem;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.columnTitle {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── CỘT 1: TRA CỨU KHÁCH IN-HOUSE ─── */
+.searchBoxWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.searchInputRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  transition: all 0.2s;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.searchInputRow:focus-within {
+  border-color: #047857;
+  box-shadow: 0 0 0 2px rgba(4, 120, 87, 0.15);
+  background-color: #ffffff;
+}
+
+.searchInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.8125rem;
+  color: #0f172a;
+  width: 100%;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.selectedTag {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background-color: #d1fae5;
+  color: #047857;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.375rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dropdownStays {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.625rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.stayItem {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.stayItem:hover {
+  background-color: #f0fdf4;
+}
+
+/* Guest In-house Scrollable List View */
+.stayListContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.stayListContainer::-webkit-scrollbar {
+  width: 4px;
+}
+.stayListContainer::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 4px;
+}
+
+.stayCardItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.stayCardItem:hover {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.stayCardItemActive {
+  background: #ecfdf5;
+  border-color: #10b981;
+  box-shadow: 0 0 0 1px #10b981;
+}
+
+.stayCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.roomBadge {
+  font-family: monospace;
+  font-weight: 800;
+  font-size: 0.75rem;
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+}
+
+.stayCardItemActive .roomBadge {
+  background: #047857;
+}
+
+.vipTag {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #047857;
+  background: #d1fae5;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+}
+
+.stayCardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.guestName {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guestSub {
+  font-size: 0.6875rem;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Service Search Input */
+.serviceSearchWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  margin-bottom: 0.5rem;
+}
+
+.serviceSearchWrapper:focus-within {
+  border-color: #047857;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(4, 120, 87, 0.15);
+}
+
+.serviceSearchInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.8125rem;
+  color: #0f172a;
+  width: 100%;
+  min-width: 0;
+}
+
+.clearBtn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+.clearBtn:hover {
+  color: #475569;
+}
+
+.actionBtnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4375rem 0.75rem;
+  background: #047857;
+  color: #ffffff;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(4, 120, 87, 0.2);
+}
+.actionBtnPrimary:hover {
+  background: #065f46;
+}
+
+/* Empty In-House State */
+.emptyInHouseBox {
+  padding: 1.5rem 1rem;
+  background-color: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 0.75rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.emptyInHouseIcon {
+  font-size: 36px;
+  color: #94a3b8;
+}
+
+.emptyInHouseTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #334155;
+  margin: 0;
+}
+
+.emptyInHouseSub {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.emptyInHouseBtn {
+  margin-top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4375rem 0.875rem;
+  background-color: #047857;
+  color: #ffffff;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.emptyInHouseBtn:hover {
+  background-color: #065f46;
+}
+
+/* Guest Profile Card */
+.guestProfileCard {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.875rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.guestHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.guestAvatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: #d1fae5;
+  color: #065f46;
+  font-weight: 800;
+  font-size: 0.9375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 2px solid #a7f3d0;
+}
+
+.guestNameCol {
+  flex: 1;
+  min-width: 0;
+}
+
+.guestName {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guestBadges {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.vipBadge {
+  font-size: 0.625rem;
+  font-weight: 800;
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.folioBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #64748b;
+  font-family: monospace;
+}
+
+.roomBadgeBox {
+  background: #047857;
+  color: #ffffff;
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.5rem;
+  font-weight: 800;
+  font-size: 0.8125rem;
+  text-align: center;
+  line-height: 1.1;
+  box-shadow: 0 2px 4px rgba(4, 120, 87, 0.2);
+  flex-shrink: 0;
+}
+
+.guestMetaGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 0.625rem;
+}
+
+@media (max-width: 480px) {
+  .guestMetaGrid {
+    grid-template-columns: 1fr;
+    gap: 0.375rem;
+  }
+}
+
+.metaLabel {
+  font-size: 0.6875rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.metaVal {
+  font-weight: 700;
+  color: #1e293b;
+  margin-top: 0.125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stayDetailList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.625rem;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.stayDetailRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ─── CỘT 2: PHÂN HỆ DỊCH VỤ YÊU CẦU ─── */
+.categoryPills {
+  display: flex;
+  gap: 0.375rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.categoryPillBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4375rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.categoryPillBtnActive {
+  background-color: #047857;
+  color: #ffffff;
+  border-color: #047857;
+  box-shadow: 0 2px 4px rgba(4, 120, 87, 0.2);
+}
+
+/* Services Scrollable Grid */
+.servicesScrollArea {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .servicesScrollArea {
+    max-height: 520px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .servicesScrollArea {
+    max-height: calc(100vh - 28rem);
+    min-height: 320px;
+  }
+}
+
+.serviceItemCard {
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.serviceItemCard:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.serviceItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.codeBadge {
+  font-size: 0.625rem;
+  font-weight: 800;
+  background-color: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  flex-shrink: 0;
+}
+
+.unitBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  flex-shrink: 0;
+}
+
+.servicePrice {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #047857;
+  text-align: right;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.serviceName {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.serviceDesc {
+  font-size: 0.6875rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.serviceItemFooter {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px dashed #f1f5f9;
+  padding-top: 0.5rem;
+}
+
+.addServiceBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  background-color: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.addServiceBtn:hover {
+  background-color: #047857;
+  color: #ffffff;
+  border-color: #047857;
+}
+
+/* Location Selector - Tự động co giãn theo không gian */
+.sectionTitleSmall {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.375rem;
+}
+
+.locationRadios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.locationOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.625rem;
+  cursor: pointer;
+  background-color: #ffffff;
+  transition: all 0.15s;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.locationOptionSelected {
+  border-color: #047857;
+  background-color: #f0fdf4;
+  box-shadow: 0 0 0 1px #047857;
+}
+
+.locLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.locSub {
+  font-size: 0.625rem;
+  color: #047857;
+  margin-top: 0.125rem;
+  font-weight: 600;
+}
+
+/* Date & Schedule Row - Tự động co giãn theo không gian */
+.scheduleGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.scheduleCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.scheduleInput {
+  padding: 0.5rem 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1e293b;
+  background: #ffffff;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.scheduleInput:focus {
+  border-color: #047857;
+}
+
+/* Dispatch Note Textarea */
+.noteTextarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  color: #1e293b;
+  outline: none;
+  min-height: 60px;
+  resize: vertical;
+  font-family: inherit;
+  background-color: #fafafa;
+}
+
+.noteTextarea:focus {
+  border-color: #047857;
+  background-color: #ffffff;
+}
+
+/* ─── CỘT 3: GIỎ HÀNG DỊCH VỤ & QUYẾT TOÁN ─── */
+.breakdownHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cartCountBadge {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  background: #d1fae5;
+  color: #047857;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.cartList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cartItem {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.cartItemTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.cartItemName {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cartRemoveBtn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.cartRemoveBtn:hover {
+  color: #ef4444;
+  background-color: #fee2e2;
+}
+
+.cartItemBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.25rem;
+}
+
+.qtyControl {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  background: #ffffff;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.qtyBtn {
+  background: #f8fafc;
+  border: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.qtyBtn:hover {
+  background-color: #e2e8f0;
+}
+
+.qtyValue {
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cartItemPrice {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #047857;
+  flex-shrink: 0;
+}
+
+.emptyCart {
+  padding: 2rem 1rem;
+  text-align: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 0.625rem;
+  color: #94a3b8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+}
+
+/* Total Highlight Box */
+.totalBox {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 1px solid #a7f3d0;
+  border-radius: 0.875rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: right;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.totalLabel {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #064e3b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.totalAmount {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #047857;
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 480px) {
+  .totalAmount {
+    font-size: 1.25rem;
+  }
+}
+
+.totalNote {
+  font-size: 0.625rem;
+  color: #065f46;
+  font-weight: 600;
+}
+
+/* Payment Method Radios */
+.paymentRadios {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  width: 100%;
+}
+
+.paymentOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  background: #ffffff;
+  transition: all 0.15s;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.paymentOptionSelected {
+  border-color: #047857;
+  background-color: #f0fdf4;
+  box-shadow: 0 0 0 1px #047857;
+}
+
+.payTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.paySub {
+  font-size: 0.625rem;
+  color: #64748b;
+  margin-top: 0.125rem;
+}
+
+/* CTA Action Buttons */
+.submitBtn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(4, 120, 87, 0.3);
+  box-sizing: border-box;
+}
+
+.submitBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(4, 120, 87, 0.4);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.submitBtn:active {
+  transform: translateY(0);
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.secondaryActionsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.draftBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.draftBtn:hover {
+  background-color: #e2e8f0;
+}
+
+.cancelBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cancelBtn:hover {
+  background-color: #fff1f2;
+  color: #be123c;
+  border-color: #fda4af;
+}
+
+/* Footer Status Bar */
+.footerStatusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 0.625rem;
+  font-size: 0.6875rem;
+  color: #64748b;
+  font-weight: 600;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.statusPillActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #047857;
+  font-weight: 800;
+  font-size: 0.625rem;
+  letter-spacing: 0.05em;
+}
+
+/* ─── MOBILE FLOATING CART BAR ─── */
+.mobileCartBar {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .mobileCartBar {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    right: 1rem;
+    background: #047857;
+    color: #ffffff;
+    border-radius: 0.875rem;
+    padding: 0.75rem 1rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 40;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .mobileCartBarLeft {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .mobileCartBarBadge {
+    background: rgba(255, 255, 255, 0.25);
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+
+  .mobileCartBarTotal {
+    font-size: 0.9375rem;
+    font-weight: 900;
+  }
+
+  .mobileCartBarBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #ffffff;
+    color: #047857;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.4375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+}
+
+/* ─── HISTORY DRAWER / MODAL ─── */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.drawerContent {
+  width: 100%;
+  max-width: 520px;
+  height: 100%;
+  background: #ffffff;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  animation: slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (max-width: 640px) {
+  .drawerContent {
+    max-width: 100vw;
+  }
+}
+
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.drawerHeader {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (max-width: 640px) {
+  .drawerHeader {
+    padding: 1rem;
+  }
+}
+
+.drawerTitle {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .drawerTitle {
+    font-size: 0.9375rem;
+  }
+}
+
+.closeDrawerBtn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  padding: 0.25rem;
+}
+
+.closeDrawerBtn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.drawerBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .drawerBody {
+    padding: 1rem;
+  }
+}
+
+.historyOrderCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.historyOrderCard:hover {
+  border-color: #a7f3d0;
+  box-shadow: 0 4px 12px rgba(4, 120, 87, 0.08);
+}
+
+.historyOrderHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.orderIdBadge {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  font-family: monospace;
+  background: #ecfdf5;
+  color: #047857;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.orderStatusBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.statusReceived {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.statusProcessing {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.statusCompleted {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.orderServiceTitle {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.orderRoomMeta {
+  font-size: 0.75rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.orderPriceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px dashed #e2e8f0;
+  padding-top: 0.375rem;
+  font-size: 0.75rem;
+}
+
+.orderTotalAmount {
+  font-weight: 800;
+  color: #047857;
+}
