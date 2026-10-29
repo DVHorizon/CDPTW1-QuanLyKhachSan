@@ -42,7 +42,7 @@ router.get('/products', async (req, res) => {
     let products = [];
     try {
       const [rows] = await pool.query(
-        'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY Category ASC, UnitPrice ASC'
+        'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY ItemName ASC'
       );
       products = rows;
     } catch (_) {
@@ -51,15 +51,15 @@ router.get('/products', async (req, res) => {
           ItemId AS ProductId, 
           ItemCode AS ProductCode, 
           ItemName AS ProductName, 
-          COALESCE(Category, 'Beverage') AS Category, 
+          'Beverage' AS Category, 
           Unit, 
-          COALESCE(UnitPrice, UnitCost, 0) AS UnitPrice, 
-          COALESCE(DefaultOpeningQty, 2) AS DefaultOpeningQty, 
-          COALESCE(IsComplimentary, 0) AS IsComplimentary, 
+          COALESCE(UnitCost, 0) AS UnitPrice, 
+          2 AS DefaultOpeningQty, 
+          0 AS IsComplimentary, 
           1 AS IsActive 
         FROM InventoryItems 
         WHERE ItemType = 'Minibar' OR ItemCode LIKE 'MB-%'
-        ORDER BY Category ASC, UnitPrice ASC
+        ORDER BY ItemName ASC
       `);
       products = invRows;
     }
@@ -189,7 +189,7 @@ router.get('/stays/:stayId', async (req, res) => {
       let products = [];
       try {
         const [pRows] = await pool.query(
-          'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY Category ASC, UnitPrice ASC'
+          'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY ItemName ASC'
         );
         products = pRows;
       } catch (_) {
@@ -198,14 +198,14 @@ router.get('/stays/:stayId', async (req, res) => {
             ItemId AS ProductId, 
             ItemCode AS ProductCode, 
             ItemName AS ProductName, 
-            COALESCE(Category, 'Beverage') AS Category, 
+            'Beverage' AS Category, 
             Unit, 
-            COALESCE(UnitPrice, UnitCost, 0) AS UnitPrice, 
-            COALESCE(DefaultOpeningQty, 2) AS DefaultOpeningQty, 
-            COALESCE(IsComplimentary, 0) AS IsComplimentary
+            COALESCE(UnitCost, 0) AS UnitPrice, 
+            2 AS DefaultOpeningQty, 
+            0 AS IsComplimentary
           FROM InventoryItems 
           WHERE ItemType = 'Minibar' OR ItemCode LIKE 'MB-%'
-          ORDER BY Category ASC, UnitPrice ASC
+          ORDER BY ItemName ASC
         `);
         products = invRows;
       }
