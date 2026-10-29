@@ -104,9 +104,25 @@ const RoomTypeManagement = () => {
       const authHeaderVal = token ? `Bearer ${token}` : 'Bearer test_admin_jwt_token';
 
       // 1. Tải danh sách Loại phòng từ MySQL
-      const res = await fetch(API_BASE_URL, {
-        headers: { Authorization: authHeaderVal },
-      });
+      let res;
+      try {
+        res = await fetch(API_BASE_URL, {
+          headers: { Authorization: authHeaderVal },
+        });
+        if (!res.ok && API_BASE_URL.startsWith('/')) {
+          res = await fetch('http://localhost:5000/api/v1/room-types', {
+            headers: { Authorization: authHeaderVal },
+          });
+        }
+      } catch (e) {
+        if (API_BASE_URL.startsWith('/')) {
+          res = await fetch('http://localhost:5000/api/v1/room-types', {
+            headers: { Authorization: authHeaderVal },
+          });
+        } else {
+          throw e;
+        }
+      }
 
       if (!res.ok) {
         throw new Error(`Máy chủ phản hồi mã lỗi ${res.status}: ${res.statusText}`);
