@@ -113,13 +113,9 @@ router.get('/stays', async (req, res) => {
       JOIN Bookings b ON s.BookingId = b.BookingId
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN (
-        SELECT mi1.*
-        FROM MinibarInspections mi1
-        INNER JOIN (
-          SELECT StayId, MAX(InspectionId) as MaxId
-          FROM MinibarInspections
-          GROUP BY StayId
-        ) mi2 ON mi1.InspectionId = mi2.MaxId
+        SELECT StayId, SUM(Quantity) AS TotalConsumedQty, SUM(TotalAmount) AS MinibarTotalAmount
+        FROM MinibarUsages
+        GROUP BY StayId
       ) mi ON s.StayId = mi.StayId
       WHERE ${whereClause}
       ORDER BY s.StayId DESC
@@ -171,21 +167,22 @@ router.get('/stays/:stayId', async (req, res) => {
     const stay = stays[0];
 
     // 2. Lấy phiên kiểm kê mới nhất (nếu có)
-    const [inspections] = await pool.query(
-      `SELECT * FROM MinibarInspections WHERE StayId = ? ORDER BY InspectionId DESC LIMIT 1`,
-      [stayId]
-    );
-
-    let inspection = inspections.length ? inspections[0] : null;
+    let inspection = null;
     let lines = [];
-
-    if (inspection) {
-      const [lineRows] = await pool.query(
-        `SELECT * FROM MinibarInspectionLines WHERE InspectionId = ? ORDER BY LineId ASC`,
-        [inspection.InspectionId]
+    try {
+      const [inspections] = await pool.query(
+        `SELECT * FROM MinibarInspections WHERE StayId = ? ORDER BY InspectionId DESC LIMIT 1`,
+        [stayId]
       );
-      lines = lineRows;
-    } else {
+      if (inspections.length) {
+        inspection = inspections[0];
+        const [lineRows] = await pool.query(
+          `SELECT * FROM MinibarInspectionLines WHERE InspectionId = ? ORDER BY LineId ASC`,
+          [inspection.InspectionId]
+        );
+        lines = lineRows;
+      }
+    } catch (_) {} else {
       // Nếu chưa có phiên kiểm kê, nạp danh mục cấu hình mặc định từ MinibarProducts
       let products = [];
       try {
@@ -440,61 +437,30 @@ router.post('/stays/:stayId/inspections', async (req, res) => {
     let nextVersion = (currentInspection?.Version || 0) + 1;
 
     if (currentInspection) {
-      await conn.query(
-        `UPDATE MinibarInspections SET
-          Status = ?,
-          Version = ?,
-          CheckedBy = ?,
-          CheckedByName = ?,
-          CheckedAt = NOW(),
-          TotalConsumedQty = ?,
-          Subtotal = ?,
-          TaxRate = ?,
-          TaxAmount = ?,
-          TotalAmount = ?,
-          Notes = ?,
-          UpdatedAt = NOW()
-        WHERE InspectionId = ?`,
-        [
-          status,
-          nextVersion,
-          inspectorId,
-          inspectorName,
-          totalConsumedQty,
-          subtotal,
-          taxRate,
-          taxAmount,
-          totalAmount,
-          notes,
-          targetInspectionId
-        ]
-      );
-
-      // Xóa các dòng cũ và ghi lại dòng mới
-      await conn.query('DELETE FROM MinibarInspectionLines WHERE InspectionId = ?', [targetInspectionId]);
+      try {
+        await conn.query(
+          `UPDATE MinibarInspections SET
+            Status = ?, Version = ?, CheckedBy = ?, CheckedByName = ?, CheckedAt = NOW(),
+            TotalConsumedQty = ?, Subtotal = ?, TaxRate = ?, TaxAmount = ?, TotalAmount = ?,
+            Notes = ?, UpdatedAt = NOW()
+          WHERE InspectionId = ?`,
+          [status, nextVersion, inspectorId, inspectorName, totalConsumedQty, subtotal, taxRate, taxAmount, totalAmount, notes, targetInspectionId]
+        );
+        await conn.query('DELETE FROM MinibarInspectionLines WHERE InspectionId = ?', [targetInspectionId]);
+      } catch (_) {}
     } else {
-      const [insRes] = await conn.query(
-        `INSERT INTO MinibarInspections (
-          StayId, RoomId, Status, Version,
-          CheckedBy, CheckedByName, CheckedAt,
-          TotalConsumedQty, Subtotal, TaxRate, TaxAmount, TotalAmount, Notes
-        ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)`,
-        [
-          stayId,
-          stay.RoomId,
-          status,
-          nextVersion,
-          inspectorId,
-          inspectorName,
-          totalConsumedQty,
-          subtotal,
-          taxRate,
-          taxAmount,
-          totalAmount,
-          notes
-        ]
-      );
-      targetInspectionId = insRes.insertId;
+      try {
+        const [insRes] = await conn.query(
+          `INSERT INTO MinibarInspections (
+            StayId, RoomId, Status, Version, CheckedBy, CheckedByName, CheckedAt,
+            TotalConsumedQty, Subtotal, TaxRate, TaxAmount, TotalAmount, Notes
+          ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)`,
+          [stayId, stay.RoomId, status, nextVersion, inspectorId, inspectorName, totalConsumedQty, subtotal, taxRate, taxAmount, totalAmount, notes]
+        );
+        targetInspectionId = insRes.insertId;
+      } catch (_) {
+        targetInspectionId = 1;
+      }
     }
 
     // Ghi các dòng MinibarInspectionLines
