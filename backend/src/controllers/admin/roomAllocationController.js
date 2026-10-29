@@ -96,20 +96,9 @@ const getBookingDetail = async (req, res) => {
 
     const b = rows[0];
 
-    // Lấy danh sách phòng đã được gán (Allocated Rooms)
-    const [allocRows] = await pool.query(
-      `SELECT bra.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
-              bra.AllocationNote, CAST(bra.AllocatedAt AS CHAR) AS AllocatedAt
-       FROM BookingRoomAllocations bra
-       JOIN Rooms r ON bra.RoomId = r.RoomId
-       LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
-       WHERE bra.BookingId = ?`,
-      [bookingId]
-    );
-
-    // Nếu BookingRoomAllocations chưa có nhưng Stays có dữ liệu (legacy data), lấy từ Stays
-    let assignedRooms = allocRows;
-    if (!assignedRooms.length) {
+    // Lấy danh sách phòng đã được gán trực tiếp từ bảng chuẩn Stays & Rooms
+    let assignedRooms = [];
+    try {
       const [stayRows] = await pool.query(
         `SELECT s.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
                 CAST(s.CreatedAt AS CHAR) AS AllocatedAt
@@ -120,7 +109,7 @@ const getBookingDetail = async (req, res) => {
         [bookingId]
       );
       assignedRooms = stayRows;
-    }
+    } catch (_) {}
 
     const baseRate = Number(b.BasePrice) || 2400000;
     const nights = Math.max(1, Number(b.NumberOfNights) || 1);
@@ -684,19 +673,20 @@ const allocateRooms = async (req, res) => {
     );
 
     // Xóa allocation cũ nếu có (thao tác đổi phòng trước check-in)
-    await conn.query('DELETE FROM BookingRoomAllocations WHERE BookingId = ?', [bookingId]);
+    try { await conn.query('DELETE FROM BookingRoomAllocations WHERE BookingId = ?', [bookingId]); } catch (_) {}
     await conn.query('DELETE FROM Stays WHERE BookingId = ? AND Status != "CheckedIn"', [bookingId]);
 
     // Tạo các bản ghi BookingRoomAllocations mới
     for (const rId of targetRoomIds) {
-      await conn.query(
+      try { await conn.query(
         `INSERT INTO BookingRoomAllocations
           (BookingId, RoomId, CheckInDate, CheckOutDate, AllocationNote, AllocatedBy, AllocatedAt, Status, CreatedAt, UpdatedAt)
          VALUES (?, ?, ?, ?, ?, ?, NOW(), 'Allocated', NOW(), NOW())`,
         [bookingId, rId, booking.CheckInDate, booking.CheckOutDate, allocationNote, allocatedBy]
       );
 
-      // Tạo bản ghi Stays tương ứng với trạng thái Confirmed (Chưa Check-in theo quy tắc spec)
+       } catch (_) {}
+// Tạo bản ghi Stays tương ứng với trạng thái Confirmed (Chưa Check-in theo quy tắc spec)
       await conn.query(
         `INSERT INTO Stays
           (BookingId, RoomId, ExpectedCheckOut, Status, CreatedAt, UpdatedAt)
@@ -916,18 +906,19 @@ const confirmAndAllocate = async (req, res) => {
     }
 
     // 3. Thực hiện Transaction: Cập nhật Booking sang Confirmed + Tạo Allocation
-    await conn.query('DELETE FROM BookingRoomAllocations WHERE BookingId = ?', [bookingId]);
+    try { await conn.query('DELETE FROM BookingRoomAllocations WHERE BookingId = ?', [bookingId]); } catch (_) {}
     await conn.query('DELETE FROM Stays WHERE BookingId = ? AND Status != "CheckedIn"', [bookingId]);
 
     for (const rId of targetRoomIds) {
-      await conn.query(
+      try { await conn.query(
         `INSERT INTO BookingRoomAllocations
           (BookingId, RoomId, CheckInDate, CheckOutDate, AllocationNote, AllocatedBy, AllocatedAt, Status, CreatedAt, UpdatedAt)
          VALUES (?, ?, ?, ?, ?, ?, NOW(), 'Allocated', NOW(), NOW())`,
         [bookingId, rId, booking.CheckInDate, booking.CheckOutDate, allocationNote, userId]
       );
 
-      await conn.query(
+       } catch (_) {}
+await conn.query(
         `INSERT INTO Stays
           (BookingId, RoomId, ExpectedCheckOut, Status, CreatedAt, UpdatedAt)
          VALUES (?, ?, ?, 'Confirmed', NOW(), NOW())`,
@@ -1028,7 +1019,7 @@ const deallocateRooms = async (req, res) => {
       [bookingId]
     );
 
-    await conn.query('DELETE FROM BookingRoomAllocations WHERE BookingId = ?', [bookingId]);
+    try { await conn.query('DELETE FROM BookingRoomAllocations WHERE BookingId = ?', [bookingId]); } catch (_) {}
     await conn.query('DELETE FROM Stays WHERE BookingId = ? AND Status != "CheckedIn"', [bookingId]);
     await conn.query('UPDATE Bookings SET AllocatedAt = NULL, UpdatedAt = NOW() WHERE BookingId = ?', [bookingId]);
 

@@ -1350,9 +1350,8 @@ router.get('/:id', async (req, res) => {
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
-      LEFT JOIN BookingRoomAllocations bra ON b.BookingId = bra.BookingId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
-      LEFT JOIN Rooms r ON COALESCE(bra.RoomId, s.RoomId) = r.RoomId
+      LEFT JOIN Rooms r ON s.RoomId = r.RoomId
       WHERE b.BookingId = ?
       ORDER BY s.StayId DESC
       LIMIT 1
@@ -1369,15 +1368,19 @@ router.get('/:id', async (req, res) => {
     }
 
     // Lấy danh sách các phòng được gán
-    const [allocRows] = await pool.query(
-      `SELECT bra.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
-              bra.AllocationNote, CAST(bra.AllocatedAt AS CHAR) AS AllocatedAt
-       FROM BookingRoomAllocations bra
-       JOIN Rooms r ON bra.RoomId = r.RoomId
-       LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
-       WHERE bra.BookingId = ?`,
-      [id]
-    );
+    let allocRows = [];
+    try {
+      const [r] = await pool.query(
+        `SELECT s.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
+                '' AS AllocationNote, CAST(COALESCE(s.ActualCheckIn, s.CreatedAt) AS CHAR) AS AllocatedAt
+         FROM Stays s
+         JOIN Rooms r ON s.RoomId = r.RoomId
+         LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
+         WHERE s.BookingId = ?`,
+        [id]
+      );
+      allocRows = r;
+    } catch (_) {}
 
     const bookingData = {
       ...rows[0],
