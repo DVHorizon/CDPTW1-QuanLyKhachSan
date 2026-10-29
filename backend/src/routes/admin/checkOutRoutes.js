@@ -386,6 +386,11 @@ const handleCheckoutPreview = async (req, res) => {
         },
         minibarItems: activeMinibarList,
         minibarTotal,
+        minibarInspection: {
+          Status: minibarUsages.length > 0 ? 'CONFIRMED' : 'NOT_INSPECTED',
+          TotalConsumedQty: minibarUsages.reduce((sum, m) => sum + Number(m.Quantity || 0), 0),
+          TotalAmount: minibarTotal,
+        },
         fnbOrders,
         fnbTotal,
         folioLedger: {
