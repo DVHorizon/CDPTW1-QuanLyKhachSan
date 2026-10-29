@@ -18,34 +18,7 @@ async function migrate() {
       console.log('✅ Đã thêm cột CheckedInAt vào Bookings');
     }
 
-    console.log('--- 2. Tạo bảng GuestIdentityDocuments (Spec 8) nếu chưa có ---');
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS GuestIdentityDocuments (
-        DocumentId INT AUTO_INCREMENT PRIMARY KEY,
-        BookingId INT NOT NULL,
-        GuestId INT NULL,
-        DocumentType ENUM('CCCD', 'Passport') NOT NULL,
-        DocumentNumber VARCHAR(50) NOT NULL,
-        FullName VARCHAR(150) NOT NULL,
-        DateOfBirth DATE NOT NULL,
-        Gender VARCHAR(20) DEFAULT 'Khác',
-        Nationality VARCHAR(100) NOT NULL,
-        DocumentExpiryDate DATE NULL,
-        IdCardImageUrl VARCHAR(500) NULL,
-        SignatureImageUrl VARCHAR(500) NULL,
-        ScannedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        ScannedBy INT NULL,
-        CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_booking_doc (BookingId),
-        INDEX idx_doc_number (DocumentNumber),
-        INDEX idx_doc_type_number (DocumentType, DocumentNumber),
-        FOREIGN KEY (BookingId) REFERENCES Bookings(BookingId) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-    console.log('✅ Đã kiểm tra/tạo bảng GuestIdentityDocuments');
-
-    console.log('--- 3. Thêm permission CHECKIN_CREATE theo Spec 8 ---');
+    console.log('--- 2. Thêm permission CHECKIN_CREATE theo Spec 8 ---');
     const [permCheck] = await conn.query(
       "SELECT PermissionId, PermissionName FROM Permissions WHERE PermissionName = 'CHECKIN_CREATE'"
     );
