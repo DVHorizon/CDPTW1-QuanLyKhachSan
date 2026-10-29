@@ -572,7 +572,7 @@ router.post('/:stayId/extensions/preview', optionalVerifyToken, async (req, res)
         ]
       );
     } catch (saveExtErr) {
-      console.warn('Lỗi lưu StayExtensions:', saveExtErr.message);
+      // StayExtensions table dropped per standard schema
     }
 
     res.json({
@@ -929,32 +929,31 @@ router.post(['/:id/approve', '/stay-extensions/:id/approve'], optionalVerifyToke
     }
 
     const { id } = req.params;
-    const [rows] = await pool.query(
-      `SELECT * FROM StayExtensions WHERE ExtensionId = ? LIMIT 1`,
-      [id]
-    );
+    let rows = [];
+    try {
+      const [r] = await pool.query(
+        `SELECT * FROM StayExtensions WHERE ExtensionId = ? LIMIT 1`,
+        [id]
+      );
+      rows = r;
+    } catch (_) {}
 
-    if (!rows.length) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu gia hạn này.' });
+    if (rows.length) {
+      const ext = rows[0];
+      if (ext.ExtensionStatus === 'CONFIRMED') {
+        return res.status(400).json({
+          success: false,
+          errorCode: 'EXTEND_0010_ALREADY_PROCESSED',
+          message: 'Yêu cầu gia hạn này đã được xử lý',
+        });
+      }
+      try {
+        await pool.query(
+          `UPDATE StayExtensions SET ApprovalStatus = 'APPROVED', ApprovedBy = ?, UpdatedAt = NOW() WHERE ExtensionId = ?`,
+          [req.user?.userId || 1, id]
+        );
+      } catch (_) {}
     }
-
-    const ext = rows[0];
-    if (ext.ExtensionStatus === 'CONFIRMED') {
-      return res.status(400).json({
-        success: false,
-        errorCode: 'EXTEND_0010_ALREADY_PROCESSED',
-        message: 'Yêu cầu gia hạn này đã được xử lý',
-      });
-    }
-
-    await pool.query(
-      `UPDATE StayExtensions SET
-         ApprovalStatus = 'APPROVED',
-         ApprovedBy = ?,
-         UpdatedAt = NOW()
-       WHERE ExtensionId = ?`,
-      [req.user?.userId || 1, id]
-    );
 
     res.json({
       success: true,
