@@ -98,15 +98,15 @@ router.get('/stays', async (req, res) => {
         rt.TypeName AS RoomTypeName,
         b.ConfirmationCode,
         COALESCE(u.FullName, 'Khách lưu trú') AS GuestName,
-        mi.InspectionId,
-        COALESCE(mi.Status, 'NOT_INSPECTED') AS MinibarInspectionStatus,
-        mi.TotalConsumedQty,
-        mi.TotalAmount AS MinibarTotalAmount,
-        mi.CheckedByName,
-        mi.CheckedAt,
-        mi.ConfirmedByName,
-        mi.ConfirmedAt,
-        mi.Version
+        1 AS InspectionId,
+        CASE WHEN mi.TotalConsumedQty > 0 THEN 'CONFIRMED' ELSE 'NOT_INSPECTED' END AS MinibarInspectionStatus,
+        COALESCE(mi.TotalConsumedQty, 0) AS TotalConsumedQty,
+        COALESCE(mi.MinibarTotalAmount, 0) AS MinibarTotalAmount,
+        NULL AS CheckedByName,
+        NULL AS CheckedAt,
+        NULL AS ConfirmedByName,
+        NULL AS ConfirmedAt,
+        1 AS Version
       FROM Stays s
       JOIN Rooms r ON s.RoomId = r.RoomId
       JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
