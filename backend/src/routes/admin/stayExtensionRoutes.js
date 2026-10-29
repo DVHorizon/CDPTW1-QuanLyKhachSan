@@ -615,11 +615,15 @@ router.post(['/:stayId/extensions/confirm', '/:stayId/extensions'], optionalVeri
         return res.json(cached.response);
       }
       // Kiểm tra DB xem đã có extension nào dùng key này chưa
-      const [existingExt] = await pool.query(
-        `SELECT * FROM StayExtensions WHERE IdempotencyKey = ? LIMIT 1`,
-        [idempotencyKey]
-      );
-      if (existingExt.length > 0 && existingExt[0].ExtensionStatus === 'CONFIRMED') {
+      let existingExt = [];
+      try {
+        const [r] = await pool.query(
+          `SELECT * FROM StayExtensions WHERE IdempotencyKey = ? LIMIT 1`,
+          [idempotencyKey]
+        );
+        existingExt = r;
+      } catch (_) {}
+      if (existingExt && existingExt.length > 0 && existingExt[0].ExtensionStatus === 'CONFIRMED') {
         const ext = existingExt[0];
         const newCheckout = toDateStr(ext.RequestedCheckoutAt);
         const resp = {
@@ -847,15 +851,17 @@ router.post(['/:stayId/extensions/confirm', '/:stayId/extensions'], optionalVeri
 
     // 7. Cập nhật bản ghi StayExtensions
     if (idempotencyKey) {
-      await conn.query(
-        `UPDATE StayExtensions SET
-           ExtensionStatus = 'CONFIRMED',
-           IdempotencyKey = ?,
-           UpdatedAt = NOW()
-         WHERE StayId = ? AND ExtensionStatus IN ('QUOTED', 'PENDING_APPROVAL')
-         ORDER BY ExtensionId DESC LIMIT 1`,
-        [idempotencyKey, stay.StayId]
-      );
+      try {
+        await conn.query(
+          `UPDATE StayExtensions SET
+             ExtensionStatus = 'CONFIRMED',
+             IdempotencyKey = ?,
+             UpdatedAt = NOW()
+           WHERE StayId = ? AND ExtensionStatus IN ('QUOTED', 'PENDING_APPROVAL')
+           ORDER BY ExtensionId DESC LIMIT 1`,
+          [idempotencyKey, stay.StayId]
+        );
+      } catch (_) {}
     }
 
     // 8. Ghi nhật ký AuditLogs
