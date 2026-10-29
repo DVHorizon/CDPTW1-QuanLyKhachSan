@@ -182,7 +182,9 @@ router.get('/stays/:stayId', async (req, res) => {
         );
         lines = lineRows;
       }
-    } catch (_) {} else {
+    } catch (_) {}
+
+    if (!inspection) {
       // Nếu chưa có phiên kiểm kê, nạp danh mục cấu hình mặc định từ MinibarProducts
       let products = [];
       try {
