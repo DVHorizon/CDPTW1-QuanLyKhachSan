@@ -97,6 +97,7 @@ const LaundryBatch = defineLaundryBatch(sequelize);
 const MaintenanceTicket = defineMaintenanceTicket(sequelize);
 const LostAndFoundItem = defineLostAndFoundItem(sequelize);
 const SmartLockKey = defineSmartLockKey(sequelize);
+const MinibarUsage = defineMinibarUsage(sequelize);
 
 // Inventory Relationships
 InventoryItem.hasMany(InventoryBatch, { foreignKey: 'ItemId', as: 'batches' });
@@ -283,6 +284,7 @@ module.exports = {
   MaintenanceTicket,
   LostAndFoundItem,
   SmartLockKey,
+  MinibarUsage,
   // Minibar models (Spec 12)
   MinibarProduct,
   MinibarInspection,
