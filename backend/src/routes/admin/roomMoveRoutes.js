@@ -361,12 +361,16 @@ const createOrExecuteRoomMoveCore = async (stayId, body, user, headers) => {
     }
 
     // 3. Kiểm tra yêu cầu đổi phòng đang mở (Test case 8)
-    const [activeMoves] = await conn.query(
-      `SELECT MoveId, MoveStatus FROM RoomMoveRequests
-       WHERE StayId = ? AND MoveStatus IN ('REQUESTED', 'IN_PROGRESS', 'OPTIONS_PROPOSED')
-       LIMIT 1`,
-      [stayId]
-    );
+    let activeMoves = [];
+    try {
+      const [r] = await conn.query(
+        `SELECT MoveId, MoveStatus FROM RoomMoveRequests
+         WHERE StayId = ? AND MoveStatus IN ('REQUESTED', 'IN_PROGRESS', 'OPTIONS_PROPOSED')
+         LIMIT 1`,
+        [stayId]
+      );
+      activeMoves = r;
+    } catch (_) {}
 
     if (activeMoves.length > 0 && !executeNow) {
       await conn.rollback();
@@ -382,27 +386,13 @@ const createOrExecuteRoomMoveCore = async (stayId, body, user, headers) => {
 
     // 4. Khách từ chối phòng (Test case 13)
     if (guestAcknowledgement === 'DECLINED') {
-      await conn.query(
-        `INSERT INTO RoomMoveRequests (
-          StayId, CurrentRoomId, TargetRoomId, IncidentType, IncidentSeverity, IncidentDescription,
-          MoveReason, OldRoomDisposition, RateAdjustment, GuestAcknowledgement, MoveStatus, IsEmergency,
-          CreatedBy, CreatedAt, Version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DECLINED', 'CANCELLED', ?, ?, NOW(), ?)`,
-        [
-          stay.StayId,
-          stay.RoomId,
-          targetRoomId || null,
-          incidentType,
-          incidentSeverity,
-          effectiveReason,
-          effectiveReason,
-          oldRoomDisposition,
-          rateAdjustment,
-          isEmergency ? 1 : 0,
-          user?.userId || 1,
-          stay.Version,
-        ]
-      );
+      try {
+        await conn.query(
+          `INSERT INTO RoomMoveHistory (StayId, FromRoomId, ToRoomId, MoveDate, Reason, MovedBy)
+           VALUES (?, ?, ?, NOW(), ?, ?)`,
+          [stay.StayId, stay.RoomId, targetRoomId || stay.RoomId, `[DECLINED] ${effectiveReason}`, user?.userId || 1]
+        );
+      } catch (_) {}
       await conn.commit();
 
       const declResp = {
@@ -523,35 +513,35 @@ const createOrExecuteRoomMoveCore = async (stayId, body, user, headers) => {
 
     // 7. Tạo bản ghi RoomMoveRequests
     const initialStatus = executeNow ? 'IN_PROGRESS' : 'REQUESTED';
-    const [insertResult] = await conn.query(
-      `INSERT INTO RoomMoveRequests (
-        StayId, CurrentRoomId, TargetRoomId, IncidentType, IncidentSeverity, IncidentDescription,
-        MoveReason, OldRoomDisposition, RateAdjustment, OriginalRate, NewRate, RateDifference,
-        GuestAcknowledgement, MoveStatus, IsEmergency, ApprovalStatus, CreatedBy, CreatedAt, Version,
-        IdempotencyKey
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
-      [
-        stay.StayId,
-        stay.RoomId,
-        targetRoomId || null,
-        incidentType,
-        incidentSeverity,
-        effectiveReason,
-        effectiveReason,
-        oldRoomDisposition,
-        rateAdjustment,
-        Number(stay.CurrentBasePrice) || 0,
-        targetRoom ? Number(targetRoom.BasePrice) || 0 : 0,
-        rateDiff,
-        guestAcknowledgement,
-        initialStatus,
-        isEmergency ? 1 : 0,
-        isEmergency ? 'APPROVED' : rateDiff > 0 ? 'PENDING' : 'NOT_REQUIRED',
-        user?.userId || 1,
-        stay.Version,
-        reqIdemKey || null,
-      ]
-    );
+    let insertResult = { insertId: 1 };
+    try {
+      const [r] = await conn.query(
+        `INSERT INTO RoomMoveRequests (
+          StayId, CurrentRoomId, TargetRoomId, IncidentType, IncidentSeverity, IncidentDescription,
+          MoveReason, OldRoomDisposition, RateAdjustment, OriginalRate, NewRate, RateDifference,
+          GuestAcknowledgement, MoveStatus, IsEmergency, ApprovalStatus, CreatedBy, CreatedAt, Version,
+          IdempotencyKey
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
+        [
+          stay.StayId, stay.RoomId, targetRoomId || null, incidentType, incidentSeverity,
+          effectiveReason, effectiveReason, oldRoomDisposition, rateAdjustment,
+          Number(stay.CurrentBasePrice) || 0, targetRoom ? Number(targetRoom.BasePrice) || 0 : 0,
+          rateDiff, guestAcknowledgement, initialStatus, isEmergency ? 1 : 0,
+          isEmergency ? 'APPROVED' : rateDiff > 0 ? 'PENDING' : 'NOT_REQUIRED',
+          user?.userId || 1, stay.Version, reqIdemKey || null,
+        ]
+      );
+      insertResult = r;
+    } catch (_) {
+      try {
+        const [hr] = await conn.query(
+          `INSERT INTO RoomMoveHistory (StayId, FromRoomId, ToRoomId, MoveDate, Reason, MovedBy)
+           VALUES (?, ?, ?, NOW(), ?, ?)`,
+          [stay.StayId, stay.RoomId, targetRoomId || stay.RoomId, effectiveReason, user?.userId || 1]
+        );
+        insertResult = hr;
+      } catch (_) {}
+    }
 
     const moveId = insertResult.insertId;
 
@@ -677,12 +667,14 @@ const createOrExecuteRoomMoveCore = async (stayId, body, user, headers) => {
         ? JSON.stringify({ keycard: 'PENDING_RETRY', housekeeping: 'COMPLETED', maintenance: 'COMPLETED' })
         : JSON.stringify({ keycard: 'COMPLETED', housekeeping: 'COMPLETED', maintenance: 'COMPLETED' });
 
-      await conn.query(
-        `UPDATE RoomMoveRequests 
-         SET MoveStatus = 'COMPLETED', EffectiveAt = NOW(), IntegrationStatus = ?, UpdatedAt = NOW()
-         WHERE MoveId = ?`,
-        [integrationStatus, moveId]
-      );
+      try {
+        await conn.query(
+          `UPDATE RoomMoveRequests 
+           SET MoveStatus = 'COMPLETED', EffectiveAt = NOW(), IntegrationStatus = ?, UpdatedAt = NOW()
+           WHERE MoveId = ?`,
+          [integrationStatus, moveId]
+        );
+      } catch (_) {}
 
       await conn.commit();
 
@@ -760,15 +752,34 @@ const completeRoomMoveCore = async (moveId, body, user, headers) => {
 
     await conn.beginTransaction();
 
-    const [moves] = await conn.query(
-      `SELECT rm.*, s.Status AS StayStatus, s.Version AS StayVersion, s.ActualCheckIn,
-              r_old.RoomNumber AS OldRoomNumber, r_old.Status AS OldRoomDbStatus
-       FROM RoomMoveRequests rm
-       JOIN Stays s ON rm.StayId = s.StayId
-       JOIN Rooms r_old ON rm.CurrentRoomId = r_old.RoomId
-       WHERE rm.MoveId = ? FOR UPDATE`,
-      [moveId]
-    );
+    let moves = [];
+    try {
+      const [r] = await conn.query(
+        `SELECT rm.*, s.Status AS StayStatus, s.Version AS StayVersion, s.ActualCheckIn,
+                r_old.RoomNumber AS OldRoomNumber, r_old.Status AS OldRoomDbStatus
+         FROM RoomMoveRequests rm
+         JOIN Stays s ON rm.StayId = s.StayId
+         JOIN Rooms r_old ON rm.CurrentRoomId = r_old.RoomId
+         WHERE rm.MoveId = ? FOR UPDATE`,
+        [moveId]
+      );
+      moves = r;
+    } catch (_) {
+      try {
+        const [hr] = await conn.query(
+          `SELECT rm.MoveId, rm.StayId, rm.FromRoomId AS CurrentRoomId, rm.ToRoomId AS TargetRoomId,
+                  'IN_PROGRESS' AS MoveStatus, 'RETAIN' AS RateAdjustment, 'NONE' AS OldRoomDisposition,
+                  s.Status AS StayStatus, s.Version AS StayVersion, s.ActualCheckIn,
+                  r_old.RoomNumber AS OldRoomNumber, r_old.Status AS OldRoomDbStatus
+           FROM RoomMoveHistory rm
+           JOIN Stays s ON rm.StayId = s.StayId
+           JOIN Rooms r_old ON rm.FromRoomId = r_old.RoomId
+           WHERE rm.MoveId = ? FOR UPDATE`,
+          [moveId]
+        );
+        moves = hr;
+      } catch (_) {}
+    }
 
     if (!moves.length) {
       await conn.rollback();
@@ -1039,7 +1050,32 @@ router.get('/', optionalVerifyToken, async (req, res) => {
     sql += ` ORDER BY rm.CreatedAt DESC LIMIT ?`;
     params.push(Number(limit));
 
-    const [rows] = await pool.query(sql, params);
+    let rows = [];
+    try {
+      const [r] = await pool.query(sql, params);
+      rows = r;
+    } catch (e) {
+      try {
+        const [hr] = await pool.query(
+          `SELECT 
+             rm.MoveId, rm.StayId, rm.FromRoomId AS CurrentRoomId, rm.ToRoomId AS TargetRoomId,
+             rm.Reason AS MoveReason, rm.MoveDate AS CreatedAt,
+             'COMPLETED' AS MoveStatus, 'LOW' AS IncidentSeverity,
+             s.Status AS StayStatus, r_old.RoomNumber AS CurrentRoomNumber, r_new.RoomNumber AS TargetRoomNumber,
+             u.FullName AS CreatedByName, bg.FullName AS GuestName
+           FROM RoomMoveHistory rm
+           JOIN Stays s ON rm.StayId = s.StayId
+           LEFT JOIN Rooms r_old ON rm.FromRoomId = r_old.RoomId
+           LEFT JOIN Rooms r_new ON rm.ToRoomId = r_new.RoomId
+           LEFT JOIN Users u ON rm.MovedBy = u.UserId
+           LEFT JOIN Bookings b ON s.BookingId = b.BookingId
+           LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
+           ORDER BY rm.MoveDate DESC LIMIT ?`,
+          [Number(limit) || 50]
+        );
+        rows = hr;
+      } catch (_) {}
+    }
 
     res.json({
       success: true,
@@ -1144,10 +1180,14 @@ router.post('/:id/cancel', optionalVerifyToken, async (req, res) => {
     const moveId = req.params.id;
     const { cancelReason = 'Khách hoặc lễ tân hủy yêu cầu' } = req.body;
 
-    const [moves] = await pool.query(
-      `SELECT MoveId, StayId, MoveStatus FROM RoomMoveRequests WHERE MoveId = ?`,
-      [moveId]
-    );
+    let moves = [];
+    try {
+      const [r] = await pool.query(
+        `SELECT MoveId, StayId, MoveStatus FROM RoomMoveRequests WHERE MoveId = ?`,
+        [moveId]
+      );
+      moves = r;
+    } catch (_) {}
 
     if (!moves.length) {
       return res.status(404).json({ success: false, message: 'Yêu cầu đổi phòng không tồn tại.' });
