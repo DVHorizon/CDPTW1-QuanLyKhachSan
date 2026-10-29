@@ -48,6 +48,7 @@ const defineLaundryBatch = require('./LaundryBatch');
 const defineMaintenanceTicket = require('./MaintenanceTicket');
 const defineLostAndFoundItem = require('./LostAndFoundItem');
 const defineSmartLockKey = require('./SmartLockKey');
+const defineMinibarUsage = require('./MinibarUsage');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
