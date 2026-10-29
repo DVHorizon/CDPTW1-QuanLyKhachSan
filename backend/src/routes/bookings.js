@@ -3,17 +3,14 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const ExcelJS = require('exceljs');
 const pool = require('../config/db');
 const bookingEngineController = require('../controllers/bookingEngineController');
 const voucherController = require('../controllers/voucherController');
-const { requirePermissions, verifyToken } = require('../middlewares/authMiddleware');
+const { requirePermissions } = require('../middlewares/authMiddleware');
 const roomAllocCtrl = require('../controllers/admin/roomAllocationController');
-const bookingChargesController = require('../modules/services/controllers/bookingChargesController');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'grand_horizon_secret_key_2026_luxury_hotel';
-
-// ─── TÍNH NĂNG C6: TỰ ĐỘNG GOM CHI PHÍ LƯU TRÚ (FEAT-INVOICE-01 / C6) ───
-router.get('/:bookingId/charges', verifyToken, bookingChargesController.getBookingCharges);
 
 // ─── TÍNH NĂNG 6: TỰ ĐỘNG TÍNH SỐ ĐÊM, PHỤ THU & TỔNG TIỀN PHÒNG (FEAT-GUEST-06 / A6) ───
 router.post('/calculate-pricing', bookingEngineController.calculatePricing);
@@ -817,36 +814,19 @@ router.get('/', checkBookingPermission, async (req, res) => {
   }
 });
 
-// ─── GET /api/v1/bookings/:id — Chi Tiết Booking + Data Masking (Mục 3.10 & 3.11 & Spec 8)
+// ─── GET /api/v1/bookings/:id — Chi Tiết Booking + Data Masking (Mục 3.10 & 3.11)
 router.get('/:id', checkBookingPermission, async (req, res) => {
   try {
     const { id } = req.params;
-    const cleanId = String(id || '').trim();
+    const bookingId = Number(id);
 
-    if (!cleanId) {
+    // Test Case 32: ID không hợp lệ hoặc số âm/0
+    if (!Number.isInteger(bookingId) || bookingId <= 0) {
       return res.status(404).json({
         success: false,
         code: 'ERROR_0024_NOT_FOUND',
         message: 'Không tìm thấy booking hoặc booking đã bị xóa',
       });
-    }
-
-    const isNumeric = /^-?\d+$/.test(cleanId);
-    let whereIdClause = 'b.ConfirmationCode = ?';
-    let queryParam = cleanId;
-
-    if (isNumeric) {
-      const numId = Number(cleanId);
-      // Test Case 32: ID không hợp lệ hoặc số âm/0
-      if (!Number.isInteger(numId) || numId <= 0) {
-        return res.status(404).json({
-          success: false,
-          code: 'ERROR_0024_NOT_FOUND',
-          message: 'Không tìm thấy booking hoặc booking đã bị xóa',
-        });
-      }
-      whereIdClause = '(b.BookingId = ? OR b.ConfirmationCode = ?)';
-      queryParam = numId;
     }
 
     // 1. Tải thông tin chính của booking
@@ -886,11 +866,10 @@ router.get('/:id', checkBookingPermission, async (req, res) => {
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
-      WHERE ${whereIdClause}
+      WHERE b.BookingId = ?
       LIMIT 1
     `;
-    const queryArgs = isNumeric ? [queryParam, cleanId] : [queryParam];
-    const [bRows] = await pool.query(bookingQuery, queryArgs);
+    const [bRows] = await pool.query(bookingQuery, [bookingId]);
 
     // Test Case 32: Không tìm thấy hoặc đã bị xóa mềm (IsDeleted = 1)
     if (!bRows.length || bRows[0].IsDeleted === 1 || bRows[0].IsDeleted === true) {
@@ -1368,19 +1347,15 @@ router.get('/:id', async (req, res) => {
     }
 
     // Lấy danh sách các phòng được gán
-    let allocRows = [];
-    try {
-      const [r] = await pool.query(
-        `SELECT s.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
-                '' AS AllocationNote, CAST(COALESCE(s.ActualCheckIn, s.CreatedAt) AS CHAR) AS AllocatedAt
-         FROM Stays s
-         JOIN Rooms r ON s.RoomId = r.RoomId
-         LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
-         WHERE s.BookingId = ?`,
-        [id]
-      );
-      allocRows = r;
-    } catch (_) {}
+    const [allocRows] = await pool.query(
+      `SELECT s.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
+              CAST(s.CreatedAt AS CHAR) AS AllocatedAt
+       FROM Stays s
+       JOIN Rooms r ON s.RoomId = r.RoomId
+       LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
+       WHERE s.BookingId = ?`,
+      [id]
+    );
 
     const bookingData = {
       ...rows[0],

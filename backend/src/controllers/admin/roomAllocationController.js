@@ -96,20 +96,17 @@ const getBookingDetail = async (req, res) => {
 
     const b = rows[0];
 
-    // Lấy danh sách phòng đã được gán trực tiếp từ bảng chuẩn Stays & Rooms
-    let assignedRooms = [];
-    try {
-      const [stayRows] = await pool.query(
-        `SELECT s.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
-                CAST(s.CreatedAt AS CHAR) AS AllocatedAt
-         FROM Stays s
-         JOIN Rooms r ON s.RoomId = r.RoomId
-         LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
-         WHERE s.BookingId = ?`,
-        [bookingId]
-      );
-      assignedRooms = stayRows;
-    } catch (_) {}
+    // Lấy danh sách phòng đã được gán (Allocated Rooms từ Stays)
+    const [stayRows] = await pool.query(
+      `SELECT s.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
+              CAST(s.CreatedAt AS CHAR) AS AllocatedAt
+       FROM Stays s
+       JOIN Rooms r ON s.RoomId = r.RoomId
+       LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
+       WHERE s.BookingId = ?`,
+      [bookingId]
+    );
+    const assignedRooms = stayRows;
 
     const baseRate = Number(b.BasePrice) || 2400000;
     const nights = Math.max(1, Number(b.NumberOfNights) || 1);
@@ -250,18 +247,11 @@ const getAvailableRooms = async (req, res) => {
     if (checkInDate && checkOutDate) {
       sql += `
         AND r.RoomId NOT IN (
-          SELECT DISTINCT bra.RoomId
-          FROM BookingRoomAllocations bra
-          JOIN Bookings b ON bra.BookingId = b.BookingId
-          WHERE b.Status NOT IN ('Cancelled', 'CheckedOut', 'Completed', 'NoShow')
-            AND (b.CheckInDate < ? AND b.CheckOutDate > ?)
-            ${bookingId ? 'AND b.BookingId != ?' : ''}
-          UNION
           SELECT DISTINCT s.RoomId
           FROM Stays s
           JOIN Bookings b2 ON s.BookingId = b2.BookingId
           WHERE b2.Status NOT IN ('Cancelled', 'CheckedOut', 'Completed', 'NoShow')
-            AND s.Status IN ('Active', 'CheckedIn', 'Confirmed')
+            AND s.Status IN ('Active', 'CheckedIn', 'Confirmed', 'Reserved')
             AND (b2.CheckInDate < ? AND b2.CheckOutDate > ?)
             ${bookingId ? 'AND b2.BookingId != ?' : ''}
         )
@@ -622,134 +612,7 @@ const allocateRooms = async (req, res) => {
       }
 
       // Kiểm tra xung đột lịch với booking khác (Overlap check)
-      const [conflictRows] = await conn.query(
-        `SELECT b.BookingId, b.ConfirmationCode
-         FROM BookingRoomAllocations bra
-         JOIN Bookings b ON bra.BookingId = b.BookingId
-         WHERE bra.RoomId = ? AND bra.BookingId != ?
-           AND b.Status NOT IN ('Cancelled', 'CheckedOut', 'Completed', 'NoShow')
-           AND (b.CheckInDate < ? AND b.CheckOutDate > ?)
-         LIMIT 1`,
-        [rId, bookingId, booking.CheckOutDate, booking.CheckInDate]
-      );
-
-      if (conflictRows.length) {
-        await conn.rollback();
-        return res.status(409).json({
-          success: false,
-          code: 'ERROR_0028_ROOM_CONFLICT',
-          message: `Phòng ${room.RoomNumber} đã có booking trong khoảng thời gian này`,
-        });
-      }
-
-      // Kiểm tra thêm trong bảng Stays
-      const [stayConflictRows] = await conn.query(
-        `SELECT b.BookingId, b.ConfirmationCode
-         FROM Stays s
-         JOIN Bookings b ON s.BookingId = b.BookingId
-         WHERE s.RoomId = ? AND s.BookingId != ?
-           AND b.Status NOT IN ('Cancelled', 'CheckedOut', 'Completed', 'NoShow')
-           AND s.Status IN ('Active', 'CheckedIn', 'Confirmed')
-           AND (b.CheckInDate < ? AND b.CheckOutDate > ?)
-         LIMIT 1`,
-        [rId, bookingId, booking.CheckOutDate, booking.CheckInDate]
-      );
-
-      if (stayConflictRows.length) {
-        await conn.rollback();
-        return res.status(409).json({
-          success: false,
-          code: 'ERROR_0028_ROOM_CONFLICT',
-          message: `Phòng ${room.RoomNumber} đã có booking trong khoảng thời gian này`,
-        });
-      }
-    }
-
-    // 3. Thực hiện gán phòng trong 1 TRANSACTION duy nhất (Atomic)
-    // Lưu các bản ghi cũ để ghi Audit
-    const [oldAllocations] = await conn.query(
-      'SELECT RoomId FROM BookingRoomAllocations WHERE BookingId = ?',
-      [bookingId]
-    );
-
-    // Xóa allocation cũ nếu có (thao tác đổi phòng trước check-in)
-    try { await conn.query('DELETE FROM BookingRoomAllocations WHERE BookingId = ?', [bookingId]); } catch (_) {}
-    await conn.query('DELETE FROM Stays WHERE BookingId = ? AND Status != "CheckedIn"', [bookingId]);
-
-    // Tạo các bản ghi BookingRoomAllocations mới
-    for (const rId of targetRoomIds) {
-      try { await conn.query(
-        `INSERT INTO BookingRoomAllocations
-          (BookingId, RoomId, CheckInDate, CheckOutDate, AllocationNote, AllocatedBy, AllocatedAt, Status, CreatedAt, UpdatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, NOW(), 'Allocated', NOW(), NOW())`,
-        [bookingId, rId, booking.CheckInDate, booking.CheckOutDate, allocationNote, allocatedBy]
-      );
-
-       } catch (_) {}
-// Tạo bản ghi Stays tương ứng với trạng thái Confirmed (Chưa Check-in theo quy tắc spec)
-      await conn.query(
-        `INSERT INTO Stays
-          (BookingId, RoomId, ExpectedCheckOut, Status, CreatedAt, UpdatedAt)
-         VALUES (?, ?, ?, 'Confirmed', NOW(), NOW())`,
-        [bookingId, rId, booking.CheckOutDate]
-      );
-
-      // Giải phóng lock tạm nếu có
-      activeRoomLocks.delete(rId);
-    }
-
-    // Cập nhật AllocatedAt trên Booking và chuyển status sang Confirmed nếu đang Pending
-    const targetBookingStatus = booking.Status === 'Pending' ? 'Confirmed' : booking.Status;
-    await conn.query(
-      `UPDATE Bookings
-       SET AllocatedAt = NOW(),
-           ConfirmedAt = COALESCE(ConfirmedAt, NOW()),
-           ConfirmedBy = COALESCE(ConfirmedBy, ?),
-           Status = ?,
-           UpdatedAt = NOW()
-       WHERE BookingId = ?`,
-      [allocatedBy, targetBookingStatus, bookingId]
-    );
-
-    // 4. Ghi AuditLogs
-    await writeAudit(conn, {
-      userId: allocatedBy,
-      actionType: 'ROOM_ALLOCATION',
-      recordId: bookingId,
-      oldValues: {
-        AllocatedRoomIds: oldAllocations.map((a) => a.RoomId),
-      },
-      newValues: {
-        AllocatedRoomIds: targetRoomIds,
-        Quantity: expectedQuantity,
-        AllocationNote: allocationNote,
-        AllocatedAt: new Date().toISOString(),
-      },
-      ipAddress: req.ip,
-    });
-
-    await conn.commit();
-
-    res.json({
-      success: true,
-      code: 'SUCCESS_0006_ROOM_ALLOCATED',
-      message: 'Gán phòng thành công',
-      data: {
-        bookingId,
-        quantity: expectedQuantity,
-        roomIds: targetRoomIds,
-        allocatedAt: new Date().toISOString(),
-      },
-    });
-  } catch (err) {
-    await conn.rollback();
-    console.error('allocateRooms error:', err);
-    res.status(500).json({
-      success: false,
-      code: 'ERROR_0030_ALLOCATION_TRANSACTION',
-      message: 'Không thể hoàn tất gán phòng, vui lòng thử lại',
-    });
-  } finally {
+      // Kiem tra xung dot da thuc hien qua Stays finally {
     conn.release();
   }
 };
@@ -886,9 +749,9 @@ const confirmAndAllocate = async (req, res) => {
 
       const [conflictRows] = await conn.query(
         `SELECT b.BookingId, b.ConfirmationCode
-         FROM BookingRoomAllocations bra
-         JOIN Bookings b ON bra.BookingId = b.BookingId
-         WHERE bra.RoomId = ? AND bra.BookingId != ?
+         FROM Stays s
+         JOIN Bookings b ON s.BookingId = b.BookingId
+         WHERE s.RoomId = ? AND s.BookingId != ? AND s.Status IN ('Active', 'CheckedIn', 'Confirmed', 'Reserved')
            AND b.Status NOT IN ('Cancelled', 'CheckedOut', 'Completed', 'NoShow')
            AND (b.CheckInDate < ? AND b.CheckOutDate > ?)
          LIMIT 1`,
@@ -906,19 +769,13 @@ const confirmAndAllocate = async (req, res) => {
     }
 
     // 3. Thực hiện Transaction: Cập nhật Booking sang Confirmed + Tạo Allocation
-    try { await conn.query('DELETE FROM BookingRoomAllocations WHERE BookingId = ?', [bookingId]); } catch (_) {}
+    // dung Stays
     await conn.query('DELETE FROM Stays WHERE BookingId = ? AND Status != "CheckedIn"', [bookingId]);
 
     for (const rId of targetRoomIds) {
-      try { await conn.query(
-        `INSERT INTO BookingRoomAllocations
-          (BookingId, RoomId, CheckInDate, CheckOutDate, AllocationNote, AllocatedBy, AllocatedAt, Status, CreatedAt, UpdatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, NOW(), 'Allocated', NOW(), NOW())`,
-        [bookingId, rId, booking.CheckInDate, booking.CheckOutDate, allocationNote, userId]
-      );
+      // da ghi nhan qua Stays
 
-       } catch (_) {}
-await conn.query(
+      await conn.query(
         `INSERT INTO Stays
           (BookingId, RoomId, ExpectedCheckOut, Status, CreatedAt, UpdatedAt)
          VALUES (?, ?, ?, 'Confirmed', NOW(), NOW())`,
@@ -1015,11 +872,11 @@ const deallocateRooms = async (req, res) => {
     }
 
     const [oldAllocations] = await conn.query(
-      'SELECT RoomId FROM BookingRoomAllocations WHERE BookingId = ?',
+      'SELECT RoomId FROM Stays WHERE BookingId = ?',
       [bookingId]
     );
 
-    try { await conn.query('DELETE FROM BookingRoomAllocations WHERE BookingId = ?', [bookingId]); } catch (_) {}
+    // dung Stays
     await conn.query('DELETE FROM Stays WHERE BookingId = ? AND Status != "CheckedIn"', [bookingId]);
     await conn.query('UPDATE Bookings SET AllocatedAt = NULL, UpdatedAt = NOW() WHERE BookingId = ?', [bookingId]);
 
