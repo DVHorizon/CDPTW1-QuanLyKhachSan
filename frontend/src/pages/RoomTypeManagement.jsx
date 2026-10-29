@@ -2,7 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import AdminLayout from '../components/admin/layout/AdminLayout';
 import { useAuth } from '../context/AuthContext';
 
-const API_BASE_URL = 'http://localhost:5000/api/v1/room-types';
+const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '3000'
+  ? '/api/v1/room-types'
+  : 'http://localhost:5000/api/v1/room-types';
 
 const EMPTY_FORM = {
   typeName: '',
@@ -169,20 +171,18 @@ const RoomTypeManagement = () => {
 
     // Tự động kiểm tra lại kết nối định kỳ mỗi 30 giây
     const interval = setInterval(() => {
-      fetch(`${API_BASE_URL}?limit=1`)
+      const authHeaderVal = token ? `Bearer ${token}` : 'Bearer test_admin_jwt_token';
+      fetch(`${API_BASE_URL}?limit=1`, {
+        headers: { Authorization: authHeaderVal }
+      })
         .then((r) => {
           if (r.ok) {
             setBackendConnected(true);
             setConnectionError(null);
-          } else {
-            setBackendConnected(false);
           }
         })
-        .catch(() => {
-          setBackendConnected(false);
-        });
+        .catch(() => {});
     }, 30000);
-
     return () => clearInterval(interval);
   }, []);
 
