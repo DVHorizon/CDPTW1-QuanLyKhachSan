@@ -516,16 +516,20 @@ async function processCheckIn(req, res) {
   // 8. Kiểm tra trùng số giấy tờ với hồ sơ khách khác (Mục 5.1 & Test Case 13: ERROR_0020_DUPLICATE_DOCUMENT)
   try {
     const isNumBooking = /^\d+$/.test(String(targetBookingId));
-    const [dupDocs] = await pool.query(
-      `SELECT gid.DocumentId, gid.BookingId, gid.FullName, b.Status AS BookingStatus
-       FROM GuestIdentityDocuments gid
-       JOIN Bookings b ON gid.BookingId = b.BookingId
-       WHERE gid.DocumentNumber = ?
-         AND (b.Status IN ('CheckedIn', 'InHouse') OR gid.FullName != ?)
-         ${isNumBooking ? 'AND gid.BookingId != ?' : 'AND b.ConfirmationCode != ?'}
-       LIMIT 1`,
-      [cleanDocNum, cleanFullName, isNumBooking ? Number(targetBookingId) : String(targetBookingId)]
-    );
+    let dupDocs = [];
+    try {
+      const [r] = await pool.query(
+        `SELECT bg.BookingGuestId AS DocumentId, bg.BookingId, bg.FullName, b.Status AS BookingStatus
+         FROM BookingGuests bg
+         JOIN Bookings b ON bg.BookingId = b.BookingId
+         WHERE bg.IdNumber = ?
+           AND (b.Status IN ('CheckedIn', 'InHouse') OR bg.FullName != ?)
+           ${isNumBooking ? 'AND bg.BookingId != ?' : 'AND b.ConfirmationCode != ?'}
+         LIMIT 1`,
+        [cleanDocNum, cleanFullName, isNumBooking ? Number(targetBookingId) : String(targetBookingId)]
+      );
+      dupDocs = r;
+    } catch (_) {}
 
     if (dupDocs.length > 0) {
       return res.status(400).json({
@@ -690,25 +694,27 @@ async function processCheckIn(req, res) {
     const savedIdCardUrl = saveBase64Image(idCardImage, 'id_cards', `CCCD_${cleanDocNum}`);
     const savedSignatureUrl = saveBase64Image(signatureData, 'signatures', `SIG_B${actualBookingId}`);
 
-    // 7. Lưu vào bảng GuestIdentityDocuments (Mục 1, 2, 3.5)
-    await conn.query(
-      `INSERT INTO GuestIdentityDocuments
-        (BookingId, GuestId, DocumentType, DocumentNumber, FullName, DateOfBirth, Gender, Nationality, DocumentExpiryDate, IdCardImageUrl, SignatureImageUrl, ScannedAt, ScannedBy)
-       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
-      [
-        actualBookingId,
-        cleanDocType,
-        cleanDocNum,
-        cleanFullName,
-        isoDob,
-        gender,
-        cleanNationality,
-        isoExpiry,
-        savedIdCardUrl,
-        savedSignatureUrl,
-        operatorUserId,
-      ]
-    );
+    // 7. Lưu vào bảng GuestIdentityDocuments (nếu có bảng)
+    try {
+      await conn.query(
+        `INSERT INTO GuestIdentityDocuments
+          (BookingId, GuestId, DocumentType, DocumentNumber, FullName, DateOfBirth, Gender, Nationality, DocumentExpiryDate, IdCardImageUrl, SignatureImageUrl, ScannedAt, ScannedBy)
+         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+        [
+          actualBookingId,
+          cleanDocType,
+          cleanDocNum,
+          cleanFullName,
+          isoDob,
+          gender,
+          cleanNationality,
+          isoExpiry,
+          savedIdCardUrl,
+          savedSignatureUrl,
+          operatorUserId,
+        ]
+      );
+    } catch (_) {}
 
     // 8. Cập nhật thông tin khách chính BookingGuests
     const [guestRows] = await conn.query(

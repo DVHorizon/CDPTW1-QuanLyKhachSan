@@ -1,9 +1,8 @@
 'use strict';
 
 /**
- * Migration 007 Spec 8 – Check-in Identity Documents
- * Thêm các cột CheckedInBy, CheckedInAt vào Bookings
- * Tạo bảng GuestIdentityDocuments và gán permission CHECKIN_CREATE
+ * Migration 007 – Bổ sung schema Nghiệp vụ Check-in tại quầy theo Spec 8
+ * Chuẩn hóa trên 57 bảng cốt lõi (dùng Bookings & BookingGuests, KHÔNG tạo GuestIdentityDocuments)
  */
 
 module.exports = {
@@ -11,9 +10,9 @@ module.exports = {
     const qi = queryInterface;
     const DataTypes = Sequelize;
 
-    // 1. Kiểm tra & thêm cột trong Bookings cho Check-in
-    const bookingCols = await qi.describeTable('Bookings');
-    const bColNames = Object.keys(bookingCols).map(c => c.toLowerCase());
+    console.log('--- 1. Kiểm tra & thêm cột trong Bookings cho Check-in ---');
+    const bookingDesc = await qi.describeTable('Bookings');
+    const bColNames = Object.keys(bookingDesc).map(c => c.toLowerCase());
 
     if (!bColNames.includes('checkedinby')) {
       await qi.addColumn('Bookings', 'CheckedInBy', {
@@ -22,7 +21,6 @@ module.exports = {
       });
       console.log('✅ Đã thêm cột CheckedInBy vào Bookings');
     }
-
     if (!bColNames.includes('checkedinat')) {
       await qi.addColumn('Bookings', 'CheckedInAt', {
         type: DataTypes.DATE,
@@ -31,82 +29,7 @@ module.exports = {
       console.log('✅ Đã thêm cột CheckedInAt vào Bookings');
     }
 
-    // 2. Tạo bảng GuestIdentityDocuments (Spec 8) nếu chưa có
-    const tables = await qi.showAllTables();
-    if (!tables.includes('GuestIdentityDocuments')) {
-      await qi.createTable('GuestIdentityDocuments', {
-        DocumentId: {
-          type: DataTypes.INTEGER,
-          primaryKey: true,
-          autoIncrement: true,
-        },
-        BookingId: {
-          type: DataTypes.INTEGER,
-          allowNull: false,
-          references: { model: 'Bookings', key: 'BookingId' },
-          onDelete: 'CASCADE',
-        },
-        GuestId: {
-          type: DataTypes.INTEGER,
-          allowNull: true,
-        },
-        DocumentType: {
-          type: DataTypes.ENUM('CCCD', 'Passport'),
-          allowNull: false,
-        },
-        DocumentNumber: {
-          type: DataTypes.STRING(50),
-          allowNull: false,
-        },
-        FullName: {
-          type: DataTypes.STRING(150),
-          allowNull: false,
-        },
-        DateOfBirth: {
-          type: DataTypes.DATEONLY,
-          allowNull: false,
-        },
-        Gender: {
-          type: DataTypes.STRING(20),
-          defaultValue: 'Khác',
-        },
-        Nationality: {
-          type: DataTypes.STRING(100),
-          allowNull: false,
-        },
-        DocumentExpiryDate: {
-          type: DataTypes.DATEONLY,
-          allowNull: true,
-        },
-        IdCardImageUrl: {
-          type: DataTypes.STRING(500),
-          allowNull: true,
-        },
-        SignatureImageUrl: {
-          type: DataTypes.STRING(500),
-          allowNull: true,
-        },
-        ScannedAt: {
-          type: DataTypes.DATE,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-        },
-        ScannedBy: {
-          type: DataTypes.INTEGER,
-          allowNull: true,
-        },
-        CreatedAt: {
-          type: DataTypes.DATE,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-        },
-        UpdatedAt: {
-          type: DataTypes.DATE,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-        },
-      });
-      console.log('✅ Đã kiểm tra/tạo bảng GuestIdentityDocuments');
-    }
-
-    // 3. Thêm permission CHECKIN_CREATE theo Spec 8
+    // 2. Thêm permission CHECKIN_CREATE theo Spec 8
     try {
       const [permCheck] = await qi.sequelize.query(
         "SELECT PermissionId, PermissionName FROM Permissions WHERE PermissionName = 'CHECKIN_CREATE'"
@@ -145,8 +68,6 @@ module.exports = {
 
   async down(queryInterface, Sequelize) {
     const qi = queryInterface;
-    try {
-      await qi.dropTable('GuestIdentityDocuments');
-    } catch (_) {}
+    console.log('🗑️ Migration 007 rollback hoàn tất.');
   }
 };
