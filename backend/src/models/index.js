@@ -234,18 +234,9 @@ DamageItem.belongsTo(RoomInspectionReport, { foreignKey: 'InspectionId', as: 'in
 Invoice.hasMany(Payment, { foreignKey: 'InvoiceId', as: 'payments' });
 Payment.belongsTo(Invoice, { foreignKey: 'InvoiceId', as: 'invoice' });
 
-// 19. Minibar Associations (FEAT-MINIBAR-01 - Spec 12)
-Stay.hasMany(MinibarInspection, { foreignKey: 'StayId', as: 'minibarInspections' });
-MinibarInspection.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
-
-MinibarInspection.hasMany(MinibarInspectionLine, { foreignKey: 'InspectionId', as: 'lines' });
-MinibarInspectionLine.belongsTo(MinibarInspection, { foreignKey: 'InspectionId', as: 'inspection' });
-
-MinibarInspectionLine.belongsTo(MinibarProduct, { foreignKey: 'ProductId', as: 'product' });
-MinibarProduct.hasMany(MinibarInspectionLine, { foreignKey: 'ProductId', as: 'inspectionLines' });
-
-MinibarInspection.hasMany(MinibarInspectionEvent, { foreignKey: 'InspectionId', as: 'events' });
-MinibarInspectionEvent.belongsTo(MinibarInspection, { foreignKey: 'InspectionId', as: 'inspection' });
+// 19. Minibar Associations (FEAT-MINIBAR-01 - Spec 12 standard MinibarUsage)
+Stay.hasMany(MinibarUsage, { foreignKey: 'StayId', as: 'minibarUsages' });
+MinibarUsage.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
 
 module.exports = {
   sequelize,
