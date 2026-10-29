@@ -557,20 +557,22 @@ const createOrExecuteRoomMoveCore = async (stayId, body, user, headers) => {
 
     // 8. Nếu executeNow được yêu cầu
     if (executeNow && targetRoom) {
-      // Đóng segment phòng cũ trong StayRoomSegments
-      await conn.query(
-        `UPDATE StayRoomSegments 
-         SET ValidTo = NOW() 
-         WHERE StayId = ? AND ValidTo IS NULL`,
-        [stay.StayId]
-      );
+      // Đóng segment phòng cũ trong StayRoomSegments (nếu có)
+      try {
+        await conn.query(
+          `UPDATE StayRoomSegments 
+           SET ValidTo = NOW() 
+           WHERE StayId = ? AND ValidTo IS NULL`,
+          [stay.StayId]
+        );
 
-      // Mở segment phòng mới
-      await conn.query(
-        `INSERT INTO StayRoomSegments (StayId, RoomId, ValidFrom, ValidTo, Reason, IncidentId, MovedBy, CreatedAt)
-         VALUES (?, ?, NOW(), NULL, ?, ?, ?, NOW())`,
-        [stay.StayId, targetRoomId, effectiveReason, moveId, user?.userId || 1]
-      );
+        // Mở segment phòng mới
+        await conn.query(
+          `INSERT INTO StayRoomSegments (StayId, RoomId, ValidFrom, ValidTo, Reason, IncidentId, MovedBy, CreatedAt)
+           VALUES (?, ?, NOW(), NULL, ?, ?, ?, NOW())`,
+          [stay.StayId, targetRoomId, effectiveReason, moveId, user?.userId || 1]
+        );
+      } catch (_) {}
 
       // Cập nhật Stay sang phòng mới và tăng version
       await conn.query(
@@ -853,20 +855,22 @@ const completeRoomMoveCore = async (moveId, body, user, headers) => {
       };
     }
 
-    // Đóng segment cũ trong StayRoomSegments
-    await conn.query(
-      `UPDATE StayRoomSegments 
-       SET ValidTo = NOW() 
-       WHERE StayId = ? AND ValidTo IS NULL`,
-      [move.StayId]
-    );
+    // Đóng segment cũ trong StayRoomSegments (nếu có)
+    try {
+      await conn.query(
+        `UPDATE StayRoomSegments 
+         SET ValidTo = NOW() 
+         WHERE StayId = ? AND ValidTo IS NULL`,
+        [move.StayId]
+      );
 
-    // Mở segment mới
-    await conn.query(
-      `INSERT INTO StayRoomSegments (StayId, RoomId, ValidFrom, ValidTo, Reason, IncidentId, MovedBy, CreatedAt)
-       VALUES (?, ?, NOW(), NULL, ?, ?, ?, NOW())`,
-      [move.StayId, move.TargetRoomId, move.MoveReason, move.MoveId, user?.userId || 1]
-    );
+      // Mở segment mới
+      await conn.query(
+        `INSERT INTO StayRoomSegments (StayId, RoomId, ValidFrom, ValidTo, Reason, IncidentId, MovedBy, CreatedAt)
+         VALUES (?, ?, NOW(), NULL, ?, ?, ?, NOW())`,
+        [move.StayId, move.TargetRoomId, move.MoveReason, move.MoveId, user?.userId || 1]
+      );
+    } catch (_) {}
 
     // Cập nhật Stay sang phòng mới và tăng version
     await conn.query(
