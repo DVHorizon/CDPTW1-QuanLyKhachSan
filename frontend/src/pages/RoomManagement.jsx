@@ -174,10 +174,26 @@ const RoomManagement = () => {
         if (rtJson.success) setRoomTypes(rtJson.data || []);
       }
 
-      // 2. Tải danh sách phòng vật lý
-      const roomsRes = await fetch(`${API_BASE_URL}/physical`, {
-        headers: { Authorization: authHeaderVal },
-      });
+      // 2. Tải danh sách phòng vật lý (với fallback cổng 5000)
+      let roomsRes;
+      try {
+        roomsRes = await fetch(`${API_BASE_URL}/physical`, {
+          headers: { Authorization: authHeaderVal },
+        });
+        if (!roomsRes.ok && API_BASE_URL.startsWith('/')) {
+          roomsRes = await fetch('http://localhost:5000/api/v1/rooms/physical', {
+            headers: { Authorization: authHeaderVal },
+          });
+        }
+      } catch (e) {
+        if (API_BASE_URL.startsWith('/')) {
+          roomsRes = await fetch('http://localhost:5000/api/v1/rooms/physical', {
+            headers: { Authorization: authHeaderVal },
+          });
+        } else {
+          throw e;
+        }
+      }
 
       if (!roomsRes.ok) {
         throw new Error(`Máy chủ phản hồi mã lỗi ${roomsRes.status}: ${roomsRes.statusText}`);
