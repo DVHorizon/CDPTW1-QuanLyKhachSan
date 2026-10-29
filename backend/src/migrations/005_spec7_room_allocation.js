@@ -22,29 +22,7 @@ async function migrate() {
       console.log('✅ Đã thêm cột AllocatedAt vào Bookings');
     }
 
-    console.log('--- 2. Tạo bảng BookingRoomAllocations nếu chưa có ---');
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS BookingRoomAllocations (
-        AllocationId INT AUTO_INCREMENT PRIMARY KEY,
-        BookingId INT NOT NULL,
-        RoomId INT NOT NULL,
-        CheckInDate DATE NOT NULL,
-        CheckOutDate DATE NOT NULL,
-        AllocationNote VARCHAR(500) NULL,
-        AllocatedBy INT NULL,
-        AllocatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        Status VARCHAR(30) DEFAULT 'Allocated',
-        CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_booking (BookingId),
-        INDEX idx_room (RoomId),
-        FOREIGN KEY (BookingId) REFERENCES Bookings(BookingId) ON DELETE CASCADE,
-        FOREIGN KEY (RoomId) REFERENCES Rooms(RoomId) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-    console.log('✅ Đã kiểm tra/tạo bảng BookingRoomAllocations');
-
-    console.log('--- 3. Thêm permissions BOOKING_CONFIRM và ROOM_ALLOCATION ---');
+    console.log('--- 2. Thêm permissions BOOKING_CONFIRM và ROOM_ALLOCATION ---');
     const [permCheck] = await conn.query(
       "SELECT PermissionId, PermissionName FROM Permissions WHERE PermissionName IN ('BOOKING_CONFIRM', 'ROOM_ALLOCATION')"
     );
