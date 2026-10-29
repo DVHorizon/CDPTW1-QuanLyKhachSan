@@ -39,9 +39,30 @@ const SPEC_MESSAGES = {
 // Danh mục sản phẩm minibar tiêu chuẩn
 router.get('/products', async (req, res) => {
   try {
-    const [products] = await pool.query(
-      'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY Category ASC, UnitPrice ASC'
-    );
+    let products = [];
+    try {
+      const [rows] = await pool.query(
+        'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY Category ASC, UnitPrice ASC'
+      );
+      products = rows;
+    } catch (_) {
+      const [invRows] = await pool.query(`
+        SELECT 
+          ItemId AS ProductId, 
+          ItemCode AS ProductCode, 
+          ItemName AS ProductName, 
+          COALESCE(Category, 'Beverage') AS Category, 
+          Unit, 
+          COALESCE(UnitPrice, UnitCost, 0) AS UnitPrice, 
+          COALESCE(DefaultOpeningQty, 2) AS DefaultOpeningQty, 
+          COALESCE(IsComplimentary, 0) AS IsComplimentary, 
+          1 AS IsActive 
+        FROM InventoryItems 
+        WHERE ItemType = 'Minibar' OR ItemCode LIKE 'MB-%'
+        ORDER BY Category ASC, UnitPrice ASC
+      `);
+      products = invRows;
+    }
     res.json({ success: true, data: products });
   } catch (err) {
     console.error('GET /minibar/products error:', err);
@@ -166,9 +187,29 @@ router.get('/stays/:stayId', async (req, res) => {
       lines = lineRows;
     } else {
       // Nếu chưa có phiên kiểm kê, nạp danh mục cấu hình mặc định từ MinibarProducts
-      const [products] = await pool.query(
-        'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY Category ASC, UnitPrice ASC'
-      );
+      let products = [];
+      try {
+        const [pRows] = await pool.query(
+          'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY Category ASC, UnitPrice ASC'
+        );
+        products = pRows;
+      } catch (_) {
+        const [invRows] = await pool.query(`
+          SELECT 
+            ItemId AS ProductId, 
+            ItemCode AS ProductCode, 
+            ItemName AS ProductName, 
+            COALESCE(Category, 'Beverage') AS Category, 
+            Unit, 
+            COALESCE(UnitPrice, UnitCost, 0) AS UnitPrice, 
+            COALESCE(DefaultOpeningQty, 2) AS DefaultOpeningQty, 
+            COALESCE(IsComplimentary, 0) AS IsComplimentary
+          FROM InventoryItems 
+          WHERE ItemType = 'Minibar' OR ItemCode LIKE 'MB-%'
+          ORDER BY Category ASC, UnitPrice ASC
+        `);
+        products = invRows;
+      }
       lines = products.map((p) => {
         const opening = Number(p.DefaultOpeningQty || 2);
         return {
