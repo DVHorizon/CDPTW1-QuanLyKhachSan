@@ -138,7 +138,7 @@ router.get('/branches', async (req, res) => {
   }
 });
 
-router.get('/room-types', async (req, res) => {
+router.get(['/room-types', '/types'], async (req, res) => {
   try {
     const list = await RoomType.findAll({
       where: { Status: 'Active', IsDeleted: false },

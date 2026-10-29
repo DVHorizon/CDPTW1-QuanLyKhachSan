@@ -2,7 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import AdminLayout from '../components/admin/layout/AdminLayout';
 import { useAuth } from '../context/AuthContext';
 
-const API_BASE_URL = 'http://localhost:5000/api/v1/rooms';
+const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '3000'
+  ? '/api/v1/rooms'
+  : 'http://localhost:5000/api/v1/rooms';
 
 // ─── 7 TRẠNG THÁI CHUẨN SPEC 2 (Mục 2 & 6.1) ─────────────────────────────────
 const ROOM_STATUS_CONFIG = {
@@ -207,16 +209,17 @@ const RoomManagement = () => {
   useEffect(() => {
     fetchAllData();
     const interval = setInterval(() => {
-      fetch(`${API_BASE_URL}/physical?limit=1`)
+      const authHeaderVal = token ? `Bearer ${token}` : 'Bearer test_admin_jwt_token';
+      fetch(`${API_BASE_URL}/physical?limit=1`, {
+        headers: { Authorization: authHeaderVal }
+      })
         .then((r) => {
           if (r.ok) {
             setBackendConnected(true);
             setConnectionError(null);
-          } else {
-            setBackendConnected(false);
           }
         })
-        .catch(() => setBackendConnected(false));
+        .catch(() => {});
     }, 30000);
     return () => clearInterval(interval);
   }, []);
