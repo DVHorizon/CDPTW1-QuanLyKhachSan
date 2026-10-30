@@ -6,11 +6,12 @@
  * Feature: FEAT-ROOMMAP-RT-01 (Cập nhật trạng thái sơ đồ phòng real-time bằng WebSocket)
  * Spec: Spec_13.CapNhatSoDoPhongRealtime.docx
  * 
- * - Multi-endpoint handling: /ws/v1/room-map, /ws/rooms, /ws
+ * - Multi-endpoint handling: /ws/v1/room-map, /ws/rooms, /ws/fnb-orders, /ws
  * - In-memory Circular Event Buffer (Outbox) with 2000 events limit
  * - Monotonic Sequence per Property & Monotonic Version per Room
  * - Heartbeat Ping/Pong (25s interval, 50s timeout)
  * - Snapshot & Cursor-based Replay for delta sync
+ * - Hỗ trợ đăng ký theo dõi đơn F&B Room Service (/ws/fnb-orders)
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -323,20 +324,23 @@ function handleClientConnection(ws, req) {
   const cursor = query.cursor !== undefined ? Number(query.cursor) : null;
   const token = query.token || null;
 
+  ws.pathname = parsedUrl.pathname;
   ws.propertyId = propertyId;
   ws.user = verifyClientToken(token);
 
-  // Send initial READY event
+  // Send initial READY / CONNECTED event
   const currentSeq = getCurrentSequence(propertyId);
   sendJson(ws, {
     schemaVersion: '1.0',
     eventType: 'READY',
-    type: 'CONNECTED', // backward compatibility with test runner
+    type: 'CONNECTED', // backward compatibility with test runner and F&B
+    path: ws.pathname,
     propertyId: propertyId,
     currentSequence: currentSeq,
     serverTime: new Date().toISOString(),
+    timestamp: new Date().toISOString(),
     heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
-    message: 'Kết nối WebSocket Room Map thành công'
+    message: 'Kết nối WebSocket Realtime thành công.'
   });
 
   // If client provided cursor at connection time, attempt replay
@@ -354,7 +358,19 @@ function handleClientConnection(ws, req) {
         sendJson(ws, {
           action: 'PONG',
           type: 'PONG',
-          serverTime: new Date().toISOString()
+          serverTime: new Date().toISOString(),
+          timestamp: Date.now()
+        });
+        return;
+      }
+
+      // F&B Order subscription
+      if (action === 'SUBSCRIBE' && data.foodOrderId) {
+        ws.subscribedOrderId = data.foodOrderId;
+        sendJson(ws, {
+          type: 'SUBSCRIBED',
+          foodOrderId: data.foodOrderId,
+          message: `Đã theo dõi đơn F&B #${data.foodOrderId}`
         });
         return;
       }
@@ -374,6 +390,7 @@ function handleClientConnection(ws, req) {
           sendJson(ws, {
             schemaVersion: '1.0',
             eventType: 'SUBSCRIBED',
+            type: 'SUBSCRIBED',
             propertyId: ws.propertyId,
             currentSequence: getCurrentSequence(ws.propertyId),
             serverTime: new Date().toISOString()
@@ -387,6 +404,7 @@ function handleClientConnection(ws, req) {
         sendJson(ws, {
           schemaVersion: '1.0',
           eventType: 'UNSUBSCRIBED',
+          type: 'UNSUBSCRIBED',
           serverTime: new Date().toISOString()
         });
         return;
@@ -445,20 +463,28 @@ function initSocket(server) {
 
   wss = new WebSocket.Server({ noServer: true });
 
-  // Handle HTTP upgrade for /ws/v1/room-map, /ws/rooms, and /ws
+  // Handle HTTP upgrade for /ws/v1/room-map, /ws/rooms, /ws/fnb-orders, and /ws
   server.on('upgrade', (request, socket, head) => {
-    const pathname = url.parse(request.url).pathname;
+    try {
+      const parsedUrl = url.parse(request.url);
+      const pathname = parsedUrl.pathname;
 
-    if (
-      pathname === '/ws/v1/room-map' ||
-      pathname === '/ws/rooms' ||
-      pathname === '/ws' ||
-      pathname.startsWith('/ws/')
-    ) {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-      });
-    } else {
+      if (
+        pathname === '/ws/v1/room-map' ||
+        pathname === '/ws/rooms' ||
+        pathname === '/ws/fnb-orders' ||
+        pathname === '/ws' ||
+        pathname.startsWith('/ws/')
+      ) {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          ws.pathname = pathname;
+          wss.emit('connection', ws, request);
+        });
+      } else {
+        socket.destroy();
+      }
+    } catch (upgradeErr) {
+      console.warn('⚠️ WebSocket upgrade error:', upgradeErr.message);
       socket.destroy();
     }
   });
@@ -490,12 +516,12 @@ function initSocket(server) {
     }
   });
 
-  console.log('✅ WebSocket Realtime Hub initialized for Room Map (/ws/v1/room-map, /ws/rooms, /ws)');
+  console.log('✅ WebSocket Realtime Hub initialized for Room Map & F&B (/ws/v1/room-map, /ws/rooms, /ws/fnb-orders, /ws)');
   return wss;
 }
 
 /**
- * Backward compatibility helpers
+ * Phát sự kiện liên quan đến Buồng phòng và Đặt phòng (Rooms & Bookings)
  */
 function broadcastRoomEvent(eventType, payload) {
   if (!wss) return;
@@ -508,17 +534,65 @@ function broadcastRoomEvent(eventType, payload) {
     timestamp: new Date().toISOString()
   });
 
+  let sentCount = 0;
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      try {
-        client.send(msg);
-      } catch (_) {}
+      if (!client.pathname || client.pathname === '/ws/rooms' || client.pathname === '/ws' || client.pathname.startsWith('/ws/')) {
+        try {
+          client.send(msg);
+          sentCount++;
+        } catch (_) {}
+      }
     }
   });
+
+  console.log(`📢 [WebSocket] Broadcast [${eventType}] tới ${sentCount} clients.`);
 }
 
-function broadcastOrderStatus(orderId, status, payload = {}) {
-  broadcastRoomEvent('ORDER_STATUS_CHANGED', { orderId, status, ...payload });
+/**
+ * Phát sự kiện đơn F&B Room Service (tương thích cả 2 chuẩn F&B)
+ */
+function broadcastOrderStatus(orderOrOrderId, status, payload = {}) {
+  if (!wss) return;
+
+  let msg;
+  let targetOrderId = null;
+
+  if (typeof orderOrOrderId === 'object' && orderOrOrderId !== null) {
+    const order = orderOrOrderId;
+    targetOrderId = order.FoodOrderId;
+    msg = JSON.stringify({
+      type: 'ORDER_STATUS_CHANGED',
+      data: {
+        foodOrderId: order.FoodOrderId,
+        status: order.Status,
+        orderTime: order.OrderTime,
+        totalAmount: order.TotalAmount,
+        roomNumber: order.Stay?.Room?.RoomNumber || 'N/A'
+      }
+    });
+  } else {
+    targetOrderId = orderOrOrderId;
+    msg = JSON.stringify({
+      schemaVersion: '1.0',
+      type: 'ORDER_STATUS_CHANGED',
+      eventType: 'ORDER_STATUS_CHANGED',
+      data: { orderId: orderOrOrderId, status, ...payload },
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      if (!client.pathname || client.pathname === '/ws/fnb-orders' || client.pathname === '/ws') {
+        if (!client.subscribedOrderId || !targetOrderId || client.subscribedOrderId === targetOrderId) {
+          try {
+            client.send(msg);
+          } catch (_) {}
+        }
+      }
+    }
+  });
 }
 
 function broadcastNewKitchenOrder(order) {
