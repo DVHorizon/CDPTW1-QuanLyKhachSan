@@ -45,11 +45,11 @@ const MenuForm = ({
           <select 
             value={formData.Status} 
             onChange={e => setFormData({...formData, Status: e.target.value})}
-            className={`cursor-pointer outline-none appearance-none font-label-sm text-label-sm font-bold shadow-sm px-4 py-2 rounded-full ${formData.Status === 'Available' ? 'bg-admin-primary/10 text-admin-primary' : formData.Status === 'Out of Stock' ? 'bg-tertiary/10 text-tertiary' : 'bg-error-container text-on-error-container'}`}
+            className={`cursor-pointer outline-none appearance-none font-label-sm text-label-sm font-bold shadow-sm px-4 py-2 rounded-full ${formData.Status === 'Available' ? 'bg-admin-primary/10 text-admin-primary' : formData.Status === 'OutOfStock' ? 'bg-tertiary/10 text-tertiary' : 'bg-error-container text-on-error-container'}`}
           >
             <option value="Available">🟢 Đang Mở Bán</option>
-            <option value="Out of Stock">🟠 Hết Hàng 86'd</option>
-            <option value="Inactive">🔴 Khóa Ẩn</option>
+            <option value="OutOfStock">🟠 Hết Hàng 86'd</option>
+            <option value="Inactive">🔴 Ngừng Bán / Khóa</option>
           </select>
         </div>
 
@@ -93,7 +93,6 @@ const MenuForm = ({
               <span className="text-body-sm font-body-sm text-on-surface-variant">Giá Bán Niêm Yết (VNĐ) *</span>
               <input 
                 type="number" 
-                 
                 min="0" 
                 value={formData.Price} 
                 onChange={e => setFormData({...formData, Price: Number(e.target.value)})}
@@ -107,33 +106,27 @@ const MenuForm = ({
                 onChange={e => setFormData({...formData, CategoryId: Number(e.target.value)})}
                 className="font-bold text-body-sm text-on-surface bg-surface border border-outline-variant rounded-lg px-3 py-2.5 focus:border-admin-primary outline-none w-full shadow-inner cursor-pointer"
               >
-                <option value={1}>Món Khai Vị</option>
-                <option value={2}>Món Chính</option>
-                <option value={3}>Tráng Miệng</option>
-                <option value={4}>Đồ Uống / Bar</option>
+                <option value={1}>Khai Vị Nóng</option>
+                <option value={2}>Khai Vị Lạnh</option>
+                <option value={5}>Bếp Nóng (Món Chính)</option>
+                <option value={6}>Bếp Lạnh</option>
+                <option value={7}>Tráng Miệng</option>
+                <option value={8}>Đồ Uống / Bar</option>
+                <option value={14}>Bánh Mì Artisan</option>
+                <option value={19}>Trà & Cà Phê</option>
+                <option value={20}>Rượu Vang & Cocktail</option>
               </select>
             </div>
           </div>
+
+
           
           <div className="flex items-center justify-between pt-space-xs mt-space-sm border-t border-surface-container-highest font-label-sm text-label-sm text-on-surface-variant">
             <span>Phụ thu In-room Dining: <strong className="text-on-surface">+15% Service Tray</strong></span>
             <span>Thuế &amp; Phí: <strong className="text-on-surface">VAT 8% + Phí PV 5%</strong></span>
           </div>
         </div>
-        
-        {/*  Recipe BOM (Bill of Materials) Mini Table (MOCKUP) */}
-        <div className="flex flex-col gap-space-xs">
-          <div className="flex items-center justify-between">
-            <span className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider">Định Lượng Nguyên Liệu Bếp (BOM)</span>
-            <button className="text-admin-primary font-label-sm text-label-sm font-semibold hover:underline" type="button">Chỉnh Định Lượng</button>
-          </div>
-          <div className="bg-surface-container rounded-lg p-2 font-body-sm text-body-sm flex flex-col gap-1.5">
-            <div className="flex items-center justify-between font-mono text-label-sm">
-              <span className="text-on-surface font-sans">1. {formData.ItemName || 'Chưa nhập tên món'} tiêu chuẩn</span>
-              <span className="text-on-surface font-bold">1 Lô định mức</span>
-            </div>
-          </div>
-        </div>
+
 
       </div>
 
