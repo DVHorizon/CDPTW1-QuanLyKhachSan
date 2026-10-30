@@ -7,6 +7,7 @@ import SearchRooms from './pages/SearchRooms';
 import RoomDetail from './pages/client/RoomDetail';
 import BookingEngine from './pages/client/BookingEngine';
 import DepositPayment from './pages/client/DepositPayment';
+import BookingConfirmation from './pages/client/BookingConfirmation';
 import Auth from './pages/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomAvailability from './pages/admin/menu/RoomAvailability';
@@ -68,6 +69,8 @@ function App() {
             <Route path="/thanh-toan" element={<DepositPayment />} />
             <Route path="/checkout/payment" element={<DepositPayment />} />
             <Route path="/checkout/step-2" element={<DepositPayment />} />
+            <Route path="/booking-confirmation" element={<BookingConfirmation />} />
+            <Route path="/xac-nhan-dat-phong" element={<BookingConfirmation />} />
             <Route path="/mock-payment/:transactionCode" element={<MockPaymentGateway />} />
             <Route path="/room-service" element={<RoomService />} />
             <Route path="/fnb/history" element={<GuestOrderHistory />} />
