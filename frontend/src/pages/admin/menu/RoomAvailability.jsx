@@ -86,7 +86,7 @@ const INITIAL_MOCK_ROOMS = [
 
 // Helper gọi API an toàn, chống triệt để lỗi Unexpected token '<' do HTML response
 const callApiSafe = async (endpoint, options = {}) => {
-  const envUrl = import.meta.env.VITE_API_URL || '';
+  const envUrl = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
   const candidates = [
     `${envUrl}${endpoint}`,
     endpoint,
@@ -213,7 +213,7 @@ export default function RoomAvailability() {
 
     try {
       const sseUrl = import.meta.env.VITE_API_URL
-        ? `${import.meta.env.VITE_API_URL}/api/v1/room-map/stream`
+        ? `${import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')}/api/v1/room-map/stream`
         : '/api/v1/room-map/stream';
 
       eventSource = new EventSource(sseUrl);

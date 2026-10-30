@@ -902,6 +902,7 @@ router.get('/:id', checkBookingPermission, async (req, res) => {
     }
 
     const b = bRows[0];
+    const bookingId = b.BookingId;
 
     // 2. Tải danh sách phòng đã đặt (Khối 2: BookingRooms)
     const roomsQuery = `

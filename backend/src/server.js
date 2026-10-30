@@ -11,7 +11,41 @@ const { initSocket } = require('./sockets/socketHandler');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// Ẩn thông tin phiên bản/công nghệ máy chủ khỏi HTTP response headers
+app.disable('x-powered-by');
+
+// Thiết lập các HTTP Security Headers tiêu chuẩn cho toàn bộ phản hồi
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; frame-ancestors 'none'");
+  next();
+});
+
+// Giới hạn CORS theo danh sách Origin hợp lệ thay vì mở toàn bộ (*)
+const allowedOrigins = (
+  process.env.CORS_ORIGIN ||
+  'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000,http://127.0.0.1:5000'
+)
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  })
+);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 

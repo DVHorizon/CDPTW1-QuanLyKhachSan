@@ -63,7 +63,9 @@ exports.getBookingCharges = async (req, res) => {
     const numBookingId = Number(bookingId);
 
     // 2. Kiểm tra tồn tại Booking (Mục 1.2)
-    const booking = await Booking.findByPk(numBookingId);
+    const booking = !Number.isNaN(numBookingId)
+      ? await Booking.findByPk(numBookingId)
+      : await Booking.findOne({ where: { ConfirmationCode: String(bookingId).trim() } });
     if (!booking) {
       return res.status(404).json({
         success: false,
