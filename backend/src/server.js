@@ -119,6 +119,15 @@ app.use('/api/smart-lock', require('./routes/smartLockRoutes'));
 // 👤 Bảo  — Guest Portal
 app.use('/api/v1/guest',      require('./modules/guest'));
 
+// Alias hỗ trợ FEAT-GUEST-04: Kiểm tra phòng trống & Khóa phòng trực tiếp
+const roomAvailabilityController = require('./controllers/roomAvailabilityController');
+app.get('/api/v1/rooms/availability',       roomAvailabilityController.checkRoomAvailability);
+app.get('/api/rooms/availability',          roomAvailabilityController.checkRoomAvailability);
+app.post('/api/v1/rooms/lock',              roomAvailabilityController.lockRoomSession);
+app.post('/api/rooms/lock',                 roomAvailabilityController.lockRoomSession);
+app.delete('/api/v1/rooms/lock/:sessionId', roomAvailabilityController.releaseRoomLock);
+app.delete('/api/rooms/lock/:sessionId',    roomAvailabilityController.releaseRoomLock);
+
 // 👤 Thực — PMS (Property Management)
 app.use('/api/v1/pms',        require('./modules/pms'));
 
@@ -149,7 +158,7 @@ app.use('/api/v1/operations', require('./modules/operations'));
 app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
 app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
 // FEAT-GUEST-05: Direct booking endpoint
-app.post('/bookings', require('./controllers/bookingEngineController').createOnlineBooking);
+app.post('/bookings', require('./middlewares/authMiddleware').verifyToken, require('./controllers/bookingEngineController').createOnlineBooking);
 
 // FEAT-GUEST-06: Direct automated real-time pricing calculation endpoint
 app.post('/bookings/calculate-pricing', require('./controllers/bookingEngineController').calculatePricing);
@@ -167,7 +176,20 @@ app.post('/api/bookings/:bookingId/apply-voucher', require('./controllers/vouche
 app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController').getBookingDetails);
 app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 
+// FEAT-INVOICE-01: Booking Charges Aggregation (C6)
+app.get('/bookings/:bookingId/charges', require('./middlewares/authMiddleware').verifyToken, require('./modules/services/controllers/bookingChargesController').getBookingCharges);
+
+// FEAT-GUEST-09: Xem lịch sử đặt phòng & Hủy phòng (Mã truy vết: A9)
+app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));
+app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
+app.use('/me',        require('./routes/bookingHistoryRoutes'));
+
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
+
+// FEAT-GUEST-10: Cổng gửi Email xác nhận & Thông báo
+const bookingQrNotificationController = require('./controllers/bookingQrNotificationController');
+app.post('/api/v1/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
+app.post('/api/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
 app.use(require('./shared/middlewares/errorHandler'));
 
 // ─── HTTP Server & WebSocket ───────────────────────────────────────────────

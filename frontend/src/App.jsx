@@ -7,6 +7,7 @@ import SearchRooms from './pages/SearchRooms';
 import RoomDetail from './pages/client/RoomDetail';
 import BookingEngine from './pages/client/BookingEngine';
 import DepositPayment from './pages/client/DepositPayment';
+import BookingConfirmation from './pages/client/BookingConfirmation';
 import Auth from './pages/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomAvailability from './pages/admin/menu/RoomAvailability';
@@ -15,6 +16,7 @@ import RoomManagement from './pages/RoomManagement';
 import StaffManagement from './pages/StaffManagement';
 import RoomService from './pages/client/RoomService';
 import Profile from './pages/client/Profile';
+import MyBookings from './pages/client/MyBookings';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
 import FnbOrderHistory from './pages/admin/fnb/FnbOrderHistory';
@@ -68,6 +70,8 @@ function App() {
             <Route path="/thanh-toan" element={<DepositPayment />} />
             <Route path="/checkout/payment" element={<DepositPayment />} />
             <Route path="/checkout/step-2" element={<DepositPayment />} />
+            <Route path="/booking-confirmation" element={<BookingConfirmation />} />
+            <Route path="/xac-nhan-dat-phong" element={<BookingConfirmation />} />
             <Route path="/mock-payment/:transactionCode" element={<MockPaymentGateway />} />
             <Route path="/room-service" element={<RoomService />} />
             <Route path="/fnb/history" element={<GuestOrderHistory />} />
@@ -77,6 +81,9 @@ function App() {
             <Route path="/fnb/dat-ban" element={<TableReservation />} />
             <Route path="/dat-ban" element={<TableReservation />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/my-bookings" element={<MyBookings />} />
+            <Route path="/me/bookings" element={<MyBookings />} />
+            <Route path="/lich-su-dat-phong" element={<MyBookings />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/login" element={<Auth />} />
             <Route path="/register" element={<Auth />} />

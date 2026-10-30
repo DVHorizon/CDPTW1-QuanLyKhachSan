@@ -24,6 +24,11 @@ export default defineConfig({
           });
         },
       },
+      '/ws': {
+        target: process.env.VITE_PROXY_TARGET || (process.env.CHOKIDAR_USEPOLLING ? 'http://backend:5000' : 'http://localhost:5000'),
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
 })

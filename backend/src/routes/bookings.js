@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const ExcelJS = require('exceljs');
 const pool = require('../config/db');
 const bookingEngineController = require('../controllers/bookingEngineController');
 const voucherController = require('../controllers/voucherController');
@@ -813,36 +814,19 @@ router.get('/', checkBookingPermission, async (req, res) => {
   }
 });
 
-// ─── GET /api/v1/bookings/:id — Chi Tiết Booking + Data Masking (Mục 3.10 & 3.11 & Spec 8)
+// ─── GET /api/v1/bookings/:id — Chi Tiết Booking + Data Masking (Mục 3.10 & 3.11)
 router.get('/:id', checkBookingPermission, async (req, res) => {
   try {
     const { id } = req.params;
-    const cleanId = String(id || '').trim();
+    const bookingId = Number(id);
 
-    if (!cleanId) {
+    // Test Case 32: ID không hợp lệ hoặc số âm/0
+    if (!Number.isInteger(bookingId) || bookingId <= 0) {
       return res.status(404).json({
         success: false,
         code: 'ERROR_0024_NOT_FOUND',
         message: 'Không tìm thấy booking hoặc booking đã bị xóa',
       });
-    }
-
-    const isNumeric = /^-?\d+$/.test(cleanId);
-    let whereIdClause = 'b.ConfirmationCode = ?';
-    let queryParam = cleanId;
-
-    if (isNumeric) {
-      const numId = Number(cleanId);
-      // Test Case 32: ID không hợp lệ hoặc số âm/0
-      if (!Number.isInteger(numId) || numId <= 0) {
-        return res.status(404).json({
-          success: false,
-          code: 'ERROR_0024_NOT_FOUND',
-          message: 'Không tìm thấy booking hoặc booking đã bị xóa',
-        });
-      }
-      whereIdClause = '(b.BookingId = ? OR b.ConfirmationCode = ?)';
-      queryParam = numId;
     }
 
     // 1. Tải thông tin chính của booking
@@ -882,11 +866,10 @@ router.get('/:id', checkBookingPermission, async (req, res) => {
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
-      WHERE ${whereIdClause}
+      WHERE b.BookingId = ?
       LIMIT 1
     `;
-    const queryArgs = isNumeric ? [queryParam, cleanId] : [queryParam];
-    const [bRows] = await pool.query(bookingQuery, queryArgs);
+    const [bRows] = await pool.query(bookingQuery, [bookingId]);
 
     // Test Case 32: Không tìm thấy hoặc đã bị xóa mềm (IsDeleted = 1)
     if (!bRows.length || bRows[0].IsDeleted === 1 || bRows[0].IsDeleted === true) {
@@ -1346,9 +1329,8 @@ router.get('/:id', async (req, res) => {
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
-      LEFT JOIN BookingRoomAllocations bra ON b.BookingId = bra.BookingId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
-      LEFT JOIN Rooms r ON COALESCE(bra.RoomId, s.RoomId) = r.RoomId
+      LEFT JOIN Rooms r ON s.RoomId = r.RoomId
       WHERE b.BookingId = ?
       ORDER BY s.StayId DESC
       LIMIT 1
@@ -1366,12 +1348,12 @@ router.get('/:id', async (req, res) => {
 
     // Lấy danh sách các phòng được gán
     const [allocRows] = await pool.query(
-      `SELECT bra.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
-              bra.AllocationNote, CAST(bra.AllocatedAt AS CHAR) AS AllocatedAt
-       FROM BookingRoomAllocations bra
-       JOIN Rooms r ON bra.RoomId = r.RoomId
+      `SELECT s.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
+              CAST(s.CreatedAt AS CHAR) AS AllocatedAt
+       FROM Stays s
+       JOIN Rooms r ON s.RoomId = r.RoomId
        LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
-       WHERE bra.BookingId = ?`,
+       WHERE s.BookingId = ?`,
       [id]
     );
 
@@ -1398,4 +1380,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+
+// ─── TÍNH NĂNG 10: TẠO MÃ QR BOOKING & GỬI EMAIL XÁC NHẬN (FEAT-GUEST-10 / A10) ───
+const bookingQrNotificationController = require('../controllers/bookingQrNotificationController');
+router.get('/:bookingId/qr-code', bookingQrNotificationController.getBookingQRCode);
 module.exports = router;

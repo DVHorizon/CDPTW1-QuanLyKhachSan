@@ -44,15 +44,14 @@ router.get('/bookings', async (req, res) => {
       LEFT JOIN (
         SELECT
           bk.BookingId,
-          MIN(COALESCE(bra.RoomId, s.RoomId)) AS RoomId,
+          MIN(s.RoomId) AS RoomId,
           GROUP_CONCAT(DISTINCT r.RoomNumber ORDER BY r.RoomNumber SEPARATOR ', ') AS AssignedRoomNumber,
           MIN(r.Floor) AS Floor,
           MIN(s.StayId) AS StayId,
           MIN(s.Status) AS StayStatus
         FROM Bookings bk
-        LEFT JOIN BookingRoomAllocations bra ON bk.BookingId = bra.BookingId
         LEFT JOIN Stays s ON bk.BookingId = s.BookingId
-        LEFT JOIN Rooms r ON COALESCE(bra.RoomId, s.RoomId) = r.RoomId
+        LEFT JOIN Rooms r ON s.RoomId = r.RoomId
         GROUP BY bk.BookingId
       ) alloc ON b.BookingId = alloc.BookingId
       WHERE b.Status NOT IN ('Cancelled', 'Completed', 'NoShow')
@@ -176,11 +175,11 @@ router.get('/check-sync/:id', async (req, res) => {
          b.BookingId,
          b.Status,
          CAST(b.UpdatedAt AS CHAR) AS UpdatedAt,
-         bra.RoomId,
+         s.RoomId,
          r.RoomNumber
        FROM Bookings b
-       LEFT JOIN BookingRoomAllocations bra ON b.BookingId = bra.BookingId
-       LEFT JOIN Rooms r ON bra.RoomId = r.RoomId
+       LEFT JOIN Stays s ON b.BookingId = s.BookingId
+       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
        WHERE b.BookingId = ?
        LIMIT 1`,
       [id]

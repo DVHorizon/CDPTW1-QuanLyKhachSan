@@ -31,10 +31,6 @@ module.exports = (sequelize) => {
     Note: {
       type: DataTypes.STRING,
       allowNull: true
-    },
-    IsCompleted: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
     }
   }, {
     tableName: 'FoodOrderDetails',

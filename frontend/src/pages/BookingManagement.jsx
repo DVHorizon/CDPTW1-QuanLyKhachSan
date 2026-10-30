@@ -2,9 +2,14 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminLayout from '../components/admin/layout/AdminLayout';
 import { useAuth } from '../context/AuthContext';
+import BookingChargesModal from '../components/admin/BookingChargesModal';
 
-const API_BASE = 'http://localhost:5000/api/v1/bookings';
-const API_ROOM_TYPES = 'http://localhost:5000/api/v1/room-types';
+const API_BASE = typeof window !== 'undefined' && window.location.port === '3000'
+  ? '/api/v1/bookings'
+  : 'http://localhost:5000/api/v1/bookings';
+const API_ROOM_TYPES = typeof window !== 'undefined' && window.location.port === '3000'
+  ? '/api/v1/room-types'
+  : 'http://localhost:5000/api/v1/room-types';
 
 // ─── 6 Trạng thái cố định và màu sắc chuẩn Spec 3.4 & 6.3 ──────────────────
 const STATUS_CONFIG = {
@@ -161,6 +166,7 @@ export default function BookingManagement() {
   );
   const [detailData, setDetailData] = useState(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [chargesModalBookingId, setChargesModalBookingId] = useState(null);
 
   // ─── State Modal Xem Trước Xuất Excel (Excel Preview Modal) ────────────────
   const [showExportPreview, setShowExportPreview] = useState(false);
@@ -887,6 +893,7 @@ export default function BookingManagement() {
                   </th>
 
                   <th className="py-3.5 px-4 text-right">Tổng tiền</th>
+                  <th className="py-3.5 px-3 text-center">Bảng kê</th>
                 </tr>
               </thead>
 
@@ -904,12 +911,13 @@ export default function BookingManagement() {
                       <td className="py-4 px-4"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
                       <td className="py-4 px-4 text-center"><div className="h-6 bg-slate-200 rounded-full w-24 mx-auto"></div></td>
                       <td className="py-4 px-4 text-right"><div className="h-4 bg-slate-200 rounded w-24 ml-auto"></div></td>
+                      <td className="py-4 px-3 text-center"><div className="h-7 w-7 bg-slate-200 rounded-lg mx-auto"></div></td>
                     </tr>
                   ))
                 ) : bookings.length === 0 ? (
                   // Empty State với hình minh họa (Mục 6.3)
                   <tr>
-                    <td colSpan={9} className="py-16 text-center">
+                    <td colSpan={10} className="py-16 text-center">
                       <div className="max-w-md mx-auto space-y-3">
                         <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto border border-blue-100 shadow-sm">
                           <span className="material-symbols-outlined text-3xl">search_off</span>
@@ -1001,6 +1009,21 @@ export default function BookingManagement() {
                         {/* Tổng tiền (Căn phải, phân cách hàng nghìn) (Mục 3.9) */}
                         <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
                           {fmtCurrency(b.totalAmount)}
+                        </td>
+
+                        {/* Cột Thao tác: Xem Bảng Kê Chi Phí C6 */}
+                        <td className="py-3.5 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setChargesModalBookingId(b.bookingId);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-100/60 transition-colors cursor-pointer border border-transparent hover:border-blue-200"
+                            title="Xem bảng kê chi phí lưu trú (Folio)"
+                          >
+                            <span className="material-symbols-outlined text-lg block">receipt_long</span>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -1438,6 +1461,19 @@ export default function BookingManagement() {
                       </div>
                     </div>
 
+                    {/* Nút Xem Bảng Kê Chi Phí Lưu Trú C6 */}
+                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Xem chi tiết các khoản phát sinh:</span>
+                      <button
+                        type="button"
+                        onClick={() => setChargesModalBookingId(selectedBookingId)}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                      >
+                        <span className="material-symbols-outlined text-sm">receipt_long</span>
+                        <span>Xem Bảng Kê Chi Phí Lưu Trú (Folio)</span>
+                      </button>
+                    </div>
+
                     {/* Các trường tài chính chi tiết (Giá gốc, Giảm giá, và Phê duyệt chỉ cho Admin) */}
                     {(detailData.payment?.originalPrice > 0 || detailData.payment?.discountApprovedBy) && (
                       <div className="pt-2 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
@@ -1545,6 +1581,13 @@ export default function BookingManagement() {
           </div>
         </div>
       )}
+
+      {/* ─── MODAL BẢNG KÊ CHI PHÍ LƯU TRÚ (FEAT-INVOICE-01 / C6) ───────────── */}
+      <BookingChargesModal
+        bookingId={chargesModalBookingId}
+        isOpen={!!chargesModalBookingId}
+        onClose={() => setChargesModalBookingId(null)}
+      />
     </AdminLayout>
   );
 }
