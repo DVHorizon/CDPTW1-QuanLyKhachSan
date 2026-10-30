@@ -463,53 +463,57 @@ export default function MyBookings() {
                         </div>
 
                         {/* Action Buttons Grid */}
-                        <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedBooking(upcomingFeaturedBooking);
-                              setIsDetailModalOpen(true);
-                            }}
-                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#0b1c30] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#213145] transition-all shadow-xs"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">visibility</span>
-                            <span>Xem Chi Tiết Đơn</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => handleOpenQrModal(upcomingFeaturedBooking, e)}
-                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#725b38] to-[#91754a] text-white text-xs font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-xs"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
-                            <span>Mã QR Check-in</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => handleOpenCancelModal(upcomingFeaturedBooking, e)}
-                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#eff4ff] text-[#ba1a1a] text-xs font-bold hover:bg-[#ffdad6]/60 transition-colors border border-[#ffdad6]"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">cancel</span>
-                            <span>Hủy Đặt Phòng Theo Quy Định</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (upcomingFeaturedBooking.invoices && upcomingFeaturedBooking.invoices.length > 0) {
-                                setSelectedInvoice(upcomingFeaturedBooking.invoices[0]);
-                                setIsVatModalOpen(true);
-                              } else {
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 border-t border-[#d3e4fe]/40 mt-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
                                 setSelectedBooking(upcomingFeaturedBooking);
                                 setIsDetailModalOpen(true);
-                              }
-                            }}
-                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#eff4ff] text-[#45464d] text-xs font-bold hover:bg-white hover:text-[#0b1c30] transition-colors ml-auto border border-[#d3e4fe]/50"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">receipt</span>
-                            <span>Tải Hóa Đơn Tạm Tính</span>
-                          </button>
+                              }}
+                              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0b1c30] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#213145] transition-all shadow-xs"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">visibility</span>
+                              <span>Chi Tiết</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenQrModal(upcomingFeaturedBooking, e)}
+                              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#725b38] to-[#91754a] text-white text-xs font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-xs"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
+                              <span>Mã QR Check-in</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenCancelModal(upcomingFeaturedBooking, e)}
+                              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#eff4ff] text-[#ba1a1a] text-xs font-bold hover:bg-[#ffdad6]/60 transition-colors border border-[#ffdad6]"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">cancel</span>
+                              <span>Hủy Phòng</span>
+                            </button>
+                          </div>
+
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (upcomingFeaturedBooking.invoices && upcomingFeaturedBooking.invoices.length > 0) {
+                                  setSelectedInvoice(upcomingFeaturedBooking.invoices[0]);
+                                  setIsVatModalOpen(true);
+                                } else {
+                                  setSelectedBooking(upcomingFeaturedBooking);
+                                  setIsDetailModalOpen(true);
+                                }
+                              }}
+                              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#eff4ff] text-[#45464d] text-xs font-bold hover:bg-white hover:text-[#0b1c30] transition-colors border border-[#d3e4fe]/50 w-full sm:w-auto"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">receipt</span>
+                              <span>Hóa Đơn Tạm Tính</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
