@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import AdminLayout from '../../components/admin/layout/AdminLayout';
+import { useAuth } from '../../context/AuthContext';
 import checkOutApi from '../../api/checkOutApi';
 
 // ─── Tiện Ích Định Dạng ────────────────────────────────────────────────────
@@ -63,6 +64,10 @@ const ToastContainer = ({ toasts, onDismiss }) => (
 export default function CheckOutDesk() {
   const navigate = useNavigate();
   const { stayId: urlStayId } = useParams();
+  const { user } = useAuth();
+  const [backendConnected, setBackendConnected] = useState(true);
+  const [connectionError, setConnectionError] = useState(null);
+  const [lastSyncedTime, setLastSyncedTime] = useState(null);
 
   // State danh sách & tìm kiếm
   const [staysList, setStaysList] = useState([]);
@@ -138,9 +143,12 @@ export default function CheckOutDesk() {
     setIsLoadingStays(true);
     try {
       const res = await checkOutApi.getStays(query, 100);
-      if (res.success && res.data) {
+      if (res && res.success && Array.isArray(res.data)) {
         setStaysList(res.data);
-        // Kiểm tra xem phòng hiện tại còn trong danh sách đang ở không (nếu vừa check-out xong thì không còn)
+        setBackendConnected(true);
+        setConnectionError(null);
+        setLastSyncedTime(new Date().toLocaleTimeString('vi-VN'));
+
         const stayStillActive = res.data.some((s) => s.StayId === selectedStayId);
         if (!stayStillActive) {
           const nextStay = res.data.length > 0 ? res.data[0] : null;
@@ -154,9 +162,18 @@ export default function CheckOutDesk() {
         } else if (urlStayId && res.data.some((s) => s.StayId === Number(urlStayId))) {
           setSelectedStayId(Number(urlStayId));
         }
+      } else {
+        throw new Error(res?.message || 'Dữ liệu trả về không hợp lệ');
       }
     } catch (err) {
-      addToast('error', 'Không thể kết nối đến danh sách phòng lưu trú: ' + err.message, 'Lỗi Kết Nối');
+      setStaysList([]);
+      setSelectedStayId(null);
+      setPreviewData(null);
+      setBackendConnected(false);
+      setConnectionError(
+        'MẤT KẾT NỐI TỚI CƠ SỞ DỮ LIỆU MYSQL! Vui lòng kiểm tra Docker container (hotel_backend, hotel_mysql) hoặc dịch vụ mạng.'
+      );
+      addToast('error', 'Mất kết nối tới CSDL MySQL! Không thể đồng bộ danh sách phòng lưu trú.', 'ERR_MYSQL_DISCONNECTED');
     } finally {
       setIsLoadingStays(false);
     }
@@ -182,7 +199,7 @@ export default function CheckOutDesk() {
     setIsLoadingDetail(true);
     try {
       const res = await checkOutApi.getStayPreview(stayId);
-      if (res.success && res.data) {
+      if (res && res.success && res.data) {
         setPreviewData(res.data);
         setMinibarItems(res.data.minibarItems || []);
         if (res.data.inspection) {
@@ -190,10 +207,15 @@ export default function CheckOutDesk() {
           setKeycardsIssued(res.data.inspection.KeycardsIssued ?? 2);
           setRoomCondition(res.data.inspection.RoomCondition || 'NOMINAL');
         }
+        setBackendConnected(true);
+        setConnectionError(null);
       } else {
-        addToast('warn', res.message || 'Không thể tải dự toán trả phòng', 'Thông Báo');
+        throw new Error(res?.message || 'Không thể tải dự toán trả phòng');
       }
     } catch (err) {
+      setPreviewData(null);
+      setBackendConnected(false);
+      setConnectionError('MẤT KẾT NỐI TỚI CƠ SỞ DỮ LIỆU MYSQL khi tải thông tin phòng.');
       addToast('error', err.message || 'Lỗi khi tải thông tin chi tiết lưu trú', 'Lỗi Máy Chủ');
     } finally {
       setIsLoadingDetail(false);
@@ -482,6 +504,32 @@ export default function CheckOutDesk() {
   return (
     <AdminLayout>
       <div className="space-y-5 pb-16 font-sans text-[#203044]">
+        {/* CẢNH BÁO MẤT KẾT NỐI MYSQL */}
+        {!backendConnected && (
+          <div className="p-4 bg-red-50 border-2 border-[#D93025] rounded-xl flex items-center justify-between gap-4 text-[#D93025] shadow-md animate-pulse">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[32px] flex-shrink-0">
+                cloud_off
+              </span>
+              <div className="flex flex-col">
+                <span className="font-bold text-base uppercase tracking-wide">
+                  CẢNH BÁO: MẤT KẾT NỐI TỚI CƠ SỞ DỮ LIỆU MYSQL!
+                </span>
+                <span className="text-xs text-red-700">
+                  {connectionError || 'Không thể kết nối đến máy chủ MySQL. Toàn bộ danh sách phòng thực tế không thể đồng bộ và hiển thị về 0.'}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => { loadStays(searchQuery); if (selectedStayId) loadStayDetail(selectedStayId); }}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#D93025] text-white rounded-lg text-xs font-bold hover:bg-red-700 transition shadow-sm whitespace-nowrap cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">refresh</span>
+              Thử Lại Kết Nối
+            </button>
+          </div>
+        )}
         {/* ─── 1. THANH ĐIỀU HƯỚNG TRẠM THU NGÂN GRAND HORIZON ──────────────── */}
         <div className="bg-white rounded-2xl border border-[#dedad0] p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#dedad0]/60 pb-3 mb-3">
@@ -514,17 +562,25 @@ export default function CheckOutDesk() {
                   {serverTime.toLocaleTimeString('vi-VN')} LST
                 </span>
               </div>
+              <div className={`px-3.5 py-1.5 rounded-xl border flex items-center gap-2 font-bold ${
+                backendConnected ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-red-50 border-red-300 text-red-700'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${backendConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
+                <span className="text-[11px] uppercase tracking-wide">{backendConnected ? `MySQL Đã Kết Nối (${staysList.length} lưu trú)` : 'Mất Kết Nối MySQL (0 phòng)'}</span>
+              </div>
               <div className="bg-[#fbf8f2] border border-[#dedad0] px-3.5 py-1.5 rounded-xl flex items-center gap-2 text-[#203044]">
                 <span className="material-symbols-outlined text-[17px] text-[#b9a277]">hotel</span>
-                <span className="text-[#8a8782] text-[11px] uppercase font-bold">CÔNG SUẤT PHÒNG:</span>
-                <span className="font-bold text-[#203044]">86.4% (124/144 PHÒNG)</span>
+                <span className="text-[#8a8782] text-[11px] uppercase font-bold">LƯU TRÚ HIỆN TẠI:</span>
+                <span className="font-bold text-[#203044]">{backendConnected ? `${staysList.length} PHÒNG CHECKED-IN` : '0 PHÒNG'}</span>
               </div>
               <div className="bg-[#fbf8f2] border border-[#dedad0] px-3.5 py-1.5 rounded-xl flex items-center gap-2 text-[#203044]">
                 <span className="material-symbols-outlined text-[17px] text-[#203044]">badge</span>
                 <span className="text-[#8a8782] text-[11px] uppercase font-bold">THU NGÂN:</span>
-                <span className="font-bold text-[#203044]">SARAH JENKINS (#4092)</span>
+                <span className="font-bold text-[#203044]">
+                  {(user?.fullName || user?.FullName || user?.username || user?.Username || 'LỄ TÂN THU NGÂN').toUpperCase()}
+                </span>
               </div>
-              {overdueStays.length > 0 ? (
+              {backendConnected && overdueStays.length > 0 ? (
                 <button
                   type="button"
                   onClick={() => setIsAlertModalOpen(true)}
@@ -537,10 +593,15 @@ export default function CheckOutDesk() {
                     XỬ LÝ NGAY
                   </span>
                 </button>
-              ) : (
+              ) : backendConnected ? (
                 <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[17px] text-emerald-600">verified</span>
                   <span>0 CẢNH BÁO // PHÒNG ĐÚNG HẠN</span>
+                </div>
+              ) : (
+                <div className="bg-red-50 border border-red-300 text-red-700 px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[17px] text-red-600">cloud_off</span>
+                  <span>MẤT KẾT NỐI CSDL (0 PHÒNG)</span>
                 </div>
               )}
             </div>
@@ -581,7 +642,7 @@ export default function CheckOutDesk() {
                       : 'text-[#8a8782] hover:text-[#203044]'
                   }`}
                 >
-                  Tất cả ({staysList.length})
+                  Tất cả ({backendConnected ? staysList.length : 0})
                 </button>
                 <button
                   type="button"
@@ -593,7 +654,7 @@ export default function CheckOutDesk() {
                   }`}
                 >
                   <span className="material-symbols-outlined text-sm">alarm</span>
-                  Quá hạn ({overdueStays.length})
+                  Quá hạn ({backendConnected ? overdueStays.length : 0})
                 </button>
                 <button
                   type="button"
@@ -604,7 +665,7 @@ export default function CheckOutDesk() {
                       : 'text-[#b9a277] hover:bg-[#b9a277]/10'
                   }`}
                 >
-                  Hôm nay ({dueTodayStays.length})
+                  Hôm nay ({backendConnected ? dueTodayStays.length : 0})
                 </button>
               </div>
 
@@ -1960,7 +2021,7 @@ export default function CheckOutDesk() {
                       <p className="font-bold uppercase text-[#203044]">LỄ TÂN THỰC HIỆN</p>
                       <p className="text-[10px] text-[#8a8782] italic mt-0.5">(Ký và ghi rõ họ tên)</p>
                       <div className="h-16"></div>
-                      <p className="font-bold text-[#203044]">Sarah Jenkins #4092</p>
+                      <p className="font-bold text-[#203044]">{(user?.fullName || user?.FullName || "Lễ Tân Thu Ngân")}</p>
                     </div>
                     <div>
                       <p className="font-bold uppercase text-[#203044]">KHÁCH HÀNG XÁC NHẬN</p>

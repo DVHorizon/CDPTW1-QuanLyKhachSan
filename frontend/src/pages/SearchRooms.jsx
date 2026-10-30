@@ -1008,7 +1008,10 @@ export default function SearchRooms() {
                           </div>
 
                           {/* Room Name & Description */}
-                          <h3 className="font-headline-md text-headline-md text-on-surface group-hover:text-secondary transition-colors">
+                          <h3
+                            onClick={() => navigate(`/rooms/${room.RoomTypeId}`)}
+                            className="font-headline-md text-headline-md text-on-surface group-hover:text-secondary transition-colors cursor-pointer"
+                          >
                             {room.TypeName}
                           </h3>
                           <p className="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">
@@ -1088,15 +1091,15 @@ export default function SearchRooms() {
                           <div className="flex items-center gap-space-sm">
                             <button
                               type="button"
-                              onClick={() => setSelectedRoomForDetail(room)}
-                              className="hidden sm:inline-flex items-center justify-center px-space-md py-3 rounded-xl bg-surface-container-low text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors border border-[#dedad0]/40"
+                              onClick={() => navigate(`/rooms/${room.RoomTypeId}`)}
+                              className="hidden sm:inline-flex items-center justify-center px-space-md py-3 rounded-xl bg-surface-container-low text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors border border-[#dedad0]/40 cursor-pointer"
                             >
                               Chi Tiết Phòng
                             </button>
                             <button
                               type="button"
-                              onClick={() => setSelectedRoomForBooking(room)}
-                              className="px-space-xl py-3 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm flex items-center gap-space-xs"
+                              onClick={() => navigate(`/dat-phong?roomTypeId=${room.RoomTypeId}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}&units=${roomsCount}&adults=${totalGuests}`)}
+                              className="px-space-xl py-3 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm flex items-center gap-space-xs cursor-pointer"
                             >
                               <span>Chọn Phòng</span>
                               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>

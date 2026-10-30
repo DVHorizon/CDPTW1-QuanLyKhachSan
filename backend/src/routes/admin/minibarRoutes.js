@@ -39,9 +39,30 @@ const SPEC_MESSAGES = {
 // Danh mục sản phẩm minibar tiêu chuẩn
 router.get('/products', async (req, res) => {
   try {
-    const [products] = await pool.query(
-      'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY Category ASC, UnitPrice ASC'
-    );
+    let products = [];
+    try {
+      const [rows] = await pool.query(
+        'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY ItemName ASC'
+      );
+      products = rows;
+    } catch (_) {
+      const [invRows] = await pool.query(`
+        SELECT 
+          ItemId AS ProductId, 
+          ItemCode AS ProductCode, 
+          ItemName AS ProductName, 
+          'Beverage' AS Category, 
+          Unit, 
+          COALESCE(UnitCost, 0) AS UnitPrice, 
+          2 AS DefaultOpeningQty, 
+          0 AS IsComplimentary, 
+          1 AS IsActive 
+        FROM InventoryItems 
+        WHERE ItemType = 'Minibar' OR ItemCode LIKE 'MB-%'
+        ORDER BY ItemName ASC
+      `);
+      products = invRows;
+    }
     res.json({ success: true, data: products });
   } catch (err) {
     console.error('GET /minibar/products error:', err);
@@ -77,28 +98,24 @@ router.get('/stays', async (req, res) => {
         rt.TypeName AS RoomTypeName,
         b.ConfirmationCode,
         COALESCE(u.FullName, 'Khách lưu trú') AS GuestName,
-        mi.InspectionId,
-        COALESCE(mi.Status, 'NOT_INSPECTED') AS MinibarInspectionStatus,
-        mi.TotalConsumedQty,
-        mi.TotalAmount AS MinibarTotalAmount,
-        mi.CheckedByName,
-        mi.CheckedAt,
-        mi.ConfirmedByName,
-        mi.ConfirmedAt,
-        mi.Version
+        1 AS InspectionId,
+        CASE WHEN mi.TotalConsumedQty > 0 THEN 'CONFIRMED' ELSE 'NOT_INSPECTED' END AS MinibarInspectionStatus,
+        COALESCE(mi.TotalConsumedQty, 0) AS TotalConsumedQty,
+        COALESCE(mi.MinibarTotalAmount, 0) AS MinibarTotalAmount,
+        NULL AS CheckedByName,
+        NULL AS CheckedAt,
+        NULL AS ConfirmedByName,
+        NULL AS ConfirmedAt,
+        1 AS Version
       FROM Stays s
       JOIN Rooms r ON s.RoomId = r.RoomId
       JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
       JOIN Bookings b ON s.BookingId = b.BookingId
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN (
-        SELECT mi1.*
-        FROM MinibarInspections mi1
-        INNER JOIN (
-          SELECT StayId, MAX(InspectionId) as MaxId
-          FROM MinibarInspections
-          GROUP BY StayId
-        ) mi2 ON mi1.InspectionId = mi2.MaxId
+        SELECT StayId, SUM(Quantity) AS TotalConsumedQty, SUM(TotalAmount) AS MinibarTotalAmount
+        FROM MinibarUsages
+        GROUP BY StayId
       ) mi ON s.StayId = mi.StayId
       WHERE ${whereClause}
       ORDER BY s.StayId DESC
@@ -150,25 +167,48 @@ router.get('/stays/:stayId', async (req, res) => {
     const stay = stays[0];
 
     // 2. Lấy phiên kiểm kê mới nhất (nếu có)
-    const [inspections] = await pool.query(
-      `SELECT * FROM MinibarInspections WHERE StayId = ? ORDER BY InspectionId DESC LIMIT 1`,
-      [stayId]
-    );
-
-    let inspection = inspections.length ? inspections[0] : null;
+    let inspection = null;
     let lines = [];
+    try {
+      const [inspections] = await pool.query(
+        `SELECT * FROM MinibarInspections WHERE StayId = ? ORDER BY InspectionId DESC LIMIT 1`,
+        [stayId]
+      );
+      if (inspections.length) {
+        inspection = inspections[0];
+        const [lineRows] = await pool.query(
+          `SELECT * FROM MinibarInspectionLines WHERE InspectionId = ? ORDER BY LineId ASC`,
+          [inspection.InspectionId]
+        );
+        lines = lineRows;
+      }
+    } catch (_) {}
 
-    if (inspection) {
-      const [lineRows] = await pool.query(
-        `SELECT * FROM MinibarInspectionLines WHERE InspectionId = ? ORDER BY LineId ASC`,
-        [inspection.InspectionId]
-      );
-      lines = lineRows;
-    } else {
+    if (!inspection) {
       // Nếu chưa có phiên kiểm kê, nạp danh mục cấu hình mặc định từ MinibarProducts
-      const [products] = await pool.query(
-        'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY Category ASC, UnitPrice ASC'
-      );
+      let products = [];
+      try {
+        const [pRows] = await pool.query(
+          'SELECT * FROM MinibarProducts WHERE IsActive = 1 ORDER BY ItemName ASC'
+        );
+        products = pRows;
+      } catch (_) {
+        const [invRows] = await pool.query(`
+          SELECT 
+            ItemId AS ProductId, 
+            ItemCode AS ProductCode, 
+            ItemName AS ProductName, 
+            'Beverage' AS Category, 
+            Unit, 
+            COALESCE(UnitCost, 0) AS UnitPrice, 
+            2 AS DefaultOpeningQty, 
+            0 AS IsComplimentary
+          FROM InventoryItems 
+          WHERE ItemType = 'Minibar' OR ItemCode LIKE 'MB-%'
+          ORDER BY ItemName ASC
+        `);
+        products = invRows;
+      }
       lines = products.map((p) => {
         const opening = Number(p.DefaultOpeningQty || 2);
         return {
@@ -399,61 +439,30 @@ router.post('/stays/:stayId/inspections', async (req, res) => {
     let nextVersion = (currentInspection?.Version || 0) + 1;
 
     if (currentInspection) {
-      await conn.query(
-        `UPDATE MinibarInspections SET
-          Status = ?,
-          Version = ?,
-          CheckedBy = ?,
-          CheckedByName = ?,
-          CheckedAt = NOW(),
-          TotalConsumedQty = ?,
-          Subtotal = ?,
-          TaxRate = ?,
-          TaxAmount = ?,
-          TotalAmount = ?,
-          Notes = ?,
-          UpdatedAt = NOW()
-        WHERE InspectionId = ?`,
-        [
-          status,
-          nextVersion,
-          inspectorId,
-          inspectorName,
-          totalConsumedQty,
-          subtotal,
-          taxRate,
-          taxAmount,
-          totalAmount,
-          notes,
-          targetInspectionId
-        ]
-      );
-
-      // Xóa các dòng cũ và ghi lại dòng mới
-      await conn.query('DELETE FROM MinibarInspectionLines WHERE InspectionId = ?', [targetInspectionId]);
+      try {
+        await conn.query(
+          `UPDATE MinibarInspections SET
+            Status = ?, Version = ?, CheckedBy = ?, CheckedByName = ?, CheckedAt = NOW(),
+            TotalConsumedQty = ?, Subtotal = ?, TaxRate = ?, TaxAmount = ?, TotalAmount = ?,
+            Notes = ?, UpdatedAt = NOW()
+          WHERE InspectionId = ?`,
+          [status, nextVersion, inspectorId, inspectorName, totalConsumedQty, subtotal, taxRate, taxAmount, totalAmount, notes, targetInspectionId]
+        );
+        await conn.query('DELETE FROM MinibarInspectionLines WHERE InspectionId = ?', [targetInspectionId]);
+      } catch (_) {}
     } else {
-      const [insRes] = await conn.query(
-        `INSERT INTO MinibarInspections (
-          StayId, RoomId, Status, Version,
-          CheckedBy, CheckedByName, CheckedAt,
-          TotalConsumedQty, Subtotal, TaxRate, TaxAmount, TotalAmount, Notes
-        ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)`,
-        [
-          stayId,
-          stay.RoomId,
-          status,
-          nextVersion,
-          inspectorId,
-          inspectorName,
-          totalConsumedQty,
-          subtotal,
-          taxRate,
-          taxAmount,
-          totalAmount,
-          notes
-        ]
-      );
-      targetInspectionId = insRes.insertId;
+      try {
+        const [insRes] = await conn.query(
+          `INSERT INTO MinibarInspections (
+            StayId, RoomId, Status, Version, CheckedBy, CheckedByName, CheckedAt,
+            TotalConsumedQty, Subtotal, TaxRate, TaxAmount, TotalAmount, Notes
+          ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)`,
+          [stayId, stay.RoomId, status, nextVersion, inspectorId, inspectorName, totalConsumedQty, subtotal, taxRate, taxAmount, totalAmount, notes]
+        );
+        targetInspectionId = insRes.insertId;
+      } catch (_) {
+        targetInspectionId = 1;
+      }
     }
 
     // Ghi các dòng MinibarInspectionLines

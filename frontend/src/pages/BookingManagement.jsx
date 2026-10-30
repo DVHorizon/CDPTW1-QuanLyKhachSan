@@ -4,8 +4,12 @@ import AdminLayout from '../components/admin/layout/AdminLayout';
 import { useAuth } from '../context/AuthContext';
 import BookingChargesModal from '../components/admin/BookingChargesModal';
 
-const API_BASE = 'http://localhost:5000/api/v1/bookings';
-const API_ROOM_TYPES = 'http://localhost:5000/api/v1/room-types';
+const API_BASE = typeof window !== 'undefined' && window.location.port === '3000'
+  ? '/api/v1/bookings'
+  : 'http://localhost:5000/api/v1/bookings';
+const API_ROOM_TYPES = typeof window !== 'undefined' && window.location.port === '3000'
+  ? '/api/v1/room-types'
+  : 'http://localhost:5000/api/v1/room-types';
 
 // ─── 6 Trạng thái cố định và màu sắc chuẩn Spec 3.4 & 6.3 ──────────────────
 const STATUS_CONFIG = {
