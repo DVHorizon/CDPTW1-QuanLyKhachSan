@@ -30,13 +30,9 @@ const MenuManagement = () => {
     if (status) params.append('status', status);
     if (params.toString()) url += `?${params.toString()}`;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500); // Tối đa 2.5s
-
-    fetch(url, { signal: controller.signal })
+    fetch(url)
       .then(res => res.json())
       .then(res => {
-        clearTimeout(timeoutId);
         if (res.success && Array.isArray(res.data)) {
           setMenuItems(res.data);
         } else {
@@ -45,7 +41,6 @@ const MenuManagement = () => {
         setLoading(false);
       })
       .catch((error) => {
-        clearTimeout(timeoutId);
         console.error("Fetch error:", error);
         setMenuItems([]);
         setLoading(false);
@@ -286,12 +281,12 @@ const MenuManagement = () => {
                   <select 
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="bg-surface pl-3 pr-8 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary border border-surface-container shadow-sm cursor-pointer"
+                    className="bg-surface pl-3 pr-8 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary border border-surface-container shadow-sm cursor-pointer font-medium"
                   >
                     <option value="">Tất Cả Trạng Thái</option>
-                    <option value="Available">Đang Phục Vụ</option>
-                    <option value="OutOfStock">Tạm Hết</option>
-                    <option value="Inactive">Ngừng Bán</option>
+                    <option value="Available">🟢 Đang Phục Vụ</option>
+                    <option value="OutOfStock">🟠 Tạm Hết Món (86'd)</option>
+                    <option value="Inactive">🔴 Ngừng Bán / Đã Khóa</option>
                   </select>
 
                   {/*  SKU Quick Lookup Field  */}
@@ -416,13 +411,38 @@ const MenuManagement = () => {
                               >
                                 <span className="material-symbols-outlined text-[15px]">edit</span>
                               </button>
-                              <button 
-                                onClick={(e) => handleArchiveClick(item.MenuItemId, e)} 
-                                className="w-7 h-7 rounded-full bg-error-container/50 text-error flex items-center justify-center hover:bg-error-container transition-colors" 
-                                title="Xóa món"
-                              >
-                                <span className="material-symbols-outlined text-[15px]">delete</span>
-                              </button>
+                              {item.Status === 'Inactive' ? (
+                                <button 
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      const res = await fetch(`http://localhost:5000/api/v1/menu-items/${item.MenuItemId}`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ Status: 'Available' })
+                                      });
+                                      if (res.ok) {
+                                        setMessageModal({ isOpen: true, type: 'success', title: 'THÀNH CÔNG', message: 'Đã mở bán lại món ăn này!' });
+                                        fetchMenu();
+                                      }
+                                    } catch (err) {
+                                      setMessageModal({ isOpen: true, type: 'error', title: 'LỖI', message: 'Không thể kết nối.' });
+                                    }
+                                  }} 
+                                  className="w-7 h-7 rounded-full bg-admin-primary/15 text-admin-primary flex items-center justify-center hover:bg-admin-primary/30 transition-colors" 
+                                  title="Mở bán lại món này"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={(e) => handleArchiveClick(item.MenuItemId, e)} 
+                                  className="w-7 h-7 rounded-full bg-error-container/50 text-error flex items-center justify-center hover:bg-error-container transition-colors" 
+                                  title="Ngừng bán món ăn này"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">delete</span>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

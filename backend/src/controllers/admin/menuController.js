@@ -26,12 +26,11 @@ function getAcronym(str) {
     .join('');
 }
 
-// Thuật toán tính khoảng cách chỉnh sửa Levenshtein Distance (để bắt lỗi chính tả, gõ nhầm phím)
+// Thuật toán khoảng cách chỉnh sửa Levenshtein Distance
 function levenshteinDistance(s1, s2) {
   const m = s1.length;
   const n = s2.length;
   const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-
   for (let i = 0; i <= m; i++) dp[i][0] = i;
   for (let j = 0; j <= n; j++) dp[0][j] = j;
 
@@ -40,39 +39,37 @@ function levenshteinDistance(s1, s2) {
       if (s1[i - 1] === s2[j - 1]) {
         dp[i][j] = dp[i - 1][j - 1];
       } else {
-        dp[i][j] = 1 + Math.min(
-          dp[i - 1][j],     // Xóa
-          dp[i][j - 1],     // Thêm
-          dp[i - 1][j - 1]  // Thay thế
-        );
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
       }
     }
   }
   return dp[m][n];
 }
 
-// Kiểm tra khớp từ mờ (Fuzzy / Sai chính tả / Gõ nhầm ký tự)
-function isFuzzyWordMatch(wordA, wordB) {
-  if (wordA === wordB) return true;
-  if (wordA.includes(wordB) || wordB.includes(wordA)) return true;
+// Khớp từ mờ chính xác theo ngữ nghĩa tiếng Việt:
+// - Chữ cái đầu phải giống nhau (tránh "com" khớp "tom")
+// - Độ dài chênh lệch không quá 1 ký tự
+function isFuzzyWordMatch(tw, kw) {
+  if (tw === kw) return true;
+  if (tw.startsWith(kw) || kw.startsWith(tw)) return true;
 
-  const len = Math.max(wordA.length, wordB.length);
-  // Từ ngắn (dưới 4 chữ cái) chỉ cho phép sai lệch tối đa 1 ký tự
-  // Từ dài cho phép sai lệch 2 ký tự (ví dụ "wagyu" vs "waygu", "salad" vs "salat")
-  const maxAllowedDistance = len <= 4 ? 1 : 2;
-  const dist = levenshteinDistance(wordA, wordB);
+  if (tw[0] !== kw[0]) return false;
+  if (Math.abs(tw.length - kw.length) > 1) return false;
 
-  return dist <= maxAllowedDistance;
+  const len = Math.max(tw.length, kw.length);
+  const maxDist = len <= 5 ? 1 : 2;
+  const dist = levenshteinDistance(tw, kw);
+  return dist <= maxDist;
 }
 
-// Search Engine tổng hợp: Khớp chính xác + Không dấu + Viết tắt + Sai chính tả (Fuzzy Search)
+// Search Engine tổng hợp: Khớp chính xác + Không dấu + Viết tắt + Sai chính tả
 function matchesSearchEngine(text, keyword) {
   if (!text || !keyword) return false;
 
   const normText = removeVietnameseTones(text);
   const normKeyword = removeVietnameseTones(keyword);
 
-  // 1. Khớp chuỗi trực tiếp (kể cả không dấu)
+  // 1. Khớp trực tiếp
   if (normText.includes(normKeyword)) return true;
 
   // 2. Khớp từ viết tắt (Acronym)
@@ -80,46 +77,48 @@ function matchesSearchEngine(text, keyword) {
   const cleanKey = normKeyword.replace(/\s+/g, '');
   if (acronym.includes(cleanKey)) return true;
 
-  // 3. Khớp mờ / Sai chính tả từng từ (Fuzzy Matching)
+  // 3. Khớp từng từ không trùng lặp (Fuzzy matching)
   const textWords = normText.split(/\s+/).filter(Boolean);
   const keyWords = normKeyword.split(/\s+/).filter(Boolean);
 
-  // Nếu tất cả các từ trong keyword đều có từ tương đồng gần đúng trong tên món ăn
-  const allKeyWordsMatch = keyWords.every(kw => 
-    textWords.some(tw => isFuzzyWordMatch(tw, kw))
-  );
+  const usedIdx = new Set();
+  const allMatch = keyWords.every(kw => {
+    for (let i = 0; i < textWords.length; i++) {
+      if (!usedIdx.has(i) && isFuzzyWordMatch(textWords[i], kw)) {
+        usedIdx.add(i);
+        return true;
+      }
+    }
+    return false;
+  });
 
-  if (allKeyWordsMatch) return true;
-
-  // 4. Nếu keyword gõ dính liền nhưng sai chính tả gần giống toàn bộ tên món (ví dụ: "bowagyu" vs "bo wagyu")
-  const textNoSpace = normText.replace(/\s+/g, '');
-  if (isFuzzyWordMatch(textNoSpace, cleanKey)) return true;
-
-  return false;
+  return allMatch;
 }
 
 // Get all Menu Items (FEAT-FNB-02)
 exports.getMenuItems = async (req, res) => {
   try {
-    const { category, keyword, status, page, limit } = req.query;
+    const { category, keyword, status, isDeleted, page, limit } = req.query;
+    
+    // Mặc định chỉ lấy các món chưa bị xóa mềm (IsDeleted = false)
+    // Nếu truyền isDeleted=true thì lấy danh sách các món trong thùng rác / đã xóa mềm
     const whereClause = { IsDeleted: false };
+    
+    if (status && status !== '') {
+      whereClause.Status = status;
+    }
     
     if (category) {
       whereClause.CategoryId = category;
     }
 
-    if (status) {
-      whereClause.Status = status;
-    }
-
-    // Nếu không có keyword, lấy nhanh 100 món đầu tiên
+    // Nếu không có keyword, lấy toàn bộ món theo thứ tự ID giảm dần
     if (!keyword || keyword.trim() === '') {
       const queryOptions = {
         where: whereClause,
         include: [{ model: MenuCategory, attributes: ['CategoryId', 'CategoryName'] }],
-        attributes: ['MenuItemId', 'CategoryId', 'ItemName', 'Price', 'Description', 'ImageUrl', 'Status', 'CreatedAt'],
-        order: [['MenuItemId', 'DESC']],
-        limit: 100
+        attributes: ['MenuItemId', 'CategoryId', 'ItemName', 'Price', 'Description', 'ImageUrl', 'Status', 'IsDeleted', 'CreatedAt'],
+        order: [['MenuItemId', 'DESC']]
       };
 
       const items = await MenuItem.findAll(queryOptions);
@@ -136,22 +135,18 @@ exports.getMenuItems = async (req, res) => {
       return res.status(200).json({ success: true, data: items });
     }
 
-    // Khi có keyword, áp dụng bộ Smart Fuzzy Search Engine
+    // Khi có keyword, áp dụng bộ Smart Fuzzy Search Engine trên toàn bộ món
     const cleanKeyword = keyword.trim();
     const items = await MenuItem.findAll({
       where: whereClause,
       include: [{ model: MenuCategory, attributes: ['CategoryId', 'CategoryName'] }],
-      attributes: ['MenuItemId', 'CategoryId', 'ItemName', 'Price', 'Description', 'ImageUrl', 'Status', 'CreatedAt'],
-      order: [['MenuItemId', 'DESC']],
-      limit: 300
+      attributes: ['MenuItemId', 'CategoryId', 'ItemName', 'Price', 'Description', 'ImageUrl', 'Status', 'IsDeleted', 'CreatedAt'],
+      order: [['MenuItemId', 'DESC']]
     });
 
     const filtered = items.filter(item => {
-      // Tìm trong Tên món ăn
       if (matchesSearchEngine(item.ItemName, cleanKeyword)) return true;
-      // Tìm trong Mô tả món ăn
       if (item.Description && matchesSearchEngine(item.Description, cleanKeyword)) return true;
-      // Tìm theo mã định danh #MN-101 hoặc 101
       const idStr = String(item.MenuItemId);
       const cleanNorm = removeVietnameseTones(cleanKeyword).replace(/[^a-z0-9]/g, '');
       if (cleanNorm && (`mn${idStr}`.includes(cleanNorm) || idStr.includes(cleanNorm))) return true;
@@ -288,15 +283,37 @@ exports.deleteMenuItem = async (req, res) => {
       return res.status(404).json({ code: 'ERROR_0004_NOT_FOUND', message: 'Không tìm thấy món ăn' });
     }
 
-    await item.update({ Status: 'Inactive', IsDeleted: true, UpdatedAt: new Date() });
+    await item.update({ Status: 'Inactive', UpdatedAt: new Date() });
 
     return res.status(200).json({
       code: 'SUCCESS_0003_DELETED',
-      message: 'Đã xóa món ăn thành công'
+      message: 'Đã chuyển trạng thái món sang Ngừng Bán'
     });
 
   } catch (error) {
     console.error('Error deleting menu item:', error);
+    return res.status(500).json({ code: 'ERROR_0500_INTERNAL', message: 'Lỗi hệ thống' });
+  }
+};
+
+// Khôi phục món đã xóa mềm (Restore Item)
+exports.restoreMenuItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const item = await MenuItem.findByPk(id);
+
+    if (!item) {
+      return res.status(404).json({ code: 'ERROR_0004_NOT_FOUND', message: 'Không tìm thấy món ăn' });
+    }
+
+    await item.update({ Status: 'Available', IsDeleted: false, UpdatedAt: new Date() });
+
+    return res.status(200).json({
+      code: 'SUCCESS_0005_RESTORED',
+      message: 'Đã khôi phục món ăn trở lại thực đơn'
+    });
+  } catch (error) {
+    console.error('Error restoring menu item:', error);
     return res.status(500).json({ code: 'ERROR_0500_INTERNAL', message: 'Lỗi hệ thống' });
   }
 };

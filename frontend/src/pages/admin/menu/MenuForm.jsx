@@ -45,11 +45,11 @@ const MenuForm = ({
           <select 
             value={formData.Status} 
             onChange={e => setFormData({...formData, Status: e.target.value})}
-            className={`cursor-pointer outline-none appearance-none font-label-sm text-label-sm font-bold shadow-sm px-4 py-2 rounded-full ${formData.Status === 'Available' ? 'bg-admin-primary/10 text-admin-primary' : formData.Status === 'Out of Stock' ? 'bg-tertiary/10 text-tertiary' : 'bg-error-container text-on-error-container'}`}
+            className={`cursor-pointer outline-none appearance-none font-label-sm text-label-sm font-bold shadow-sm px-4 py-2 rounded-full ${formData.Status === 'Available' ? 'bg-admin-primary/10 text-admin-primary' : formData.Status === 'OutOfStock' ? 'bg-tertiary/10 text-tertiary' : 'bg-error-container text-on-error-container'}`}
           >
             <option value="Available">🟢 Đang Mở Bán</option>
-            <option value="Out of Stock">🟠 Hết Hàng 86'd</option>
-            <option value="Inactive">🔴 Khóa Ẩn</option>
+            <option value="OutOfStock">🟠 Hết Hàng 86'd</option>
+            <option value="Inactive">🔴 Ngừng Bán / Khóa</option>
           </select>
         </div>
 

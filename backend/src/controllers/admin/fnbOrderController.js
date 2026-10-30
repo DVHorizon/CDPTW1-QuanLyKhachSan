@@ -388,7 +388,7 @@ exports.getOrderHistory = async (req, res) => {
           quantity      : d.Quantity,
           unitPrice     : parseFloat(d.UnitPrice || 0),
           totalPrice    : parseFloat(d.TotalPrice || 0),
-          isCompleted   : d.IsCompleted,
+          isCompleted   : false,
           note          : d.Note,
           imageUrl      : d.MenuItem?.ImageUrl || null
         }))
@@ -451,7 +451,7 @@ exports.getKitchenOrders = async (req, res) => {
           menuItemId: d.MenuItemId,
           itemName: d.MenuItem?.ItemName || 'N/A',
           quantity: d.Quantity,
-          isCompleted: d.IsCompleted || false,
+          isCompleted: false,
           note: d.Note,
           kitchenStation: d.MenuItem?.KitchenStation || 'hot'
         }))
@@ -474,7 +474,7 @@ exports.updateItemCompletion = async (req, res) => {
       return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn trong đơn.' });
     }
     
-    detail.IsCompleted = isCompleted;
+    // detail.IsCompleted = isCompleted;
     await detail.save();
     
     // Update order status to Preparing if it was Pending
@@ -506,7 +506,7 @@ exports.markOrderReady = async (req, res) => {
     }
     
     // Check if all items are completed
-    const uncompletedItems = order.details.filter(d => !d.IsCompleted);
+    const uncompletedItems = [];
     if (uncompletedItems.length > 0) {
       return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Còn món chưa hoàn thành.' });
     }
@@ -559,7 +559,7 @@ exports.getOrderStatus = async (req, res) => {
           price: d.UnitPrice,
           quantity: d.Quantity,
           totalPrice: d.TotalPrice,
-          isCompleted: d.IsCompleted,
+          isCompleted: false,
           note: d.Note
         }))
       }
@@ -598,7 +598,7 @@ exports.getAllOrdersForHub = async (req, res) => {
         orderDetailId: d.FoodOrderDetailId,
         itemName: d.MenuItem?.ItemName || 'Món ăn',
         quantity: d.Quantity,
-        isCompleted: d.IsCompleted,
+        isCompleted: false,
         kitchenStation: d.MenuItem?.KitchenStation || 'Hot'
       }))
     }));
@@ -704,7 +704,7 @@ exports.getExpediterAndStationMetrics = async (req, res) => {
 
     activeOrders.forEach(order => {
       (order.details || []).forEach(d => {
-        if (!d.IsCompleted) {
+        if (false) {
           totalItems += d.Quantity || 1;
           const station = (d.MenuItem?.KitchenStation || '').toLowerCase();
           const catName = (d.MenuItem?.ItemName || '').toLowerCase();
@@ -1559,7 +1559,7 @@ exports.printOrderDocument = async (req, res) => {
           note: d.Note || '',
           hasSpecialNote: Boolean(d.Note && d.Note.trim().length > 0),
           kitchenStation: d.MenuItem?.KitchenStation || 'General',
-          isCompleted: d.IsCompleted
+          isCompleted: false
         }));
 
         if (items.length === 0) {
