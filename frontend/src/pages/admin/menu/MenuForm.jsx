@@ -119,34 +119,7 @@ const MenuForm = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-space-md pt-2">
-            <div className="flex flex-col gap-1">
-              <span className="text-body-sm font-body-sm text-on-surface-variant">Khung Giờ Phục Vụ</span>
-              <select
-                value={formData.ServingTime || 'Cả Ngày'}
-                onChange={e => setFormData({...formData, ServingTime: e.target.value})}
-                className="font-semibold text-body-sm text-on-surface bg-surface border border-outline-variant rounded-lg px-3 py-2.5 focus:border-admin-primary outline-none w-full shadow-inner cursor-pointer"
-              >
-                <option value="Cả Ngày">Cả Ngày</option>
-                <option value="Ăn Sáng">Ăn Sáng (06:00 - 10:00)</option>
-                <option value="Tối">Tối / In-Room Đêm</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-body-sm font-body-sm text-on-surface-variant">Trạm Bếp Xử Lý</span>
-              <select
-                value={formData.KitchenStation || 'Bếp Nóng 01'}
-                onChange={e => setFormData({...formData, KitchenStation: e.target.value})}
-                className="font-semibold text-body-sm text-on-surface bg-surface border border-outline-variant rounded-lg px-3 py-2.5 focus:border-admin-primary outline-none w-full shadow-inner cursor-pointer"
-              >
-                <option value="Bếp Nóng 01">Bếp Nóng 01</option>
-                <option value="Bếp Nóng 02">Bếp Nóng 02</option>
-                <option value="Bếp Lạnh & Salad">Bếp Lạnh & Salad</option>
-                <option value="Bếp Bánh & Tráng Miệng">Bếp Bánh & Tráng Miệng</option>
-                <option value="Quầy Bar Sommelier">Quầy Bar Sommelier</option>
-              </select>
-            </div>
-          </div>
+
           
           <div className="flex items-center justify-between pt-space-xs mt-space-sm border-t border-surface-container-highest font-label-sm text-label-sm text-on-surface-variant">
             <span>Phụ thu In-room Dining: <strong className="text-on-surface">+15% Service Tray</strong></span>

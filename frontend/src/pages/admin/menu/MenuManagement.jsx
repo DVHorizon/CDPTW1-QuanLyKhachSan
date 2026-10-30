@@ -7,8 +7,7 @@ const MenuManagement = () => {
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [servingTime, setServingTime] = useState('');
-  const [stockStatus, setStockStatus] = useState('');
+  const [status, setStatus] = useState('');
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, itemId: null });
   const [messageModal, setMessageModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,14 +27,17 @@ const MenuManagement = () => {
     const params = new URLSearchParams();
     if (keyword) params.append('keyword', keyword);
     if (selectedCategory) params.append('category', selectedCategory);
-    if (servingTime) params.append('servingTime', servingTime);
-    if (stockStatus) params.append('stockStatus', stockStatus);
+    if (status) params.append('status', status);
     if (params.toString()) url += `?${params.toString()}`;
 
-    fetch(url)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500); // Tối đa 2.5s
+
+    fetch(url, { signal: controller.signal })
       .then(res => res.json())
       .then(res => {
-        if (res.success) {
+        clearTimeout(timeoutId);
+        if (res.success && Array.isArray(res.data)) {
           setMenuItems(res.data);
         } else {
           setMenuItems([]);
@@ -43,6 +45,7 @@ const MenuManagement = () => {
         setLoading(false);
       })
       .catch((error) => {
+        clearTimeout(timeoutId);
         console.error("Fetch error:", error);
         setMenuItems([]);
         setLoading(false);
@@ -50,11 +53,12 @@ const MenuManagement = () => {
   };
 
   useEffect(() => { 
+    setCurrentPage(1);
     const timer = setTimeout(() => {
       fetchMenu();
     }, 300); // Debounce search
     return () => clearTimeout(timer);
-  }, [keyword, selectedCategory, servingTime, stockStatus]);
+  }, [keyword, selectedCategory, status]);
 
   const openAddModal = () => {
     setEditingItem(null);
@@ -180,7 +184,7 @@ const MenuManagement = () => {
           <div className="flex flex-wrap items-center gap-space-xs">
             <button onClick={openAddModal} className="flex items-center gap-space-xs px-space-md py-space-sm bg-admin-primary-container text-on-admin-primary font-label-md text-label-md font-semibold rounded-lg hover:brightness-105 shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all cursor-pointer" type="button">
               <span className="material-symbols-outlined text-[18px]">add_circle</span>
-              <span>+ Thêm Món / SKU Mới</span>
+              <span>+ Thêm Món Mới</span>
             </button>
           </div>
         </div>
@@ -189,12 +193,12 @@ const MenuManagement = () => {
           {/*  Card 1: Active SKUs  */}
           <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between relative overflow-hidden">
             <div className="flex items-center justify-between mb-space-xs">
-              <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Món Đang Bán (Active SKUs)</span>
+              <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Món Đang Phục Vụ</span>
               <span className="material-symbols-outlined text-[20px] text-admin-primary">restaurant_menu</span>
             </div>
             <div className="flex items-baseline gap-space-xs">
               <span className="font-headline-lg text-headline-lg font-bold text-on-surface font-mono">64</span>
-              <span className="font-label-sm text-label-sm text-admin-primary font-semibold">SKU Trực Tuyến</span>
+              <span className="font-label-sm text-label-sm text-admin-primary font-semibold">Món Trực Tuyến</span>
             </div>
             <div className="flex items-center gap-space-sm pt-space-xs mt-space-xs text-on-surface-variant font-body-sm text-body-sm bg-surface-container-low px-space-xs py-1 rounded-md">
               <span>Khai vị: <strong className="text-on-surface font-mono">14</strong></span>
@@ -277,27 +281,16 @@ const MenuManagement = () => {
                   </button>
                 </div>
                 
-                {/* Advanced Filters */}
+                {/* Filters */}
                 <div className="flex gap-2 items-center w-full md:w-auto">
                   <select 
-                    value={servingTime}
-                    onChange={(e) => setServingTime(e.target.value)}
-                    className="bg-surface pl-3 pr-8 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary border border-surface-container shadow-sm"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="bg-surface pl-3 pr-8 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary border border-surface-container shadow-sm cursor-pointer"
                   >
-                    <option value="">Khung Giờ</option>
-                    <option value="Ăn Sáng">Ăn Sáng (06-10)</option>
-                    <option value="Cả Ngày">Cả Ngày</option>
-                    <option value="Tối">In-Room Đêm</option>
-                  </select>
-
-                  <select 
-                    value={stockStatus}
-                    onChange={(e) => setStockStatus(e.target.value)}
-                    className="bg-surface pl-3 pr-8 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary border border-surface-container shadow-sm"
-                  >
-                    <option value="">Tồn Kho</option>
-                    <option value="Available">Đang Bán</option>
-                    <option value="OutOfStock">Hết Hàng (86'd)</option>
+                    <option value="">Tất Cả Trạng Thái</option>
+                    <option value="Available">Đang Phục Vụ</option>
+                    <option value="OutOfStock">Tạm Hết</option>
                     <option value="Inactive">Ngừng Bán</option>
                   </select>
 
@@ -306,7 +299,7 @@ const MenuManagement = () => {
                     <span className="material-symbols-outlined absolute left-2.5 top-2 text-[18px] text-on-surface-variant">search</span>
                     <input 
                       className="w-full bg-surface pl-8 pr-12 py-1.5 rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary shadow-sm border border-surface-container" 
-                      placeholder="Tìm mã SKU, tên, dị ứng, nguyên liệu..." 
+                      placeholder="Tìm theo tên món ăn hoặc mô tả..." 
                       type="text" 
                       value={keyword}
                       onChange={(e) => setKeyword(e.target.value)} 
@@ -320,22 +313,27 @@ const MenuManagement = () => {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
-                      <th className="py-2.5 px-3 rounded-l-lg">Mã SKU &amp; Tên Món</th>
-                      <th className="py-2.5 px-3">Trạm Bếp</th>
-                      <th className="py-2.5 px-3 text-center">Nấu (Phút)</th>
-                      <th className="py-2.5 px-3 text-right">Giá Vốn</th>
+                      <th className="py-2.5 px-3 rounded-l-lg">Mã &amp; Tên Món</th>
+                      <th className="py-2.5 px-3">Danh Mục</th>
                       <th className="py-2.5 px-3 text-right">Giá Niêm Yết</th>
-                      <th className="py-2.5 px-3 text-center">Biên LN</th>
-                      <th className="py-2.5 px-3 text-center rounded-r-lg">POS Live</th>
+                      <th className="py-2.5 px-3 text-center">Trạng Thái</th>
+                      <th className="py-2.5 px-3 text-center rounded-r-lg">Thao Tác</th>
                     </tr>
                   </thead>
 
                   <tbody className="text-body-sm font-body-sm divide-y divide-surface-container-high/60">
                     {loading ? (
-                      <tr><td colSpan="7" className="text-center py-4">Đang tải dữ liệu từ Backend...</td></tr>
+                      <tr>
+                        <td colSpan="5" className="text-center py-10">
+                          <div className="flex items-center justify-center gap-2 text-on-surface-variant font-medium">
+                            <span className="w-5 h-5 border-2 border-admin-primary border-t-transparent rounded-full animate-spin"></span>
+                            <span>Đang tải thực đơn...</span>
+                          </div>
+                        </td>
+                      </tr>
                     ) : menuItems.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="text-center py-8">
+                        <td colSpan="5" className="text-center py-8">
                           <div className="flex flex-col items-center justify-center gap-1.5 text-on-surface-variant">
                             <span className="material-symbols-outlined text-[32px] text-outline">search_off</span>
                             <span className="font-semibold text-body-md">
@@ -343,20 +341,17 @@ const MenuManagement = () => {
                                 ? 'Không tìm thấy món ăn phù hợp với từ khóa.' 
                                 : selectedCategory
                                   ? 'Không tìm thấy món ăn trong danh mục đã chọn.'
-                                  : servingTime
-                                    ? 'Không có món ăn thuộc khung giờ đã chọn.'
-                                    : stockStatus
-                                      ? 'Không có món ăn phù hợp với tình trạng đã chọn.'
-                                      : 'Chưa có món ăn nào trong CSDL'}
+                                  : status
+                                    ? 'Không có món ăn phù hợp với trạng thái đã chọn.'
+                                    : 'Chưa có món ăn nào trong CSDL'}
                             </span>
-                            {(keyword || selectedCategory || servingTime || stockStatus) && (
+                            {(keyword || selectedCategory || status) && (
                               <button
                                 type="button"
                                 onClick={() => {
                                   setKeyword('');
                                   setSelectedCategory('');
-                                  setServingTime('');
-                                  setStockStatus('');
+                                  setStatus('');
                                 }}
                                 className="mt-2 px-3 py-1 bg-surface-container hover:bg-surface-container-highest text-primary font-bold text-xs rounded-lg transition-colors cursor-pointer"
                               >
@@ -385,7 +380,7 @@ const MenuManagement = () => {
                                   </span>
                                   {item.Status !== 'Available' && <span className="bg-[#EF4444] text-white font-label-sm text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shadow-sm">86'D</span>}
                                 </div>
-                                <span className="font-mono text-label-sm text-on-surface-variant">{item.MenuItemId}</span>
+                                <span className="font-mono text-label-sm text-on-surface-variant font-bold text-admin-primary">#MN-{item.MenuItemId}</span>
                               </div>
                             </div>
                           </td>
@@ -394,25 +389,41 @@ const MenuManagement = () => {
                               <span className="w-1.5 h-1.5 rounded-full bg-tertiary"></span> {item.MenuCategory ? item.MenuCategory.CategoryName : 'Chưa phân loại'}
                             </span>
                           </td>
-                          <td className="py-3 px-3 text-center font-mono font-semibold text-on-surface">15'</td>
-                          <td className="py-3 px-3 text-right font-mono text-on-surface-variant">{Number(item.Price * 0.3).toLocaleString('vi-VN')} đ</td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-on-surface">{Number(item.Price).toLocaleString('vi-VN')} đ</td>
-                          <td className="py-3 px-3 text-center">
-                            <span className="font-mono font-bold text-admin-primary bg-admin-primary/10 px-2 py-0.5 rounded text-label-sm">70.0%</span>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-on-surface">
+                            {Number(item.Price).toLocaleString('vi-VN')} đ
                           </td>
                           <td className="py-3 px-3 text-center">
-                            <button 
-                              onClick={(e) => handleStatusToggle(item, e)}
-                              className={`inline-flex items-center justify-center w-6 h-6 rounded-full transition-colors ${item.Status === 'Available' ? 'bg-[#10B981]/15 text-[#10B981] hover:bg-[#10B981]/30' : 'bg-[#EF4444]/15 text-[#EF4444] hover:bg-[#EF4444]/30'}`}
-                              title={item.Status === 'Available' ? 'Đang Bán - Bấm để báo Hết Hàng' : 'Hết Hàng - Bấm để báo Đang Bán'}
-                            >
-                              <span className="material-symbols-outlined text-[16px]">
-                                {item.Status === 'Available' ? 'check_circle' : 'cancel'}
-                              </span>
-                            </button>
-                            <button onClick={(e) => handleArchiveClick(item.MenuItemId, e)} className="ml-2 w-6 h-6 rounded-full bg-error-container/50 text-error flex items-center justify-center hover:bg-error-container transition-colors" title="Xóa Món">
-                              <span className="material-symbols-outlined text-[14px]">delete</span>
-                            </button>
+                            <span className={`inline-flex items-center gap-1 font-label-sm text-label-sm px-2.5 py-1 rounded-full font-bold ${item.Status === 'Available' ? 'bg-[#10B981]/15 text-[#10B981]' : item.Status === 'OutOfStock' ? 'bg-[#F59E0B]/15 text-[#F59E0B]' : 'bg-[#EF4444]/15 text-[#EF4444]'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${item.Status === 'Available' ? 'bg-[#10B981]' : item.Status === 'OutOfStock' ? 'bg-[#F59E0B]' : 'bg-[#EF4444]'}`}></span>
+                              {item.Status === 'Available' ? 'Đang Phục Vụ' : item.Status === 'OutOfStock' ? 'Tạm Hết' : 'Ngừng Bán'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button 
+                                onClick={(e) => handleStatusToggle(item, e)}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${item.Status === 'Available' ? 'bg-[#10B981]/15 text-[#10B981] hover:bg-[#10B981]/30' : 'bg-[#EF4444]/15 text-[#EF4444] hover:bg-[#EF4444]/30'}`}
+                                title={item.Status === 'Available' ? 'Đổi trạng thái: Tạm Hết' : 'Đổi trạng thái: Mở Bán'}
+                              >
+                                <span className="material-symbols-outlined text-[16px]">
+                                  {item.Status === 'Available' ? 'toggle_on' : 'toggle_off'}
+                                </span>
+                              </button>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); openEditModal(item); }} 
+                                className="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface flex items-center justify-center transition-colors" 
+                                title="Chỉnh sửa món"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">edit</span>
+                              </button>
+                              <button 
+                                onClick={(e) => handleArchiveClick(item.MenuItemId, e)} 
+                                className="w-7 h-7 rounded-full bg-error-container/50 text-error flex items-center justify-center hover:bg-error-container transition-colors" 
+                                title="Xóa món"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">delete</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -421,15 +432,33 @@ const MenuManagement = () => {
 
                 </table>
               </div>
-              {/*  Table Operational Footer Strip  */}
+              {/*  Table Operational Footer Strip (Dynamic Pagination)  */}
               <div className="flex items-center justify-between pt-space-xs font-label-sm text-label-sm text-on-surface-variant">
-                <span>Hiển thị 5 / 64 món trong thực đơn hiện hành</span>
+                <span>
+                  {menuItems.length > 0
+                    ? `Hiển thị ${(currentPage - 1) * itemsPerPage + 1} - ${Math.min(currentPage * itemsPerPage, menuItems.length)} trên tổng số ${menuItems.length} món`
+                    : 'Không có món ăn nào'}
+                </span>
                 <div className="flex items-center gap-space-xs">
-                  <button className="w-7 h-7 rounded flex items-center justify-center bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface" type="button">
+                  <button 
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${currentPage <= 1 ? 'opacity-40 cursor-not-allowed bg-surface-container text-on-surface-variant' : 'bg-surface-container hover:bg-surface-container-high text-on-surface cursor-pointer'}`} 
+                    type="button"
+                    title="Trang trước"
+                  >
                     <span className="material-symbols-outlined text-[16px]">chevron_left</span>
                   </button>
-                  <span className="font-mono font-semibold text-on-surface">1 / 13</span>
-                  <button className="w-7 h-7 rounded flex items-center justify-center bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface" type="button">
+                  <span className="font-mono font-semibold text-on-surface px-1">
+                    {totalPages > 0 ? `${currentPage} / ${totalPages}` : '0 / 0'}
+                  </span>
+                  <button 
+                    disabled={currentPage >= totalPages || totalPages === 0}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${currentPage >= totalPages || totalPages === 0 ? 'opacity-40 cursor-not-allowed bg-surface-container text-on-surface-variant' : 'bg-surface-container hover:bg-surface-container-high text-on-surface cursor-pointer'}`} 
+                    type="button"
+                    title="Trang sau"
+                  >
                     <span className="material-symbols-outlined text-[16px]">chevron_right</span>
                   </button>
                 </div>
@@ -478,14 +507,14 @@ const MenuManagement = () => {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-surface-container-lowest w-full max-w-md p-space-lg rounded-2xl shadow-xl flex flex-col items-center text-center gap-space-md border-t-4 border-error">
             <span className="material-symbols-outlined text-[48px] text-error mb-2">warning</span>
-            <h2 className="text-headline-sm font-bold text-on-surface">Xác nhận Xóa Món Ăn</h2>
-            <p className="text-body-md text-on-surface-variant">Bạn có chắc chắn muốn xóa vĩnh viễn món ăn này khỏi hệ thống? Dữ liệu bị xóa sẽ không thể khôi phục.</p>
+            <h2 className="text-headline-sm font-bold text-on-surface">Ngừng Kinh Doanh &amp; Lưu Trữ Món</h2>
+            <p className="text-body-md text-on-surface-variant">Món ăn này sẽ được ẩn khỏi thực đơn bán hàng (xóa mềm). Toàn bộ lịch sử hóa đơn và dữ liệu trong CSDL vẫn được lưu trữ an toàn.</p>
             <div className="flex justify-center gap-3 mt-4 w-full">
               <button type="button" onClick={() => setConfirmModal({ isOpen: false, itemId: null })} className="flex-1 py-3 rounded-lg bg-surface-container text-on-surface font-semibold hover:bg-surface-container-high transition-colors">
                 Hủy
               </button>
               <button type="button" onClick={executeArchive} className="flex-1 py-3 rounded-lg bg-error text-on-error font-bold hover:brightness-110 transition-colors shadow-lg">
-                Đồng ý Xóa
+                Xác Nhận Ẩn Món
               </button>
             </div>
           </div>
