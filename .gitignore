@@ -50,3 +50,14 @@ Thumbs.db
 # 9. Cơ sở dữ liệu cục bộ
 *.sqlite
 database.sqlite
+
+# 10. File backup Database
+*.sql
+!db/*.sql
+
+# 11. Các file nháp và ticket giao việc tạm thời của AI Agent (Matt Pocock Skills)
+.scratch/
+
+# 12. Uploads ảnh của người dùng
+backend/uploads/*
+!backend/uploads/.gitkeep

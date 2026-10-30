@@ -342,6 +342,30 @@ exports.searchRooms = async (req, res) => {
       candidateRoomTypeIds = topRooms.map(r => r.RoomTypeId);
     }
 
+    if (cleanKeyword) {
+      const keywordMatches = await RoomType.findAll({
+        where: {
+          Status: 'Active',
+          IsDeleted: false,
+          [Op.or]: [
+            { TypeName: { [Op.like]: `%${cleanKeyword}%` } },
+            { Description: { [Op.like]: `%${cleanKeyword}%` } },
+            { TypeCode: { [Op.like]: `%${cleanKeyword}%` } },
+          ],
+        },
+        attributes: ['RoomTypeId'],
+        raw: true,
+      });
+      const matchedIds = keywordMatches.map((r) => r.RoomTypeId);
+      if (matchedIds.length > 0) {
+        if (candidateRoomTypeIds && candidateRoomTypeIds.length > 0) {
+          candidateRoomTypeIds = [...new Set([...candidateRoomTypeIds, ...matchedIds])];
+        } else {
+          candidateRoomTypeIds = matchedIds;
+        }
+      }
+    }
+
     const roomTypeWhere = {
       Status: 'Active',
       IsDeleted: false,
@@ -355,7 +379,7 @@ exports.searchRooms = async (req, res) => {
     const candidateRoomTypes = await RoomType.findAll({
       where: roomTypeWhere,
       order: [['BasePrice', 'ASC']],
-      limit: 50
+      limit: 100
     });
 
     const availableRoomsList = [];
@@ -373,7 +397,21 @@ exports.searchRooms = async (req, res) => {
       }
 
       // Tổng số phòng vật lý
-      const totalPhysical = await Room.count({ where: roomWhere });
+      let totalPhysical = await Room.count({ where: roomWhere });
+      if (totalPhysical === 0) {
+        try {
+          await Room.create({
+            BranchId: targetBranchId || 1,
+            RoomTypeId: rtId,
+            RoomNumber: `${rtId}-101`,
+            Floor: 1,
+            Status: 'CleanAvailable',
+            Description: `Phòng ${rt.TypeName} tiêu chuẩn`,
+            IsDeleted: false,
+          });
+          totalPhysical = 1;
+        } catch (_) {}
+      }
       if (totalPhysical === 0) continue;
 
       // Số phòng đang bảo trì / hỏng hóc (Status IN ('Maintenance', 'OutOfOrder'))

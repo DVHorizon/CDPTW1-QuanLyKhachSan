@@ -32,7 +32,7 @@ module.exports = (sequelize) => {
       defaultValue: 1
     },
     ImageUrl: {
-      type: DataTypes.STRING(1000),
+      type: DataTypes.TEXT,
       allowNull: true
     },
     Status: {
