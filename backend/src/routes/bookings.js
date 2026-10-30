@@ -1380,4 +1380,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+
+// ─── TÍNH NĂNG 10: TẠO MÃ QR BOOKING & GỬI EMAIL XÁC NHẬN (FEAT-GUEST-10 / A10) ───
+const bookingQrNotificationController = require('../controllers/bookingQrNotificationController');
+router.get('/:bookingId/qr-code', bookingQrNotificationController.getBookingQRCode);
 module.exports = router;
