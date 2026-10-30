@@ -11,7 +11,7 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
  */
 const register = async (req, res) => {
   try {
-    const { fullName, email, phone, password, enrollClub } = req.body;
+    const { fullName, email, phone, password, enrollClub, roleId, roleName } = req.body;
 
     // 1. Kiểm tra đầu vào bắt buộc
     if (!fullName || !fullName.trim()) {
@@ -78,30 +78,56 @@ const register = async (req, res) => {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // 5. Xác định RoleId (5 = Guest) và TierId (1 = Standard / 3 = Gold nếu tham gia Club)
-    // Lấy RoleId cho 'Guest' từ bảng Roles, dự phòng 5
-    let guestRoleId = 5;
+    // 5. Xác định RoleId và RoleName (Mặc định 5 = Guest hoặc theo lựa chọn khi đăng ký)
+    let assignedRoleId = 5;
+    let assignedRoleName = 'Guest';
+
     try {
-      const [roles] = await pool.query(
-        'SELECT RoleId FROM Roles WHERE RoleName = "Guest" LIMIT 1'
-      );
-      if (roles.length > 0) guestRoleId = roles[0].RoleId;
+      if (roleId) {
+        const [rRows] = await pool.query(
+          'SELECT RoleId, RoleName FROM Roles WHERE RoleId = ? LIMIT 1',
+          [Number(roleId)]
+        );
+        if (rRows.length > 0) {
+          assignedRoleId = rRows[0].RoleId;
+          assignedRoleName = rRows[0].RoleName;
+        }
+      } else if (roleName) {
+        const [rRows] = await pool.query(
+          'SELECT RoleId, RoleName FROM Roles WHERE LOWER(RoleName) = LOWER(?) LIMIT 1',
+          [String(roleName).trim()]
+        );
+        if (rRows.length > 0) {
+          assignedRoleId = rRows[0].RoleId;
+          assignedRoleName = rRows[0].RoleName;
+        }
+      } else {
+        const [roles] = await pool.query(
+          'SELECT RoleId, RoleName FROM Roles WHERE RoleName = "Guest" LIMIT 1'
+        );
+        if (roles.length > 0) {
+          assignedRoleId = roles[0].RoleId;
+          assignedRoleName = roles[0].RoleName;
+        }
+      }
     } catch (_) {}
 
-    // Lấy TierId từ bảng MembershipTiers (1 = Standard)
-    let membershipTierId = enrollClub ? 1 : null;
+    // Lấy TierId từ bảng MembershipTiers (1 = Standard nếu là Guest và tham gia club)
+    let membershipTierId = (assignedRoleName === 'Guest' && enrollClub) ? 1 : null;
     try {
       const [tiers] = await pool.query(
         'SELECT TierId FROM MembershipTiers ORDER BY TierId ASC LIMIT 1'
       );
-      if (tiers.length > 0 && enrollClub) membershipTierId = tiers[0].TierId;
+      if (tiers.length > 0 && assignedRoleName === 'Guest' && enrollClub) {
+        membershipTierId = tiers[0].TierId;
+      }
     } catch (_) {}
 
     // 6. Thêm người dùng mới vào bảng Users
     const [insertResult] = await pool.query(
       `INSERT INTO Users (RoleId, TierId, FullName, Email, Phone, PasswordHash, Status, CreatedAt, UpdatedAt)
        VALUES (?, ?, ?, ?, ?, ?, 'Active', NOW(), NOW())`,
-      [guestRoleId, membershipTierId, cleanFullName, cleanEmail, cleanPhone, passwordHash]
+      [assignedRoleId, membershipTierId, cleanFullName, cleanEmail, cleanPhone, passwordHash]
     );
 
     const newUserId = insertResult.insertId;
@@ -110,8 +136,8 @@ const register = async (req, res) => {
     const token = jwt.sign(
       {
         userId: newUserId,
-        roleId: guestRoleId,
-        roleName: 'Guest',
+        roleId: assignedRoleId,
+        roleName: assignedRoleName,
         email: cleanEmail,
         fullName: cleanFullName
       },
@@ -122,17 +148,17 @@ const register = async (req, res) => {
     // 8. Trả về thông tin người dùng và Token
     return res.status(201).json({
       success: true,
-      message: 'Đăng ký tài khoản thành công! Chào mừng quý khách đến với Grand Horizon.',
+      message: `Đăng ký tài khoản thành công với vai trò ${assignedRoleName}!`,
       token,
       user: {
         userId: newUserId,
         fullName: cleanFullName,
         email: cleanEmail,
         phone: cleanPhone,
-        roleId: guestRoleId,
-        roleName: 'Guest',
+        roleId: assignedRoleId,
+        roleName: assignedRoleName,
         tierId: membershipTierId,
-        tierName: enrollClub ? 'Standard' : 'Chưa xếp hạng',
+        tierName: membershipTierId ? 'Standard' : 'Chưa xếp hạng',
         status: 'Active'
       }
     });
@@ -151,9 +177,10 @@ const register = async (req, res) => {
  */
 const login = async (req, res) => {
   try {
-    // Chấp nhận identifier hoặc email / phone
+    // Chấp nhận identifier hoặc email / phone kèm expectedRole (nếu có từ form)
     const identifier = req.body.identifier || req.body.email || req.body.phone;
     const password = req.body.password;
+    const expectedRole = req.body.expectedRole; // 'Guest' | 'Admin' | 'Receptionist' | 'Kitchen' | 'Housekeeping'
 
     if (!identifier || !identifier.trim()) {
       return res.status(400).json({
@@ -194,7 +221,43 @@ const login = async (req, res) => {
 
     const user = users[0];
 
-    // 2. Kiểm tra trạng thái tài khoản
+    // 2. Khóa và kiểm tra vai trò nếu người dùng chọn đối tượng đăng nhập
+    if (expectedRole) {
+      const userRole = user.RoleName || 'Guest';
+      const roleDisplayName = {
+        Admin: 'Quản trị viên (Admin)',
+        Receptionist: 'Lễ tân',
+        Kitchen: 'Bếp / F&B',
+        Housekeeping: 'Buồng phòng',
+        Guest: 'Khách hàng'
+      };
+
+      if (expectedRole === 'Guest' && userRole !== 'Guest') {
+        return res.status(403).json({
+          success: false,
+          code: 'ROLE_MISMATCH',
+          message: `Tài khoản này là tài khoản ${roleDisplayName[userRole] || userRole} nội bộ. Vui lòng chọn đúng vai trò để đăng nhập.`
+        });
+      }
+
+      if (expectedRole !== 'Guest' && userRole === 'Guest') {
+        return res.status(403).json({
+          success: false,
+          code: 'ROLE_MISMATCH',
+          message: `Tài khoản này là tài khoản Khách hàng thông thường, không có quyền đăng nhập với vai trò ${roleDisplayName[expectedRole] || expectedRole}.`
+        });
+      }
+
+      if (expectedRole !== 'Guest' && userRole !== expectedRole) {
+        return res.status(403).json({
+          success: false,
+          code: 'ROLE_MISMATCH',
+          message: `Tài khoản của bạn thuộc vai trò "${roleDisplayName[userRole] || userRole}", không khớp với vai trò "${roleDisplayName[expectedRole] || expectedRole}" đã chọn.`
+        });
+      }
+    }
+
+    // 3. Kiểm tra trạng thái tài khoản
     if (user.Status !== 'Active') {
       return res.status(403).json({
         success: false,
@@ -202,7 +265,7 @@ const login = async (req, res) => {
       });
     }
 
-    // 3. Kiểm tra mật khẩu bcrypt
+    // 4. Kiểm tra mật khẩu bcrypt
     const isPasswordValid = await bcrypt.compare(password, user.PasswordHash);
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -211,7 +274,7 @@ const login = async (req, res) => {
       });
     }
 
-    // 4. Khởi tạo JWT Token
+    // 5. Khởi tạo JWT Token
     const token = jwt.sign(
       {
         userId: user.UserId,

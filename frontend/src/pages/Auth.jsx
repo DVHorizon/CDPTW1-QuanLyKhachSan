@@ -21,6 +21,7 @@ const Auth = () => {
   const [activeTab, setActiveTab] = useState(initialMode);
 
   // Form states - Đăng nhập
+  const [selectedRole, setSelectedRole] = useState('Guest'); // 'Guest' | 'Admin' | 'Receptionist' | 'Kitchen' | 'Housekeeping'
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
@@ -86,7 +87,7 @@ const Auth = () => {
 
     try {
       setIsLoading(true);
-      const res = await login(loginIdentifier.trim(), loginPassword);
+      const res = await login(loginIdentifier.trim(), loginPassword, selectedRole);
       if (res.success) {
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
@@ -264,6 +265,60 @@ const Auth = () => {
           {/* ============================================================== */}
           {activeTab === 'login' && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {/* Chọn vai trò đăng nhập (Radio bar phong cách portal chuyên nghiệp) */}
+              <div className="p-3 bg-[#e5eeff]/70 border border-[#cbdbf5] rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-[#0b1c30] uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[15px] text-[#725b38]">badge</span>
+                    <span>Bạn đăng nhập với tư cách:</span>
+                  </span>
+                  <span className="text-[10px] text-[#725b38] font-semibold bg-[#fedeb2]/40 px-2 py-0.5 rounded-full border border-[#b9a277]/30">
+                    Phân quyền hệ thống
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { id: 'Guest', label: 'Khách hàng', icon: 'person', sample: 'guest@hoteldomain.vn' },
+                    { id: 'Admin', label: 'Quản trị viên', icon: 'shield_person', sample: 'admin@hoteldomain.vn' },
+                    { id: 'Receptionist', label: 'Lễ tân', icon: 'desk', sample: 'receptionist@hoteldomain.vn' },
+                    { id: 'Kitchen', label: 'Bếp / F&B', icon: 'restaurant', sample: 'kitchen@hoteldomain.vn' },
+                    { id: 'Housekeeping', label: 'Buồng phòng', icon: 'cleaning_services', sample: 'housekeeping@hoteldomain.vn' }
+                  ].map((role) => {
+                    const isChecked = selectedRole === role.id;
+                    return (
+                      <label
+                        key={role.id}
+                        onClick={() => {
+                          setSelectedRole(role.id);
+                          // Tự động điền tài khoản mẫu tiện lợi cho demo
+                          setLoginIdentifier(role.sample);
+                          setLoginPassword('123456');
+                        }}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs font-semibold cursor-pointer transition-all select-none ${
+                          isChecked
+                            ? 'bg-[#725b38] text-white border-[#725b38] shadow-xs'
+                            : 'bg-white text-[#203044] border-[#d3e4fe] hover:border-[#b9a277] hover:bg-[#fbf8f2]'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="loginRole"
+                          value={role.id}
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="w-3.5 h-3.5 accent-[#fedeb2] cursor-pointer"
+                        />
+                        <span className={`material-symbols-outlined text-[15px] ${isChecked ? 'text-[#fedeb2]' : 'text-[#725b38]'}`}>
+                          {role.icon}
+                        </span>
+                        <span className="truncate">{role.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-[#0b1c30] mb-2">
                   Email, Tên đăng nhập hoặc Số điện thoại

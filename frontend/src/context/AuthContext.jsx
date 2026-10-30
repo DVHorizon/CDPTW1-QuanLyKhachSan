@@ -38,8 +38,8 @@ export const AuthProvider = ({ children }) => {
     verifyUser();
   }, [token]);
 
-  const handleLogin = async (identifier, password) => {
-    const response = await loginUser({ identifier, password });
+  const handleLogin = async (identifier, password, expectedRole) => {
+    const response = await loginUser({ identifier, password, expectedRole });
     if (response.success && response.token) {
       setToken(response.token);
       setUser(response.user);

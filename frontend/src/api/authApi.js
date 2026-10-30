@@ -21,14 +21,14 @@ const safeFetch = async (endpoint, options = {}) => {
  * Đăng nhập hệ thống
  * POST /api/v1/auth/login
  */
-export const loginUser = async ({ identifier, password }) => {
+export const loginUser = async ({ identifier, password, expectedRole }) => {
   try {
     const res = await safeFetch('/v1/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ identifier, password })
+      body: JSON.stringify({ identifier, password, expectedRole })
     });
 
     const text = await res.text();
@@ -55,7 +55,7 @@ export const loginUser = async ({ identifier, password }) => {
  * Đăng ký tài khoản khách hàng mới
  * POST /api/v1/auth/register
  */
-export const registerUser = async ({ fullName, email, phone, password, enrollClub = true }) => {
+export const registerUser = async ({ fullName, email, phone, password, enrollClub = true, roleId, roleName }) => {
   try {
     const res = await safeFetch('/v1/auth/register', {
       method: 'POST',
@@ -67,7 +67,9 @@ export const registerUser = async ({ fullName, email, phone, password, enrollClu
         email,
         phone,
         password,
-        enrollClub
+        enrollClub,
+        roleId,
+        roleName
       })
     });
 
