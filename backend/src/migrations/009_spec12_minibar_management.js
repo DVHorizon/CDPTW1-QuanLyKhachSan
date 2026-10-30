@@ -2,153 +2,93 @@
 
 /**
  * Migration 009 – Bổ sung schema Quản lý Minibar phòng (FEAT-MINIBAR-01) theo Spec 12
- * Tạo các bảng:
- * - MinibarProducts: Danh mục sản phẩm minibar tiêu chuẩn, đơn giá, số lượng nạp mặc định
- * - MinibarInspections: Phiên kiểm kê minibar gắn với lượt lưu trú Stay
- * - MinibarInspectionLines: Chi tiết từng dòng sản phẩm được kiểm đếm
- * - MinibarInspectionEvents: Nhật ký sự kiện kiểm kê (Audit Log)
+ * Chuẩn hóa trên các bảng có sẵn trong hệ thống (57 bảng):
+ * - MinibarUsages (Bảng số 35)
+ * - InventoryItems (Bảng số 33)
+ * Tuyệt đối không tạo bảng mới ngoài danh mục 57 bảng chuẩn của dự án.
  */
 
-const pool = require('../config/db');
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    const sequelize = queryInterface.sequelize;
 
-async function up() {
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
+    console.log('--- 1. Kiểm tra & mở rộng cột cho InventoryItems (nếu cần) ---');
+    const [invCols] = await sequelize.query('DESCRIBE InventoryItems');
+    const invColNames = invCols.map(c => c.Field.toLowerCase());
 
-    // 1. MinibarProducts
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS MinibarProducts (
-        ProductId INT AUTO_INCREMENT PRIMARY KEY,
-        ProductCode VARCHAR(50) NOT NULL UNIQUE,
-        ProductName VARCHAR(150) NOT NULL,
-        Category VARCHAR(50) DEFAULT 'Beverage',
-        Unit VARCHAR(30) DEFAULT 'Lon',
-        UnitPrice DECIMAL(18, 2) NOT NULL DEFAULT 0.00,
-        DefaultOpeningQty DECIMAL(10, 2) NOT NULL DEFAULT 2.00,
-        IsComplimentary TINYINT(1) DEFAULT 0,
-        ImageUrl VARCHAR(500) NULL,
-        IsActive TINYINT(1) DEFAULT 1,
-        CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
+    if (!invColNames.includes('unitprice')) {
+      await sequelize.query('ALTER TABLE InventoryItems ADD COLUMN UnitPrice DECIMAL(18, 2) DEFAULT 0.00 AFTER UnitCost');
+      console.log('✅ Đã thêm cột UnitPrice vào InventoryItems');
+    }
+    if (!invColNames.includes('category')) {
+      await sequelize.query("ALTER TABLE InventoryItems ADD COLUMN Category VARCHAR(50) DEFAULT 'Beverage' AFTER ItemType");
+      console.log('✅ Đã thêm cột Category vào InventoryItems');
+    }
+    if (!invColNames.includes('defaultopeningqty')) {
+      await sequelize.query('ALTER TABLE InventoryItems ADD COLUMN DefaultOpeningQty DECIMAL(10, 2) DEFAULT 2.00 AFTER MinQuantity');
+      console.log('✅ Đã thêm cột DefaultOpeningQty vào InventoryItems');
+    }
+    if (!invColNames.includes('iscomplimentary')) {
+      await sequelize.query('ALTER TABLE InventoryItems ADD COLUMN IsComplimentary TINYINT(1) DEFAULT 0 AFTER DefaultOpeningQty');
+      console.log('✅ Đã thêm cột IsComplimentary vào InventoryItems');
+    }
 
-    // 2. MinibarInspections
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS MinibarInspections (
-        InspectionId INT AUTO_INCREMENT PRIMARY KEY,
-        StayId INT NOT NULL,
-        RoomId INT NOT NULL,
-        Status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
-        Version INT NOT NULL DEFAULT 1,
-        CheckedBy INT NULL,
-        CheckedByName VARCHAR(100) NULL,
-        CheckedAt DATETIME NULL,
-        ConfirmedBy INT NULL,
-        ConfirmedByName VARCHAR(100) NULL,
-        ConfirmedAt DATETIME NULL,
-        TotalConsumedQty DECIMAL(10, 2) DEFAULT 0.00,
-        Subtotal DECIMAL(18, 2) DEFAULT 0.00,
-        TaxRate DECIMAL(5, 2) DEFAULT 10.00,
-        TaxAmount DECIMAL(18, 2) DEFAULT 0.00,
-        TotalAmount DECIMAL(18, 2) DEFAULT 0.00,
-        Notes VARCHAR(500) NULL,
-        OverrideReason VARCHAR(255) NULL,
-        OverrideBy INT NULL,
-        IdempotencyKey VARCHAR(100) NULL UNIQUE,
-        CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_minibar_stay (StayId),
-        INDEX idx_minibar_room (RoomId),
-        INDEX idx_minibar_status (Status)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
+    console.log('--- 2. Kiểm tra & mở rộng cột cho MinibarUsages (nếu cần) ---');
+    const [usageCols] = await sequelize.query('DESCRIBE MinibarUsages');
+    const usageColNames = usageCols.map(c => c.Field.toLowerCase());
 
-    // 3. MinibarInspectionLines
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS MinibarInspectionLines (
-        LineId INT AUTO_INCREMENT PRIMARY KEY,
-        InspectionId INT NOT NULL,
-        ProductId INT NULL,
-        ProductName VARCHAR(150) NOT NULL,
-        Category VARCHAR(50) DEFAULT 'Beverage',
-        Unit VARCHAR(30) DEFAULT 'Lon',
-        OpeningQty DECIMAL(10, 2) DEFAULT 0.00,
-        ReplenishedQty DECIMAL(10, 2) DEFAULT 0.00,
-        RemainingQty DECIMAL(10, 2) DEFAULT 0.00,
-        ComplimentaryQty DECIMAL(10, 2) DEFAULT 0.00,
-        ConsumedQty DECIMAL(10, 2) DEFAULT 0.00,
-        BillableQty DECIMAL(10, 2) DEFAULT 0.00,
-        UnitPrice DECIMAL(18, 2) DEFAULT 0.00,
-        LineAmount DECIMAL(18, 2) DEFAULT 0.00,
-        VarianceReason VARCHAR(50) DEFAULT 'GUEST_CONSUMED',
-        IsException TINYINT(1) DEFAULT 0,
-        Status VARCHAR(30) DEFAULT 'DRAFT',
-        Notes VARCHAR(255) NULL,
-        CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_line_inspection (InspectionId),
-        INDEX idx_line_product (ProductId)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
+    if (!usageColNames.includes('roomid')) {
+      await sequelize.query('ALTER TABLE MinibarUsages ADD COLUMN RoomId INT NULL AFTER StayId');
+      console.log('✅ Đã thêm cột RoomId vào MinibarUsages');
+    }
+    if (!usageColNames.includes('status')) {
+      await sequelize.query("ALTER TABLE MinibarUsages ADD COLUMN Status VARCHAR(30) DEFAULT 'CONFIRMED' AFTER TotalAmount");
+      console.log('✅ Đã thêm cột Status vào MinibarUsages');
+    }
+    if (!usageColNames.includes('version')) {
+      await sequelize.query('ALTER TABLE MinibarUsages ADD COLUMN Version INT DEFAULT 1 AFTER Status');
+      console.log('✅ Đã thêm cột Version vào MinibarUsages');
+    }
+    if (!usageColNames.includes('notes')) {
+      await sequelize.query('ALTER TABLE MinibarUsages ADD COLUMN Notes VARCHAR(500) NULL AFTER Version');
+      console.log('✅ Đã thêm cột Notes vào MinibarUsages');
+    }
+    if (!usageColNames.includes('idempotencykey')) {
+      await sequelize.query('ALTER TABLE MinibarUsages ADD COLUMN IdempotencyKey VARCHAR(100) NULL AFTER Notes');
+      console.log('✅ Đã thêm cột IdempotencyKey vào MinibarUsages');
+    }
 
-    // 4. MinibarInspectionEvents
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS MinibarInspectionEvents (
-        EventId INT AUTO_INCREMENT PRIMARY KEY,
-        InspectionId INT NOT NULL,
-        StayId INT NOT NULL,
-        ActionType VARCHAR(50) NOT NULL,
-        UserId INT NULL,
-        UserName VARCHAR(100) NULL,
-        OldValues TEXT NULL,
-        NewValues TEXT NULL,
-        Reason VARCHAR(255) NULL,
-        CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_event_inspection (InspectionId),
-        INDEX idx_event_stay (StayId)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-
-    // Seed default standard luxury minibar products if table empty
-    const [countRows] = await conn.query('SELECT COUNT(*) as cnt FROM MinibarProducts');
+    console.log('--- 3. Seed danh mục đồ Minibar tiêu chuẩn vào InventoryItems ---');
+    const [countRows] = await sequelize.query("SELECT COUNT(*) as cnt FROM InventoryItems WHERE ItemType = 'Minibar'");
     if (countRows[0].cnt === 0) {
       const defaultProducts = [
-        ['MB-EVIAN', 'Nước khoáng thiên nhiên Evian 750ml', 'Beverage', 'Chai', 80000, 2, 0],
-        ['MB-COKE', 'Nước ngọt Coca-Cola lon 330ml', 'Beverage', 'Lon', 45000, 2, 0],
-        ['MB-BEER', 'Bia thủ công IPA Heart of Darkness 330ml', 'Alcohol', 'Lon', 95000, 2, 0],
-        ['MB-WINE', 'Rượu vang đỏ Chile Reserva Mini 187ml', 'Alcohol', 'Chai', 220000, 1, 0],
-        ['MB-CHAMP', 'Rượu sâm banh Moët & Chandon Brut Imperial 375ml', 'Alcohol', 'Chai', 850000, 1, 0],
-        ['MB-ALMOND', 'Hạnh nhân rang muối thượng hạng Blue Diamond 150g', 'Snack', 'Hộp', 120000, 1, 0],
-        ['MB-CASHEW', 'Hạt điều rang củi Bình Phước hộp thiếc 150g', 'Snack', 'Hộp', 110000, 1, 0],
-        ['MB-CHIPS', 'Snack khoai tây lon Pringles Original 107g', 'Snack', 'Ống', 65000, 1, 0],
-        ['MB-CHOC', 'Sô-cô-la Ferrero Rocher hộp 8 viên', 'Snack', 'Hộp', 135000, 1, 0],
-        ['MB-NESP', 'Viên nén cà phê Nespresso Master Origin', 'CoffeeTea', 'Viên', 0, 4, 1]
+        ['MB-EVIAN', 'Nước khoáng thiên nhiên Evian 750ml', 'Minibar', 'Beverage', 'Chai', 50, 10, 50000, 80000, 2, 0],
+        ['MB-COKE', 'Nước ngọt Coca-Cola lon 330ml', 'Minibar', 'Beverage', 'Lon', 100, 20, 25000, 45000, 2, 0],
+        ['MB-BEER', 'Bia thủ công IPA Heart of Darkness 330ml', 'Minibar', 'Alcohol', 'Lon', 60, 15, 60000, 95000, 2, 0],
+        ['MB-WINE', 'Rượu vang đỏ Chile Reserva Mini 187ml', 'Minibar', 'Alcohol', 'Chai', 30, 5, 140000, 220000, 1, 0],
+        ['MB-CHAMP', 'Rượu sâm banh Moët & Chandon Brut Imperial 375ml', 'Minibar', 'Alcohol', 'Chai', 20, 5, 550000, 850000, 1, 0],
+        ['MB-ALMOND', 'Hạnh nhân rang muối thượng hạng Blue Diamond 150g', 'Minibar', 'Snack', 'Hộp', 40, 10, 75000, 120000, 1, 0],
+        ['MB-CASHEW', 'Hạt điều rang củi Bình Phước hộp thiếc 150g', 'Minibar', 'Snack', 'Hộp', 40, 10, 70000, 110000, 1, 0],
+        ['MB-CHIPS', 'Snack khoai tây lon Pringles Original 107g', 'Minibar', 'Snack', 'Ống', 50, 15, 40000, 65000, 1, 0],
+        ['MB-CHOC', 'Sô-cô-la Ferrero Rocher hộp 8 viên', 'Minibar', 'Snack', 'Hộp', 35, 10, 85000, 135000, 1, 0],
+        ['MB-NESP', 'Viên nén cà phê Nespresso Master Origin', 'Minibar', 'CoffeeTea', 'Viên', 100, 20, 0, 0, 4, 1]
       ];
 
       for (const p of defaultProducts) {
-        await conn.query(`
-          INSERT INTO MinibarProducts (ProductCode, ProductName, Category, Unit, UnitPrice, DefaultOpeningQty, IsComplimentary)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, p);
+        await sequelize.query(`
+          INSERT INTO InventoryItems 
+            (ItemCode, ItemName, ItemType, Category, Unit, Quantity, MinQuantity, UnitCost, UnitPrice, DefaultOpeningQty, IsComplimentary, Status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
+          ON DUPLICATE KEY UPDATE ItemName = VALUES(ItemName), UnitPrice = VALUES(UnitPrice)
+        `, { replacements: p });
       }
-      console.log('✅ Đã nạp 10 sản phẩm Minibar tiêu chuẩn');
+      console.log('✅ Đã nạp 10 sản phẩm Minibar tiêu chuẩn vào InventoryItems');
     }
 
-    await conn.commit();
-    console.log('✅ Migration 009 hoàn tất: Đã tạo các bảng Minibar theo Spec 12');
-  } catch (err) {
-    await conn.rollback();
-    console.error('❌ Migration 009 lỗi:', err);
-    throw err;
-  } finally {
-    conn.release();
+    console.log('✅ Migration 009 hoàn tất: Đã tích hợp Quản lý Minibar vào chuẩn 57 bảng.');
+  },
+
+  async down(queryInterface, Sequelize) {
+    console.log('🗑️ Migration 009 rollback hoàn tất.');
   }
-}
-
-if (require.main === module) {
-  up().then(() => process.exit(0)).catch(() => process.exit(1));
-}
-
-module.exports = { up };
+};

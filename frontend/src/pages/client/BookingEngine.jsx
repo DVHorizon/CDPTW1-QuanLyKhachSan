@@ -70,12 +70,28 @@ export default function BookingEngine() {
   const [highFloorPanorama, setHighFloorPanorama] = useState(true);
 
   // Guest details form state
-  const [firstName, setFirstName] = useState(user?.FullName ? user.FullName.split(' ').pop() : 'An');
-  const [lastName, setLastName] = useState(user?.FullName ? user.FullName.split(' ').slice(0, -1).join(' ') || 'Nguyễn' : 'Nguyễn Văn');
-  const [email, setEmail] = useState(user?.Email || 'an.nguyen@grandhorizon.vn');
-  const [phoneNumber, setPhoneNumber] = useState(user?.Phone || '+84908123456');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [specialRequests, setSpecialRequests] = useState('');
   const [isPolicyAccepted, setIsPolicyAccepted] = useState(false);
+
+  // Sync user details when authenticated user changes
+  useEffect(() => {
+    if (user) {
+      if (user.FullName) {
+        const parts = user.FullName.trim().split(' ');
+        setFirstName(parts.length > 1 ? parts[parts.length - 1] : parts[0]);
+        setLastName(parts.length > 1 ? parts.slice(0, -1).join(' ') : '');
+      }
+      if (user.Email) setEmail(user.Email);
+      if (user.Phone) setPhoneNumber(user.Phone);
+    }
+  }, [user]);
+
+  // Auth requirement modal state
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Add-on experiences (FEAT-GUEST-06: 4 gói tiện ích cốt lõi khách sạn)
   const [addonBuffet, setAddonBuffet] = useState(false);
@@ -288,6 +304,12 @@ export default function BookingEngine() {
     if (e) e.preventDefault();
     setErrorMessage('');
     setErrorCode('');
+
+    // Check Authentication: Yêu cầu đăng nhập trước khi tạo booking
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
 
     // Client-side validations per specifications
     const trimmedFirst = firstName.trim();
@@ -1466,6 +1488,66 @@ export default function BookingEngine() {
           paymentMethod="BANK_TRANSFER"
           user={user}
         />
+
+        {/* Modal Yêu cầu đăng nhập trước khi hoàn tất đặt phòng */}
+        {showAuthModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-100 text-center space-y-5">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 text-[#725b38] mx-auto flex items-center justify-center shadow-inner">
+                <span className="material-symbols-outlined text-[36px]">lock</span>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl sm:text-2xl font-serif font-bold text-slate-900">
+                  Yêu Cầu Đăng Nhập
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Để bảo mật đơn đặt phòng và liên kết quyền lợi hội viên cũng như theo dõi trong mục <strong className="text-slate-800">Lịch sử đặt phòng</strong>, quý khách vui lòng đăng nhập trước khi tiếp tục.
+                </p>
+              </div>
+
+              <div className="bg-amber-50/70 border border-amber-200/60 rounded-2xl p-4 text-xs text-amber-900 flex items-center gap-3 text-left">
+                <span className="material-symbols-outlined text-[#725b38] text-[24px] shrink-0">verified</span>
+                <span>Thông tin phòng, ngày lưu trú và các tiện ích đã chọn sẽ được giữ nguyên sau khi đăng nhập.</span>
+              </div>
+
+              <div className="pt-2 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentUrl = window.location.pathname + window.location.search;
+                    navigate(`/login?redirect=${encodeURIComponent(currentUrl)}`);
+                  }}
+                  className="w-full py-3.5 px-6 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white font-bold text-sm tracking-wide shadow-md transition-all flex items-center justify-center gap-2 group cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">login</span>
+                  <span>Đăng Nhập Tài Khoản Ngay</span>
+                  <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                </button>
+
+                <div className="flex items-center justify-between gap-3 pt-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentUrl = window.location.pathname + window.location.search;
+                      navigate(`/login?mode=register&redirect=${encodeURIComponent(currentUrl)}`);
+                    }}
+                    className="text-[#725b38] hover:underline font-semibold"
+                  >
+                    Chưa có tài khoản? Đăng ký
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAuthModal(false)}
+                    className="text-slate-500 hover:text-slate-800 font-medium px-3 py-1 rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       </main>
 

@@ -174,13 +174,13 @@ const login = async (req, res) => {
     // 1. Tìm tài khoản theo Email hoặc Số điện thoại kèm thông tin Role & MembershipTier
     const [users] = await pool.query(
       `SELECT u.UserId, u.RoleId, u.TierId, u.FullName, u.Email, u.Phone, 
-              u.PasswordHash, u.Status, u.CreatedAt,
+              u.PasswordHash, u.Status, u.IsDeleted, u.CreatedAt,
               r.RoleName,
               mt.TierName, mt.Benefits, mt.DiscountRate, mt.PointMultiplier
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
        LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
-       WHERE (u.Email = ? OR u.Phone = ?)
+       WHERE (u.Email = ? OR u.Phone = ?) AND (u.IsDeleted = 0 OR u.IsDeleted IS NULL)
        LIMIT 1`,
       [cleanIdentifier.toLowerCase(), cleanIdentifier]
     );

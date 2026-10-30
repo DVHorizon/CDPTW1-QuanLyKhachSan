@@ -186,40 +186,33 @@ const Auth = () => {
       {/* SINGLE CENTERED LUXURY MODAL CARD */}
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-[0_20px_50px_rgba(11,28,48,0.12)] border border-[#d3e4fe]/80 overflow-hidden relative z-10 animate-fade-in transition-all">
         
-        {/* Top Branding & Status Bar */}
-        <div className="px-6 pt-7 pb-4 border-b border-[#e5eeff] relative">
-          {/* Close Button back to Home positioned absolute top-right */}
+        {/* Top Branding Bar with Absolute Close Button */}
+        <div className="relative px-6 pt-7 pb-3 flex flex-col items-center justify-center text-center">
+          {/* Close Button back to Home */}
           <Link
             to="/"
-            className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-[#45464d] hover:text-[#0b1c30] hover:bg-[#e5eeff] transition-colors"
+            className="absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center text-[#45464d] hover:text-[#0b1c30] hover:bg-[#e5eeff] transition-colors"
             title="Đóng / Về trang chủ"
           >
             <span className="material-symbols-outlined text-xl">close</span>
           </Link>
 
-          {/* Centered Brand Icon & Large Gold Name */}
-          <div className="flex flex-col items-center justify-center text-center space-y-2">
-            <div className="w-12 h-12 rounded-full bg-[#fedeb2]/40 flex items-center justify-center text-[#937243] border border-[#e0c298]/60 shadow-sm">
-              <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-                hotel_class
-              </span>
-            </div>
-            <div>
-              <span className="font-['Playfair_Display',Georgia,serif] text-2xl sm:text-3xl font-extrabold text-[#937243] tracking-wide block leading-tight">
-                Grand Horizon
-              </span>
-            </div>
+          {/* Grand Horizon centered, large & colorful */}
+          <div className="flex flex-col items-center justify-center pt-2">
+            <h1 className="font-['Playfair_Display',Georgia,serif] text-3xl sm:text-4xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-[#725b38] via-[#a38048] to-[#584323] drop-shadow-xs">
+              Grand Horizon
+            </h1>
           </div>
         </div>
 
         {/* Modal Inner Body */}
-        <div className="px-6 py-6 sm:px-8 sm:py-8">
+        <div className="px-6 pb-6 pt-2 sm:px-8 sm:pb-8">
           
           {/* Header & Switch Tabs */}
           <div className="mb-6 text-center">
-            <h2 className="font-['Playfair_Display',Georgia,serif] text-2xl sm:text-[28px] font-bold text-[#0b1c30] mb-1.5">
+            <h2 className="font-['Playfair_Display',Georgia,serif] text-2xl sm:text-[28px] font-bold text-[#0b1c30] mb-3 text-center">
               {activeTab === 'login' && 'Đăng Nhập'}
-              {activeTab === 'register' && 'Đăng Ký Hội Viên'}
+              {activeTab === 'register' && 'Đăng Ký Tài Khoản'}
               {activeTab === 'recovery' && 'Khôi Phục Mật Khẩu'}
             </h2>
 
@@ -342,7 +335,6 @@ const Auth = () => {
                   </span>
                 </label>
               </div>
-
               {/* Primary CTA Button (Gold Accent) */}
               <button
                 type="submit"
