@@ -59,5 +59,13 @@ module.exports = {
   broadcastTableReservation,
   broadcastNewKitchenOrder: socketHandler.broadcastNewKitchenOrder,
   broadcastRoomMapUpdate,
+  broadcastRoomStatusChange: socketHandler.broadcastRoomStatusChange,
+  getCurrentSequence: socketHandler.getCurrentSequence,
+  getNextSequence: socketHandler.getNextSequence,
+  getRoomVersion: socketHandler.getRoomVersion,
+  setRoomVersion: socketHandler.setRoomVersion,
+  getOutboxChanges: socketHandler.getOutboxChanges,
+  getDefaultDisplayHints: socketHandler.getDefaultDisplayHints,
+  DISPLAY_HINTS: socketHandler.DISPLAY_HINTS,
   getWss: socketHandler.getWss
 };

@@ -1,9 +1,8 @@
 'use strict';
 
 /**
- * Migration 005 Spec 7 – Room Allocation (FEAT-ROOM-ALLOCATION)
- * Thêm các cột ConfirmedBy, ConfirmedAt, AllocatedAt vào Bookings
- * Tạo bảng BookingRoomAllocations và gán permissions
+ * Migration 005 – Bổ sung schema Xác nhận đặt phòng & Gán phòng (Spec 7: FEAT-ROOMALLOC-01)
+ * Chuẩn hóa trên 57 bảng cốt lõi (sử dụng Stays & Bookings, KHÔNG tạo bảng BookingRoomAllocations)
  */
 
 module.exports = {
@@ -11,9 +10,9 @@ module.exports = {
     const qi = queryInterface;
     const DataTypes = Sequelize;
 
-    // 1. Kiểm tra & thêm cột trong Bookings
-    const bookingCols = await qi.describeTable('Bookings');
-    const bColNames = Object.keys(bookingCols).map(c => c.toLowerCase());
+    console.log('--- 1. Kiểm tra & thêm cột trong Bookings ---');
+    const bookingDesc = await qi.describeTable('Bookings');
+    const bColNames = Object.keys(bookingDesc).map(c => c.toLowerCase());
 
     if (!bColNames.includes('confirmedby')) {
       await qi.addColumn('Bookings', 'ConfirmedBy', {
@@ -22,7 +21,6 @@ module.exports = {
       });
       console.log('✅ Đã thêm cột ConfirmedBy vào Bookings');
     }
-
     if (!bColNames.includes('confirmedat')) {
       await qi.addColumn('Bookings', 'ConfirmedAt', {
         type: DataTypes.DATE,
@@ -30,7 +28,6 @@ module.exports = {
       });
       console.log('✅ Đã thêm cột ConfirmedAt vào Bookings');
     }
-
     if (!bColNames.includes('allocatedat')) {
       await qi.addColumn('Bookings', 'AllocatedAt', {
         type: DataTypes.DATE,
@@ -39,65 +36,7 @@ module.exports = {
       console.log('✅ Đã thêm cột AllocatedAt vào Bookings');
     }
 
-    // 2. Tạo bảng BookingRoomAllocations nếu chưa có
-    const tables = await qi.showAllTables();
-    if (!tables.includes('BookingRoomAllocations')) {
-      await qi.createTable('BookingRoomAllocations', {
-        AllocationId: {
-          type: DataTypes.INTEGER,
-          primaryKey: true,
-          autoIncrement: true,
-        },
-        BookingId: {
-          type: DataTypes.INTEGER,
-          allowNull: false,
-          references: { model: 'Bookings', key: 'BookingId' },
-          onDelete: 'CASCADE',
-        },
-        RoomId: {
-          type: DataTypes.INTEGER,
-          allowNull: false,
-          references: { model: 'Rooms', key: 'RoomId' },
-          onDelete: 'CASCADE',
-        },
-        CheckInDate: {
-          type: DataTypes.DATEONLY,
-          allowNull: false,
-        },
-        CheckOutDate: {
-          type: DataTypes.DATEONLY,
-          allowNull: false,
-        },
-        AllocationNote: {
-          type: DataTypes.STRING(500),
-          allowNull: true,
-        },
-        AllocatedBy: {
-          type: DataTypes.INTEGER,
-          allowNull: true,
-        },
-        AllocatedAt: {
-          type: DataTypes.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-        },
-        Status: {
-          type: DataTypes.STRING(30),
-          defaultValue: 'Allocated',
-        },
-        CreatedAt: {
-          type: DataTypes.DATE,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-        },
-        UpdatedAt: {
-          type: DataTypes.DATE,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-        },
-      });
-      console.log('✅ Đã kiểm tra/tạo bảng BookingRoomAllocations');
-    }
-
-    // 3. Thêm permissions BOOKING_CONFIRM và ROOM_ALLOCATION
+    // 2. Thêm permissions BOOKING_CONFIRM và ROOM_ALLOCATION
     try {
       const [existingPerms] = await qi.sequelize.query(
         "SELECT PermissionId, PermissionName FROM Permissions WHERE PermissionName IN ('BOOKING_CONFIRM', 'ROOM_ALLOCATION')"
@@ -144,8 +83,6 @@ module.exports = {
 
   async down(queryInterface, Sequelize) {
     const qi = queryInterface;
-    try {
-      await qi.dropTable('BookingRoomAllocations');
-    } catch (_) {}
+    console.log('🗑️ Migration 005 rollback hoàn tất.');
   }
 };
