@@ -119,6 +119,15 @@ app.use('/api/smart-lock', require('./routes/smartLockRoutes'));
 // 👤 Bảo  — Guest Portal
 app.use('/api/v1/guest',      require('./modules/guest'));
 
+// Alias hỗ trợ FEAT-GUEST-04: Kiểm tra phòng trống & Khóa phòng trực tiếp
+const roomAvailabilityController = require('./controllers/roomAvailabilityController');
+app.get('/api/v1/rooms/availability',       roomAvailabilityController.checkRoomAvailability);
+app.get('/api/rooms/availability',          roomAvailabilityController.checkRoomAvailability);
+app.post('/api/v1/rooms/lock',              roomAvailabilityController.lockRoomSession);
+app.post('/api/rooms/lock',                 roomAvailabilityController.lockRoomSession);
+app.delete('/api/v1/rooms/lock/:sessionId', roomAvailabilityController.releaseRoomLock);
+app.delete('/api/rooms/lock/:sessionId',    roomAvailabilityController.releaseRoomLock);
+
 // 👤 Thực — PMS (Property Management)
 app.use('/api/v1/pms',        require('./modules/pms'));
 
