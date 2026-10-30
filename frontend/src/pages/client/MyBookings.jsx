@@ -50,6 +50,12 @@ export default function MyBookings() {
   const [isVatModalOpen, setIsVatModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
+  // State Modal mã QR Check-in điện tử
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrModalBooking, setQrModalBooking] = useState(null);
+  const [loadingQr, setLoadingQr] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState(null);
+
   // Debounce tìm kiếm
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -100,6 +106,32 @@ export default function MyBookings() {
       loadBookings();
     }
   }, [isAuthenticated, activeTab, dateWindow, debouncedKeyword]);
+
+  // Xử lý mở Modal Mã QR Check-in
+  const handleOpenQrModal = async (booking, e) => {
+    if (e) e.stopPropagation();
+    setQrModalBooking(booking);
+    setIsQrModalOpen(true);
+    setLoadingQr(true);
+    setQrCodeData(null);
+    if (booking.bookingQrCode && booking.bookingQrCode.startsWith("data:image")) {
+      setQrCodeData(booking.bookingQrCode);
+      setLoadingQr(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/v1/bookings/" + booking.bookingId + "/qr-code");
+      const json = await res.json();
+      if (json.success && json.data && json.data.qrCodeUrl) {
+        setQrCodeData(json.data.qrCodeUrl);
+        booking.bookingQrCode = json.data.qrCodeUrl;
+      }
+    } catch (err) {
+      console.error("Lỗi tải mã QR:", err);
+    } finally {
+      setLoadingQr(false);
+    }
+  };
 
   // Xử lý Hủy đặt phòng
   const handleOpenCancelModal = (booking, e) => {
@@ -446,6 +478,15 @@ export default function MyBookings() {
 
                           <button
                             type="button"
+                            onClick={(e) => handleOpenQrModal(upcomingFeaturedBooking, e)}
+                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#725b38] to-[#91754a] text-white text-xs font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-xs"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
+                            <span>Mã QR Check-in</span>
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={(e) => handleOpenCancelModal(upcomingFeaturedBooking, e)}
                             className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#eff4ff] text-[#ba1a1a] text-xs font-bold hover:bg-[#ffdad6]/60 transition-colors border border-[#ffdad6]"
                           >
@@ -729,6 +770,37 @@ export default function MyBookings() {
             </div>
 
             <div className="p-6 space-y-6">
+              {/* Thẻ QR Check-in VIP */}
+              {['Pending', 'Confirmed'].includes(selectedBooking.status) && (
+                <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-[#131b2e] to-[#1e2a47] text-white shadow-md border border-[#725b38]/50">
+                  <div className="bg-white p-2 rounded-xl shadow-inner flex items-center justify-center shrink-0">
+                    {selectedBooking.bookingQrCode ? (
+                      <img src={selectedBooking.bookingQrCode} alt="QR Check-in" className="w-24 h-24 object-contain rounded-md" />
+                    ) : (
+                      <div className="w-24 h-24 flex flex-col items-center justify-center text-[10px] text-gray-500 text-center p-1">
+                        <span className="material-symbols-outlined text-2xl text-[#725b38]">qr_code_2</span>
+                        <span>Quét tại quầy lễ tân</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-1 text-center sm:text-left flex-1">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fedeb2]/20 text-[#fedeb2] text-[10px] font-bold uppercase tracking-wider">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#fedeb2] animate-pulse"></span>
+                      <span>Mã QR Check-in Không Chạm</span>
+                    </div>
+                    <h4 className="font-serif text-base font-bold text-white">Mã xác nhận: {selectedBooking.confirmationCode}</h4>
+                    <p className="text-xs text-slate-300">Xuất trình mã này tại quầy Lễ Tân để nhận phòng ngay không cần thủ tục giấy tờ.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => handleOpenQrModal(selectedBooking, e)}
+                    className="px-3.5 py-2 rounded-xl bg-[#fedeb2] text-[#78603e] text-xs font-bold hover:brightness-105 transition-all shadow-xs shrink-0"
+                  >
+                    Phóng to QR
+                  </button>
+                </div>
+              )}
+
               {/* Thông tin phòng & lưu trú */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-[#eff4ff]/60 border border-[#d3e4fe]/50">
                 <div>
@@ -1109,6 +1181,86 @@ export default function MyBookings() {
                 <span className="material-symbols-outlined text-[16px]">print</span>
                 <span>Tải Bản In PDF</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ─── MODAL 4: VÉ ĐIỆN TỬ & MÃ QR CHECK-IN (FEAT-GUEST-10) ─── */}
+      {isQrModalOpen && qrModalBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl border border-[#d3e4fe] animate-scale-up">
+            {/* Header Thẻ VIP */}
+            <div className="bg-[#131b2e] text-white p-6 relative overflow-hidden">
+              <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-[#725b38]/30 blur-2xl"></div>
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-full bg-[#fedeb2] text-[#78603e] flex items-center justify-center font-bold text-xs">
+                    GH
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#fedeb2]">Grand Horizon Pass</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsQrModalOpen(false)}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              </div>
+              <div className="mt-4 relative z-10">
+                <h3 className="text-xl font-serif font-bold text-white">Mã Check-in Không Chạm</h3>
+                <p className="text-xs text-slate-300 mt-0.5">Mã xác nhận: <strong className="text-[#fedeb2] font-mono tracking-wider">{qrModalBooking.confirmationCode}</strong></p>
+              </div>
+            </div>
+
+            {/* Thân QR */}
+            <div className="p-6 flex flex-col items-center text-center bg-white space-y-4">
+              <div className="p-4 rounded-2xl bg-[#eff4ff] border-2 border-dashed border-[#725b38]/40 shadow-inner flex items-center justify-center min-h-[220px] min-w-[220px]">
+                {loadingQr ? (
+                  <div className="flex flex-col items-center gap-2 text-xs text-[#76777d]">
+                    <span className="material-symbols-outlined animate-spin text-3xl text-[#725b38]">progress_activity</span>
+                    <span>Đang khởi tạo mã QR bảo mật...</span>
+                  </div>
+                ) : qrCodeData ? (
+                  <img src={qrCodeData} alt="Mã QR Check-in" className="w-48 h-48 object-contain rounded-lg shadow-xs" />
+                ) : (
+                  <div className="text-xs text-red-500">Không thể tải mã QR</div>
+                )}
+              </div>
+
+              <div className="w-full text-left space-y-2 text-xs p-3.5 rounded-xl bg-[#f8f9ff] border border-[#d3e4fe]/60">
+                <div className="flex justify-between">
+                  <span className="text-[#76777d]">Hạng phòng:</span>
+                  <span className="font-bold text-[#0b1c30]">{qrModalBooking.roomType?.TypeName || 'Biệt Thự Cao Cấp'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#76777d]">Nhận phòng:</span>
+                  <span className="font-bold text-[#0b1c30]">{formatDate(qrModalBooking.checkInDate)} (14:00)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#76777d]">Trả phòng:</span>
+                  <span className="font-bold text-[#0b1c30]">{formatDate(qrModalBooking.checkOutDate)} (12:00)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#76777d]">Trạng thái:</span>
+                  <span className="font-bold text-[#069669]">{qrModalBooking.status}</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-[#76777d] leading-relaxed">
+                Quý khách vui lòng xuất trình mã QR này tại Quầy Lễ Tân hoặc Máy Check-in tự động (Kiosk) để nhận chìa khóa phòng nhanh trong vòng 30 giây.
+              </p>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="p-4 bg-gray-50 border-t border-[#c6c6cd]/30 flex justify-end gap-2">
+              <Link
+                to={'/booking-confirmation?bookingId=' + qrModalBooking.bookingId}
+                className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-[#0b1c30] text-white text-xs font-bold hover:bg-[#213145] transition-colors shadow-xs"
+              >
+                <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                <span>Xem Trang Xác Nhận Đầy Đủ</span>
+              </Link>
             </div>
           </div>
         </div>
