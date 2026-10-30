@@ -183,6 +183,11 @@ app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
 app.use('/me',        require('./routes/bookingHistoryRoutes'));
 
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
+
+// FEAT-GUEST-10: Cổng gửi Email xác nhận & Thông báo
+const bookingQrNotificationController = require('./controllers/bookingQrNotificationController');
+app.post('/api/v1/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
+app.post('/api/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
 app.use(require('./shared/middlewares/errorHandler'));
 
 // ─── HTTP Server & WebSocket ───────────────────────────────────────────────
