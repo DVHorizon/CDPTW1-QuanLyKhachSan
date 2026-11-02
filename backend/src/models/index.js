@@ -49,6 +49,7 @@ const defineMaintenanceTicket = require('./MaintenanceTicket');
 const defineLostAndFoundItem = require('./LostAndFoundItem');
 const defineSmartLockKey = require('./SmartLockKey');
 const defineMinibarUsage = require('./MinibarUsage');
+const definePricingRule = require('./PricingRule');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -99,6 +100,12 @@ const MaintenanceTicket = defineMaintenanceTicket(sequelize);
 const LostAndFoundItem = defineLostAndFoundItem(sequelize);
 const SmartLockKey = defineSmartLockKey(sequelize);
 const MinibarUsage = defineMinibarUsage(sequelize);
+const PricingRule = definePricingRule(sequelize);
+
+
+// PricingRule Relationships (FEAT-GUEST-12)
+RoomType.hasMany(PricingRule, { foreignKey: 'RoomTypeId', as: 'pricingRules' });
+PricingRule.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
 
 // Inventory Relationships
 InventoryItem.hasMany(InventoryBatch, { foreignKey: 'ItemId', as: 'batches' });
@@ -252,6 +259,7 @@ module.exports = {
   sequelize,
   Branch,
   RoomType,
+  PricingRule,
   Room,
   RoomSearchIndex,
   Amenity,
