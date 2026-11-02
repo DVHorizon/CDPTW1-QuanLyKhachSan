@@ -247,11 +247,12 @@ const buildBookingFilter = async (queryObj) => {
   const hasDateTo = dateTo !== undefined && dateTo !== null && String(dateTo).trim() !== '';
 
   if (!hasDateFrom && !hasDateTo) {
-    // Mặc định: 30 ngày gần nhất (hôm nay - 29 ngày đến hôm nay)
-    finalDateFrom = addDaysUtc7(today, -29);
-    finalDateTo = today;
+    if (!cleanKeyword) {
+      // Mặc định: 30 ngày gần nhất (hôm nay - 29 ngày đến hôm nay) khi KHÔNG nhập từ khóa
+      finalDateFrom = addDaysUtc7(today, -29);
+      finalDateTo = today;
+    }
   } else if (!hasDateFrom || !hasDateTo) {
-    // Chỉ có 1 trong 2 mốc
     errors.push({
       field: 'dateRange',
       code: 'ERROR_0022_INVALID_DATE_RANGE',
@@ -390,31 +391,34 @@ const buildBookingFilter = async (queryObj) => {
   const whereClauses = ['b.IsDeleted = 0'];
   const params = [];
 
-  // Từ khóa tìm kiếm: Tìm trên Mã booking, Họ tên khách, SĐT (Mục 3.2 & Test Case 5-9)
+  // Từ khóa tìm kiếm: Tìm trên Mã booking, Mã giao dịch, Họ tên khách, SĐT (Mục 3.2 & Test Case 5-9)
   if (cleanKeyword) {
     const escaped = `%${escapeSqlLike(cleanKeyword)}%`;
     whereClauses.push(`(
       b.ConfirmationCode LIKE ? OR
+      EXISTS (SELECT 1 FROM Payments p WHERE p.BookingId = b.BookingId AND p.TransactionCode LIKE ?) OR
       COALESCE(bg.FullName, u.FullName) LIKE ? OR
       COALESCE(bg.Phone, u.Phone) LIKE ?
     )`);
-    params.push(escaped, escaped, escaped);
+    params.push(escaped, escaped, escaped, escaped);
   }
-
   // Khoảng ngày (Mục 3.3)
-  if (cleanDateType === 'BOOKING_DATE') {
-    whereClauses.push('DATE(CONVERT_TZ(b.CreatedAt, "+00:00", "+07:00")) BETWEEN ? AND ?');
-    params.push(finalDateFrom, finalDateTo);
-  } else if (cleanDateType === 'CHECKOUT_DATE') {
-    whereClauses.push('DATE(b.CheckOutDate) BETWEEN ? AND ?');
-    params.push(finalDateFrom, finalDateTo);
-  } else {
-    // CHECKIN_DATE (mặc định)
-    whereClauses.push('DATE(b.CheckInDate) BETWEEN ? AND ?');
-    params.push(finalDateFrom, finalDateTo);
+  // Khoảng ngày (Mục 3.3): Nếu CÓ nhập từ khóa tìm kiếm (cleanKeyword),
+  // ưu tiên tìm theo từ khóa và bỏ qua giới hạn ngày để đơn tương lai/quá khứ hiển thị ngay (Phương án 1)
+  // Áp dụng khoảng ngày nếu người dùng chọn ngày (hoặc ngày mặc định khi không tìm keyword):
+  if (finalDateFrom && finalDateTo) {
+    if (cleanDateType === 'BOOKING_DATE') {
+      whereClauses.push('DATE(CONVERT_TZ(b.CreatedAt, "+00:00", "+07:00")) BETWEEN ? AND ?');
+      params.push(finalDateFrom, finalDateTo);
+    } else if (cleanDateType === 'CHECKOUT_DATE') {
+      whereClauses.push('DATE(b.CheckOutDate) BETWEEN ? AND ?');
+      params.push(finalDateFrom, finalDateTo);
+    } else {
+      // CHECKIN_DATE (mặc định)
+      whereClauses.push('DATE(b.CheckInDate) BETWEEN ? AND ?');
+      params.push(finalDateFrom, finalDateTo);
+    }
   }
-
-  // Trạng thái (Mục 3.4)
   if (cleanStatuses.length < 6) {
     const dbStatuses = [];
     cleanStatuses.forEach((st) => {
@@ -814,36 +818,19 @@ router.get('/', checkBookingPermission, async (req, res) => {
   }
 });
 
-// ─── GET /api/v1/bookings/:id — Chi Tiết Booking + Data Masking (Mục 3.10 & 3.11 & Spec 8)
+// ─── GET /api/v1/bookings/:id — Chi Tiết Booking + Data Masking (Mục 3.10 & 3.11)
 router.get('/:id', checkBookingPermission, async (req, res) => {
   try {
     const { id } = req.params;
-    const cleanId = String(id || '').trim();
+    const bookingId = Number(id);
 
-    if (!cleanId) {
+    // Test Case 32: ID không hợp lệ hoặc số âm/0
+    if (!Number.isInteger(bookingId) || bookingId <= 0) {
       return res.status(404).json({
         success: false,
         code: 'ERROR_0024_NOT_FOUND',
         message: 'Không tìm thấy booking hoặc booking đã bị xóa',
       });
-    }
-
-    const isNumeric = /^-?\d+$/.test(cleanId);
-    let whereIdClause = 'b.ConfirmationCode = ?';
-    let queryParam = cleanId;
-
-    if (isNumeric) {
-      const numId = Number(cleanId);
-      // Test Case 32: ID không hợp lệ hoặc số âm/0
-      if (!Number.isInteger(numId) || numId <= 0) {
-        return res.status(404).json({
-          success: false,
-          code: 'ERROR_0024_NOT_FOUND',
-          message: 'Không tìm thấy booking hoặc booking đã bị xóa',
-        });
-      }
-      whereIdClause = '(b.BookingId = ? OR b.ConfirmationCode = ?)';
-      queryParam = numId;
     }
 
     // 1. Tải thông tin chính của booking
@@ -883,11 +870,10 @@ router.get('/:id', checkBookingPermission, async (req, res) => {
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
-      WHERE ${whereIdClause}
+      WHERE b.BookingId = ?
       LIMIT 1
     `;
-    const queryArgs = isNumeric ? [queryParam, cleanId] : [queryParam];
-    const [bRows] = await pool.query(bookingQuery, queryArgs);
+    const [bRows] = await pool.query(bookingQuery, [bookingId]);
 
     // Test Case 32: Không tìm thấy hoặc đã bị xóa mềm (IsDeleted = 1)
     if (!bRows.length || bRows[0].IsDeleted === 1 || bRows[0].IsDeleted === true) {
@@ -1133,9 +1119,10 @@ router.get('/', async (req, res) => {
         COALESCE(bg.Phone, u.Phone) LIKE ? OR
         COALESCE(bg.IdNumber, u.IdNumber) LIKE ? OR
         COALESCE(bg.Email, u.Email) LIKE ? OR
-        r.RoomNumber LIKE ?
+        r.RoomNumber LIKE ? OR
+        p.TransactionCode LIKE ?
       )`);
-      baseParams.push(q, q, q, q, q, q);
+      baseParams.push(q, q, q, q, q, q, q);
     }
 
     if (date && String(date).trim() && date !== 'all') {
@@ -1197,6 +1184,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE ${whereSql}
     `;
     const [[{ total }]] = await pool.query(countQuery, params);
@@ -1237,6 +1225,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE ${whereSql}
       ORDER BY b.CheckInDate ASC, b.BookingId DESC
       LIMIT ? OFFSET ?
@@ -1262,6 +1251,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE ${baseWhereSql}
       `,
       [todayStr, todayStr, ...baseParams]
@@ -1347,9 +1337,9 @@ router.get('/:id', async (req, res) => {
       LEFT JOIN BookingGuests bg ON b.BookingId = bg.BookingId AND bg.IsPrimaryGuest = 1
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
-      LEFT JOIN BookingRoomAllocations bra ON b.BookingId = bra.BookingId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
-      LEFT JOIN Rooms r ON COALESCE(bra.RoomId, s.RoomId) = r.RoomId
+      LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE b.BookingId = ?
       ORDER BY s.StayId DESC
       LIMIT 1
@@ -1367,12 +1357,12 @@ router.get('/:id', async (req, res) => {
 
     // Lấy danh sách các phòng được gán
     const [allocRows] = await pool.query(
-      `SELECT bra.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
-              bra.AllocationNote, CAST(bra.AllocatedAt AS CHAR) AS AllocatedAt
-       FROM BookingRoomAllocations bra
-       JOIN Rooms r ON bra.RoomId = r.RoomId
+      `SELECT s.RoomId, r.RoomNumber, r.Floor, r.Status AS RoomStatus, rt.TypeName AS RoomTypeName,
+              CAST(s.CreatedAt AS CHAR) AS AllocatedAt
+       FROM Stays s
+       JOIN Rooms r ON s.RoomId = r.RoomId
        LEFT JOIN RoomTypes rt ON r.RoomTypeId = rt.RoomTypeId
-       WHERE bra.BookingId = ?`,
+       WHERE s.BookingId = ?`,
       [id]
     );
 
@@ -1399,4 +1389,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+
+// ─── TÍNH NĂNG 10: TẠO MÃ QR BOOKING & GỬI EMAIL XÁC NHẬN (FEAT-GUEST-10 / A10) ───
+const bookingQrNotificationController = require('../controllers/bookingQrNotificationController');
+router.get('/:bookingId/qr-code', bookingQrNotificationController.getBookingQRCode);
 module.exports = router;

@@ -386,6 +386,11 @@ const handleCheckoutPreview = async (req, res) => {
         },
         minibarItems: activeMinibarList,
         minibarTotal,
+        minibarInspection: {
+          Status: minibarUsages.length > 0 ? 'CONFIRMED' : 'NOT_INSPECTED',
+          TotalConsumedQty: minibarUsages.reduce((sum, m) => sum + Number(m.Quantity || 0), 0),
+          TotalAmount: minibarTotal,
+        },
         fnbOrders,
         fnbTotal,
         folioLedger: {
@@ -791,15 +796,6 @@ const handleCompleteCheckout = async (req, res) => {
       ? minibarRows.reduce((sum, m) => sum + Number(m.TotalAmount || 0), 0)
       : DEFAULT_MINIBAR_ITEMS.reduce((sum, i) => sum + (i.defaultQty * i.unitPrice), 0);
 
-    // Lấy các đơn F&B gộp vào tiền phòng (RoomInvoice)
-    const [fnbOrders] = await conn.query(
-      `SELECT FoodOrderId, TotalAmount, PaymentMode, Status
-       FROM FoodOrders
-       WHERE StayId = ? AND PaymentMode = 'RoomInvoice' AND Status != 'Cancelled'`,
-      [stayId]
-    );
-    const fnbTotal = fnbOrders.reduce((sum, o) => sum + Number(o.TotalAmount || 0), 0);
-
     // 7. Cập nhật hóa đơn Invoice & InvoiceDetail
     const [existInvoices] = await conn.query(
       'SELECT * FROM Invoices WHERE StayId = ? ORDER BY InvoiceId DESC LIMIT 1',
@@ -814,7 +810,7 @@ const handleCompleteCheckout = async (req, res) => {
     const roomChargeTotal = roomRate * nights;
     const resortFee = 150000 * nights;
 
-    const subtotal = roomChargeTotal + resortFee + minibarTotal + fnbTotal + lateCalc.lateFeeAmount + approvedDamageTotal + linenDamageFee + keycardPenalty;
+    const subtotal = roomChargeTotal + resortFee + minibarTotal + lateCalc.lateFeeAmount + approvedDamageTotal + linenDamageFee + keycardPenalty;
     const vatRate = Number(policy.TaxRate || 10);
     const vatAmount = Math.round(subtotal * (vatRate / 100));
     const totalAmount = subtotal + vatAmount;
@@ -854,16 +850,6 @@ const handleCompleteCheckout = async (req, res) => {
       { type: 'ResortFee', desc: `Phí tiện ích & dịch vụ nghỉ dưỡng (${nights} đêm)`, qty: nights, unit: 150000, total: resortFee },
       { type: 'Minibar', desc: `Tiêu dùng minibar & đồ uống tại phòng`, qty: 1, unit: minibarTotal, total: minibarTotal }
     ];
-
-    if (fnbTotal > 0) {
-      details.push({
-        type: 'FoodOrder',
-        desc: `Dịch vụ gọi món tại phòng F&B (Gộp hóa đơn phòng - ${fnbOrders.length} đơn)`,
-        qty: fnbOrders.length,
-        unit: fnbTotal,
-        total: fnbTotal
-      });
-    }
 
     if (lateCalc.lateFeeAmount > 0) {
       details.push({
@@ -947,24 +933,33 @@ const handleCompleteCheckout = async (req, res) => {
     );
 
     // Cập nhật Housekeeping assignment tự động
+    const [housekeeperRows] = await conn.query("SELECT UserId FROM Users WHERE RoleId = 4 LIMIT 1");
+    const housekeeperId = housekeeperRows.length > 0 ? housekeeperRows[0].UserId : 4;
     await conn.query(
-      `INSERT INTO HousekeepingAssignments (RoomId, StayId, Priority, Status, Note)
-       VALUES (?, ?, 1, 'Assigned', 'Dọn phòng sau Check-out. Telemetry dispatched tự động.')`,
-      [stay.RoomId, stayId]
-    ).catch(() => {});
+      `INSERT INTO HousekeepingAssignments (RoomId, UserId, StayId, Priority, Status, Note)
+       VALUES (?, ?, ?, 1, 'Assigned', 'Dọn phòng sau Check-out. Telemetry dispatched tự động.')`,
+      [stay.RoomId, housekeeperId, stayId]
+    ).catch((e) => console.error('Housekeeping assignment error:', e.message));
 
     // 12. Ghi Audit Log an toàn
     await conn.query(
-      `INSERT INTO AuditLogs (UserId, Action, TableName, RecordId, OldValue, NewValue, Note)
-       VALUES (?, 'CHECKOUT_GUEST', 'Stays', ?, ?, ?, ?)`,
+      `INSERT INTO AuditLogs (UserId, ActionType, TableName, RecordId, OldValues, NewValues, ActionTime, IpAddress)
+       VALUES (?, 'CHECKOUT_GUEST', 'Stays', ?, ?, ?, NOW(), ?)`,
       [
         stay.UserId || 1,
         stayId,
         JSON.stringify({ status: 'CheckedIn', roomStatus: 'Clean' }),
-        JSON.stringify({ status: 'CheckedOut', roomStatus: targetRoomStatus, invoiceId, finalBalanceDue, lateFee: lateCalc.lateFeeAmount }),
-        `Hoàn tất checkout phòng ${stay.RoomNumber}. Phương thức thanh toán: ${paymentMethod}`
+        JSON.stringify({
+          status: 'CheckedOut',
+          roomStatus: targetRoomStatus,
+          invoiceId,
+          finalBalanceDue,
+          lateFee: lateCalc.lateFeeAmount,
+          note: `Hoàn tất checkout phòng ${stay.RoomNumber}. Phương thức thanh toán: ${paymentMethod}`
+        }),
+        req.ip || '127.0.0.1'
       ]
-    ).catch(() => {});
+    ).catch((e) => console.error('AuditLog insert error:', e.message));
 
     await conn.commit();
 
@@ -1020,15 +1015,15 @@ const handleFolioAdjustment = async (req, res) => {
     }
 
     await pool.query(
-      `INSERT INTO AuditLogs (UserId, Action, TableName, RecordId, OldValue, NewValue, Note)
-       VALUES (1, 'FEE_OVERRIDE', 'FolioCharges', ?, ?, ?, ?)`,
+      `INSERT INTO AuditLogs (UserId, ActionType, TableName, RecordId, OldValues, NewValues, ActionTime, IpAddress)
+       VALUES (1, 'FEE_OVERRIDE', 'FolioCharges', ?, ?, ?, NOW(), ?)`,
       [
         stayId,
         JSON.stringify({ chargeType, amount: oldAmount }),
-        JSON.stringify({ chargeType, amount: newAmount, approver }),
-        `Lý do điều chỉnh/miễn phí: [${reasonCode}] ${note || ''}`
+        JSON.stringify({ chargeType, amount: newAmount, approver, reasonCode, note: note || '' }),
+        req.ip || '127.0.0.1'
       ]
-    ).catch(() => {});
+    ).catch((e) => console.error('Folio adjustment audit log error:', e.message));
 
     res.json({
       success: true,

@@ -15,11 +15,25 @@ const ALL_NAV_ITEMS = [
   { icon: "how_to_reg", label: "Check-in Tại Quầy (Express)", to: "/admin/check-in", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "more_time", label: "Gia Hạn Lưu Trú & Đổi Phòng", to: "/admin/extend-stay", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "logout", label: "Check-Out & Kiểm Phòng", to: "/admin/check-out", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "kitchen", label: "Quản Lý Minibar Phòng", to: "/admin/minibar", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "cleaning_services", label: "Buồng Phòng & Kỹ Thuật", to: "/admin/buong-phong", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
+  
+  // tuyen/7 Operations, Smart Lock, Housekeeping & Maintenance
+  { icon: "inventory_2", label: "Kho Đồ Tiêu Hao & Minibar", to: "/admin/housekeeping/inventory", allowedRoles: ['Admin', 'Housekeeping', 'Receptionist'] },
+  { icon: "dry_cleaning", label: "Đồ Vải & Chu Kỳ Giặt Ủi", to: "/admin/housekeeping/linen", allowedRoles: ['Admin', 'Housekeeping'] },
+  { icon: "search_hands_free", label: "Đồ Thất Lạc & Bỏ Quên", to: "/admin/housekeeping/lost-and-found", allowedRoles: ['Admin', 'Housekeeping', 'Receptionist'] },
+  { icon: "engineering", label: "Bảo Trì & Kỹ Thuật", to: "/admin/engineering", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
+  { icon: "key", label: "Khóa Thông Minh & E-Key", to: "/admin/security/smart-lock", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "security", label: "Kiểm Soát Nội Bộ & Nhật Ký", to: "/admin/audit-logs", allowedRoles: ['Admin'] },
+  { icon: "event_available", label: "Điều Độ Lịch Trực Ca", to: "/admin/roster", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "campaign", label: "Tiếp Thị & CSKH (Marketing)", to: "/admin/marketing", allowedRoles: ['Admin', 'Receptionist'] },
+
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "event_available", label: "Tiếp Nhận & Đặt Dịch Vụ", to: "/admin/services/dispatch", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "pending_actions", label: "Tiến Độ Đơn Dịch Vụ", to: "/admin/services/orders", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "restaurant", label: "Quản Lý Thực Đơn (F&B)", to: "/admin/menu", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
+  { icon: "inventory_2", label: "Kho Nguyên Liệu Bếp", to: "/admin/fnb/kitchen-inventory", allowedRoles: ['Admin', 'Kitchen'] },
+  { icon: "table_restaurant", label: "Sơ Đồ Bàn Ăn (Table Map)", to: "/admin/fnb/table-map", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
   { icon: "soup_kitchen", label: "Màn Hình Bếp (KDS)", to: "/admin/fnb/kitchen", allowedRoles: ['Admin', 'Kitchen'] },
   { icon: "local_shipping", label: "Theo Dõi & Giao Món", to: "/admin/fnb/dispatch", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
   { icon: "receipt_long", label: "Lịch Sử & Tổng Hợp F&B", to: "/admin/fnb/history", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
@@ -64,13 +78,31 @@ const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
 
   const badgeInfo = getRoleBadge(userRole);
 
+  // Lưu và phục hồi vị trí cuộn của sidebar để không bị nhảy lên đầu trang khi bấm chuyển trang
+  const navScrollRef = React.useRef(null);
+
+  const handleScroll = (e) => {
+    sessionStorage.setItem('admin_sidebar_scroll_top', e.currentTarget.scrollTop);
+  };
+
+  React.useLayoutEffect(() => {
+    const savedTop = sessionStorage.getItem('admin_sidebar_scroll_top');
+    if (savedTop && navScrollRef.current) {
+      navScrollRef.current.scrollTop = parseInt(savedTop, 10);
+    }
+  }, []);
+
   return (
     <aside
       className={`fixed left-0 top-0 h-screen ${
         isCollapsed ? "w-20" : "w-72"
       } bg-surface-container-lowest z-50 shadow-[0_1px_8px_rgba(0,0,0,0.04)] transition-all duration-300 ease-in-out border-r border-outline-variant/20`}
     >
-      <div className="h-full flex flex-col justify-between overflow-y-auto overflow-x-hidden">
+      <div 
+        ref={navScrollRef}
+        onScroll={handleScroll}
+        className="h-full flex flex-col justify-between overflow-y-auto overflow-x-hidden"
+      >
         <div className="flex flex-col">
           {/* Logo / Brand */}
           <div

@@ -71,12 +71,17 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(30),
       defaultValue: 'Pending'
     },
+    IsDeleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
+    },
     BookingSource: {
       type: DataTypes.STRING(50),
       defaultValue: 'DirectWeb'
     },
     BookingQrCode: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.TEXT('medium'),
       allowNull: true
     },
     ConfirmationCode: {
@@ -85,10 +90,6 @@ module.exports = (sequelize) => {
     },
     ConfirmationSentAt: {
       type: DataTypes.DATE,
-      allowNull: true
-    },
-    Note: {
-      type: DataTypes.STRING(500),
       allowNull: true
     }
   }, {

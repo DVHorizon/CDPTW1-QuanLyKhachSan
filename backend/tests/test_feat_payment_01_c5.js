@@ -63,7 +63,8 @@ async function runTests() {
   assert.strictEqual(createBookingRes.status, 201, 'Tạo booking mới thất bại');
   const testBookingId = createBookingRes.data.data.bookingId;
   const depositAmount = Number(createBookingRes.data.data.depositAmount || 1000000);
-  console.log(`   ✅ Đã tạo BookingId=${testBookingId}, Số tiền cọc=${depositAmount.toLocaleString()}đ.\n`);
+  const totalAmount = Number(createBookingRes.data.data.totalAmount || 5000000);
+  console.log(`   ✅ Đã tạo BookingId=${testBookingId}, Tổng tiền=${totalAmount.toLocaleString()}đ, Cọc tối thiểu=${depositAmount.toLocaleString()}đ.\n`);
 
   // TC01: Guest gửi method = "Cash" -> 403 ERROR_0010_FORBIDDEN
   console.log('👉 [3] TC01: Khách hàng (Guest) cố tình chọn method = "Cash"...');
@@ -112,14 +113,14 @@ async function runTests() {
   assert.strictEqual(tc03Res.data.code, 'ERROR_0015_PRECONDITION_FAILED');
   console.log('   ✅ [PASS] TC03: Trả về ERROR_0015_PRECONDITION_FAILED chuẩn xác.\n');
 
-  // TC04: Số tiền amount vượt quá số cọc/dư còn phải thanh toán -> ERROR_0012_OUT_OF_RANGE
-  console.log(`👉 [6] TC04: Số tiền thanh toán vượt quá số cọc (nhập ${depositAmount + 1000000}đ)...`);
+  // TC04: Số tiền amount vượt quá số dư còn phải thanh toán (D7) -> ERROR_0012_OUT_OF_RANGE
+  console.log(`👉 [6] TC04: Số tiền thanh toán vượt quá số dư booking còn lại (nhập ${totalAmount + 1000000}đ)...`);
   const tc04Res = await request('/payments', {
     method: 'POST',
     headers: { Authorization: `Bearer ${adminToken}` },
     body: JSON.stringify({
       bookingId: testBookingId,
-      amount: depositAmount + 1000000,
+      amount: totalAmount + 1000000,
       method: 'Cash',
     }),
   });

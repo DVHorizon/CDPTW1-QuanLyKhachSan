@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import RoomDetailModal from '../../components/modals/RoomDetailModal';
+import QuickBookingModal from '../../components/modals/QuickBookingModal';
 import { fetchHomeData } from '../../api/hotelApi';
 import {
   mockBranches,
@@ -71,6 +72,7 @@ function Home() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [wishlist, setWishlist] = useState([]);
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
+  const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [openFaqId, setOpenFaqId] = useState(1);
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterName, setNewsletterName] = useState('');
@@ -584,6 +586,16 @@ function Home() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              navigate(`/rooms/${rt.RoomTypeId}`);
+                            }}
+                            className="px-3 py-2 rounded-xl bg-[#fbf8f2] hover:bg-[#eae8df] text-[#203044] text-[12.5px] font-bold border border-[#dedad0] transition-colors"
+                            type="button"
+                          >
+                            Chi Tiết
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleBookNow(rt);
                             }}
                             className="px-4 py-2 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[12.5px] font-bold shadow-sm transition-all flex items-center gap-1 group-hover:shadow-md"
@@ -966,8 +978,17 @@ function Home() {
         onClose={() => setSelectedRoomForDetail(null)}
         onBookNow={(room) => {
           setSelectedRoomForDetail(null);
-          handleBookNow(room);
+          setSelectedRoomForBooking(room);
         }}
+      />
+
+      <QuickBookingModal
+        room={selectedRoomForBooking}
+        branch={currentBranchName}
+        checkIn={checkInDate}
+        checkOut={checkOutDate}
+        isOpen={Boolean(selectedRoomForBooking)}
+        onClose={() => setSelectedRoomForBooking(null)}
       />
     </MainLayout>
   );

@@ -1,177 +1,189 @@
 const { MenuItem, MenuCategory } = require('../../models');
 const { Op } = require('sequelize');
 
-// Hàm loại bỏ dấu tiếng Việt để tìm kiếm không dấu
-const removeVietnameseTones = (str) => {
+// Helper bỏ dấu tiếng Việt
+function removeVietnameseTones(str) {
   if (!str) return '';
-  return str
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
-    .toLowerCase()
-    .trim();
-};
+  str = str.toLowerCase();
+  str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, 'a');
+  str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, 'e');
+  str = str.replace(/ì|í|ị|ỉ|ĩ/g, 'i');
+  str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, 'o');
+  str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, 'u');
+  str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, 'y');
+  str = str.replace(/đ/g, 'd');
+  str = str.replace(/\u0300|\u0301|\u0303|\u0309|\u0323/g, '');
+  str = str.replace(/\u02C6|\u0306|\u031B/g, '');
+  return str.trim();
+}
 
-// Hàm lấy chữ cái đầu của từng từ (Acronym / Viết tắt)
-// Ví dụ: "Bò Wagyu Thượng Hạng" -> "bwth"
-const getAcronym = (str) => {
-  if (!str) return '';
-  const cleanStr = removeVietnameseTones(str);
-  return cleanStr
+// Lấy chữ cái đầu (acronym), ví dụ "Bò Wagyu" -> "bw"
+function getAcronym(str) {
+  return removeVietnameseTones(str)
     .split(/\s+/)
-    .map(word => word[0])
     .filter(Boolean)
+    .map(word => word[0])
     .join('');
-};
+}
 
-// Get all Menu Items với Smart Search Engine
+// Thuật toán khoảng cách chỉnh sửa Levenshtein Distance
+function levenshteinDistance(s1, s2) {
+  const m = s1.length;
+  const n = s2.length;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (s1[i - 1] === s2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+  }
+  return dp[m][n];
+}
+
+// Khớp từ mờ chính xác theo ngữ nghĩa tiếng Việt:
+// - Chữ cái đầu phải giống nhau (tránh "com" khớp "tom")
+// - Độ dài chênh lệch không quá 1 ký tự
+function isFuzzyWordMatch(tw, kw) {
+  if (tw === kw) return true;
+  if (tw.startsWith(kw) || kw.startsWith(tw)) return true;
+
+  if (tw[0] !== kw[0]) return false;
+  if (Math.abs(tw.length - kw.length) > 1) return false;
+
+  const len = Math.max(tw.length, kw.length);
+  const maxDist = len <= 5 ? 1 : 2;
+  const dist = levenshteinDistance(tw, kw);
+  return dist <= maxDist;
+}
+
+// Search Engine tổng hợp: Khớp chính xác + Không dấu + Viết tắt + Sai chính tả
+function matchesSearchEngine(text, keyword) {
+  if (!text || !keyword) return false;
+
+  const normText = removeVietnameseTones(text);
+  const normKeyword = removeVietnameseTones(keyword);
+
+  // 1. Khớp trực tiếp
+  if (normText.includes(normKeyword)) return true;
+
+  // 2. Khớp từ viết tắt (Acronym)
+  const acronym = getAcronym(text);
+  const cleanKey = normKeyword.replace(/\s+/g, '');
+  if (acronym.includes(cleanKey)) return true;
+
+  // 3. Khớp từng từ không trùng lặp (Fuzzy matching)
+  const textWords = normText.split(/\s+/).filter(Boolean);
+  const keyWords = normKeyword.split(/\s+/).filter(Boolean);
+
+  const usedIdx = new Set();
+  const allMatch = keyWords.every(kw => {
+    for (let i = 0; i < textWords.length; i++) {
+      if (!usedIdx.has(i) && isFuzzyWordMatch(textWords[i], kw)) {
+        usedIdx.add(i);
+        return true;
+      }
+    }
+    return false;
+  });
+
+  return allMatch;
+}
+
+// Get all Menu Items (FEAT-FNB-02)
 exports.getMenuItems = async (req, res) => {
   try {
-    const { category, keyword, stockStatus, servingTime, kitchenStation } = req.query;
+    const { category, keyword, status, isDeleted, page, limit } = req.query;
+    
+    // Mặc định chỉ lấy các món chưa bị xóa mềm (IsDeleted = false)
+    // Nếu truyền isDeleted=true thì lấy danh sách các món trong thùng rác / đã xóa mềm
     const whereClause = { IsDeleted: false };
     
+    if (status && status !== '') {
+      whereClause.Status = status;
+    }
+    
     if (category) {
-      whereClause.CategoryId = category;
+      if (isNaN(category)) {
+        // Nếu truyền tên danh mục (VD: Khai vị, Món chính, Đồ uống)
+        const cat = await MenuCategory.findOne({
+          where: {
+            CategoryName: { [Op.like]: `%${category}%` }
+          }
+        });
+        if (cat) {
+          whereClause.CategoryId = cat.CategoryId;
+        } else {
+          whereClause.CategoryId = -1; // Không tìm thấy danh mục
+        }
+      } else {
+        whereClause.CategoryId = category;
+      }
     }
 
-    if (stockStatus) {
-      whereClause.Status = stockStatus;
+    // Nếu không có keyword, lấy toàn bộ món theo thứ tự ID giảm dần
+    if (!keyword || keyword.trim() === '') {
+      const queryOptions = {
+        where: whereClause,
+        include: [{ model: MenuCategory, attributes: ['CategoryId', 'CategoryName'] }],
+        attributes: ['MenuItemId', 'CategoryId', 'ItemName', 'Price', 'Description', 'ImageUrl', 'Status', 'IsDeleted', 'CreatedAt'],
+        order: [['MenuItemId', 'DESC']]
+      };
+
+      const items = await MenuItem.findAll(queryOptions);
+
+      if (items.length === 0) {
+        if (category) {
+          return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn trong danh mục đã chọn.' });
+        }
+        if (status) {
+          return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không có món ăn phù hợp với trạng thái đã chọn.' });
+        }
+      }
+
+      return res.status(200).json({ success: true, data: items });
     }
 
-    if (servingTime) {
-      whereClause.ServingTime = servingTime;
-    }
-
-    if (kitchenStation) {
-      whereClause.KitchenStation = kitchenStation;
-    }
-
-    // Lấy dữ liệu theo các filter cứng (Category, Status, Time, Station)
+    // Khi có keyword, áp dụng bộ Smart Fuzzy Search Engine trên toàn bộ món
+    const cleanKeyword = keyword.trim();
     const items = await MenuItem.findAll({
       where: whereClause,
-      include: MenuCategory,
-      order: [['MenuItemId', 'ASC']]
+      include: [{ model: MenuCategory, attributes: ['CategoryId', 'CategoryName'] }],
+      attributes: ['MenuItemId', 'CategoryId', 'ItemName', 'Price', 'Description', 'ImageUrl', 'Status', 'IsDeleted', 'CreatedAt'],
+      order: [['MenuItemId', 'DESC']]
     });
 
-    // Nếu không có keyword, trả về danh sách đầy đủ (giới hạn theo limit)
-    if (!keyword || !keyword.trim()) {
-      const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
-      return res.status(200).json({
-        success: true,
-        total: items.length,
-        data: items.slice(0, limit)
-      });
-    }
-
-    // XỬ LÝ SMART SEARCH:
-    // 1. Tìm chính xác từ khóa
-    // 2. Tìm Tiếng Việt không dấu
-    // 3. Tìm viết tắt chữ cái đầu (Acronym, ví dụ 'bwth' -> 'Bò Wagyu Thượng Hạng')
-    const rawKw = keyword.trim().toLowerCase();
-    const cleanKw = removeVietnameseTones(keyword);
-    const isShortAcronym = /^[a-z0-9]{2,8}$/i.test(cleanKw); // Nếu người dùng gõ chuỗi ngắn không dấu cách
-
-    const Fuse = require('fuse.js');
-
-    // 1. Kiểm tra so khớp chính xác / không dấu / viết tắt
-    let matchedList = items.filter(item => {
-      const itemName = item.ItemName || '';
-      const sku = item.SKU || '';
-      const desc = item.Description || '';
-      const ingredients = item.Ingredients || '';
-      const allergens = item.Allergens || '';
-
-      const cleanItemName = removeVietnameseTones(itemName);
-      const cleanSku = removeVietnameseTones(sku);
-      const cleanDesc = removeVietnameseTones(desc);
-      const cleanIngredients = removeVietnameseTones(ingredients);
-      const cleanAllergens = removeVietnameseTones(allergens);
-
-      // (A) So khớp chuỗi con không dấu liên tục:
-      // - Luôn so khớp trên Tên món (ItemName) và Mã (SKU)
-      // - Với Mô tả (Description) & Nguyên liệu: chỉ so khớp khi từ khóa >= 3 ký tự HOẶC chứa ranh giới từ
-      const matchNameOrSku = cleanItemName.includes(cleanKw) || cleanSku.includes(cleanKw);
-      if (matchNameOrSku) return true;
-
-      // (B) So khớp viết tắt chữ cái đầu (Acronym: 'sc' -> 'Salad Cá', 'bwth' -> 'Bò Wagyu Thượng Hạng')
-      // Bắt đầu bằng chữ cái đầu của các từ
-      if (isShortAcronym) {
-        const itemAcronym = getAcronym(itemName);
-        if (itemAcronym.startsWith(cleanKw) || itemAcronym.includes(cleanKw)) {
-          return true;
-        }
-
-        const skuCompact = cleanSku.replace(/[^a-z0-9]/g, '');
-        if (skuCompact.includes(cleanKw)) {
-          return true;
-        }
-      }
-
-      // (C) So khớp từ khóa rời rạc (Ví dụ: 'tôm nướng' -> 'Tôm Hùm Nướng Bơ Tỏi')
-      const kwWords = cleanKw.split(/\s+/).filter(w => w.length > 0);
-      if (kwWords.length > 1) {
-        const fullItemText = `${cleanItemName} ${cleanIngredients} ${cleanDesc} ${cleanSku}`;
-        const allWordsPresent = kwWords.every(word => fullItemText.includes(word));
-        if (allWordsPresent) return true;
-      }
-
-      // (D) So khớp trên Mô tả & Nguyên liệu: CHỈ KHI từ khóa dài >= 3 ký tự để tránh dính chữ ngẫu nhiên (như 'sc' trong mascarpone)
-      if (cleanKw.length >= 3) {
-        const matchDetails = cleanIngredients.includes(cleanKw) || cleanDesc.includes(cleanKw) || cleanAllergens.includes(cleanKw);
-        if (matchDetails) return true;
-      }
-
+    const filtered = items.filter(item => {
+      if (matchesSearchEngine(item.ItemName, cleanKeyword)) return true;
+      if (item.Description && matchesSearchEngine(item.Description, cleanKeyword)) return true;
+      const idStr = String(item.MenuItemId);
+      const cleanNorm = removeVietnameseTones(cleanKeyword).replace(/[^a-z0-9]/g, '');
+      if (cleanNorm && (`mn${idStr}`.includes(cleanNorm) || idStr.includes(cleanNorm))) return true;
       return false;
     });
 
-    // 2. NẾU VẪN CHƯA TÌM THẤY (Do gõ sai chính tả: ví dụ 'wagiu', 'vagyu', 'tom humm', 'sup bao ngu')
-    // -> Kích hoạt Fuzzy Search với Fuse.js (Ngưỡng sai số threshold = 0.4)
-    if (matchedList.length === 0 && cleanKw.length >= 3) {
-      const fuseData = items.map(item => ({
-        original: item,
-        cleanName: removeVietnameseTones(item.ItemName || ''),
-        cleanIngredients: removeVietnameseTones(item.Ingredients || ''),
-        cleanDesc: removeVietnameseTones(item.Description || ''),
-        cleanSku: removeVietnameseTones(item.SKU || '')
-      }));
-
-      const fuse = new Fuse(fuseData, {
-        keys: [
-          { name: 'cleanName', weight: 0.6 },
-          { name: 'cleanIngredients', weight: 0.2 },
-          { name: 'cleanDesc', weight: 0.1 },
-          { name: 'cleanSku', weight: 0.1 }
-        ],
-        threshold: 0.4, // Cho phép sai khác khoảng 40% ký tự do gõ nhầm/thiếu
-        distance: 100,
-        minMatchCharLength: 3
-      });
-
-      const fuzzyResults = fuse.search(cleanKw);
-      matchedList = fuzzyResults.map(r => r.item.original);
+    if (filtered.length === 0) {
+      return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn phù hợp với từ khóa.' });
     }
 
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
-    // Luôn trả về 200 kể cả khi không tìm thấy món nào
-    return res.status(200).json({
-      success: true,
-      total: matchedList.length,
-      data: matchedList.slice(0, limit)
-    });
+    return res.status(200).json({ success: true, data: filtered });
 
   } catch (error) {
     console.error('Error fetching menu items:', error);
-    return res.status(500).json({ success: false, message: 'Không thể tải danh sách món ăn.' });
+    res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể tải danh sách món ăn.' });
   }
 };
 
-// Create Item
+// Create Item (FEAT-FNB-01)
 exports.createMenuItem = async (req, res) => {
   try {
-    const { CategoryId, ItemName, Price, Description, ImageUrl, Status, SKU, Ingredients, Allergens, ServingTime, KitchenStation } = req.body;
+    const { CategoryId, ItemName, Price, Description, ImageUrl, Status } = req.body;
 
-    // Validate required fields & constraints
     if (!ItemName || ItemName.trim() === '') {
       return res.status(400).json({ code: 'ERROR_0001_REQUIRED', message: 'Tên món không được để trống' });
     }
@@ -184,7 +196,7 @@ exports.createMenuItem = async (req, res) => {
     if (!CategoryId) {
       return res.status(400).json({ code: 'ERROR_0001_REQUIRED', message: 'Danh mục không được để trống' });
     }
-    if (Price === undefined || Price === null || isNaN(Price) || Price < 0) {
+    if (Price === undefined || Price === null || isNaN(Price) || Number(Price) <= 0) {
       return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Giá bán không hợp lệ' });
     }
     if (!Status) {
@@ -197,12 +209,20 @@ exports.createMenuItem = async (req, res) => {
     }
 
     const newItem = await MenuItem.create({
-      CategoryId, ItemName, Price, Description, ImageUrl, Status, SKU, Ingredients, Allergens, ServingTime, KitchenStation
+      CategoryId,
+      ItemName: ItemName.trim(),
+      Price,
+      Description: Description || null,
+      ImageUrl: ImageUrl || null,
+      Status,
+      IsDeleted: false,
+      CreatedAt: new Date(),
+      UpdatedAt: new Date()
     });
 
     return res.status(201).json({
       code: 'SUCCESS_0001_CREATED',
-      message: `Thêm mới món ăn thành công`,
+      message: 'Thêm mới món ăn thành công',
       data: newItem
     });
 
@@ -212,11 +232,11 @@ exports.createMenuItem = async (req, res) => {
   }
 };
 
-// Update Item
+// Update Item (FEAT-FNB-01)
 exports.updateMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const { CategoryId, ItemName, Price, Description, ImageUrl, Status, SKU, Ingredients, Allergens, ServingTime, KitchenStation } = req.body;
+    const { CategoryId, ItemName, Price, Description, ImageUrl, Status } = req.body;
 
     const item = await MenuItem.findByPk(id);
     if (!item) {
@@ -234,7 +254,7 @@ exports.updateMenuItem = async (req, res) => {
     if (Description && Description.length > 1000) {
       return res.status(400).json({ code: 'ERROR_0003_MAX_LENGTH', message: 'Mô tả không được vượt quá 1000 ký tự' });
     }
-    if (Price !== undefined && (Price === null || isNaN(Price) || Price < 0)) {
+    if (Price !== undefined && (Price === null || isNaN(Price) || Number(Price) <= 0)) {
       return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Giá bán không hợp lệ' });
     }
 
@@ -247,16 +267,11 @@ exports.updateMenuItem = async (req, res) => {
 
     await item.update({
       CategoryId: CategoryId || item.CategoryId,
-      ItemName: ItemName || item.ItemName,
+      ItemName: ItemName !== undefined ? ItemName.trim() : item.ItemName,
       Price: Price !== undefined ? Price : item.Price,
       Description: Description !== undefined ? Description : item.Description,
       ImageUrl: ImageUrl !== undefined ? ImageUrl : item.ImageUrl,
       Status: Status || item.Status,
-      SKU: SKU !== undefined ? SKU : item.SKU,
-      Ingredients: Ingredients !== undefined ? Ingredients : item.Ingredients,
-      Allergens: Allergens !== undefined ? Allergens : item.Allergens,
-      ServingTime: ServingTime !== undefined ? ServingTime : item.ServingTime,
-      KitchenStation: KitchenStation !== undefined ? KitchenStation : item.KitchenStation,
       UpdatedAt: new Date()
     });
 
@@ -272,7 +287,7 @@ exports.updateMenuItem = async (req, res) => {
   }
 };
 
-// Soft Delete Item
+// Soft Delete Item (FEAT-FNB-01)
 exports.deleteMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
@@ -282,17 +297,11 @@ exports.deleteMenuItem = async (req, res) => {
       return res.status(404).json({ code: 'ERROR_0004_NOT_FOUND', message: 'Không tìm thấy món ăn' });
     }
 
-    // TODO: Món đang có đơn hàng chưa hoàn tất không được lưu trữ
-    // const hasPendingOrders = await checkPendingOrders(id);
-    // if (hasPendingOrders) {
-    //   return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể lưu trữ. Món đang có đơn hàng chưa hoàn tất.' });
-    // }
-
-    await item.update({ Status: 'Inactive', IsDeleted: true, UpdatedAt: new Date() });
+    await item.update({ Status: 'Inactive', UpdatedAt: new Date() });
 
     return res.status(200).json({
       code: 'SUCCESS_0003_DELETED',
-      message: 'Đã xóa món ăn thành công'
+      message: 'Đã chuyển trạng thái món sang Ngừng Bán'
     });
 
   } catch (error) {
@@ -301,13 +310,33 @@ exports.deleteMenuItem = async (req, res) => {
   }
 };
 
+// Khôi phục món đã xóa mềm (Restore Item)
+exports.restoreMenuItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const item = await MenuItem.findByPk(id);
+
+    if (!item) {
+      return res.status(404).json({ code: 'ERROR_0004_NOT_FOUND', message: 'Không tìm thấy món ăn' });
+    }
+
+    await item.update({ Status: 'Available', IsDeleted: false, UpdatedAt: new Date() });
+
+    return res.status(200).json({
+      code: 'SUCCESS_0005_RESTORED',
+      message: 'Đã khôi phục món ăn trở lại thực đơn'
+    });
+  } catch (error) {
+    console.error('Error restoring menu item:', error);
+    return res.status(500).json({ code: 'ERROR_0500_INTERNAL', message: 'Lỗi hệ thống' });
+  }
+};
+
+// Update status
 exports.updateMenuItemStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    
-    // Authorization mock logic could go here
-    // if (!req.headers.authorization) return res.status(401).json({ code: 'ERROR_0009_UNAUTHENTICATED', message: 'Bạn cần đăng nhập để thực hiện chức năng này' });
     
     const validStatuses = ['Available', 'OutOfStock', 'Inactive'];
     if (!status || !validStatuses.includes(status)) {
@@ -317,12 +346,6 @@ exports.updateMenuItemStatus = async (req, res) => {
     const item = await MenuItem.findByPk(id);
     if (!item) {
       return res.status(404).json({ code: 'ERROR_0004_NOT_FOUND', message: 'Không tìm thấy món ăn' });
-    }
-    
-    // Simulate POS sync
-    const posSyncSuccess = true; // In real life, call POS API here
-    if (!posSyncSuccess) {
-      return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể đồng bộ với hệ thống POS.' });
     }
     
     await item.update({ Status: status, UpdatedAt: new Date() });
@@ -336,17 +359,3 @@ exports.updateMenuItemStatus = async (req, res) => {
     return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể cập nhật trạng thái món.' });
   }
 };
-
-exports.getMenuCategories = async (req, res) => {
-  try {
-    const categories = await MenuCategory.findAll({
-      where: { IsDeleted: false },
-      order: [['CategoryId', 'ASC']]
-    });
-    return res.status(200).json({ success: true, data: categories });
-  } catch (error) {
-    console.error('Error fetching menu categories:', error);
-    return res.status(500).json({ code: 'ERROR_0500_INTERNAL', message: 'Không thể tải danh mục thực đơn.' });
-  }
-};
-

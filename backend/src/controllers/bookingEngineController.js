@@ -62,6 +62,17 @@ exports.createOnlineBooking = async (req, res) => {
     const effectivePhone = (phoneNumber || guestPhone || '').trim();
     const effectiveSpecialReq = (specialRequests || specialRequest || '').trim();
 
+    // 0. Enforce Authentication: Phải đăng nhập mới được tạo đặt phòng
+    const authenticatedUserId = req.user?.id || req.user?.userId || req.user?.UserId;
+    if (!authenticatedUserId) {
+      await transaction.rollback();
+      return res.status(401).json({
+        success: false,
+        code: 'ERROR_0009_UNAUTHENTICATED',
+        message: 'Vui lòng đăng nhập tài khoản để thực hiện đặt phòng.'
+      });
+    }
+
     // 1. Validate Policy Acceptance (TC02)
     if (isPolicyAccepted !== true && isPolicyAccepted !== 'true') {
       await transaction.rollback();
@@ -346,7 +357,7 @@ exports.createOnlineBooking = async (req, res) => {
 
     // 8. DB Transaction: Create Booking & Primary Guest
     const booking = await Booking.create({
-      UserId: req.user?.id || req.user?.UserId || 1,
+      UserId: authenticatedUserId,
       RoomTypeId: parseInt(roomTypeId, 10),
       VoucherId: appliedVoucherId || null,
       CheckInDate: checkInDate,

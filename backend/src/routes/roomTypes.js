@@ -1,11 +1,69 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { RoomType, Room, Amenity, RoomTypeAmenity, Booking, AuditLog, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { JWT_SECRET } = require('../middlewares/authMiddleware');
+const { broadcastRoomEvent } = require('../sockets/socketHandler');
+
+// ─── CONCURRENT EDITING LOCK MANAGEMENT ───────────────────────────────────
+// Quản lý khóa chỉnh sửa đồng thời trong bộ nhớ
+// Key: roomTypeId (string), Value: { userId, userName, acquiredAt, expiresAt }
+const activeEditingLocks = new Map();
+
+function cleanExpiredLocks() {
+  const now = Date.now();
+  for (const [id, lock] of activeEditingLocks.entries()) {
+    if (lock.expiresAt <= now) {
+      activeEditingLocks.delete(id);
+      try {
+        broadcastRoomEvent('ROOM_TYPE_EDITING_END', {
+          roomTypeId: Number(id),
+          user: lock.userName,
+          reason: 'EXPIRED',
+        });
+      } catch (_) {}
+    }
+  }
+}
+setInterval(cleanExpiredLocks, 10000);
+
+const saveBase64Image = (imgStr) => {
+  if (!imgStr || typeof imgStr !== 'string') return imgStr;
+  if (!imgStr.startsWith('data:image/')) return imgStr;
+
+  const commaIdx = imgStr.indexOf(',');
+  if (commaIdx === -1) return imgStr;
+
+  const meta = imgStr.substring(0, commaIdx);
+  const rawData = imgStr.substring(commaIdx + 1);
+
+  let ext = 'jpg';
+  if (meta.includes('png')) ext = 'png';
+  else if (meta.includes('webp')) ext = 'webp';
+  else if (meta.includes('jpeg') || meta.includes('jpg')) ext = 'jpg';
+
+  try {
+    const buffer = Buffer.from(rawData.trim(), 'base64');
+    const uploadDir = path.join(__dirname, '../../uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filename = `room_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const filePath = path.join(uploadDir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    return `/uploads/${filename}`;
+  } catch (err) {
+    console.error('Lỗi khi lưu ảnh base64:', err);
+    return imgStr;
+  }
+};
 
 // ─── AUTH & PERMISSION MIDDLEWARE (Theo mục 3.1 & 5.1 Spec) ────────────────
 function checkRoomTypePermission(requiredPermission = 'ROOMTYPE_MANAGE') {
@@ -224,9 +282,15 @@ router.get('/', async (req, res) => {
       where.TypeName = { [Op.like]: `%${String(searchKeyword).trim()}%` };
     }
 
+    const sortParam = req.query.sort || req.query.order;
+    const orderClause =
+      sortParam === 'asc' || sortParam === 'name_asc'
+        ? [['TypeName', 'ASC']]
+        : [['CreatedAt', 'DESC'], ['RoomTypeId', 'DESC']];
+
     const opts = {
       where,
-      order: [['TypeName', 'ASC']], // Wireframe 6.1: sắp xếp mặc định theo tên A-Z
+      order: orderClause,
       include: [
         {
           model: Amenity,
@@ -501,7 +565,7 @@ router.post('/', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) =>
       }
     }
 
-    const cleanImgUrls = imgList.map((i) => (typeof i === 'string' ? i : i.url || ''));
+    const cleanImgUrls = imgList.map((i) => saveBase64Image(typeof i === 'string' ? i : i.url || ''));
     const thumbnail = cleanImgUrls[0] || '';
 
     // 6. Validate Amenities (Mục 3.7)
@@ -552,6 +616,52 @@ router.post('/', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) =>
     }));
     await RoomTypeAmenity.bulkCreate(rtaRows, { transaction: t, ignoreDuplicates: true });
 
+    // 9.1. Tạo phòng vật lý mẫu ban đầu để loại phòng mới có thể tìm thấy và đặt phòng ngay trên Guest Portal / Search
+    try {
+      const initialRooms = [
+        {
+          BranchId: 1,
+          RoomTypeId: newRT.RoomTypeId,
+          RoomNumber: `${newRT.RoomTypeId}-101`,
+          Floor: 1,
+          Status: 'CleanAvailable',
+          Description: `Phòng ${cleanTypeName} tiêu chuẩn tại Chi nhánh Phú Quốc`,
+          IsDeleted: false,
+        },
+        {
+          BranchId: 1,
+          RoomTypeId: newRT.RoomTypeId,
+          RoomNumber: `${newRT.RoomTypeId}-102`,
+          Floor: 1,
+          Status: 'CleanAvailable',
+          Description: `Phòng ${cleanTypeName} tiêu chuẩn tại Chi nhánh Phú Quốc`,
+          IsDeleted: false,
+        },
+        {
+          BranchId: 2,
+          RoomTypeId: newRT.RoomTypeId,
+          RoomNumber: `${newRT.RoomTypeId}-201`,
+          Floor: 2,
+          Status: 'CleanAvailable',
+          Description: `Phòng ${cleanTypeName} tiêu chuẩn tại Chi nhánh Cam Ranh`,
+          IsDeleted: false,
+        },
+        {
+          BranchId: 3,
+          RoomTypeId: newRT.RoomTypeId,
+          RoomNumber: `${newRT.RoomTypeId}-301`,
+          Floor: 3,
+          Status: 'CleanAvailable',
+          Description: `Phòng ${cleanTypeName} tiêu chuẩn tại Chi nhánh Côn Đảo`,
+          IsDeleted: false,
+        },
+      ];
+      await Room.bulkCreate(initialRooms, { transaction: t, ignoreDuplicates: true });
+      await newRT.update({ TotalRooms: initialRooms.length }, { transaction: t });
+    } catch (e) {
+      console.warn('Không thể tạo phòng vật lý tự động:', e.message);
+    }
+
     // 10. Ghi AuditLog (Mục 3.10)
     try {
       if (AuditLog) {
@@ -589,6 +699,86 @@ router.post('/', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) =>
   }
 });
 
+// ─── API QUẢN LÝ KHÓA CHỈNH SỬA ĐỒNG THỜI (CONCURRENCY EDIT LOCKS) ─────────
+router.get('/editing-locks', checkRoomTypePermission('ROOMTYPE_VIEW'), (req, res) => {
+  cleanExpiredLocks();
+  const locks = {};
+  for (const [id, lock] of activeEditingLocks.entries()) {
+    locks[id] = {
+      userId: lock.userId,
+      userName: lock.userName,
+      acquiredAt: lock.acquiredAt,
+      expiresAt: lock.expiresAt,
+    };
+  }
+  return res.json({ success: true, data: locks });
+});
+
+router.post('/:id/editing-lock', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) => {
+  cleanExpiredLocks();
+  const { id } = req.params;
+  const currentUserId = req.user?.userId || req.user?.id || 'admin_user';
+  const currentUserName = req.user?.fullName || req.user?.name || req.user?.username || 'Quản trị viên';
+
+  const existingLock = activeEditingLocks.get(String(id));
+  if (
+    existingLock &&
+    String(existingLock.userId) !== String(currentUserId) &&
+    existingLock.expiresAt > Date.now()
+  ) {
+    // Có người khác đang mở chỉnh sửa
+    return res.json({
+      success: true,
+      isLockedByOther: true,
+      lockedBy: {
+        userId: existingLock.userId,
+        userName: existingLock.userName,
+        remainingSeconds: Math.ceil((existingLock.expiresAt - Date.now()) / 1000),
+      },
+      message: `Loại phòng này hiện đang được [${existingLock.userName}] mở chỉnh sửa`,
+    });
+  }
+
+  // Cấp hoặc gia hạn khóa 2 phút
+  activeEditingLocks.set(String(id), {
+    userId: currentUserId,
+    userName: currentUserName,
+    acquiredAt: Date.now(),
+    expiresAt: Date.now() + 120000,
+  });
+
+  try {
+    broadcastRoomEvent('ROOM_TYPE_EDITING_START', {
+      roomTypeId: Number(id),
+      user: currentUserName,
+      userId: currentUserId,
+    });
+  } catch (_) {}
+
+  return res.json({
+    success: true,
+    isLockedByOther: false,
+    message: 'Đã nhận quyền chỉnh sửa an toàn',
+  });
+});
+
+router.delete('/:id/editing-lock', checkRoomTypePermission('ROOMTYPE_MANAGE'), (req, res) => {
+  const { id } = req.params;
+  const existingLock = activeEditingLocks.get(String(id));
+
+  if (existingLock) {
+    activeEditingLocks.delete(String(id));
+    try {
+      broadcastRoomEvent('ROOM_TYPE_EDITING_END', {
+        roomTypeId: Number(id),
+        user: existingLock.userName,
+      });
+    } catch (_) {}
+  }
+
+  return res.json({ success: true, message: 'Đã giải phóng quyền chỉnh sửa' });
+});
+
 // ─── PUT CẬP NHẬT LOẠI PHÒNG (Mục 4.2 Spec) ────────────────────────────────
 router.put('/:id', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) => {
   const t = await sequelize.transaction();
@@ -601,6 +791,16 @@ router.put('/:id', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) 
 
     if (!rt) {
       await t.rollback();
+      // Kiểm tra xem bản ghi này có bị xóa trước đó không
+      const deletedRt = await RoomType.findByPk(id);
+      if (deletedRt && deletedRt.IsDeleted) {
+        return res.status(409).json({
+          success: false,
+          code: 'ERROR_0017_RECORD_DELETED',
+          message: 'Không thể lưu: Loại phòng này đã bị một quản trị viên khác xóa khỏi hệ thống trong lúc bạn đang chỉnh sửa!',
+        });
+      }
+
       return res.status(404).json({
         success: false,
         message: 'Lỗi đồng bộ: Loại phòng này không còn tồn tại trong cơ sở dữ liệu!',
@@ -617,7 +817,23 @@ router.put('/:id', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) 
       amenityIds, tien_ich,
       status, trang_thai,
       code, ma_loai,
+      lastUpdatedAt,
     } = req.body;
+
+    // 0. Kiểm tra xung đột sửa đồng thời (Optimistic Concurrency Control)
+    if (lastUpdatedAt) {
+      const clientTime = new Date(lastUpdatedAt).getTime();
+      const serverTime = new Date(rt.UpdatedAt).getTime();
+      if (!isNaN(clientTime) && !isNaN(serverTime) && serverTime - clientTime > 1500) {
+        await t.rollback();
+        return res.status(409).json({
+          success: false,
+          code: 'ERROR_0016_CONCURRENT_MODIFICATION',
+          message: `Xung đột dữ liệu: Loại phòng này vừa được một quản trị viên khác cập nhật vào lúc ${new Date(rt.UpdatedAt).toLocaleTimeString('vi-VN')}. Để tránh ghi đè làm mất thông tin, hệ thống đã tạm chặn thao tác lưu này. Vui lòng tải lại dữ liệu mới nhất!`,
+          serverUpdatedAt: rt.UpdatedAt,
+        });
+      }
+    }
 
     // 1. Validate typeName
     const rawName = typeName !== undefined ? typeName : ten_loai;
@@ -784,7 +1000,7 @@ router.put('/:id', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) 
       }
     }
 
-    const cleanImgUrls = imgList.map((i) => (typeof i === 'string' ? i : i.url || ''));
+    const cleanImgUrls = imgList.map((i) => saveBase64Image(typeof i === 'string' ? i : i.url || ''));
     const thumbnail = cleanImgUrls[0] || rt.ImageUrl;
 
     // 6. Validate Amenities
@@ -859,6 +1075,21 @@ router.put('/:id', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) 
 
     await t.commit();
 
+    // Giải phóng khóa chỉnh sửa và thông báo realtime cho các client
+    activeEditingLocks.delete(String(id));
+    try {
+      broadcastRoomEvent('ROOM_TYPE_UPDATED', {
+        roomTypeId: Number(id),
+        typeName: cleanTypeName,
+        updatedBy: req.user?.fullName || req.user?.name || req.user?.username || 'Quản trị viên khác',
+        updatedAt: new Date().toISOString(),
+      });
+      broadcastRoomEvent('ROOM_TYPE_EDITING_END', {
+        roomTypeId: Number(id),
+        user: req.user?.fullName || req.user?.name || req.user?.username || 'Quản trị viên',
+      });
+    } catch (_) {}
+
     const updated = await RoomType.findOne({
       where: { RoomTypeId: id },
       include: [{ model: Amenity, as: 'amenityList', through: { attributes: [] } }],
@@ -892,6 +1123,16 @@ router.patch('/:id/trang-thai', checkRoomTypePermission('ROOMTYPE_MANAGE'), asyn
     }
 
     await rt.update({ Status: finalStatus });
+
+    try {
+      broadcastRoomEvent('ROOM_TYPE_STATUS_CHANGED', {
+        roomTypeId: Number(id),
+        typeName: rt.TypeName,
+        status: finalStatus,
+        updatedBy: req.user?.fullName || req.user?.name || req.user?.username || 'Quản trị viên',
+      });
+    } catch (_) {}
+
     return res.json({
       success: true,
       message: `Đã ${finalStatus === 'Active' ? 'kích hoạt' : 'tạm dừng'} loại phòng thành công`,
@@ -931,22 +1172,63 @@ router.delete('/:id', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, re
       }
     } catch (_) {}
 
-    // Nếu còn phòng vật lý HOẶC còn booking hiệu lực → CHẶN xóa (Mục 3.9 & Test case 14)
-    if (linkedRoomsCount > 0 || linkedBookingsCount > 0) {
+    const cascade =
+      req.query.cascadeRooms === 'true' ||
+      req.body?.cascadeRooms === true ||
+      req.body?.force === true;
+
+    // Nếu còn booking đang hoạt động → TUYỆT ĐỐI CHẶN xóa để bảo vệ khách và dữ liệu
+    if (linkedBookingsCount > 0) {
       return res.status(400).json({
         success: false,
         code: 'ERROR_0015_HAS_RELATED_DATA',
-        message: 'Không thể xóa loại phòng vì vẫn còn phòng hoặc đặt phòng liên quan',
+        message: 'Không thể xóa loại phòng vì vẫn còn đặt phòng đang hoạt động (Pending/Confirmed/CheckedIn)',
         relatedData: {
           rooms: linkedRoomsCount,
           bookings: linkedBookingsCount,
+          hasActiveBookings: true,
+          canCascadeDelete: false,
         },
       });
+    }
+
+    // Nếu còn phòng vật lý nhưng KHÔNG có booking nào đang hoạt động:
+    if (linkedRoomsCount > 0) {
+      if (!cascade) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0015_HAS_RELATED_DATA',
+          message: 'Loại phòng đang có phòng vật lý liên kết nhưng không có đơn đặt phòng nào đang hoạt động.',
+          relatedData: {
+            rooms: linkedRoomsCount,
+            bookings: 0,
+            hasActiveBookings: false,
+            canCascadeDelete: true,
+          },
+        });
+      }
+
+      // Quản trị viên đã xác nhận xóa kèm các phòng vật lý liên kết:
+      await Room.update({ IsDeleted: true }, { where: { RoomTypeId: id } });
     }
 
     // 3. Thực hiện XÓA MỀM (soft delete): Status = Inactive, IsDeleted = true
     const oldValues = { ...rt.toJSON() };
     await rt.update({ Status: 'Inactive', IsDeleted: true });
+
+    // Giải phóng khóa chỉnh sửa và thông báo realtime cho các client
+    activeEditingLocks.delete(String(id));
+    try {
+      broadcastRoomEvent('ROOM_TYPE_DELETED', {
+        roomTypeId: Number(id),
+        typeName: rt.TypeName,
+        deletedBy: req.user?.fullName || req.user?.name || req.user?.username || 'Quản trị viên khác',
+      });
+      broadcastRoomEvent('ROOM_TYPE_EDITING_END', {
+        roomTypeId: Number(id),
+        user: 'Deleted',
+      });
+    } catch (_) {}
 
     // Ghi AuditLog
     try {
@@ -957,7 +1239,11 @@ router.delete('/:id', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, re
           entity_name: 'RoomTypes',
           entity_id: id,
           old_values: oldValues,
-          new_values: { Status: 'Inactive', IsDeleted: true },
+          new_values: {
+            Status: 'Inactive',
+            IsDeleted: true,
+            CascadeRooms: cascade ? linkedRoomsCount : 0,
+          },
           ip_address: req.ip,
         });
       }
@@ -966,7 +1252,11 @@ router.delete('/:id', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, re
     return res.json({
       success: true,
       code: 'SUCCESS_0003_DELETED',
-      message: 'Xóa loại phòng thành công',
+      message:
+        linkedRoomsCount > 0 && cascade
+          ? `Xóa thành công loại phòng và toàn bộ ${linkedRoomsCount} phòng vật lý liên kết`
+          : 'Xóa loại phòng thành công',
+      deletedRoomsCount: cascade ? linkedRoomsCount : 0,
     });
   } catch (err) {
     console.error('DELETE /room-types error:', err);
