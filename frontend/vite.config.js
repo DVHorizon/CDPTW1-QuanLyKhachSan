@@ -29,6 +29,10 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
       },
+      '/uploads': {
+        target: process.env.VITE_PROXY_TARGET || (process.env.CHOKIDAR_USEPOLLING ? 'http://backend:5000' : 'http://localhost:5000'),
+        changeOrigin: true,
+      },
     },
   },
 })
