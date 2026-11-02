@@ -109,7 +109,21 @@ exports.getMenuItems = async (req, res) => {
     }
     
     if (category) {
-      whereClause.CategoryId = category;
+      if (isNaN(category)) {
+        // Nếu truyền tên danh mục (VD: Khai vị, Món chính, Đồ uống)
+        const cat = await MenuCategory.findOne({
+          where: {
+            CategoryName: { [Op.like]: `%${category}%` }
+          }
+        });
+        if (cat) {
+          whereClause.CategoryId = cat.CategoryId;
+        } else {
+          whereClause.CategoryId = -1; // Không tìm thấy danh mục
+        }
+      } else {
+        whereClause.CategoryId = category;
+      }
     }
 
     // Nếu không có keyword, lấy toàn bộ món theo thứ tự ID giảm dần
