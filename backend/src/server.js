@@ -46,6 +46,7 @@ app.use('/api/v1', require('./routes/admin/menuRoutes'));
 
 // Route F&B Orders (Room Service, KDS, History)
 app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/v1/kitchen-inventory', require('./routes/admin/kitchenInventoryRoutes'));
 
 // Route Quản lý tình trạng phòng trống (Room Availability)
 app.use('/api/admin/room-availability', require('./routes/admin/roomAvailability'));
@@ -201,6 +202,15 @@ try {
 }
 
 const { AuditLog } = require('./models');
+
+// ─── Global Unhandled Error Prevention (Ngăn chặn tiến trình Node.js bị crash) ───
+process.on('uncaughtException', (err) => {
+  console.error('🔥 [CRITICAL] Uncaught Exception:', err.message, err.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 [CRITICAL] Unhandled Rejection:', reason);
+});
 
 // ─── Start server ──────────────────────────────────────────────────────────
 server.listen(PORT, async () => {

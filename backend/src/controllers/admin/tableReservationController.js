@@ -1,7 +1,7 @@
 'use strict';
 
 const { Op } = require('sequelize');
-const { sequelize, RestaurantTable, TableReservation, User, FoodOrder, FoodOrderDetail, MenuItem } = require('../../models');
+const { sequelize, RestaurantTable, TableReservation, User, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room } = require('../../models');
 const { broadcastTableReservation, broadcastTableUpdate } = require('../../services/websocketService');
 
 // Khoảng thời gian dùng bữa trung bình (120 phút = 2 giờ)
