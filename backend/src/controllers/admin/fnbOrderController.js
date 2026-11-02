@@ -1,3 +1,4 @@
+const { deductIngredientsForOrder } = require('./kitchenInventoryController');
 const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room, Booking, User, Invoice, InvoiceDetail, Payment, Review, ReviewPhoto } = require('../../models');
 const { broadcastOrderStatus, broadcastNewKitchenOrder } = require('../../services/websocketService');
 
@@ -227,6 +228,8 @@ exports.createRoomServiceOrder = async (req, res) => {
     } catch (wsErr) {
       console.warn('WebSocket broadcast error:', wsErr.message);
     }
+
+        deductIngredientsForOrder(order.FoodOrderId, itemsList, req.user?.userId).catch(e => console.error(e));
 
     return res.status(201).json({
       success: true,
