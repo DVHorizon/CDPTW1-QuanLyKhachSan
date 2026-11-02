@@ -203,6 +203,15 @@ try {
 
 const { AuditLog } = require('./models');
 
+// ─── Global Unhandled Error Prevention (Ngăn chặn tiến trình Node.js bị crash) ───
+process.on('uncaughtException', (err) => {
+  console.error('🔥 [CRITICAL] Uncaught Exception:', err.message, err.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 [CRITICAL] Unhandled Rejection:', reason);
+});
+
 // ─── Start server ──────────────────────────────────────────────────────────
 server.listen(PORT, async () => {
   console.log(`✅ Backend server with WebSocket running on port ${PORT}`);

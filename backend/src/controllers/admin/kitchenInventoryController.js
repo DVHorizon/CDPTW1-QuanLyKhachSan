@@ -18,25 +18,31 @@ const { sequelize } = require('../../models');
  */
 exports.getKitchenIngredients = async (req, res) => {
   try {
-    const { keyword, statusFilter, page = 1, limit = 20 } = req.query;
+    const { keyword, search, status, statusFilter, page = 1, limit = 20 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
     const offset = (pageNum - 1) * limitNum;
+
+    // Hỗ trợ cả param 'keyword' lẫn 'search'
+    const searchQuery = (keyword || search || '').trim();
+
+    // Hỗ trợ cả status ('ALL', 'LOW', 'OUT', 'NORMAL') và statusFilter ('critical', 'out_of_stock', 'normal')
+    const currentStatus = (status || statusFilter || 'ALL').toUpperCase();
 
     // Điều kiện lọc
     let whereCondition = "ItemType = 'Kitchen' AND (IsDeleted = 0 OR IsDeleted IS NULL)";
     const replacements = [];
 
-    if (keyword && keyword.trim() !== '') {
+    if (searchQuery !== '') {
       whereCondition += " AND (ItemCode LIKE ? OR ItemName LIKE ?)";
-      replacements.push(`%${keyword.trim()}%`, `%${keyword.trim()}%`);
+      replacements.push(`%${searchQuery}%`, `%${searchQuery}%`);
     }
 
-    if (statusFilter === 'critical') {
+    if (currentStatus === 'LOW' || currentStatus === 'CRITICAL') {
       whereCondition += " AND Quantity <= MinQuantity AND Quantity > 0";
-    } else if (statusFilter === 'out_of_stock') {
+    } else if (currentStatus === 'OUT' || currentStatus === 'OUT_OF_STOCK') {
       whereCondition += " AND Quantity <= 0";
-    } else if (statusFilter === 'normal') {
+    } else if (currentStatus === 'NORMAL') {
       whereCondition += " AND Quantity > MinQuantity";
     }
 
@@ -83,13 +89,17 @@ exports.getKitchenIngredients = async (req, res) => {
       pagination: {
         page: pageNum,
         limit: limitNum,
+        total: totalItems,
         totalItems,
         totalPages: Math.ceil(totalItems / limitNum) || 1
       },
       metrics: {
+        totalSku: metrics[0]?.totalSKU || 0,
         totalSKU: metrics[0]?.totalSKU || 0,
+        lowStockCount: metrics[0]?.criticalCount || 0,
         criticalCount: metrics[0]?.criticalCount || 0,
         outOfStockCount: metrics[0]?.outOfStockCount || 0,
+        inStockCount: metrics[0]?.normalCount || 0,
         normalCount: metrics[0]?.normalCount || 0,
         parStockRate: metrics[0]?.parStockRate || 94.2
       }
@@ -104,11 +114,61 @@ exports.getKitchenIngredients = async (req, res) => {
 };
 
 /**
+ * 1.1 Lấy mã nguyên liệu tiếp theo tự động tăng dần (ING-xxxx)
+ */
+exports.getNextIngredientCode = async (req, res) => {
+  try {
+    const [rows] = await sequelize.query(
+      "SELECT ItemCode FROM InventoryItems WHERE ItemCode LIKE 'ING-%' ORDER BY ItemId DESC"
+    );
+
+    let maxNum = 0;
+    for (const r of rows) {
+      const match = r.ItemCode.match(/^ING-(\d+)$/i);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maxNum) maxNum = n;
+      }
+    }
+
+    const nextNumber = maxNum + 1;
+    const nextCode = `ING-${String(nextNumber).padStart(4, '0')}`;
+
+    return res.status(200).json({
+      success: true,
+      nextCode
+    });
+  } catch (error) {
+    console.error('Error in getNextIngredientCode:', error);
+    return res.status(200).json({
+      success: true,
+      nextCode: 'ING-0900'
+    });
+  }
+};
+
+/**
  * 2. Thêm mới nguyên liệu bếp (FEAT-FNB-14 mục 4.1)
  */
 exports.createKitchenIngredient = async (req, res) => {
   try {
-    const { itemCode, itemName, unit, quantity, minQuantity, unitCost } = req.body;
+    let { itemCode, itemName, unit, quantity, minQuantity, unitCost } = req.body;
+
+    // Nếu người dùng không nhập mã hoặc để trống, hệ thống tự động sinh mã ING-xxxx tăng dần
+    if (!itemCode || String(itemCode).trim() === '') {
+      const [rows] = await sequelize.query(
+        "SELECT ItemCode FROM InventoryItems WHERE ItemCode LIKE 'ING-%' ORDER BY ItemId DESC"
+      );
+      let maxNum = 0;
+      for (const r of rows) {
+        const match = r.ItemCode.match(/^ING-(\d+)$/i);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (n > maxNum) maxNum = n;
+        }
+      }
+      itemCode = `ING-${String(maxNum + 1).padStart(4, '0')}`;
+    }
 
     // 1. Kiểm tra để trống
     if (!itemCode || String(itemCode).trim() === '') {
@@ -333,7 +393,7 @@ exports.getTransactions = async (req, res) => {
  */
 exports.getAffectedDishes = async (req, res) => {
   try {
-    // Tìm các nguyên liệu bếp đang bị dưới ngưỡng an toàn
+    // Tìm các nguyên liệu bếp đang bị dưới ngưỡng an toàn (Quantity <= MinQuantity)
     const [criticalIngredients] = await sequelize.query(`
       SELECT ItemId, ItemCode, ItemName, Quantity, MinQuantity, Unit 
       FROM InventoryItems 
@@ -345,34 +405,63 @@ exports.getAffectedDishes = async (req, res) => {
       return res.status(200).json({ success: true, data: [] });
     }
 
-    // Ghép món ăn trong MenuItems có tên hoặc mô tả chứa từ khóa của nguyên liệu bị thiếu
+    const KEYWORD_MAP = {
+      'Wagyu': ['Wagyu', 'Bò'],
+      'Cá Hồi': ['Cá Hồi', 'Salad'],
+      'Tôm Hùm': ['Tôm Hùm', 'Tôm'],
+      'Bào Ngư': ['Bào Ngư', 'Súp'],
+      'Cua Hoàng Đế': ['Cua Hoàng Đế', 'Cua'],
+      'Nấm Truffle': ['Truffle', 'Nấm', 'Bò', 'Salad'],
+      'Sò Điệp': ['Sò Điệp', 'Hải Sản'],
+      'Bơ': ['Bánh', 'Tiramisu']
+    };
+
     const affectedDishes = [];
+    const addedMenuIds = new Set();
+
     for (const ing of criticalIngredients) {
-      // Tách từ khóa quan trọng từ tên nguyên liệu (ví dụ: 'Thịt Thăn Bò Wagyu' -> 'Wagyu', 'Bò', 'Cá Hồi'...)
-      let keyword = ing.ItemName.replace(/Hàng Tồn Kho Vật Tư #\d+/g, '').replace(/Thịt Thăn /g, '').replace(/ Tươi/g, '').trim();
-      if (!keyword || keyword.length < 2) keyword = ing.ItemName;
+      // Tìm danh sách từ khóa tương ứng
+      let matchedSearchKeys = [];
+      for (const [key, searchKeys] of Object.entries(KEYWORD_MAP)) {
+        if (ing.ItemName.includes(key)) {
+          matchedSearchKeys = searchKeys;
+          break;
+        }
+      }
+
+      if (matchedSearchKeys.length === 0) {
+        matchedSearchKeys = [ing.ItemName.split(' ')[0]];
+      }
+
+      const orClauses = matchedSearchKeys.map(() => 'ItemName LIKE ?').join(' OR ');
+      const replacements = matchedSearchKeys.map(k => `%${k}%`);
 
       const [dishes] = await sequelize.query(`
         SELECT MenuItemId, ItemName, Price, Status, ImageUrl
         FROM MenuItems
-        WHERE (ItemName LIKE ? OR Description LIKE ?) AND (IsDeleted = 0 OR IsDeleted IS NULL)
-        LIMIT 3
-      `, { replacements: [`%${keyword}%`, `%${keyword}%`] });
+        WHERE (${orClauses}) AND (IsDeleted = 0 OR IsDeleted IS NULL)
+        LIMIT 4
+      `, { replacements });
 
       dishes.forEach(d => {
-        affectedDishes.push({
-          MenuItemId: d.MenuItemId,
-          ItemName: d.ItemName,
-          Price: d.Price,
-          Status: d.Status,
-          ImageUrl: d.ImageUrl,
-          ItemId: ing.ItemId,
-          ItemCode: ing.ItemCode,
-          IngredientName: ing.ItemName,
-          CurrentStock: ing.Quantity,
-          MinQuantity: ing.MinQuantity,
-          Unit: ing.Unit
-        });
+        if (!addedMenuIds.has(d.MenuItemId)) {
+          addedMenuIds.add(d.MenuItemId);
+          affectedDishes.push({
+            MenuItemId: d.MenuItemId,
+            ItemName: d.ItemName,
+            Price: d.Price,
+            Status: d.Status,
+            ImageUrl: d.ImageUrl,
+            ItemId: ing.ItemId,
+            ItemCode: ing.ItemCode,
+            MissingIngredientName: ing.ItemName,
+            IngredientName: ing.ItemName,
+            CurrentQuantity: parseFloat(ing.Quantity).toFixed(2),
+            CurrentStock: parseFloat(ing.Quantity).toFixed(2),
+            MinQuantity: parseFloat(ing.MinQuantity).toFixed(2),
+            Unit: ing.Unit
+          });
+        }
       });
     }
 

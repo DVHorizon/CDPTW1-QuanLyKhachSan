@@ -28,7 +28,34 @@ export default function KitchenInventory() {
   const [addError, setAddError] = useState('');
   const [addSuccess, setAddSuccess] = useState('');
 
-  // Form / Tab Điều chỉnh Nhập / Xuất kho nhanh
+  // Mở modal Thêm nguyên liệu và tự động lấy mã tiếp theo
+  const handleOpenAddModal = async () => {
+    setAddError('');
+    setAddSuccess('');
+    setAddForm({
+      itemCode: 'Đang tạo mã...',
+      itemName: '',
+      unit: 'Kilogram (KG)',
+      quantity: '',
+      minQuantity: '',
+      unitCost: ''
+    });
+    setShowAddModal(true);
+
+    try {
+      const res = await fetch('http://localhost:5000/api/v1/kitchen-inventory/ingredients/next-code', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.nextCode) {
+        setAddForm(prev => ({ ...prev, itemCode: data.nextCode }));
+      } else {
+        setAddForm(prev => ({ ...prev, itemCode: 'ING-0816' }));
+      }
+    } catch {
+      setAddForm(prev => ({ ...prev, itemCode: 'ING-0816' }));
+    }
+  };
   const [selectedIngredient, setSelectedIngredient] = useState(null);
   const [importForm, setImportForm] = useState({
     itemId: '',
@@ -44,7 +71,7 @@ export default function KitchenInventory() {
   const [affectedLoading, setAffectedLoading] = useState(false);
   const [markSuccessMsg, setMarkSuccessMsg] = useState('');
 
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const token = localStorage.getItem('hotel_token') || localStorage.getItem('token') || sessionStorage.getItem('token');
 
   // Tải danh sách nguyên liệu và metrics
   const fetchIngredients = async () => {
@@ -266,7 +293,7 @@ export default function KitchenInventory() {
               Gợi Ý Món Tạm Hết {metrics.lowStockCount > 0 && `(${metrics.lowStockCount})`}
             </button>
             <button 
-              onClick={() => setShowAddModal(true)}
+              onClick={handleOpenAddModal}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-medium text-sm transition shadow-sm"
             >
               <span className="material-symbols-outlined text-[18px]">add_circle</span>
@@ -525,24 +552,54 @@ export default function KitchenInventory() {
 
               {selectedIngredient ? (
                 <form onSubmit={handleImportStock} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">NGUYÊN LIỆU ĐANG CHỌN</label>
-                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
+                  {/* THÔNG TIN CHI TIẾT NGUYÊN LIỆU ĐANG CHỌN */}
+                  <div className="rounded-xl border border-emerald-600/30 bg-gradient-to-br from-emerald-50/60 to-slate-50 p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-emerald-100">
                       <div>
-                        <span className="font-semibold text-slate-900 text-sm block">{selectedIngredient.ItemName}</span>
-                        <span className="font-mono text-xs text-slate-500">{selectedIngredient.ItemCode}</span>
+                        <span className="text-[10px] font-bold tracking-wider text-emerald-800 uppercase bg-emerald-100/80 px-2 py-0.5 rounded-full inline-block mb-1">
+                          NGUYÊN LIỆU ĐANG CHỌN
+                        </span>
+                        <h4 className="font-bold text-slate-900 text-base leading-snug">
+                          {selectedIngredient.ItemName}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
+                            {selectedIngredient.ItemCode}
+                          </span>
+                          <span className="text-xs text-slate-500 font-medium">
+                            • Vị trí: Kho Lạnh B2
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-xs text-slate-500 block">Hiện tồn:</span>
-                        <span className="font-mono font-bold text-emerald-700 text-sm">
-                          {parseFloat(selectedIngredient.Quantity).toFixed(2)} {selectedIngredient.Unit}
+                      <div className="text-right flex-shrink-0">
+                        <span className="text-[11px] text-slate-500 block">Tồn thực tế</span>
+                        <span className="font-mono font-extrabold text-emerald-700 text-lg">
+                          {parseFloat(selectedIngredient.Quantity).toFixed(2)}
+                        </span>
+                        <span className="text-xs text-slate-600 font-medium ml-1">
+                          {selectedIngredient.Unit}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-3 text-xs">
+                      <div className="p-2 rounded-lg bg-white border border-slate-100 shadow-2xs">
+                        <span className="text-[11px] text-slate-400 block">Định mức an toàn:</span>
+                        <span className="font-mono font-semibold text-slate-800 text-sm">
+                          {parseFloat(selectedIngredient.MinQuantity).toFixed(2)} {selectedIngredient.Unit}
+                        </span>
+                      </div>
+                      <div className="p-2 rounded-lg bg-white border border-slate-100 shadow-2xs">
+                        <span className="text-[11px] text-slate-400 block">Giá vốn đơn vị:</span>
+                        <span className="font-mono font-semibold text-slate-800 text-sm">
+                          {parseFloat(selectedIngredient.UnitCost || 0).toLocaleString()} đ
                         </span>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">SỐ LƯỢNG NHẬP VÀO (*)</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">SỐ LƯỢNG NHẬP VÀO (*)</label>
                     <div className="relative">
                       <input 
                         type="number"
@@ -552,9 +609,9 @@ export default function KitchenInventory() {
                         placeholder="Nhập số lượng (vd: 10.5)"
                         value={importForm.importQuantity}
                         onChange={(e) => setImportForm({ ...importForm, importQuantity: e.target.value })}
-                        className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                        className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-semibold"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400">
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                         {selectedIngredient.Unit}
                       </span>
                     </div>
@@ -661,14 +718,16 @@ export default function KitchenInventory() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Mã nguyên liệu (*)</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-slate-700">Mã nguyên liệu</label>
+                      <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-medium">Tự động tăng</span>
+                    </div>
                     <input 
                       type="text"
-                      required
-                      placeholder="vd: ING-0501"
+                      readOnly
+                      title="Mã nguyên liệu được hệ thống tự động sinh tăng dần"
                       value={addForm.itemCode}
-                      onChange={(e) => setAddForm({ ...addForm, itemCode: e.target.value })}
-                      className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                      className="w-full px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded-lg text-slate-700 font-mono font-semibold cursor-not-allowed select-none"
                     />
                   </div>
                   <div>

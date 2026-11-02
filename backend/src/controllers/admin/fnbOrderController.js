@@ -194,10 +194,11 @@ exports.createRoomServiceOrder = async (req, res) => {
 
     await transaction.commit();
 
+    const itemsList = orderDetails.map(d => ({ menuItemId: d.MenuItemId, itemName: (d.itemName || ('M�n an #' + d.MenuItemId)), quantity: d.Quantity, note: d.Note }));
     // 7. Gửi đơn xuống quy trình KDS / Bếp qua WebSocket (FEAT-FNB-06 & FEAT-FNB-12)
     try {
       const roomNum = stay.Room?.RoomNumber || 'N/A';
-      const itemsList = orderDetails.map(d => ({
+      const _ignore = orderDetails.map(d => ({
         menuItemId: d.MenuItemId,
         itemName: d.itemName || `Món ăn #${d.MenuItemId}`,
         quantity: d.Quantity,
@@ -245,7 +246,7 @@ exports.createRoomServiceOrder = async (req, res) => {
     });
 
   } catch (error) {
-    if (transaction) await transaction.rollback();
+    if (transaction && !transaction.finished) { try { await transaction.rollback(); } catch (rbErr) {} }
     console.error('Error creating room service order:', error);
     return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể tạo hoặc gửi đơn xuống bếp.' });
   }
