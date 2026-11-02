@@ -65,6 +65,7 @@ module.exports = (sequelize) => {
   // Tạo Database Trigger trực tiếp trong SQLite để chặn can thiệp từ ngoài ORM
   AuditLog.initDatabaseTriggers = async () => {
     try {
+      if (sequelize.getDialect() !== 'sqlite') return;
       await sequelize.query(`
         CREATE TRIGGER IF NOT EXISTS trg_prevent_audit_log_update
         BEFORE UPDATE ON audit_logs

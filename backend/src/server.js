@@ -6,7 +6,6 @@ const path = require('path');
 const cors = require('cors');
 require('dotenv').config();
 
-const path = require('path');
 const { initSocket } = require('./sockets/socketHandler');
 
 const app = express();
@@ -149,6 +148,8 @@ app.use('/api/v1/fnb-orders',         require('./routes/admin/fnbOrderRoutes'));
 app.use('/api/fnb-orders',            require('./routes/admin/fnbOrderRoutes'));
 app.use('/api/v1/table-reservations', require('./routes/admin/tableReservationRoutes'));
 app.use('/api/table-reservations',    require('./routes/admin/tableReservationRoutes'));
+app.get('/api/v1/statistics/fnb',     require('./controllers/admin/fnbOrderController').getFnbStatistics);
+app.post('/api/v1/ai/combo-suggestion', require('./controllers/admin/fnbOrderController').getAiComboSuggestion);
 
 // 👤 Tuyền — Back-office Operations
 app.use('/api/v1/operations', require('./modules/operations'));
