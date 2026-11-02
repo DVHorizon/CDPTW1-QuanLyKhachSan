@@ -18,6 +18,7 @@ import RoomService from './pages/client/RoomService';
 import Profile from './pages/client/Profile';
 import MyBookings from './pages/client/MyBookings';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
+import KitchenInventory from './pages/admin/fnb/KitchenInventory';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
 import FnbOrderHistory from './pages/admin/fnb/FnbOrderHistory';
 import TableMap from './pages/admin/fnb/TableMap';
@@ -138,6 +139,8 @@ function App() {
             <Route path="/admin/staff-accounts" element={<Navigate to="/admin/staff" replace />} />
 
             <Route path="/admin/fnb/kitchen" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} />
+            <Route path="/admin/fnb/kitchen-inventory" element={<ProtectedRoute><KitchenInventory /></ProtectedRoute>} />
+            <Route path="/admin/fnb/nguyen-lieu" element={<ProtectedRoute><KitchenInventory /></ProtectedRoute>} />
             <Route path="/admin/fnb/dispatch" element={<ProtectedRoute><OrderDispatchHub /></ProtectedRoute>} />
             <Route path="/admin/fnb/room-service" element={<ProtectedRoute><RoomService /></ProtectedRoute>} />
             <Route path="/admin/fnb/history" element={<ProtectedRoute><FnbOrderHistory /></ProtectedRoute>} />
