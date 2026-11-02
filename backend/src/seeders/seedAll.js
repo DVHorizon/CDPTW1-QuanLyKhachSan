@@ -14,8 +14,8 @@ async function seed() {
 
     console.log(`Starting Database Sync...`);
     // Turn off constraints for SQLite during mass sync/seed
-    await db.sequelize.query('PRAGMA foreign_keys = OFF');
-    await db.sequelize.sync({ force: true });
+    await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+    await db.MenuItem.destroy({ where: {}, truncate: true });
     console.log('Database synced and reset successfully.');
 
     // 1. Seed Categories
@@ -61,7 +61,7 @@ async function seed() {
       }
     }
 
-    await db.sequelize.query('PRAGMA foreign_keys = ON');
+    await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
     console.log(`\n✅ Thành công! Đã nạp ${count} records vào bảng MenuItems với hiệu năng cao.`);
     process.exit(0);
 
