@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 
 const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, checkOut, checkOutDate, isOpen = true, onClose, onSuccess }) => {
   if (!isOpen || !room) return null;
@@ -24,6 +24,8 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
   const [specialRequest, setSpecialRequest] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [bookingRef, setBookingRef] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Tính số đêm
   const d1 = new Date(bookingIn);
@@ -31,9 +33,6 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
   const diffTime = Math.max(d2 - d1, 86400000);
   const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   const totalAmount = nights * (room.BasePrice || 1850000);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,7 +83,6 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
     setIsSuccess(false);
     onClose();
   };
-
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -175,6 +173,13 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
         ) : (
           /* FORM STATE */
           <form onSubmit={handleSubmit} className="p-5 sm:p-7 flex flex-col gap-5">
+            {errorMessage && (
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">error</span>
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
             {/* Room Brief Card */}
             <div className="flex items-center gap-4 p-3.5 bg-[#fbf8f2] rounded-xl border border-[#dedad0]">
               <img 
@@ -329,9 +334,10 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[13px] font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5"
+                disabled={isSubmitting}
+                className="px-6 py-2.5 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[13px] font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
               >
-                <span>Xác Nhận Đặt Phòng</span>
+                <span>{isSubmitting ? 'Đang Xử Lý...' : 'Xác Nhận Đặt Phòng'}</span>
                 <span className="material-symbols-outlined text-[18px]">done</span>
               </button>
             </div>

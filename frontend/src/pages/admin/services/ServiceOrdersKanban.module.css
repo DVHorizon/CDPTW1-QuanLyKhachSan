@@ -1,0 +1,669 @@
+/* ServiceOrdersKanban.module.css */
+.kanbanContainer {
+  padding: 1.5rem;
+  background-color: #f8fafc;
+  min-height: calc(100vh - 4rem);
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .kanbanContainer {
+    padding: 1rem;
+  }
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toastSuccess {
+  background-color: #064e3b;
+  color: #ecfdf5;
+  border: 1px solid #10b981;
+}
+
+.toastError {
+  background-color: #7f1d1d;
+  color: #fef2f2;
+  border: 1px solid #ef4444;
+}
+
+/* Banner Header */
+.headerBanner {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  flex-wrap: wrap;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.headerIconBox {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(3, 105, 161, 0.25);
+  flex-shrink: 0;
+}
+
+.headerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #0369a1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background-color: #f0f9ff;
+  padding: 0.2rem 0.625rem;
+  border-radius: 9999px;
+  border: 1px solid #bae6fd;
+  margin-bottom: 0.25rem;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.3);
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+.headerTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.headerSubtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.actionBtnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #047857;
+  color: #ffffff;
+  border-radius: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(4, 120, 87, 0.25);
+  border: none;
+  cursor: pointer;
+}
+
+.actionBtnPrimary:hover {
+  background: #065f46;
+  transform: translateY(-1px);
+}
+
+.actionBtnOutline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.actionBtnOutline:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+/* Stats Counter Row */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+.statCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.875rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.statLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 0.25rem;
+}
+
+.statIconBox {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+/* Filter Bar */
+.filterBar {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  min-width: 260px;
+  flex: 1;
+  max-width: 400px;
+}
+
+.searchBox:focus-within {
+  border-color: #0284c7;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+}
+
+.searchInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.8125rem;
+  color: #0f172a;
+  width: 100%;
+}
+
+/* Kanban Board Columns */
+.kanbanGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(320px, 1fr));
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+
+@media (max-width: 1080px) {
+  .kanbanGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kanbanColumn {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.875rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  min-height: 480px;
+}
+
+.columnHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.columnTitleBox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.columnDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.columnTitle {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #1e293b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.columnBadge {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+}
+
+/* Cards Area */
+.cardsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  max-height: calc(100vh - 22rem);
+  padding-right: 0.25rem;
+}
+
+.emptyColumn {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.8125rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Order Card */
+.orderCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.875rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  transition: all 0.2s;
+}
+
+.orderCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
+}
+
+.cardTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.orderRoomBadge {
+  font-family: monospace;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
+}
+
+.orderTimeBadge {
+  font-size: 0.6875rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cardServiceName {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.cardQtyBadge {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  margin-right: 0.375rem;
+}
+
+.cardMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #475569;
+  border-top: 1px dashed #f1f5f9;
+  padding-top: 0.5rem;
+}
+
+.guestInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardPrice {
+  font-family: monospace;
+  font-weight: 800;
+  color: #047857;
+  font-size: 0.875rem;
+}
+
+.cardNoteBox {
+  background: #f8fafc;
+  border-left: 3px solid #cbd5e1;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.6875rem;
+  color: #475569;
+  border-radius: 0 0.25rem 0.25rem 0;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.cancelReasonBox {
+  background: #fef2f2;
+  border-left: 3px solid #ef4444;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.6875rem;
+  color: #991b1b;
+  border-radius: 0 0.25rem 0.25rem 0;
+}
+
+/* Card Actions */
+.cardActionRow {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.btnActionSmall {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnStart {
+  background: #0284c7;
+  color: #ffffff;
+}
+.btnStart:hover {
+  background: #0369a1;
+}
+
+.btnComplete {
+  background: #059669;
+  color: #ffffff;
+}
+.btnComplete:hover {
+  background: #047857;
+}
+
+.btnCancel {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 0.375rem 0.625rem;
+}
+.btnCancel:hover {
+  background: #fecaca;
+}
+
+/* Tab toggle in column 3 */
+.tabToggleGroup {
+  display: flex;
+  background: #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.2rem;
+  gap: 0.2rem;
+}
+
+.tabToggleBtn {
+  flex: 1;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tabToggleBtnActive {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Cancel Modal */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+}
+
+.modalBox {
+  background: #ffffff;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modalTitle {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #991b1b;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modalCloseBtn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.modalCloseBtn:hover {
+  color: #334155;
+}
+
+.quickReasonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.quickReasonChip {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.quickReasonChip:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.reasonTextarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  box-sizing: border-box;
+  outline: none;
+  font-family: inherit;
+}
+
+.reasonTextarea:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+}
+
+.modalFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 0.75rem;
+}
+
+.modalBtnCancel {
+  padding: 0.5rem 1rem;
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.modalBtnConfirm {
+  padding: 0.5rem 1.25rem;
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.modalBtnConfirm:hover {
+  background: #b91c1c;
+}
+
+.modalBtnConfirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

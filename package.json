@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "sequelize-cli": "^6.6.5"
+  }
+}

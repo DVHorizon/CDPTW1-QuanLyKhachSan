@@ -76,7 +76,7 @@ module.exports = (sequelize) => {
       defaultValue: 'DirectWeb'
     },
     BookingQrCode: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.TEXT('medium'),
       allowNull: true
     },
     ConfirmationCode: {
@@ -85,10 +85,6 @@ module.exports = (sequelize) => {
     },
     ConfirmationSentAt: {
       type: DataTypes.DATE,
-      allowNull: true
-    },
-    Note: {
-      type: DataTypes.STRING(500),
       allowNull: true
     }
   }, {

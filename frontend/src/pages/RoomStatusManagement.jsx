@@ -5,6 +5,29 @@ import { useSocket } from '../context/SocketContext';
 // ─── Cấu hình API Backend ──────────────────────────────────────────────────
 const API_BASE = 'http://localhost:5000/api/phong';
 
+// Helper lấy header xác thực và content-type
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('hotel_token') || localStorage.getItem('token') || '';
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
+// Safe JSON parser phòng ngừa server trả về HTML lỗi (502, 500, 404)
+const safeJson = async (res) => {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    return {
+      success: false,
+      message: res.statusText || `Lỗi phản hồi máy chủ (Mã HTTP ${res.status})`
+    };
+  }
+};
+
 // Mapping 4 trạng thái chuẩn PMS
 const STATUS_CONFIG = {
   clean: {
@@ -115,6 +138,24 @@ const RoomStatusManagement = () => {
   const [editModal, setEditModal] = useState(null); // null | { room, isNew: boolean }
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(null); // null | room
 
+  // ─── Modal bảo trì (FEAT-ROOMSTATUS-01 Spec 6.2) ──────────────────────────
+  const [maintenanceModal, setMaintenanceModal] = useState(null); // null | { room, action: 'on'|'off' }
+  const [maintenanceNote, setMaintenanceNote] = useState('');
+  const [maintenanceError, setMaintenanceError] = useState('');
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
+
+  // ─── Modal lịch sử trạng thái (FEAT-ROOMSTATUS-01 Spec 6.1) ──────────────
+  const [historyModal, setHistoryModal] = useState(false);
+  const [historyRoomId, setHistoryRoomId] = useState('');
+  const [historyFrom, setHistoryFrom] = useState('');
+  const [historyTo, setHistoryTo] = useState('');
+  const [historyData, setHistoryData] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyRoomNumber, setHistoryRoomNumber] = useState('');
+
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
@@ -124,14 +165,22 @@ const RoomStatusManagement = () => {
   const fetchRealRooms = async (silence = false) => {
     if (!silence) setIsRefreshing(true);
     try {
-      const res = await fetch(`${API_BASE}?limit=50&cat_bot_du_thua=true`);
-      const data = await res.json();
+      const res = await fetch(`${API_BASE}?limit=50&cat_bot_du_thua=true`, {
+        headers: getAuthHeaders()
+      });
+      const data = await safeJson(res);
       if (data.success && Array.isArray(data.data)) {
         setRooms(data.data);
         setTotalInDb(data.totalInDb || data.data.length);
 
-        // Tự động giữ selection nếu có
+        // Tự động giữ selection hoặc ưu tiên chọn theo URL param roomId (?roomId=...)
+        const searchParams = new URLSearchParams(window.location.search);
+        const targetRoomId = searchParams.get('roomId');
         setSelectedRoom((prev) => {
+          if (targetRoomId) {
+            const foundByParam = data.data.find((x) => String(x.id) === String(targetRoomId) || String(x.so_phong) === String(targetRoomId));
+            if (foundByParam) return foundByParam;
+          }
           if (!prev) return data.data[0] || null;
           const found = data.data.find((x) => x.id === prev.id);
           return found || data.data[0] || null;
@@ -256,14 +305,14 @@ const RoomStatusManagement = () => {
     try {
       const res = await fetch(`${API_BASE}/${roomId}/chuyen-trang-thai`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           targetStatus,
           prevUpdatedAt: currentRoom.updated_at
         })
       });
 
-      const result = await res.json();
+      const result = await safeJson(res);
 
       // Trường hợp 1: Phòng bị xóa bởi người khác (Xung đột sửa - xóa)
       if (res.status === 404 || result.isRecordDeleted) {
@@ -311,12 +360,93 @@ const RoomStatusManagement = () => {
     }
   };
 
-  // ─── Đồng bộ & cắt bớt nếu DB dư thừa chỉ lấy đúng 50 phòng ──────────────
+  // ─── Xử lý bảo trì (FEAT-ROOMSTATUS-01 Spec 3.5 & 4.4) ──────────────────
+  const handleOpenMaintenanceModal = (room, action) => {
+    setMaintenanceModal({ room, action });
+    setMaintenanceNote('');
+    setMaintenanceError('');
+  };
+
+  const handleSubmitMaintenance = async () => {
+    if (!maintenanceModal) return;
+    const { room, action } = maintenanceModal;
+
+    // Validate client-side (Spec 3.5 & 3.9)
+    if (action === 'on') {
+      const trimmed = maintenanceNote.trim();
+      if (!trimmed) { setMaintenanceError('Vui lòng nhập lý do bảo trì'); return; }
+      if (trimmed.length < 5) { setMaintenanceError('Lý do bảo trì phải có ít nhất 5 ký tự'); return; }
+      if (trimmed.length > 500) { setMaintenanceError('Lý do bảo trì không được vượt quá 500 ký tự'); return; }
+    }
+
+    setMaintenanceLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/${room.id}/maintenance`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action, maintenanceNote: maintenanceNote.trim() })
+      });
+      const result = await safeJson(res);
+
+      if (!res.ok || !result.success) {
+        setMaintenanceError(result.message || 'Lỗi khi cập nhật trạng thái bảo trì');
+        return;
+      }
+
+      setRooms(prev => prev.map(r => r.id === result.data.id ? result.data : r));
+      if (selectedRoom?.id === result.data.id) setSelectedRoom(result.data);
+      showToast('Cập nhật trạng thái phòng thành công');
+      setMaintenanceModal(null);
+    } catch (err) {
+      setMaintenanceError('Lỗi kết nối khi cập nhật bảo trì: ' + err.message);
+    } finally {
+      setMaintenanceLoading(false);
+    }
+  };
+
+  // ─── Tải lịch sử trạng thái phòng (FEAT-ROOMSTATUS-01 Spec 6.1) ──────────
+  const fetchStatusHistory = async (page = 1) => {
+    setHistoryLoading(true);
+    try {
+      let url;
+      if (historyRoomId) {
+        const params = new URLSearchParams({ page, pageSize: 20 });
+        if (historyFrom) params.append('from', historyFrom);
+        if (historyTo) params.append('to', historyTo);
+        url = `${API_BASE}/${historyRoomId}/status-history?${params}`;
+      } else {
+        const params = new URLSearchParams({ page, pageSize: 20 });
+        if (historyFrom) params.append('from', historyFrom);
+        if (historyTo) params.append('to', historyTo);
+        if (historyRoomNumber) params.append('roomNumber', historyRoomNumber);
+        url = `${API_BASE}/all-status-history?${params}`;
+      }
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      const data = await safeJson(res);
+      if (data.success) {
+        setHistoryData(data.data || []);
+        setHistoryTotal(data.total || 0);
+        setHistoryTotalPages(data.totalPages || 1);
+        setHistoryPage(page);
+      } else {
+        showToast(data.message || 'Lỗi tải lịch sử trạng thái', 'error');
+      }
+    } catch (err) {
+      showToast('Lỗi kết nối: ' + err.message, 'error');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+
   const handleSync50Rooms = async () => {
     try {
       setIsRefreshing(true);
-      const res = await fetch(`${API_BASE}/dong-bo-50`, { method: 'POST' });
-      const data = await res.json();
+      const res = await fetch(`${API_BASE}/dong-bo-50`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      const data = await safeJson(res);
       if (data.success) {
         showToast(data.message || 'Đã đồng bộ cơ sở dữ liệu thành công!');
         fetchRealRooms();
@@ -340,8 +470,11 @@ const RoomStatusManagement = () => {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/${roomToDelete.id}`, { method: 'DELETE' });
-      const data = await res.json();
+      const res = await fetch(`${API_BASE}/${roomToDelete.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      const data = await safeJson(res);
 
       if (res.status === 404 || data.isRecordDeleted) {
         setSyncModal({
@@ -399,10 +532,10 @@ const RoomStatusManagement = () => {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(f)
       });
-      const data = await res.json();
+      const data = await safeJson(res);
 
       // Kiểm tra phòng bị xóa khi đang sửa
       if (!isNew && (res.status === 404 || data.isRecordDeleted)) {
@@ -1196,21 +1329,47 @@ const RoomStatusManagement = () => {
                       <span>Chờ Dọn Dẹp</span>
                     </button>
 
-                    <button
-                      onClick={() => handleChangeStatus(selectedRoom.id, 'ooo')}
-                      className={`flex items-center gap-1.5 p-2.5 rounded-xl font-label-sm text-label-sm font-bold transition-all cursor-pointer ${
-                        getRoomStatusKey(selectedRoom) === 'ooo'
-                          ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-400/50'
-                          : 'bg-surface-container-lowest hover:bg-rose-500/10 text-rose-600 border border-rose-500/30'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">build_circle</span>
-                      <span>Khóa Bảo Trì</span>
-                    </button>
+                    {/* Nút Bảo Trì / Gỡ Bảo Trì — đi qua modal có maintenanceNote (Spec 3.5) */}
+                    {getRoomStatusKey(selectedRoom) === 'ooo' ? (
+                      <button
+                        onClick={() => handleOpenMaintenanceModal(selectedRoom, 'off')}
+                        className="flex items-center gap-1.5 p-2.5 rounded-xl font-label-sm text-label-sm font-bold transition-all cursor-pointer bg-rose-600 text-white shadow-md ring-2 ring-rose-400/50"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">build_circle</span>
+                        <span>Gỡ Bảo Trì</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenMaintenanceModal(selectedRoom, 'on')}
+                        disabled={getRoomStatusKey(selectedRoom) === 'inhouse'}
+                        className={`flex items-center gap-1.5 p-2.5 rounded-xl font-label-sm text-label-sm font-bold transition-all cursor-pointer ${
+                          getRoomStatusKey(selectedRoom) === 'inhouse'
+                            ? 'bg-surface-container-highest text-on-surface-variant border border-outline-variant/30 opacity-50 cursor-not-allowed'
+                            : 'bg-surface-container-lowest hover:bg-rose-500/10 text-rose-600 border border-rose-500/30'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">build_circle</span>
+                        <span>Khóa Bảo Trì</span>
+                      </button>
+                    )}
                   </div>
                   <p className="text-[11px] text-on-surface-variant italic mt-1">
                     * {STATUS_CONFIG[getRoomStatusKey(selectedRoom)].description}
                   </p>
+                  {/* Nút xem lịch sử trạng thái phòng (Spec 6.1) */}
+                  <button
+                    onClick={() => {
+                      setHistoryRoomId(String(selectedRoom.id));
+                      setHistoryRoomNumber(selectedRoom.so_phong);
+                      setHistoryModal(true);
+                      fetchStatusHistory(1);
+                    }}
+                    className="w-full mt-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-high font-label-sm text-label-sm font-bold transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">history</span>
+                    <span>Xem Lịch Sử Trạng Thái</span>
+                  </button>
+
                 </div>
 
                 {/* Thông tin phần cứng & IoT */}
@@ -1452,6 +1611,222 @@ const RoomStatusManagement = () => {
             </div>
           </div>
         )}
+        {/* ─── 8. MODAL BẢO TRÌ PHÒNG (FEAT-ROOMSTATUS-01 Spec 6.2) ──────────── */}
+        {maintenanceModal && (
+          <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-surface-container-lowest rounded-2xl p-6 max-w-md w-full shadow-2xl border border-outline-variant/40 flex flex-col space-y-4">
+              {/* Tiêu đề (Spec 6.2 STT 1) */}
+              <div className="flex items-center justify-between border-b pb-3 border-outline-variant/30">
+                <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface flex items-center gap-2">
+                  <span className={`material-symbols-outlined text-[24px] ${maintenanceModal.action === 'on' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                    {maintenanceModal.action === 'on' ? 'build' : 'check_circle'}
+                  </span>
+                  <span>
+                    {maintenanceModal.action === 'on'
+                      ? `Đánh Dấu Bảo Trì Phòng ${maintenanceModal.room.so_phong}`
+                      : `Gỡ Bảo Trì Phòng ${maintenanceModal.room.so_phong}`}
+                  </span>
+                </h3>
+                <button onClick={() => setMaintenanceModal(null)} className="w-8 h-8 rounded-lg hover:bg-surface-container flex items-center justify-center text-on-surface-variant cursor-pointer">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              {/* Textarea lý do bảo trì — chỉ hiển thị khi đánh dấu (Spec 6.2 STT 2) */}
+              {maintenanceModal.action === 'on' && (
+                <div className="flex flex-col gap-1">
+                  <label className="font-label-sm text-label-sm font-bold text-on-surface-variant">
+                    Lý do bảo trì <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={maintenanceNote}
+                    onChange={(e) => {
+                      setMaintenanceNote(e.target.value);
+                      setMaintenanceError('');
+                    }}
+                    onBlur={() => {
+                      const trimmed = maintenanceNote.trim();
+                      if (!trimmed) setMaintenanceError('Vui lòng nhập lý do bảo trì');
+                      else if (trimmed.length < 5) setMaintenanceError('Lý do bảo trì phải có ít nhất 5 ký tự');
+                      else if (trimmed.length > 500) setMaintenanceError('Lý do bảo trì không được vượt quá 500 ký tự');
+                      else setMaintenanceError('');
+                    }}
+                    maxLength={500}
+                    placeholder="Mô tả chi tiết lý do khóa phòng bảo trì..."
+                    className="bg-surface border border-outline-variant rounded-xl px-3 py-2 text-body-sm text-on-surface outline-none focus:ring-1 focus:ring-rose-400 resize-none"
+                  />
+                  <div className="flex items-center justify-between">
+                    {maintenanceError ? (
+                      <span className="text-rose-500 text-[13px] font-semibold">{maintenanceError}</span>
+                    ) : (
+                      <span />
+                    )}
+                    <span className={`text-[11px] font-mono ${maintenanceNote.length > 480 ? 'text-rose-500' : 'text-on-surface-variant'}`}>
+                      {maintenanceNote.length}/500
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Cảnh báo phụ khi gỡ bảo trì (Spec 6.2 STT 3) */}
+              {maintenanceModal.action === 'off' && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                  <p className="text-[13px] text-amber-700 dark:text-amber-400 font-semibold">
+                    Sau khi gỡ bảo trì, phòng sẽ chuyển về trạng thái Chờ dọn dẹp và cần được dọn lại trước khi đón khách.
+                  </p>
+                </div>
+              )}
+
+              {/* Hàng nút (Spec 6.2 STT 4) */}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-outline-variant/30">
+                <button
+                  type="button"
+                  onClick={() => setMaintenanceModal(null)}
+                  className="px-4 py-2 rounded-xl border border-outline-variant text-on-surface font-label-md text-label-md font-bold hover:bg-surface-container cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitMaintenance}
+                  disabled={maintenanceLoading}
+                  className={`px-5 py-2 rounded-xl font-label-md text-label-md font-bold shadow-md text-white cursor-pointer transition-all ${
+                    maintenanceModal.action === 'on'
+                      ? 'bg-[#EA4335] hover:brightness-110'
+                      : 'bg-[#1F4E78] hover:brightness-110'
+                  } ${maintenanceLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  {maintenanceLoading ? 'Đang xử lý...' : 'Xác Nhận'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── 9. MODAL LỊCH SỬ TRẠNG THÁI PHÒNG (FEAT-ROOMSTATUS-01 Spec 6.1) ── */}
+        {historyModal && (
+          <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-surface-container-lowest rounded-2xl p-6 max-w-4xl w-full shadow-2xl border border-outline-variant/40 flex flex-col space-y-4 max-h-[90vh]">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b pb-3 border-outline-variant/30 flex-shrink-0">
+                <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface flex items-center gap-2">
+                  <span className="material-symbols-outlined text-admin-primary">history</span>
+                  <span>Lịch Sử Trạng Thái Phòng</span>
+                  {historyRoomNumber && <span className="text-admin-primary font-mono">— {historyRoomNumber}</span>}
+                </h3>
+                <button onClick={() => { setHistoryModal(false); setHistoryRoomId(''); setHistoryRoomNumber(''); setHistoryData([]); }} className="w-8 h-8 rounded-lg hover:bg-surface-container flex items-center justify-center text-on-surface-variant cursor-pointer">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              {/* Thanh công cụ (Spec 6.1 STT 1) */}
+              <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
+                <input
+                  type="text"
+                  value={historyRoomNumber}
+                  onChange={(e) => { setHistoryRoomNumber(e.target.value); setHistoryRoomId(''); }}
+                  placeholder="Tìm theo số phòng..."
+                  className="bg-surface border border-outline-variant rounded-xl px-3 py-1.5 text-body-sm text-on-surface outline-none focus:ring-1 focus:ring-admin-primary min-w-[140px]"
+                />
+                <input type="date" value={historyFrom} onChange={e => setHistoryFrom(e.target.value)}
+                  className="bg-surface border border-outline-variant rounded-xl px-3 py-1.5 text-body-sm text-on-surface outline-none focus:ring-1 focus:ring-admin-primary" />
+                <span className="text-on-surface-variant text-sm">đến</span>
+                <input type="date" value={historyTo} onChange={e => setHistoryTo(e.target.value)}
+                  className="bg-surface border border-outline-variant rounded-xl px-3 py-1.5 text-body-sm text-on-surface outline-none focus:ring-1 focus:ring-admin-primary" />
+                <button
+                  onClick={() => fetchStatusHistory(1)}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-admin-primary text-white font-label-sm text-label-sm font-bold hover:brightness-110 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">search</span>
+                  Tra cứu
+                </button>
+              </div>
+
+              {/* Bảng lịch sử (Spec 6.1 STT 2-3, sắp xếp mới nhất trước, 20 dòng/trang) */}
+              <div className="overflow-y-auto flex-1">
+                {historyLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <span className="material-symbols-outlined text-[36px] text-admin-primary animate-spin">sync</span>
+                  </div>
+                ) : historyData.length === 0 ? (
+                  <div className="text-center py-12 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[40px]">history_toggle_off</span>
+                    <p className="mt-2 font-semibold">Không có dữ liệu lịch sử</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse text-body-sm">
+                    <thead>
+                      <tr className="bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+                        <th className="py-3 px-4">Thời Điểm</th>
+                        <th className="py-3 px-4">Phòng</th>
+                        <th className="py-3 px-4">Trạng Thái Cũ → Mới</th>
+                        <th className="py-3 px-4">Nguồn Kích Hoạt</th>
+                        <th className="py-3 px-4">Người Thực Hiện</th>
+                        <th className="py-3 px-4">Ghi Chú</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/20">
+                      {historyData.map(h => (
+                        <tr key={h.historyId} className="hover:bg-surface-container/40 transition-colors">
+                          <td className="py-2.5 px-4 font-mono text-[11px] text-on-surface-variant whitespace-nowrap">
+                            {new Date(h.changedAt).toLocaleString('vi-VN')}
+                          </td>
+                          <td className="py-2.5 px-4 font-mono font-bold text-on-surface">
+                            {h.roomNumber}{h.floor ? ` (T${h.floor})` : ''}
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[11px] px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-semibold">{h.oldStatusLabel || '—'}</span>
+                              <span className="material-symbols-outlined text-[14px] text-on-surface-variant">arrow_forward</span>
+                              <span className="text-[11px] px-2 py-0.5 rounded bg-admin-primary/10 text-admin-primary font-bold">{h.newStatusLabel}</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-4">
+                            {/* Badge nguồn kích hoạt (Spec 6.1 STT 3) */}
+                            <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-bold border ${
+                              h.isAutomatic
+                                ? 'bg-blue-500/10 text-blue-600 border-blue-500/30'
+                                : 'bg-amber-500/10 text-amber-700 border-amber-500/30'
+                            }`}>
+                              <span className="material-symbols-outlined text-[12px]">{h.isAutomatic ? 'smart_toy' : 'person'}</span>
+                              {h.isAutomatic ? 'Tự Động' : 'Thủ Công'}
+                            </span>
+                            <div className="text-[11px] text-on-surface-variant mt-0.5">{h.triggerEventLabel}</div>
+                          </td>
+                          <td className="py-2.5 px-4 text-[12px] text-on-surface">{h.changedBy}</td>
+                          <td className="py-2.5 px-4 text-[11px] text-on-surface-variant max-w-[160px] truncate" title={h.note || ''}>{h.note || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Phân trang (Spec 6.1: 20 dòng/trang) */}
+              {historyTotalPages > 1 && (
+                <div className="flex items-center justify-between flex-shrink-0 pt-2 border-t border-outline-variant/20">
+                  <span className="text-[12px] text-on-surface-variant">
+                    Tổng {historyTotal} bản ghi • Trang {historyPage}/{historyTotalPages}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={historyPage <= 1}
+                      onClick={() => fetchStatusHistory(historyPage - 1)}
+                      className="px-3 py-1 rounded-lg bg-surface-container font-label-sm font-bold text-on-surface disabled:opacity-40 cursor-pointer"
+                    >‹ Trước</button>
+                    <button
+                      disabled={historyPage >= historyTotalPages}
+                      onClick={() => fetchStatusHistory(historyPage + 1)}
+                      className="px-3 py-1 rounded-lg bg-surface-container font-label-sm font-bold text-on-surface disabled:opacity-40 cursor-pointer"
+                    >Tiếp ›</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
     </AdminLayout>
   );

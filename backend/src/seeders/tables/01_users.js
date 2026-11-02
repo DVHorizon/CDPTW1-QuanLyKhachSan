@@ -16,23 +16,25 @@ async function run(sequelize, IdPool, options = {}) {
 
   // Tạo tài khoản test cố định đầu tiên
   const defaultAccounts = [
-    { RoleName: 'Admin', Email: 'admin@hoteldomain.vn', FullName: 'Quản Trị Viên Hệ Thống' },
-    { RoleName: 'Receptionist', Email: 'receptionist@hoteldomain.vn', FullName: 'Lễ Tân Trực Ban' },
-    { RoleName: 'Kitchen', Email: 'kitchen@hoteldomain.vn', FullName: 'Bếp Trưởng Điều Hành' },
-    { RoleName: 'Housekeeping', Email: 'housekeeping@hoteldomain.vn', FullName: 'Tổ Trưởng Buồng Phòng' },
-    { RoleName: 'Guest', Email: 'guest@hoteldomain.vn', FullName: 'Khách Hàng VIP Trải Nghiệm' },
+    { RoleName: 'Admin', Email: 'admin@hoteldomain.vn', FullName: 'Quản Trị Viên Hệ Thống', Username: 'admin' },
+    { RoleName: 'Receptionist', Email: 'receptionist@hoteldomain.vn', FullName: 'Lễ Tân Trực Ban', Username: 'receptionist' },
+    { RoleName: 'Kitchen', Email: 'kitchen@hoteldomain.vn', FullName: 'Bếp Trưởng Điều Hành', Username: 'kitchen' },
+    { RoleName: 'Housekeeping', Email: 'housekeeping@hoteldomain.vn', FullName: 'Tổ Trưởng Buồng Phòng', Username: 'housekeeping' },
+    { RoleName: 'Guest', Email: 'guest@hoteldomain.vn', FullName: 'Khách Hàng VIP Trải Nghiệm', Username: 'guest' },
   ];
 
   await seedInChunks('Users', (i) => {
     let roleObj;
     let userEmail;
     let userName;
+    let username = null;
 
     if (i <= defaultAccounts.length) {
       const def = defaultAccounts[i - 1];
       roleObj = roles.find(r => r.RoleName === def.RoleName) || roles[0];
       userEmail = def.Email;
       userName = def.FullName;
+      username = def.Username;
     } else {
       const roleName = faker.random.weighted({
         Guest: 75, Receptionist: 12, Kitchen: 5, Housekeeping: 5, Admin: 3
@@ -49,6 +51,7 @@ async function run(sequelize, IdPool, options = {}) {
     return {
       RoleId: roleObj.RoleId,
       TierId: tier ? tier.TierId : null,
+      Username: username,
       FullName: userName,
       Email: userEmail,
       Phone: faker.phone(),
