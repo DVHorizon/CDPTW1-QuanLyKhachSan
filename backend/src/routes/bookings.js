@@ -390,31 +390,33 @@ const buildBookingFilter = async (queryObj) => {
   const whereClauses = ['b.IsDeleted = 0'];
   const params = [];
 
-  // Từ khóa tìm kiếm: Tìm trên Mã booking, Họ tên khách, SĐT (Mục 3.2 & Test Case 5-9)
+  // Từ khóa tìm kiếm: Tìm trên Mã booking, Mã giao dịch, Họ tên khách, SĐT (Mục 3.2 & Test Case 5-9)
   if (cleanKeyword) {
     const escaped = `%${escapeSqlLike(cleanKeyword)}%`;
     whereClauses.push(`(
       b.ConfirmationCode LIKE ? OR
+      EXISTS (SELECT 1 FROM Payments p WHERE p.BookingId = b.BookingId AND p.TransactionCode LIKE ?) OR
       COALESCE(bg.FullName, u.FullName) LIKE ? OR
       COALESCE(bg.Phone, u.Phone) LIKE ?
     )`);
-    params.push(escaped, escaped, escaped);
+    params.push(escaped, escaped, escaped, escaped);
   }
-
   // Khoảng ngày (Mục 3.3)
-  if (cleanDateType === 'BOOKING_DATE') {
-    whereClauses.push('DATE(CONVERT_TZ(b.CreatedAt, "+00:00", "+07:00")) BETWEEN ? AND ?');
-    params.push(finalDateFrom, finalDateTo);
-  } else if (cleanDateType === 'CHECKOUT_DATE') {
-    whereClauses.push('DATE(b.CheckOutDate) BETWEEN ? AND ?');
-    params.push(finalDateFrom, finalDateTo);
-  } else {
-    // CHECKIN_DATE (mặc định)
-    whereClauses.push('DATE(b.CheckInDate) BETWEEN ? AND ?');
-    params.push(finalDateFrom, finalDateTo);
+  // Khoảng ngày (Mục 3.3): Nếu CÓ nhập từ khóa tìm kiếm (cleanKeyword),
+  // ưu tiên tìm theo từ khóa và bỏ qua giới hạn ngày để đơn tương lai/quá khứ hiển thị ngay (Phương án 1)
+  if (!cleanKeyword) {
+    if (cleanDateType === 'BOOKING_DATE') {
+      whereClauses.push('DATE(CONVERT_TZ(b.CreatedAt, "+00:00", "+07:00")) BETWEEN ? AND ?');
+      params.push(finalDateFrom, finalDateTo);
+    } else if (cleanDateType === 'CHECKOUT_DATE') {
+      whereClauses.push('DATE(b.CheckOutDate) BETWEEN ? AND ?');
+      params.push(finalDateFrom, finalDateTo);
+    } else {
+      // CHECKIN_DATE (mặc định)
+      whereClauses.push('DATE(b.CheckInDate) BETWEEN ? AND ?');
+      params.push(finalDateFrom, finalDateTo);
+    }
   }
-
-  // Trạng thái (Mục 3.4)
   if (cleanStatuses.length < 6) {
     const dbStatuses = [];
     cleanStatuses.forEach((st) => {
