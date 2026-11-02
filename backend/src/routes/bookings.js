@@ -200,9 +200,10 @@ router.get('/', async (req, res) => {
         COALESCE(bg.Phone, u.Phone) LIKE ? OR
         COALESCE(bg.IdNumber, u.IdNumber) LIKE ? OR
         COALESCE(bg.Email, u.Email) LIKE ? OR
-        r.RoomNumber LIKE ?
+        r.RoomNumber LIKE ? OR
+        p.TransactionCode LIKE ?
       )`);
-      baseParams.push(q, q, q, q, q, q);
+      baseParams.push(q, q, q, q, q, q, q);
     }
 
     if (date && String(date).trim() && date !== 'all') {
@@ -264,6 +265,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE ${whereSql}
     `;
     const [[{ total }]] = await pool.query(countQuery, params);
@@ -304,6 +306,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE ${whereSql}
       ORDER BY b.CheckInDate ASC, b.BookingId DESC
       LIMIT ? OFFSET ?
@@ -329,6 +332,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE ${baseWhereSql}
       `,
       [todayStr, todayStr, ...baseParams]
@@ -403,6 +407,7 @@ router.get('/:id', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE b.BookingId = ?
       ORDER BY s.StayId DESC
       LIMIT 1

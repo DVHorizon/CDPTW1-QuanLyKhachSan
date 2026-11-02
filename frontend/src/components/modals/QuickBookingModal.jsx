@@ -58,7 +58,8 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
           specialRequest,
           adults: room.AdultCapacity || 2,
           children: room.ChildCapacity || 0,
-          roomQuantity: 1
+          roomQuantity: 1,
+          isPolicyAccepted: true
         })
       });
 
@@ -73,10 +74,7 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
       }
     } catch (err) {
       console.error('Booking submission error:', err);
-      // Fallback hiển thị mã offline nếu mạng ngắt
-      const refCode = 'GH-' + Math.floor(100000 + Math.random() * 900000);
-      setBookingRef(refCode);
-      setIsSuccess(true);
+      setErrorMessage('Không thể kết nối tới máy chủ đặt phòng. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
