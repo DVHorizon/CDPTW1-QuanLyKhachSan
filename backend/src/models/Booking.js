@@ -71,6 +71,11 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(30),
       defaultValue: 'Pending'
     },
+    IsDeleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
+    },
     BookingSource: {
       type: DataTypes.STRING(50),
       defaultValue: 'DirectWeb'
