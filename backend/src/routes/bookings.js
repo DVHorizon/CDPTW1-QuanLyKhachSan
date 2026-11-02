@@ -247,11 +247,12 @@ const buildBookingFilter = async (queryObj) => {
   const hasDateTo = dateTo !== undefined && dateTo !== null && String(dateTo).trim() !== '';
 
   if (!hasDateFrom && !hasDateTo) {
-    // Mặc định: 30 ngày gần nhất (hôm nay - 29 ngày đến hôm nay)
-    finalDateFrom = addDaysUtc7(today, -29);
-    finalDateTo = today;
+    if (!cleanKeyword) {
+      // Mặc định: 30 ngày gần nhất (hôm nay - 29 ngày đến hôm nay) khi KHÔNG nhập từ khóa
+      finalDateFrom = addDaysUtc7(today, -29);
+      finalDateTo = today;
+    }
   } else if (!hasDateFrom || !hasDateTo) {
-    // Chỉ có 1 trong 2 mốc
     errors.push({
       field: 'dateRange',
       code: 'ERROR_0022_INVALID_DATE_RANGE',
@@ -404,7 +405,8 @@ const buildBookingFilter = async (queryObj) => {
   // Khoảng ngày (Mục 3.3)
   // Khoảng ngày (Mục 3.3): Nếu CÓ nhập từ khóa tìm kiếm (cleanKeyword),
   // ưu tiên tìm theo từ khóa và bỏ qua giới hạn ngày để đơn tương lai/quá khứ hiển thị ngay (Phương án 1)
-  if (!cleanKeyword) {
+  // Áp dụng khoảng ngày nếu người dùng chọn ngày (hoặc ngày mặc định khi không tìm keyword):
+  if (finalDateFrom && finalDateTo) {
     if (cleanDateType === 'BOOKING_DATE') {
       whereClauses.push('DATE(CONVERT_TZ(b.CreatedAt, "+00:00", "+07:00")) BETWEEN ? AND ?');
       params.push(finalDateFrom, finalDateTo);
