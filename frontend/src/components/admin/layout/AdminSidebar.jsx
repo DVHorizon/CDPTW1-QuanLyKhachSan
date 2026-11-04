@@ -40,7 +40,7 @@ const ALL_NAV_ITEMS = [
   { icon: "loyalty", label: "Khách Hàng & Hội Viên", to: "/admin/loyalty", allowedRoles: ['Admin', 'Receptionist'] },
   // Quản lý tài khoản (USER_MANAGE) — Spec 3: CHỈ ADMIN mới nhìn thấy menu này!
   { icon: "manage_accounts", label: "Quản Lý Tài Khoản & Phân Quyền", to: "/admin/staff", allowedRoles: ['Admin'], requiredPermission: 'USER_MANAGE' },
-  { icon: "admin_panel_settings", label: "Quản Trị Hệ Thống", to: "/admin/quan-tri", allowedRoles: ['Admin'] },
+
 ];
 
 const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
