@@ -156,6 +156,10 @@ Review.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 Review.hasMany(ReviewPhoto, { foreignKey: 'ReviewId', as: 'photos' });
 ReviewPhoto.belongsTo(Review, { foreignKey: 'ReviewId', as: 'review' });
 
+// 7c. Stay & Review (FEAT-GUEST-11)
+Stay.hasOne(Review, { foreignKey: 'StayId', as: 'review' });
+Review.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
+
 // 8. MenuCategory & MenuItem
 MenuCategory.hasMany(MenuItem, { foreignKey: 'CategoryId' });
 MenuItem.belongsTo(MenuCategory, { foreignKey: 'CategoryId' });

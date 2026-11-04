@@ -6,6 +6,13 @@ const roomSearchController = require('../controllers/roomSearchController');
 const bookingEngineController = require('../controllers/bookingEngineController');
 const dynamicPricingController = require('../controllers/dynamicPricingController');
 const { verifyToken } = require('../middlewares/authMiddleware');
+const { handleSearch } = require('../controllers/esRoomController');
+const { searchRoomsSolr } = require('../controllers/solrRoomController');
+
+//Đăng ký đường dẫn API 
+router.get('/search', handleSearch);
+router.get('/search-es', handleSearch);
+router.get('/search-solr', searchRoomsSolr);
 
 // GET /api/v1/rooms/search
 router.get('/search', roomSearchController.searchRooms);
@@ -27,3 +34,4 @@ router.get('/:roomId/pricing', dynamicPricingController.getRoomDynamicPricing);
 router.get('/:id', roomSearchController.getRoomDetail);
 
 module.exports = router;
+

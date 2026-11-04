@@ -521,3 +521,36 @@ export const getDynamicPricingApi = async (roomId, { checkInDate, checkOutDate }
     };
   }
 };
+
+
+/**
+ * FEAT-GUEST-11: Room Review & Rating API
+ */
+export const submitRoomReviewApi = async (roomId, payload, token = null) => {
+  try {
+    const authToken = token || localStorage.getItem('hotel_token');
+    const res = await fetch(`${API_BASE_URL}/v1/rooms/${roomId}/reviews`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi submitRoomReviewApi:', err);
+    return { success: false, message: 'Không thể kết nối máy chủ gửi đánh giá' };
+  }
+};
+
+export const getRoomReviewsApi = async (roomId, params = {}) => {
+  try {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_BASE_URL}/v1/rooms/${roomId}/reviews?${query}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi getRoomReviewsApi:', err);
+    return { success: false, message: 'Không thể tải danh sách đánh giá' };
+  }
+};
