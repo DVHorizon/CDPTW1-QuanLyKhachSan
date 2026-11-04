@@ -491,3 +491,33 @@ export const cancelMyBookingApi = async (bookingId, body = {}, token = null) => 
     };
   }
 };
+
+/**
+ * TÍNH NĂNG 12: ĐIỀU CHỈNH GIÁ PHÒNG LINH HOẠT THEO THỜI ĐIỂM (DYNAMIC PRICING ENGINE)
+ * Mã tính năng: FEAT-GUEST-12 | Mã truy vết: A12
+ * GET /api/v1/rooms/{roomId}/pricing?checkInDate=YYYY-MM-DD&checkOutDate=YYYY-MM-DD
+ * @param {number|string} roomId - ID loại phòng hoặc phòng cần tính toán
+ * @param {Object} params - { checkInDate, checkOutDate }
+ */
+export const getDynamicPricingApi = async (roomId, { checkInDate, checkOutDate }) => {
+  try {
+    const query = new URLSearchParams();
+    if (checkInDate) query.append('checkInDate', checkInDate);
+    if (checkOutDate) query.append('checkOutDate', checkOutDate);
+
+    let res = await fetch(`${API_BASE_URL}/v1/rooms/${roomId}/pricing?${query.toString()}`);
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/${roomId}/pricing?${query.toString()}`);
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi getDynamicPricingApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_0043_PRICING_RULE_ERROR',
+      message: 'Không thể áp dụng bảng giá động cho khoảng thời gian này'
+    };
+  }
+};
