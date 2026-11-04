@@ -1,9 +1,83 @@
 const { deductIngredientsForOrder } = require('./kitchenInventoryController');
-const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room, Booking, User, Invoice, InvoiceDetail, Payment, Review, ReviewPhoto } = require('../../models');
+const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room, Booking, User, Invoice, InvoiceDetail, Payment, Review, ReviewPhoto, TableReservation, RestaurantTable } = require('../../models');
 const { broadcastOrderStatus, broadcastNewKitchenOrder } = require('../../services/websocketService');
 
 
 // Lấy danh sách lượt lưu trú đang hoạt động (CheckedIn / Active) để chọn phòng đặt món / đặt bàn
+
+// Lấy thông tin lượt đặt bàn còn hiệu lực của khách hàng để gọi món tại bàn
+exports.getMyActiveTableReservation = async (req, res) => {
+  try {
+    const { Op } = require('sequelize');
+    const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId || req.query.userId;
+    const phone = req.query.phone;
+
+    let userCondition = [];
+    if (currentUserId) userCondition.push({ UserId: currentUserId });
+    
+    // Tìm user theo phone nếu có truyền vào
+    if (phone) {
+      const matchedUser = await User.findOne({ where: { Phone: phone } });
+      if (matchedUser) {
+        userCondition.push({ UserId: matchedUser.UserId });
+      }
+    }
+
+    if (userCondition.length === 0) {
+      return res.status(200).json({
+        success: true,
+        hasReservation: false,
+        message: 'Chưa có thông tin nhận diện khách hàng.',
+        data: null
+      });
+    }
+
+    // Quét các lượt đặt bàn của user trong ngày hôm nay hoặc sắp tới có trạng thái Confirmed / Pending
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+
+    const reservation = await TableReservation.findOne({
+      where: {
+        [Op.or]: userCondition,
+        Status: { [Op.in]: ['Confirmed', 'Pending'] },
+        ReservationTime: { [Op.gte]: startOfDay }
+      },
+      include: [
+        { model: RestaurantTable, as: 'table' },
+        { model: User, as: 'user', attributes: ['UserId', 'FullName', 'Phone', 'Email'] }
+      ],
+      order: [['ReservationTime', 'ASC']]
+    });
+
+    if (!reservation) {
+      return res.status(200).json({
+        success: true,
+        hasReservation: false,
+        message: 'Quý khách chưa có lượt đặt bàn nào còn hiệu lực trong ngày hôm nay.',
+        data: null
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      hasReservation: true,
+      data: {
+        reservationId: reservation.TableReservationId,
+        tableId: reservation.TableId,
+        tableNumber: reservation.table?.TableNumber || ('Bàn #' + reservation.TableId),
+        location: reservation.table?.Location || 'Khu vực chung',
+        guestCount: reservation.GuestCount,
+        reservationTime: reservation.ReservationTime,
+        status: reservation.Status,
+        customerName: reservation.user?.FullName || 'Quý Khách'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching active table reservation:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi kiểm tra thông tin đặt bàn.' });
+  }
+};
+
 exports.getActiveStays = async (req, res) => {
   try {
     const stays = await Stay.findAll({
@@ -39,41 +113,93 @@ exports.getActiveStays = async (req, res) => {
 };
 
 // FEAT-FNB-04 (A4.4): ĐẶT MÓN ROOM SERVICE ONLINE
+// FEAT-FNB-04 (A4.4): ĐẶT MÓN F&B (Room Service tại phòng hoặc Gọi món tại Bàn Nhà Hàng)
 exports.createRoomServiceOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    const { stayId, roomId, items, paymentMode, userId, note } = req.body;
+    const { orderTarget = 'Room', stayId, roomId, tableId, items, paymentMode, userId, note } = req.body;
     const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId || userId;
-
-    // 1. Kiểm tra phòng và lượt lưu trú
-    if (!stayId || !roomId) {
-      await transaction.rollback();
-      return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Vui lòng chọn phòng hợp lệ.' });
-    }
-
     const { Op } = require('sequelize');
-    const stay = await Stay.findOne({
-      where: {
-        StayId: stayId,
-        RoomId: roomId,
-        Status: { [Op.in]: ['Active', 'CheckedIn'] }
-      },
-      include: [{ model: Room }],
-      transaction
-    });
 
-    if (!stay) {
-      await transaction.rollback();
-      return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Vui lòng chọn phòng hợp lệ.' });
+    let resolvedStayId = null;
+    let resolvedRoomId = null;
+    let resolvedTableId = null;
+    let locationLabel = 'N/A';
+    let stay = null;
+    let assignedTable = null;
+
+    if (orderTarget === 'Table' || tableId) {
+      // 1A. KIỂM TRA ĐẶT BÀN: Khách phải có lượt đặt bàn hợp lệ hôm nay hoặc chỉ định bàn hợp lệ
+      const targetTableId = tableId;
+      if (!targetTableId) {
+        // Tự động tìm bàn mà user đã đặt trong ngày hôm nay
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const userRes = await TableReservation.findOne({
+          where: {
+            UserId: currentUserId,
+            Status: { [Op.in]: ['Confirmed', 'Pending'] },
+            ReservationTime: { [Op.gte]: startOfDay }
+          },
+          include: [{ model: RestaurantTable, as: 'table' }],
+          order: [['ReservationTime', 'ASC']],
+          transaction
+        });
+
+        if (!userRes || !userRes.TableId) {
+          await transaction.rollback();
+          return res.status(400).json({
+            code: 'ERROR_0005_INVALID_VALUE',
+            message: 'Quý khách vui lòng đặt bàn trước khi gọi món tại nhà hàng.'
+          });
+        }
+        resolvedTableId = userRes.TableId;
+        assignedTable = userRes.table;
+      } else {
+        assignedTable = await RestaurantTable.findOne({
+          where: { TableId: targetTableId, IsDeleted: false },
+          transaction
+        });
+        if (!assignedTable) {
+          await transaction.rollback();
+          return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Bàn không tồn tại.' });
+        }
+        resolvedTableId = assignedTable.TableId;
+      }
+      locationLabel = assignedTable?.TableNumber || ('Bàn #' + resolvedTableId);
+    } else {
+      // 1B. KIỂM TRA PHÒNG LƯU TRÚ (ROOM SERVICE)
+      if (!stayId || !roomId) {
+        await transaction.rollback();
+        return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Vui lòng chọn phòng hợp lệ.' });
+      }
+
+      stay = await Stay.findOne({
+        where: {
+          StayId: stayId,
+          RoomId: roomId,
+          Status: { [Op.in]: ['Active', 'CheckedIn'] }
+        },
+        include: [{ model: Room }],
+        transaction
+      });
+
+      if (!stay) {
+        await transaction.rollback();
+        return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Vui lòng chọn phòng hợp lệ.' });
+      }
+      resolvedStayId = stay.StayId;
+      resolvedRoomId = stay.RoomId;
+      locationLabel = 'Phòng ' + (stay.Room?.RoomNumber || stay.RoomId);
     }
 
-    // 2. Kiểm tra chọn món
+    // 2. Kiểm tra danh sách món
     if (!items || !Array.isArray(items) || items.length === 0) {
       await transaction.rollback();
       return res.status(400).json({ code: 'ERROR_0001_REQUIRED', message: 'Vui lòng chọn ít nhất một món.' });
     }
 
-    // 3. Kiểm tra số lượng món và món đang phục vụ
+    // 3. Kiểm tra số lượng và tính tiền
     let totalAmount = 0;
     const orderDetails = [];
 
@@ -108,13 +234,12 @@ exports.createRoomServiceOrder = async (req, res) => {
       });
     }
 
-    // 4. Tính toán tổng hóa đơn
     if (isNaN(totalAmount) || totalAmount <= 0) {
       await transaction.rollback();
       return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể tính tổng hóa đơn.' });
     }
 
-    // 5. Kiểm tra hình thức thanh toán
+    // 4. Kiểm tra hình thức thanh toán
     if (!paymentMode) {
       await transaction.rollback();
       return res.status(400).json({ code: 'ERROR_0001_REQUIRED', message: 'Vui lòng chọn hình thức thanh toán.' });
@@ -125,15 +250,20 @@ exports.createRoomServiceOrder = async (req, res) => {
       return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Hình thức thanh toán không hợp lệ' });
     }
 
-    // 6. Tạo FoodOrders và FoodOrderDetails
+    // Nếu đặt tại Bàn mà không có stayId thì không cho gộp vào RoomInvoice
+    const finalPaymentMode = (resolvedTableId && !resolvedStayId && paymentMode === 'RoomInvoice') ? 'PayNow' : paymentMode;
+
+    // 5. Tạo FoodOrders và FoodOrderDetails
+    const orderType = resolvedTableId ? 'Restaurant' : 'RoomService';
     const order = await FoodOrder.create({
-      StayId: stayId,
-      RoomId: roomId,
+      StayId: resolvedStayId,
+      RoomId: resolvedRoomId,
+      TableId: resolvedTableId,
       UserId: currentUserId || 1,
-      OrderType: 'RoomService',
+      OrderType: orderType,
       Status: 'Pending',
       TotalAmount: totalAmount,
-      PaymentMode: paymentMode,
+      PaymentMode: finalPaymentMode,
       Note: note ? String(note).trim() : null
     }, { transaction });
 
@@ -142,8 +272,13 @@ exports.createRoomServiceOrder = async (req, res) => {
       await FoodOrderDetail.create(detail, { transaction });
     }
 
-    // Nếu chọn gộp vào hóa đơn phòng (RoomInvoice), tự động ghi nhận folio charge vào Invoice của lượt lưu trú
-    if (paymentMode === 'RoomInvoice') {
+    // Nếu là đơn Bàn, cập nhật trạng thái bàn sang Occupied
+    if (assignedTable) {
+      await assignedTable.update({ Status: 'Occupied' }, { transaction });
+    }
+
+    // Gộp hóa đơn phòng nếu chọn RoomInvoice
+    if (finalPaymentMode === 'RoomInvoice' && stay) {
       try {
         let invoice = await Invoice.findOne({
           where: { StayId: stay.StayId },
@@ -165,79 +300,90 @@ exports.createRoomServiceOrder = async (req, res) => {
           }, { transaction });
         }
 
-        // Tạo chi tiết khoản phí (folio charge) vào InvoiceDetails
         const orderAmount = parseFloat(order.TotalAmount || 0);
         await InvoiceDetail.create({
           InvoiceId: invoice.InvoiceId,
           ItemType: 'FoodOrder',
-          ItemId: order.FoodOrderId,
-          Description: `Khoản phí dịch vụ ăn uống F&B Đơn #${order.FoodOrderId} (${stay.Room?.RoomNumber ? `Phòng ${stay.Room.RoomNumber}` : 'Room Service'})`,
-          Quantity: 1.00,
+          Description: `Gọi món F&B (${orderType}) - Đơn #${order.FoodOrderId}`,
+          Quantity: 1,
           UnitPrice: orderAmount,
-          TotalPrice: orderAmount
+          Amount: orderAmount
         }, { transaction });
 
-        // Cập nhật tổng tiền Invoice
-        const currentSubtotal = parseFloat(invoice.Subtotal || 0) + orderAmount;
-        const vatRate = parseFloat(invoice.VATRate || 10.00);
-        const vatAmount = (currentSubtotal * vatRate) / 100;
-        const totalInvoice = currentSubtotal + vatAmount;
-
-        invoice.Subtotal = currentSubtotal;
-        invoice.VATAmount = vatAmount;
-        invoice.TotalAmount = totalInvoice;
-        await invoice.save({ transaction });
+        const newSubtotal = (parseFloat(invoice.Subtotal) || 0) + orderAmount;
+        const newVATAmount = newSubtotal * (parseFloat(invoice.VATRate) || 10) / 100;
+        const newTotalAmount = newSubtotal + newVATAmount;
+        await invoice.update({
+          Subtotal: newSubtotal,
+          VATAmount: newVATAmount,
+          TotalAmount: newTotalAmount
+        }, { transaction });
       } catch (folioErr) {
-        console.warn('Lỗi tự động ghi nhận folio charge cho RoomInvoice:', folioErr.message);
+        console.warn('Lỗi ghi nhận RoomInvoice:', folioErr.message);
       }
     }
 
     await transaction.commit();
 
-    const itemsList = orderDetails.map(d => ({ menuItemId: d.MenuItemId, itemName: (d.itemName || ('M�n an #' + d.MenuItemId)), quantity: d.Quantity, note: d.Note }));
-    // 7. Gửi đơn xuống quy trình KDS / Bếp qua WebSocket (FEAT-FNB-06 & FEAT-FNB-12)
-    try {
-      const roomNum = stay.Room?.RoomNumber || 'N/A';
-      const _ignore = orderDetails.map(d => ({
-        menuItemId: d.MenuItemId,
-        itemName: d.itemName || `Món ăn #${d.MenuItemId}`,
-        quantity: d.Quantity,
-        note: d.Note
-      }));
+    const itemsList = orderDetails.map(d => ({
+      menuItemId: d.MenuItemId,
+      itemName: (d.itemName || ('Món ăn #' + d.MenuItemId)),
+      quantity: d.Quantity,
+      note: d.Note
+    }));
 
-      // Broadcast sự kiện new_fnb_order theo chuẩn SPEC FEAT-FNB-12
+    // 6. Gửi WebSocket thông báo Bếp (KDS) và Sơ đồ bàn (TableMap)
+    try {
       broadcastNewKitchenOrder({
         foodOrderId: order.FoodOrderId,
-        orderType: 'RoomService',
-        location: `Phòng ${roomNum}`,
+        orderType: order.OrderType,
+        location: locationLabel,
         orderTime: order.createdAt || new Date().toISOString(),
         totalAmount: order.TotalAmount,
         note: req.body?.note || '',
         items: itemsList
       });
 
-      // Broadcast thay đổi trạng thái đơn
       broadcastOrderStatus({
         orderId: order.FoodOrderId,
         status: 'Pending',
-        orderType: 'RoomService',
+        orderType: order.OrderType,
         paymentMode: order.PaymentMode,
         totalAmount: order.TotalAmount,
-        roomNumber: roomNum,
+        roomNumber: stay?.Room?.RoomNumber || null,
+        tableId: resolvedTableId,
+        tableNumber: assignedTable?.TableNumber || null,
         updatedAt: new Date().toISOString()
       });
+
+      // Nếu là đơn Bàn, phát WebSocket cập nhật tức thì trên Sơ Đồ Bàn Ăn (TableMap)
+      if (resolvedTableId) {
+        const { broadcastTableUpdate } = require('../../services/websocketService');
+        if (broadcastTableUpdate) {
+          broadcastTableUpdate({
+            tableId: resolvedTableId,
+            tableNumber: assignedTable?.TableNumber || ('Bàn #' + resolvedTableId),
+            status: 'Occupied',
+            action: 'OrderDishes',
+            orderId: order.FoodOrderId,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
     } catch (wsErr) {
       console.warn('WebSocket broadcast error:', wsErr.message);
     }
 
-        deductIngredientsForOrder(order.FoodOrderId, itemsList, req.user?.userId).catch(e => console.error(e));
+    deductIngredientsForOrder(order.FoodOrderId, itemsList, req.user?.userId).catch(e => console.error(e));
 
     return res.status(201).json({
       success: true,
-      message: 'Đặt món thành công. Đơn đã được chuyển xuống bếp.',
+      message: 'Đặt món thành công. Món ăn đã được liên kết với ' + locationLabel + ' và chuyển xuống bếp.',
       data: {
         orderId: order.FoodOrderId,
         stayId: order.StayId,
+        tableId: order.TableId,
+        tableNumber: assignedTable?.TableNumber || null,
         orderType: order.OrderType,
         status: order.Status,
         totalAmount: order.TotalAmount,
@@ -246,14 +392,16 @@ exports.createRoomServiceOrder = async (req, res) => {
     });
 
   } catch (error) {
-    if (transaction && !transaction.finished) { try { await transaction.rollback(); } catch (rbErr) {} }
-    console.error('Error creating room service order:', error);
+    if (transaction && !transaction.finished) {
+      try {
+        await transaction.rollback();
+      } catch (rbErr) {}
+    }
+    console.error('Error creating fnb order:', error);
     return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể tạo hoặc gửi đơn xuống bếp.' });
   }
 };
 
-
-// FEAT-FNB-08 (A4.8): LỊCH SỬ GỌI MÓN & DANH SÁCH TỔNG HỢP ĐƠN F&B TRONG NGÀY
 exports.getOrderHistory = async (req, res) => {
   try {
     const { Op } = require('sequelize');

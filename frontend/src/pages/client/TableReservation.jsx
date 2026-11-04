@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import GuestSidebar from "../../components/layout/GuestSidebar";
 import GuestHeader from "../../components/layout/GuestHeader";
 
@@ -1502,16 +1503,25 @@ export default function TableReservation() {
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setShowModal(false);
-                setShowHistoryDrawer(true);
-              }}
-              className="w-full py-3 px-4 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all text-sm"
-            >
-              Hoàn Tất & Xem Danh Sách Bàn Đã Đặt
-            </button>
+            <div className="flex flex-col gap-2.5 w-full">
+              <Link
+                to="/room-service?target=Table"
+                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all text-sm flex items-center justify-center gap-2 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">restaurant</span>
+                <span>Gọi Món Cho Bàn Này Ngay</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowModal(false);
+                  setShowHistoryDrawer(true);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-all text-xs border border-slate-200"
+              >
+                Xem Danh Sách Bàn Đã Đặt
+              </button>
+            </div>
           </div>
         </div>
       )}
