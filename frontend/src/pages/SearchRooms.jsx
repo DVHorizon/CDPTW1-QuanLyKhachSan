@@ -76,6 +76,7 @@ export default function SearchRooms() {
   const [errorMessage, setErrorMessage] = useState('');
   const [validationError, setValidationError] = useState('');
   const [searchEngineMeta, setSearchEngineMeta] = useState(null);
+  const [selectedEngine, setSelectedEngine] = useState('solr');
   const [wishlist, setWishlist] = useState([]);
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
@@ -210,7 +211,8 @@ export default function SearchRooms() {
       view: selectedView,
       amenities: selectedAmenities,
       rating: selectedRating === '4.5' ? '4.5' : selectedRating === '4.0' ? '4.0' : undefined,
-      sortBy
+      sortBy,
+      engine: selectedEngine
     };
 
     // Cập nhật search params trên URL
@@ -241,13 +243,15 @@ export default function SearchRooms() {
 
     if (result.searchEngine) {
       setSearchEngineMeta(result.searchEngine);
+    } else if (result.engine) {
+      setSearchEngineMeta({ engine: result.engine, executionTimeMs: result.executionTimeMs, query: result.originalKeyword, normalizedQuery: result.normalizedKeyword, isFullWidthInput: result.isFullWidthInput });
     }
   };
 
   // Tự động tìm kiếm lần đầu khi mount
   useEffect(() => {
     executeSearch();
-  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, priceMax]);
+  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, priceMax, selectedEngine]);
 
   // Xử lý Wishlist
   const toggleWishlist = (roomId) => {
@@ -609,6 +613,38 @@ export default function SearchRooms() {
                     )}
                   </div>
                 )}
+              </div>
+
+                            {/* Dual Search Engine Switcher */}
+              <div className="flex items-center gap-2 flex-wrap pt-1">
+                <span className="text-xs font-semibold text-outline flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[15px]">manage_search</span>
+                  Cỗ máy tìm kiếm:
+                </span>
+                <div className="inline-flex rounded-lg border border-outline-variant/30 p-0.5 bg-surface-container-low text-xs shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedEngine('solr'); executeSearch({ engine: 'solr' }); }}
+                    className={`px-3 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
+                      selectedEngine === 'solr'
+                        ? 'bg-amber-500 text-white shadow-sm'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    <span>☀️ Apache Solr</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedEngine('elasticsearch'); executeSearch({ engine: 'elasticsearch' }); }}
+                    className={`px-3 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
+                      selectedEngine === 'elasticsearch'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    <span>⚡ Elasticsearch</span>
+                  </button>
+                </div>
               </div>
 
               {/* Search Engine Badge */}

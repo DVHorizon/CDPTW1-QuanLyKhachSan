@@ -117,6 +117,7 @@ export const searchRoomsApi = async (params = {}) => {
     }
     if (params.rating) query.append('rating', params.rating);
     if (params.sortBy) query.append('sortBy', params.sortBy);
+    if (params.engine) query.append('engine', params.engine);
 
     // Thử gọi /api/v1/rooms/search trước, fallback về /api/rooms/search
     let endpoint = `${API_BASE_URL}/v1/rooms/search?${query.toString()}`;
@@ -554,3 +555,4 @@ export const getRoomReviewsApi = async (roomId, params = {}) => {
     return { success: false, message: 'Không thể tải danh sách đánh giá' };
   }
 };
+
