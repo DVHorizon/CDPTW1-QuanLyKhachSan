@@ -68,6 +68,8 @@ export default function SearchRooms() {
   ]);
   const [selectedRating, setSelectedRating] = useState('all');
   const [sortBy, setSortBy] = useState('price_asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   // UI state
   const [branches, setBranches] = useState([]);
@@ -161,6 +163,7 @@ export default function SearchRooms() {
 
   // Hàm thực hiện tìm kiếm phòng
   const executeSearch = async (overrideParams = {}) => {
+    setCurrentPage(1);
     setValidationError('');
     setErrorMessage('');
 
@@ -933,7 +936,7 @@ export default function SearchRooms() {
 
               {/* Danh sách phòng dạng thẻ ngang (Horizontal Cards) */}
               <div className="flex flex-col gap-space-lg">
-                {rooms.map((room) => {
+                {rooms.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((room) => {
                   const isSaved = wishlist.includes(room.RoomTypeId);
                   return (
                     <article
@@ -1105,46 +1108,54 @@ export default function SearchRooms() {
                 })}
               </div>
 
-              {/* Pagination & Direct Assistance Strip */}
-              <div className="flex items-center justify-center pt-space-md border-t border-[#dedad0]/40">
-                {/* Page Selectors */}
-                <div className="flex items-center gap-space-xs">
-                  <button
-                    type="button"
-                    disabled
-                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface-variant flex items-center justify-center shadow-sm disabled:opacity-40"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">chevron_left</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="w-10 h-10 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg shadow-sm font-bold"
-                  >
-                    1
-                  </button>
-                  <button
-                    type="button"
-                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors shadow-sm"
-                  >
-                    2
-                  </button>
-                  <button
-                    type="button"
-                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors shadow-sm"
-                  >
-                    3
-                  </button>
-                  <span className="px-space-xs text-outline">...</span>
-                  <button
-                    type="button"
-                    className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors shadow-sm"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-                  </button>
-                </div>
+              {/* Pagination (Chỉ hiển thị khi số lượng phòng nhiều hơn 1 trang) */}
+              {rooms.length > itemsPerPage && (
+                <div className="flex items-center justify-center pt-space-md border-t border-[#dedad0]/40">
+                  <div className="flex items-center gap-space-xs">
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => {
+                        setCurrentPage(p => Math.max(1, p - 1));
+                        window.scrollTo({ top: 350, behavior: 'smooth' });
+                      }}
+                      className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface-variant flex items-center justify-center shadow-sm disabled:opacity-40 hover:bg-surface-container cursor-pointer transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                    </button>
 
-                
-              </div>
+                    {Array.from({ length: Math.ceil(rooms.length / itemsPerPage) }, (_, i) => i + 1).map(pageNum => (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => {
+                          setCurrentPage(pageNum);
+                          window.scrollTo({ top: 350, behavior: 'smooth' });
+                        }}
+                        className={`w-10 h-10 rounded-xl font-label-lg text-label-lg shadow-sm transition-colors cursor-pointer ${
+                          currentPage === pageNum
+                            ? 'bg-primary text-on-primary font-bold'
+                            : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    ))}
+
+                    <button
+                      type="button"
+                      disabled={currentPage === Math.ceil(rooms.length / itemsPerPage)}
+                      onClick={() => {
+                        setCurrentPage(p => Math.min(Math.ceil(rooms.length / itemsPerPage), p + 1));
+                        window.scrollTo({ top: 350, behavior: 'smooth' });
+                      }}
+                      className="w-10 h-10 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors shadow-sm disabled:opacity-40 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
             </main>
           </div>
