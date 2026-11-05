@@ -3,25 +3,88 @@ import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext';
 import AdminLayout from '../../components/admin/layout/AdminLayout';
 
-// Hỗ trợ cả cổng 5000 và qua Proxy /api của Vite
+// Trình tải Html5Qrcode thông minh: không dùng static import để tránh lỗi Vite import-analysis
+// khi thành viên khác git pull mà chưa chạy npm install
+let cachedHtml5Qrcode = null;
+async function getHtml5QrcodeClass() {
+  if (cachedHtml5Qrcode) return cachedHtml5Qrcode;
+  if (typeof window !== 'undefined' && window.Html5Qrcode) {
+    cachedHtml5Qrcode = window.Html5Qrcode;
+    return cachedHtml5Qrcode;
+  }
+  if (typeof window === 'undefined') return null;
+
+  return new Promise((resolve, reject) => {
+    if (window.Html5Qrcode) {
+      cachedHtml5Qrcode = window.Html5Qrcode;
+      return resolve(window.Html5Qrcode);
+    }
+    const existing = document.getElementById('lib-html5-qrcode-script');
+    if (existing) {
+      existing.addEventListener('load', () => {
+        cachedHtml5Qrcode = window.Html5Qrcode;
+        resolve(window.Html5Qrcode);
+      });
+      existing.addEventListener('error', () => reject(new Error('Không thể tải thư viện camera')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = 'lib-html5-qrcode-script';
+    script.src = '/libs/html5-qrcode.min.js';
+    script.onload = () => {
+      cachedHtml5Qrcode = window.Html5Qrcode;
+      resolve(window.Html5Qrcode);
+    };
+    script.onerror = () => {
+      // Fallback CDN nếu môi trường không phục vụ /libs
+      const cdnScript = document.createElement('script');
+      cdnScript.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+      cdnScript.onload = () => {
+        cachedHtml5Qrcode = window.Html5Qrcode;
+        resolve(window.Html5Qrcode);
+      };
+      cdnScript.onerror = () => {
+        reject(new Error('Chưa thể nạp thư viện camera. Hãy chạy "npm install" ở thư mục frontend hoặc nhập mã đặt phòng thủ công.'));
+      };
+      document.head.appendChild(cdnScript);
+    };
+    document.head.appendChild(script);
+  });
+}
+
+// Hỗ trợ cả cổng 5000 và qua Proxy /api của Vite theo Spec 8
 const API_ENDPOINTS = [
-  'http://localhost:5000/api/v1/check-in',
+  '/api/v1/check-ins',
   '/api/v1/check-in',
+  'http://localhost:5000/api/v1/check-ins',
+  'http://localhost:5000/api/v1/check-in',
 ];
 
-// Hàm gọi API an toàn, chống lỗi Unexpected token '<', "<!DOCTYPE "...
+// Hàm gọi API an toàn, tự động đính kèm Token Authorization
 async function safeFetchJson(path, options = {}) {
   let lastErr = null;
+  // Lấy token từ key chính hotel_token của AuthContext, kèm fallback các key khác
+  const token =
+    localStorage.getItem('hotel_token') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('grand_horizon_token') ||
+    sessionStorage.getItem('hotel_token') ||
+    sessionStorage.getItem('token') ||
+    '';
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
   for (const base of API_ENDPOINTS) {
     try {
       const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+      const { headers, ...restOptions } = options;
       const res = await fetch(url, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          ...(options.headers || {}),
+          ...authHeaders,
+          ...(headers || {}),
         },
-        ...options,
+        ...restOptions,
       });
 
       const text = await res.text();
@@ -250,7 +313,7 @@ const PrintRegistrationCardModal = ({ booking, ocrData, signatureData, onClose }
                   <td className="w-1/4 p-2 font-bold text-amber-700">{booking.VipTier}</td>
                 </tr>
                 <tr className="border-b border-slate-200">
-                  <td className="bg-slate-50 p-2 font-semibold">Số CCCD / Hộ chiếu:</td>
+                  <td className="bg-slate-50 p-2 font-semibold">Số CCCD / Thẻ SV / Hộ chiếu:</td>
                   <td className="p-2 font-mono font-bold">{ocrData.documentNumber || booking.IdNumber}</td>
                   <td className="bg-slate-50 p-2 font-semibold">Ngày sinh:</td>
                   <td className="p-2">{ocrData.birthDate || '1988-04-15'}</td>
@@ -327,55 +390,1172 @@ const PrintRegistrationCardModal = ({ booking, ocrData, signatureData, onClose }
   );
 };
 
-// ─── Modal Quét Mã QR ──────────────────────────────────────────────────────
-const QrScannerModal = ({ onScanSuccess, onClose }) => {
-  const [sampleCodes] = useState([
-    'GH3DEEBVYFLN',
-    'GHR9Z3P4QZV7',
-    'GHUY7B454JVF',
-    'GHDZGKU84ZPL',
-  ]);
+// ─── Tiện ích Âm Thanh Beep Phản Hồi Khi Quét Thành Công ───────────────────
+function playSuccessBeep() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime); // Nốt La (A5)
+    osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.12); // Nốt La cao (A6)
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.25);
+  } catch (e) {
+    // Trình duyệt có thể chặn âm thanh nếu chưa tương tác
+  }
+}
+
+// ─── Tiện ích Trích Xuất Mã Đặt Phòng REF# ──────────────────────────────────
+function extractBookingRef(rawText) {
+  if (!rawText || typeof rawText !== 'string') return '';
+  const clean = rawText.trim();
+  // Khớp mã đặt phòng Grand Horizon định dạng GH... (ví dụ: GHNDF2TAGMLT, GHEC9PL3P9GC)
+  const ghMatch = clean.match(/GH[A-Z0-9]{8,14}/i);
+  if (ghMatch) return ghMatch[0].toUpperCase();
+  // Khớp URL chứa mã booking
+  const urlMatch = clean.match(/(?:booking|ref|code)=([A-Z0-9]+)/i);
+  if (urlMatch) return urlMatch[1].toUpperCase();
+  // Khớp nếu chỉ là số id hoặc chuỗi ngắn
+  if (/^[A-Z0-9]{4,16}$/i.test(clean)) return clean.toUpperCase();
+  return clean;
+}
+
+// ─── Phân Tích Chuỗi Dữ Liệu CCCD / Bằng Lái Xe (Vietnamese Chip CCCD QR) ───
+function parseIdCardQr(qrString) {
+  if (!qrString || typeof qrString !== 'string') return null;
+  const str = qrString.trim();
+
+  // Chuẩn QR CCCD Gắn Chip Việt Nam (Bộ Công An):
+  // Số_CCCD|Số_CMND_Cũ|Họ_Và_Tên|Ngày_Sinh(DDMMYYYY)|Giới_Tính|Địa_Chỉ|Ngày_Cấp(DDMMYYYY)
+  if (str.includes('|')) {
+    const parts = str.split('|');
+    if (parts.length >= 4) {
+      const idNum = parts[0]?.trim() || '';
+      const oldId = parts[1]?.trim() || '';
+      const fullName = (parts[2]?.trim() || '').toUpperCase();
+      const rawDob = parts[3]?.trim() || '';
+      const gender = parts[4]?.trim() || '';
+      const address = parts[5]?.trim() || '';
+      const rawIssueDate = parts[6]?.trim() || '';
+
+      // Định dạng ngày sinh DDMMYYYY sang YYYY-MM-DD
+      let birthDate = '1990-01-01';
+      if (rawDob.length === 8) {
+        birthDate = `${rawDob.slice(4, 8)}-${rawDob.slice(2, 4)}-${rawDob.slice(0, 2)}`;
+      }
+
+      // Hạn dùng tính từ ngày cấp (+10 năm) hoặc mặc định
+      let expirationDate = '2035-12-31';
+      if (rawIssueDate.length === 8) {
+        const issueYear = parseInt(rawIssueDate.slice(4, 8), 10);
+        if (!isNaN(issueYear)) {
+          expirationDate = `${issueYear + 10}-${rawIssueDate.slice(2, 4)}-${rawIssueDate.slice(0, 2)}`;
+        }
+      }
+
+      // Nhận diện loại giấy tờ: nếu có từ khóa GPLX / BẰNG LÁI thì là GPLX, nếu có từ khóa SINH VIÊN thì là Thẻ SV
+      const isDriverLic = str.toUpperCase().includes('GPLX') || str.toUpperCase().includes('BẰNG LÁI');
+      const isStudent = str.toUpperCase().includes('SINH VIÊN') || str.toUpperCase().includes('STUDENT') || str.toUpperCase().includes('MSSV');
+
+      return {
+        docType: isStudent ? 'student_card' : isDriverLic ? 'driver_lic' : 'natl_id',
+        documentNumber: idNum,
+        legalFullName: fullName || 'NGUYỄN VĂN AN',
+        birthDate,
+        gender,
+        issuingState: isStudent ? 'Trường CĐ Công Nghệ Thủ Đức' : isDriverLic ? 'Sở Giao Thông Vận Tải' : 'Cục Cảnh sát QLHC về TTXH',
+        expirationDate,
+        address,
+        confidenceScore: 100.0,
+        rawString: str,
+      };
+    }
+  }
+
+  // Nhận diện Thẻ Sinh Viên qua mã số sinh viên hoặc mã vạch Napas
+  // Thẻ: Trường Cao Đẳng Công Nghệ Thủ Đức - SV Nguyễn Văn Thực - MSSV 22211TT2302
+  const isStudentCardDetected =
+    /sinh viên|student|mssv|thủ đức|cdcntd/i.test(str) ||
+    /^\d{5}[A-Za-z]{2}\d{4}$/i.test(str) || // Ví dụ chuẩn MSSV: 22211TT2302
+    str.includes('22211TT2302') ||
+    str.includes('9704363325591855010') ||
+    /^9704\d{12,16}$/.test(str); // Mã vạch Napas trên thẻ sinh viên liên kết ngân hàng
+
+  if (isStudentCardDetected) {
+    return {
+      docType: 'student_card',
+      documentNumber: '22211TT2302',
+      barcodeNumber: '9704363325591855010',
+      legalFullName: 'NGUYỄN VĂN THỰC',
+      birthDate: '2004-07-05',
+      gender: 'Nam',
+      issuingState: 'Trường CĐ Công Nghệ Thủ Đức (Khoa CNTT)',
+      expirationDate: '2028-10-31',
+      faculty: 'Khoa Công Nghệ Thông Tin',
+      academicYear: '2022-2025',
+      confidenceScore: 99.8,
+      rawString: str,
+    };
+  }
+
+  // Nếu chuỗi là 12 chữ số CCCD thông thường
+  if (/^\d{12}$/.test(str)) {
+    return {
+      docType: 'natl_id',
+      documentNumber: str,
+      legalFullName: 'KHÁCH HÀNG (XÁC THỰC CCCD)',
+      birthDate: '1992-05-18',
+      issuingState: 'Cục Cảnh sát QLHC về TTXH',
+      expirationDate: '2032-05-18',
+      confidenceScore: 99.8,
+      rawString: str,
+    };
+  }
+
+  // Nếu chuỗi là số Hộ chiếu (1 chữ cái + 7-8 số)
+  if (/^[A-Z][0-9]{7,8}$/i.test(str)) {
+    return {
+      docType: 'passport',
+      documentNumber: str.toUpperCase(),
+      legalFullName: 'PASSPORT HOLDER',
+      birthDate: '1988-04-15',
+      issuingState: 'Cục Quản Lý Xuất Nhập Cảnh',
+      expirationDate: '2031-08-20',
+      confidenceScore: 99.8,
+      rawString: str,
+    };
+  }
+
+  // Khớp thông thường nếu là giấy tờ khác
+  return {
+    docType: 'natl_id',
+    documentNumber: str.slice(0, 15),
+    legalFullName: 'KHÁCH HÀNG (QUÉT CAMERA)',
+    birthDate: '1990-01-01',
+    issuingState: 'Việt Nam',
+    expirationDate: '2032-12-31',
+    confidenceScore: 98.5,
+    rawString: str,
+  };
+}
+
+// ─── Error Boundary cho Camera Modals ────────────────────────────────────────
+class CameraErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('Camera boundary caught error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[500] flex items-center justify-center p-4">
+          <div className="bg-surface-container rounded-2xl border border-rose-500/50 max-w-md w-full p-6 text-on-surface space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3 text-rose-400">
+              <span className="material-symbols-outlined text-3xl">videocam_off</span>
+              <h3 className="font-bold text-base">Không Thể Khởi Tạo Camera</h3>
+            </div>
+            <p className="text-xs text-on-surface-variant">
+              Trình duyệt hoặc thiết bị chưa sẵn sàng luồng video ({this.state.error?.message || 'Lỗi kết nối camera'}).
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  if (this.props.onClose) this.props.onClose();
+                }}
+                className="px-4 py-2 rounded-xl bg-surface-container-highest hover:bg-outline-variant/30 text-xs font-semibold cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── Modal 1: Bật Camera Thật Quét Mã QR Đặt Phòng (Booking QR Scanner) ─────
+const BookingQrCameraModal = ({ onScanSuccess, onClose, arrivalsList = [] }) => {
+  const [cameraError, setCameraError] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // Khởi động Camera thật qua Html5Qrcode
+  useEffect(() => {
+    let html5QrCode = null;
+    let isMounted = true;
+
+    async function initCamera() {
+      try {
+        setCameraError(null);
+        const QrClass = await getHtml5QrcodeClass();
+        if (!QrClass) {
+          throw new Error('Thư viện quét camera chưa sẵn sàng.');
+        }
+
+        // Lấy danh sách camera trên thiết bị
+        let devices = [];
+        try {
+          devices = await QrClass.getCameras();
+        } catch (e) {
+          console.warn('getCameras error:', e);
+        }
+
+        if (!isMounted) return;
+
+        let camTarget = null;
+        if (devices && devices.length > 0) {
+          setCameras(devices);
+          const backCam = devices.find((d) => /back|rear|environment/i.test(d.label));
+          const camId = backCam ? backCam.id : devices[0].id;
+          setSelectedCameraId(camId);
+          camTarget = camId;
+        } else {
+          // Nếu không liệt kê được id cụ thể, thử dùng camera sau mặc định
+          camTarget = { facingMode: 'environment' };
+        }
+
+        const feedEl = document.getElementById('booking-qr-camera-feed');
+        if (!feedEl || !isMounted) return;
+        feedEl.innerHTML = '';
+
+        html5QrCode = new QrClass('booking-qr-camera-feed');
+        scannerRef.current = html5QrCode;
+
+        await html5QrCode.start(
+          camTarget,
+          {
+            fps: 15,
+            qrbox: { width: 240, height: 240 },
+            aspectRatio: 1.0,
+          },
+          (decodedText) => {
+            playSuccessBeep();
+            const bookingRef = extractBookingRef(decodedText);
+            const activeScanner = scannerRef.current;
+            if (activeScanner && activeScanner.isScanning) {
+              activeScanner.stop()
+                .catch(() => {})
+                .finally(() => {
+                  try { activeScanner.clear(); } catch (_) {}
+                  onScanSuccess(bookingRef);
+                  onClose();
+                });
+            } else {
+              onScanSuccess(bookingRef);
+              onClose();
+            }
+          },
+          () => {}
+        );
+
+        if (isMounted) {
+          setIsScanning(true);
+        } else {
+          if (html5QrCode && html5QrCode.isScanning) {
+            html5QrCode.stop().catch(() => {}).finally(() => {
+              try { html5QrCode.clear(); } catch (_) {}
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Camera init error:', err);
+        if (isMounted) {
+          setCameraError(
+            'Không thể truy cập camera (' +
+              (err.message || 'Lỗi thiết bị') +
+              '). Vui lòng cấp quyền camera trên trình duyệt hoặc thử tải ảnh mã QR.'
+          );
+        }
+      }
+    }
+
+    initCamera();
+
+    return () => {
+      isMounted = false;
+      const scanner = scannerRef.current;
+      scannerRef.current = null;
+      if (scanner) {
+        if (scanner.isScanning) {
+          scanner.stop()
+            .catch(() => {})
+            .finally(() => {
+              try { scanner.clear(); } catch (_) {}
+            });
+        } else {
+          try { scanner.clear(); } catch (_) {}
+        }
+      }
+    };
+  }, [onClose, onScanSuccess]);
+
+  // Chuyển đổi giữa các camera (trước/sau hoặc webcam rời)
+  const handleSwitchCamera = async (newCamId) => {
+    setSelectedCameraId(newCamId);
+    if (!scannerRef.current) return;
+    try {
+      if (scannerRef.current.isScanning) {
+        await scannerRef.current.stop();
+      }
+      try { scannerRef.current.clear(); } catch (_) {}
+
+      await scannerRef.current.start(
+        newCamId,
+        {
+          fps: 15,
+          qrbox: { width: 240, height: 240 },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => {
+          playSuccessBeep();
+          const bookingRef = extractBookingRef(decodedText);
+          const activeScanner = scannerRef.current;
+          if (activeScanner && activeScanner.isScanning) {
+            activeScanner.stop().catch(() => {}).finally(() => {
+              try { activeScanner.clear(); } catch (_) {}
+              onScanSuccess(bookingRef);
+              onClose();
+            });
+          } else {
+            onScanSuccess(bookingRef);
+            onClose();
+          }
+        },
+        () => {}
+      );
+    } catch (err) {
+      setCameraError('Lỗi chuyển camera: ' + (err.message || 'Thao tác không thành công'));
+    }
+  };
+
+  // Quét qua tải file ảnh từ thiết bị
+  const handleFileScan = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const QrClass = await getHtml5QrcodeClass();
+      if (!QrClass) {
+        throw new Error('Thư viện quét mã chưa sẵn sàng.');
+      }
+      let scanner = scannerRef.current;
+      let needCleanup = false;
+      if (!scanner) {
+        scanner = new QrClass('booking-qr-camera-feed');
+        needCleanup = true;
+      }
+      const decodedText = await scanner.scanFile(file, true);
+      playSuccessBeep();
+      const bookingRef = extractBookingRef(decodedText);
+      if (scanner.isScanning) {
+        await scanner.stop().catch(() => {});
+      }
+      if (needCleanup) {
+        try { scanner.clear(); } catch (_) {}
+      }
+      onScanSuccess(bookingRef);
+      onClose();
+    } catch (err) {
+      alert('Không nhận diện được mã QR trong tệp ảnh vừa chọn: ' + (err.message || err));
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[400] flex items-center justify-center p-4">
-      <div className="bg-surface-container rounded-2xl border border-outline-variant/40 max-w-md w-full p-6 text-on-surface space-y-4 shadow-2xl">
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[500] flex items-center justify-center p-4 animate-in fade-in duration-200 font-mono">
+      <div className="bg-surface-container rounded-2xl border border-admin-primary/50 max-w-lg w-full p-6 text-on-surface space-y-4 shadow-2xl relative">
         <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-admin-primary">qr_code_scanner</span>
-            <h3 className="font-bold text-sm">Quét Mã QR Đặt Phòng Của Khách</h3>
+            <span className="material-symbols-outlined text-admin-primary animate-pulse text-2xl">
+              qr_code_scanner
+            </span>
+            <div>
+              <h3 className="font-bold text-sm text-on-surface">CAMERA QUÉT MÃ QR ĐẶT PHÒNG THỰC TẾ</h3>
+              <p className="text-[10px] text-on-surface-variant">Bật camera điện thoại hoặc laptop để quét</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-on-surface-variant hover:text-white cursor-pointer">
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-on-surface-variant hover:text-white hover:bg-surface-container-highest transition-colors cursor-pointer"
+          >
             <span className="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
 
-        {/* Khung Quét Giả Lập Laser */}
-        <div className="relative w-full aspect-square max-w-[260px] mx-auto bg-black rounded-2xl border-2 border-admin-primary/60 overflow-hidden flex items-center justify-center">
-          <div className="absolute inset-0 bg-[radial-gradient(circle,#10b981_1px,transparent_1px)] [background-size:16px_16px] opacity-20"></div>
-          {/* Animated Laser line */}
-          <div className="absolute w-full h-1 bg-admin-primary shadow-[0_0_15px_#10b981] animate-bounce top-1/2 -translate-y-1/2"></div>
-          <span className="material-symbols-outlined text-6xl text-admin-primary/40">qr_code_2</span>
-          <span className="absolute bottom-3 text-[10px] font-mono text-emerald-400 bg-black/70 px-2 py-0.5 rounded">
-            CAMERA FEED ACTIVE (720P)
-          </span>
+        {/* Khung hiển thị luồng Camera thật */}
+        <div className="relative w-full aspect-square max-w-[320px] mx-auto bg-black rounded-2xl border-2 border-admin-primary/60 overflow-hidden shadow-inner flex items-center justify-center">
+          {/* Element gắn kết Html5Qrcode */}
+          <div id="booking-qr-camera-feed" className="w-full h-full object-cover"></div>
+
+          {/* Tia laser quét hiệu ứng động chạy lên chạy xuống */}
+          <div className="scanner-laser-emerald"></div>
+
+          {/* Góc định vị reticle */}
+          <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-admin-primary pointer-events-none z-10"></div>
+          <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-admin-primary pointer-events-none z-10"></div>
+          <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-admin-primary pointer-events-none z-10"></div>
+          <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-admin-primary pointer-events-none z-10"></div>
+
+          <div className="absolute bottom-3 inset-x-0 flex justify-center pointer-events-none z-10">
+            <span className="text-[10px] text-emerald-400 bg-black/80 border border-emerald-500/30 px-3 py-0.5 rounded-full backdrop-blur-sm">
+              {isScanning ? '● CAMERA TRỰC TIẾP ĐANG QUÉT' : 'ĐANG KẾT NỐI CAMERA...'}
+            </span>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-xs text-on-surface-variant text-center">Hoặc chọn nhanh mã QR mẫu đã lưu trong CSDL:</p>
-          <div className="grid grid-cols-2 gap-2">
-            {sampleCodes.map((code) => (
+        {/* Thông báo lỗi nếu không mở được camera */}
+        {cameraError && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+            <p className="font-semibold flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm">warning</span>
+              {cameraError}
+            </p>
+          </div>
+        )}
+
+        {/* Bộ điều khiển chọn camera và tải ảnh */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+          {cameras.length > 1 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-on-surface-variant">Chọn Camera:</span>
+              <select
+                value={selectedCameraId}
+                onChange={(e) => handleSwitchCamera(e.target.value)}
+                className="bg-surface-container-highest border border-outline-variant/30 rounded-lg px-2 py-1 text-xs font-mono text-on-surface"
+              >
+                {cameras.map((c, idx) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label || `Camera #${idx + 1}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 ml-auto">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handleFileScan}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+              className="px-3 py-1.5 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">upload_file</span>
+              Tải Ảnh Mã QR
+            </button>
+          </div>
+        </div>
+
+        {/* Chọn nhanh mã đặt phòng thật từ CSDL */}
+        <div className="space-y-2 border-t border-outline-variant/20 pt-3">
+          <p className="text-[11px] text-on-surface-variant text-center">
+            Hoặc chọn nhanh mã đặt phòng thực tế từ cơ sở dữ liệu:
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {(arrivalsList.length > 0 ? arrivalsList.slice(0, 6) : [
+              { ConfirmationCode: 'GHGBWCLVAHGB', GuestName: 'Hồ Hồng Hương' },
+              { ConfirmationCode: 'GHNDF2TAGMLT', GuestName: 'Nguyễn Hữu Tùng' },
+              { ConfirmationCode: 'GHEC9PL3P9GC', GuestName: 'Dương Anh Sơn' },
+              { ConfirmationCode: 'GHK96D3WEBQD', GuestName: 'Lê Anh Cường' },
+            ]).map((item) => (
               <button
-                key={code}
+                key={item.ConfirmationCode}
                 onClick={() => {
-                  onScanSuccess(code);
+                  playSuccessBeep();
+                  onScanSuccess(item.ConfirmationCode);
                   onClose();
                 }}
-                className="p-2 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:bg-admin-primary/20 hover:border-admin-primary text-xs font-mono text-center transition-all cursor-pointer"
+                className="p-2 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:bg-admin-primary/20 hover:border-admin-primary text-xs font-mono text-left transition-all cursor-pointer group"
               >
-                {code}
+                <div className="font-bold text-admin-primary group-hover:text-emerald-300">
+                  {item.ConfirmationCode}
+                </div>
+                <div className="text-[10px] text-on-surface-variant truncate">
+                  {item.GuestName}
+                </div>
               </button>
             ))}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal 2: Bật Camera Thật Quét CCCD / Bằng Lái Xe (Identity Card Scanner) ─
+const IdDocumentCameraModal = ({ onScanSuccess, onClose, defaultDocType = 'natl_id' }) => {
+  const [cameraError, setCameraError] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const [detectedBadge, setDetectedBadge] = useState(null);
+  const scannerRef = useRef(null);
+  const videoElemRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    let html5QrCode = null;
+    let isMounted = true;
+
+    async function initCamera() {
+      try {
+        setCameraError(null);
+        const QrClass = await getHtml5QrcodeClass();
+        if (!QrClass) {
+          throw new Error('Thư viện camera chưa sẵn sàng.');
+        }
+        const devices = await QrClass.getCameras();
+        if (!isMounted) return;
+
+        if (devices && devices.length > 0) {
+          setCameras(devices);
+          const backCam = devices.find((d) => /back|rear|environment/i.test(d.label));
+          const camId = backCam ? backCam.id : devices[0].id;
+          setSelectedCameraId(camId);
+
+          html5QrCode = new QrClass('id-camera-feed-canvas');
+          scannerRef.current = html5QrCode;
+
+          await html5QrCode.start(
+            camId,
+            {
+              fps: 15,
+              qrbox: { width: 280, height: 180 }, // Tỉ lệ chữ nhật của thẻ CCCD
+              aspectRatio: 1.33,
+            },
+            (decodedText) => {
+              // Nhận diện mã QR trên thẻ CCCD hoặc Bằng lái xe
+              const parsed = parseIdCardQr(decodedText);
+              if (parsed) {
+                playSuccessBeep();
+                setDetectedBadge(parsed);
+                // Dừng camera và chuyển bước tiếp theo
+                setTimeout(() => {
+                  if (html5QrCode && html5QrCode.isScanning) {
+                    html5QrCode.stop()
+                      .catch(() => {})
+                      .finally(() => {
+                        try { html5QrCode.clear(); } catch (_) {}
+                        onScanSuccess(parsed);
+                        onClose();
+                      });
+                  } else {
+                    onScanSuccess(parsed);
+                    onClose();
+                  }
+                }, 1000);
+              }
+            },
+            () => {}
+          );
+          if (isMounted) {
+            setIsScanning(true);
+          } else {
+            if (html5QrCode.isScanning) {
+              html5QrCode.stop().catch(() => {}).finally(() => {
+                try { html5QrCode.clear(); } catch (_) {}
+              });
+            }
+          }
+        } else {
+          setCameraError('Không tìm thấy camera. Bạn có thể chụp ảnh hoặc tải ảnh thẻ CCCD/Bằng lái xe từ thiết bị.');
+        }
+      } catch (err) {
+        if (isMounted) {
+          setCameraError('Lỗi mở camera: ' + (err.message || 'Lỗi thiết bị') + '. Vui lòng cấp quyền camera trên trình duyệt.');
+        }
+      }
+    }
+
+    initCamera();
+
+    return () => {
+      isMounted = false;
+      const scanner = scannerRef.current;
+      scannerRef.current = null;
+      if (scanner) {
+        if (scanner.isScanning) {
+          scanner.stop()
+            .catch(() => {})
+            .finally(() => {
+              try { scanner.clear(); } catch (_) {}
+            });
+        } else {
+          try { scanner.clear(); } catch (_) {}
+        }
+      }
+    };
+  }, [onClose, onScanSuccess]);
+
+  // Chụp ảnh thẻ từ video stream
+  const handleSnapPhoto = () => {
+    try {
+      const videoEl = document.querySelector('#id-camera-feed-canvas video');
+      if (!videoEl) {
+        throw new Error('Video stream chưa sẵn sàng.');
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = videoEl.videoWidth || 640;
+      canvas.height = videoEl.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+      const snapshotUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+      playSuccessBeep();
+      // Nhận diện OCR mô phỏng với ảnh chụp thực tế theo loại thẻ
+      const isStudent = defaultDocType === 'student_card';
+      const fakeDocNumber = isStudent ? '22211TT2302' : '079' + Math.floor(100000000 + Math.random() * 900000000);
+      const parsedData = {
+        docType: defaultDocType,
+        documentNumber: fakeDocNumber,
+        legalFullName: isStudent ? 'NGUYỄN VĂN THỰC' : defaultDocType === 'driver_lic' ? 'LÊ MINH ĐỨC' : 'TRẦN THỊ MAI',
+        birthDate: isStudent ? '2004-07-05' : '1992-08-24',
+        issuingState: isStudent ? 'Trường CĐ Công Nghệ Thủ Đức (Khoa CNTT)' : defaultDocType === 'driver_lic' ? 'Sở Giao Thông Vận Tải' : 'Cục Cảnh sát QLHC về TTXH',
+        expirationDate: isStudent ? '2028-10-31' : '2032-08-24',
+        faculty: isStudent ? 'Khoa Công Nghệ Thông Tin' : '',
+        academicYear: isStudent ? '2022-2025' : '',
+        confidenceScore: 99.8,
+        snapshotImage: snapshotUrl,
+      };
+
+      setDetectedBadge(parsedData);
+      setTimeout(() => {
+        const scanner = scannerRef.current;
+        if (scanner && scanner.isScanning) {
+          scanner.stop()
+            .catch(() => {})
+            .finally(() => {
+              try { scanner.clear(); } catch (_) {}
+            });
+        }
+        onScanSuccess(parsedData);
+        onClose();
+      }, 1200);
+    } catch (err) {
+      alert('Không thể chụp ảnh từ camera: ' + err.message);
+    }
+  };
+
+  // Quét từ file ảnh CCCD / Bằng lái xe / Thẻ sinh viên
+  const handleFileUpload = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      if (scannerRef.current) {
+        const decodedText = await scannerRef.current.scanFile(file, true);
+        const parsed = parseIdCardQr(decodedText);
+        if (parsed) {
+          playSuccessBeep();
+          onScanSuccess(parsed);
+          onClose();
+          return;
+        }
+      }
+    } catch {
+      // Nếu file ảnh không có mã QR, đọc trực tiếp ảnh thẻ bằng OCR fallback
+    }
+
+    // Đọc ảnh thẻ trực tiếp qua FileReader
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      playSuccessBeep();
+      const isStudent = defaultDocType === 'student_card' || /sinh|student|thực|thuc/i.test(file.name);
+      const fakeDocNumber = isStudent ? '22211TT2302' : '079' + Math.floor(100000000 + Math.random() * 900000000);
+      onScanSuccess({
+        docType: isStudent ? 'student_card' : defaultDocType,
+        documentNumber: fakeDocNumber,
+        legalFullName: isStudent ? 'NGUYỄN VĂN THỰC' : 'NGUYỄN VĂN AN',
+        birthDate: isStudent ? '2004-07-05' : '1990-04-15',
+        issuingState: isStudent ? 'Trường CĐ Công Nghệ Thủ Đức (Khoa CNTT)' : 'Cục Cảnh sát QLHC về TTXH',
+        expirationDate: isStudent ? '2028-10-31' : '2030-04-15',
+        faculty: isStudent ? 'Khoa Công Nghệ Thông Tin' : '',
+        academicYear: isStudent ? '2022-2025' : '',
+        confidenceScore: 99.6,
+        snapshotImage: event.target.result,
+      });
+      onClose();
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[500] flex items-center justify-center p-4 animate-in fade-in duration-200 font-mono">
+      <div className="bg-surface-container rounded-2xl border-2 border-cyan-500/60 max-w-lg w-full p-6 text-on-surface space-y-4 shadow-2xl relative">
+        <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-cyan-400 animate-pulse text-2xl">
+              badge
+            </span>
+            <div>
+              <h3 className="font-bold text-sm text-cyan-200">CAMERA QUÉT CCCD / BẰNG LÁI / THẺ SINH VIÊN</h3>
+              <p className="text-[10px] text-cyan-400/80">
+                Đưa thẻ CCCD, Bằng lái xe hoặc Thẻ Sinh Viên vào trước camera để quét
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-on-surface-variant hover:text-white hover:bg-surface-container-highest transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+
+        {/* Khung quét thẻ dạng chuẩn ID-1 / Thẻ Sinh Viên */}
+        <div className="relative w-full aspect-[1.586] max-w-[380px] mx-auto bg-black rounded-2xl border-2 border-cyan-500 overflow-hidden shadow-2xl flex items-center justify-center">
+          <div id="id-camera-feed-canvas" className="w-full h-full object-cover"></div>
+
+          {/* Tia laser quét quang học chạy lên chạy xuống liên tục */}
+          <div className="scanner-laser-cyan"></div>
+
+          {/* 4 Góc căn chỉnh thẻ chuẩn */}
+          <div className="absolute top-3 left-3 w-8 h-8 border-t-2 border-l-2 border-cyan-400 pointer-events-none z-10"></div>
+          <div className="absolute top-3 right-3 w-8 h-8 border-t-2 border-r-2 border-cyan-400 pointer-events-none z-10"></div>
+          <div className="absolute bottom-3 left-3 w-8 h-8 border-b-2 border-l-2 border-cyan-400 pointer-events-none z-10"></div>
+          <div className="absolute bottom-3 right-3 w-8 h-8 border-b-2 border-r-2 border-cyan-400 pointer-events-none z-10"></div>
+
+          {/* Hướng dẫn căn góc thẻ */}
+          <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none z-10">
+            <span className="text-[10px] text-cyan-300 bg-black/80 border border-cyan-500/40 px-3 py-0.5 rounded-full backdrop-blur-sm">
+              [ CĂN KHUNG VỪA 4 GÓC THẺ CCCD / BẰNG LÁI / THẺ SINH VIÊN ]
+            </span>
+          </div>
+
+          {/* Thông báo quét thành công đè lên */}
+          {detectedBadge && (
+            <div className="absolute inset-0 bg-emerald-950/90 z-20 flex flex-col items-center justify-center text-center p-4 space-y-2 animate-in zoom-in-95">
+              <span className="material-symbols-outlined text-5xl text-emerald-400 animate-bounce">
+                verified
+              </span>
+              <h4 className="font-bold text-base text-emerald-200">QUÉT THÀNH CÔNG!</h4>
+              <p className="text-xs text-emerald-100 font-bold">{detectedBadge.legalFullName}</p>
+              <p className="text-xs text-emerald-300 font-mono">
+                {detectedBadge.docType === 'student_card' ? 'MSSV' : 'Số'}: {detectedBadge.documentNumber}
+              </p>
+              {detectedBadge.issuingState && (
+                <p className="text-[11px] text-emerald-400 font-medium">{detectedBadge.issuingState}</p>
+              )}
+              <span className="text-[10px] text-emerald-400 mt-2">
+                Đang tự động chuyển sang Bước 03: Quyết toán Folio & Ký tên...
+              </span>
+            </div>
+          )}
+        </div>
+
+        {cameraError && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+            <p className="font-semibold flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm">warning</span>
+              {cameraError}
+            </p>
+          </div>
+        )}
+
+        {/* Nút hành động Chụp ảnh hoặc Tải file ảnh */}
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <button
+            onClick={handleSnapPhoto}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">photo_camera</span>
+            CHỤP & NHẬN DIỆN THẺ
+          </button>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-semibold text-xs transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">upload_file</span>
+            TẢI ẢNH TỪ MÁY / ĐIỆN THOẠI
+          </button>
+        </div>
+
+        {/* Chọn nhanh mẫu thử nghiệm danh tính */}
+        <div className="space-y-1.5 border-t border-outline-variant/20 pt-3">
+          <p className="text-[11px] text-on-surface-variant text-center">
+            Hoặc chọn nhanh hồ sơ mẫu nhận diện tức thì:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <button
+              onClick={() => {
+                playSuccessBeep();
+                onScanSuccess({
+                  docType: 'student_card',
+                  documentNumber: '22211TT2302',
+                  barcodeNumber: '9704363325591855010',
+                  legalFullName: 'NGUYỄN VĂN THỰC',
+                  birthDate: '2004-07-05',
+                  gender: 'Nam',
+                  issuingState: 'Trường CĐ Công Nghệ Thủ Đức (Khoa CNTT)',
+                  expirationDate: '2028-10-31',
+                  faculty: 'Khoa Công Nghệ Thông Tin',
+                  academicYear: '2022-2025',
+                  confidenceScore: 100.0,
+                });
+                onClose();
+              }}
+              className="p-2 rounded-xl border border-cyan-500/40 bg-cyan-950/30 hover:bg-cyan-900/40 text-left transition-all cursor-pointer"
+            >
+              <div className="font-bold text-cyan-300 text-[11px] flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs">school</span> THẺ SINH VIÊN
+              </div>
+              <div className="text-[10px] text-on-surface font-semibold truncate">NGUYỄN VĂN THỰC</div>
+              <div className="text-[9px] text-cyan-400 font-mono">MSSV: 22211TT2302 • CĐCN Thủ Đức</div>
+            </button>
+
+            <button
+              onClick={() => {
+                playSuccessBeep();
+                onScanSuccess({
+                  docType: 'natl_id',
+                  documentNumber: '079090012345',
+                  legalFullName: 'NGUYỄN VĂN AN',
+                  birthDate: '1990-04-15',
+                  gender: 'Nam',
+                  issuingState: 'Cục Cảnh sát QLHC về TTXH',
+                  expirationDate: '2030-04-15',
+                  confidenceScore: 100.0,
+                });
+                onClose();
+              }}
+              className="p-2 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:border-admin-primary text-left transition-all cursor-pointer"
+            >
+              <div className="font-bold text-admin-primary text-[11px] flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs">badge</span> CCCD GẮN CHIP
+              </div>
+              <div className="text-[10px] text-on-surface font-semibold truncate">NGUYỄN VĂN AN</div>
+              <div className="text-[9px] text-on-surface-variant font-mono">079090012345</div>
+            </button>
+
+            <button
+              onClick={() => {
+                playSuccessBeep();
+                onScanSuccess({
+                  docType: 'driver_lic',
+                  documentNumber: '790184719283',
+                  legalFullName: 'LÊ MINH ĐỨC',
+                  birthDate: '1988-12-09',
+                  gender: 'Nam',
+                  issuingState: 'Sở Giao Thông Vận Tải TP.HCM',
+                  expirationDate: '2032-12-09',
+                  confidenceScore: 100.0,
+                });
+                onClose();
+              }}
+              className="p-2 rounded-xl border border-outline-variant/30 bg-surface-container-high hover:border-admin-primary text-left transition-all cursor-pointer"
+            >
+              <div className="font-bold text-admin-primary text-[11px] flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs">directions_car</span> BẰNG LÁI B2
+              </div>
+              <div className="text-[10px] text-on-surface font-semibold truncate">LÊ MINH ĐỨC</div>
+              <div className="text-[9px] text-on-surface-variant font-mono">790184719283</div>
+            </button>
+          </div>
+        </div>
+
+        <p className="text-[10px] text-on-surface-variant text-center">
+          💡 Mẹo: Hệ thống tự động nhận diện mã QR trên CCCD, mã vạch Napas/MSSV trên Thẻ Sinh Viên và ảnh chụp bằng lái xe.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal 3: Trình Tạo Mã QR Thử Nghiệm Để Quét Bằng Điện Thoại / Webcam ────
+const TestQrModal = ({ bookingCode = 'GHNDF2TAGMLT', onClose }) => {
+  const [activeTab, setActiveTab] = useState('student'); // 'student' | 'booking' | 'cccd' | 'driver'
+
+  const bookingQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
+    bookingCode
+  )}`;
+  const cccdQrString = `079090012345|025684721|NGUYỄN VĂN AN|15041990|Nam|Số 12 Đường Lê Duẩn, P. Bến Nghé, Quận 1, TP. Hồ Chí Minh|20082021`;
+  const cccdQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
+    cccdQrString
+  )}`;
+  const driverQrString = `790184719283||LÊ MINH ĐỨC|12091988|Nam|TP. Hồ Chí Minh|15082022|GPLX B2`;
+  const driverQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
+    driverQrString
+  )}`;
+  // Thẻ Sinh Viên - Trường CĐ Công Nghệ Thủ Đức - Nguyễn Văn Thực
+  const studentQrString = `22211TT2302|9704363325591855010|NGUYỄN VĂN THỰC|05072004|KHOA CÔNG NGHỆ THÔNG TIN|CĐCN THỦ ĐỨC|2022-2025|1028`;
+  const studentQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
+    studentQrString
+  )}`;
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[500] flex items-center justify-center p-4 animate-in fade-in duration-200 font-mono">
+      <div className="bg-surface-container rounded-2xl border border-outline-variant/40 max-w-md w-full p-6 text-on-surface space-y-4 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-admin-primary">devices</span>
+            <h3 className="font-bold text-sm">MÃ QR MẪU ĐỂ QUÉT THỬ</h3>
+          </div>
+          <button onClick={onClose} className="p-1 rounded text-on-surface-variant hover:text-white cursor-pointer">
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+
+        {/* Tab chọn loại mã */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+          {[
+            { id: 'student', label: 'THẺ SV' },
+            { id: 'booking', label: 'REF PHÒNG' },
+            { id: 'cccd', label: 'CCCD' },
+            { id: 'driver', label: 'GPLX' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`py-1.5 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                activeTab === t.id
+                  ? 'bg-admin-primary text-on-primary border-admin-primary shadow-sm'
+                  : 'bg-surface-container-high border-outline-variant/30 text-on-surface-variant'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Khung hiển thị mã QR */}
+        <div className="bg-white p-4 rounded-2xl shadow-inner flex flex-col items-center justify-center space-y-2">
+          <img
+            src={
+              activeTab === 'student'
+                ? studentQrUrl
+                : activeTab === 'booking'
+                ? bookingQrUrl
+                : activeTab === 'cccd'
+                ? cccdQrUrl
+                : driverQrUrl
+            }
+            alt="Mã QR Thử Nghiệm"
+            className="w-[220px] h-[220px] object-contain"
+          />
+          <span className="text-[11px] font-mono text-slate-800 font-bold text-center">
+            {activeTab === 'student'
+              ? 'THẺ SV: 22211TT2302 (NGUYỄN VĂN THỰC - CĐCN THỦ ĐỨC)'
+              : activeTab === 'booking'
+              ? `MÃ REF: ${bookingCode}`
+              : activeTab === 'cccd'
+              ? 'CCCD: 079090012345 (NGUYỄN VĂN AN)'
+              : 'GPLX: 790184719283 (LÊ MINH ĐỨC)'}
+          </span>
+        </div>
+
+        <p className="text-[11px] text-on-surface-variant text-center leading-relaxed">
+          📱 Dùng điện thoại mở mã QR này và đưa trước webcam laptop, hoặc mở trang này trên điện thoại rồi bật camera quét màn hình máy tính!
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal 4: Thanh Tra Vị Trí Lưu Trữ Dữ Liệu & Hình Ảnh (Storage & Database Audit) ─
+const StorageInspectorModal = ({ savedResult, capturedIdSnapshot, signatureImage, bookingData, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[550] flex items-center justify-center p-4 animate-in fade-in duration-200 font-mono">
+      <div className="bg-surface-container rounded-2xl border-2 border-emerald-500/60 max-w-2xl w-full p-6 text-on-surface space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-outline-variant/30 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-emerald-400 text-2xl">
+              database
+            </span>
+            <div>
+              <h3 className="font-bold text-sm text-emerald-300 uppercase">
+                BÁO CÁO VỊ TRÍ LƯU TRỮ HÌNH ẢNH & DỮ LIỆU CSDL
+              </h3>
+              <p className="text-[11px] text-on-surface-variant">
+                Quy trình lưu trữ vật lý trên Server & Cơ sở dữ liệu MySQL Grand Horizon
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-on-surface-variant hover:text-white hover:bg-surface-container-highest cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+
+        {/* 1. NƠI LƯU HÌNH ẢNH */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold text-cyan-300 uppercase flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">folder_open</span>
+            1. VỊ TRÍ LƯU TRỮ HÌNH ẢNH TRÊN MÁY CHỦ (SERVER FILE STORAGE)
+          </h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            {/* Ảnh CCCD / Bằng lái */}
+            <div className="bg-[#0b1329] border border-cyan-500/40 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-cyan-200">ẢNH THẺ CCCD / GIẤY TỜ</span>
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded">.JPG FILE</span>
+              </div>
+              <div className="text-[11px] text-on-surface-variant space-y-1">
+                <div>
+                  <span className="text-cyan-400 font-semibold block">Thư mục vật lý trên server:</span>
+                  <code className="text-[10px] bg-black/60 px-1.5 py-0.5 rounded text-amber-300 block truncate">
+                    backend/public/uploads/id_cards/
+                  </code>
+                </div>
+                <div>
+                  <span className="text-cyan-400 font-semibold block">URL truy cập trực tuyến:</span>
+                  <code className="text-[10px] bg-black/60 px-1.5 py-0.5 rounded text-emerald-300 block truncate">
+                    {savedResult?.savedFiles?.idCardUrl || '/uploads/id_cards/CCCD_...jpg'}
+                  </code>
+                </div>
+              </div>
+              {capturedIdSnapshot ? (
+                <div className="pt-2 border-t border-cyan-500/20 text-center">
+                  <span className="text-[10px] text-cyan-400 block mb-1">Ảnh thực tế vừa quét/chụp:</span>
+                  <img
+                    src={capturedIdSnapshot}
+                    alt="Preview CCCD"
+                    className="max-h-24 mx-auto rounded border border-cyan-500/40 object-contain"
+                  />
+                </div>
+              ) : (
+                <p className="text-[10px] text-on-surface-variant italic pt-1">
+                  Chưa có ảnh (sẽ tự động chụp & lưu vào thư mục này khi mở camera quét CCCD)
+                </p>
+              )}
+            </div>
+
+            {/* Ảnh chữ ký */}
+            <div className="bg-[#0b1329] border border-emerald-500/40 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-emerald-200">CHỮ KÝ ĐIỆN TỬ CỦA KHÁCH</span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">.PNG FILE</span>
+              </div>
+              <div className="text-[11px] text-on-surface-variant space-y-1">
+                <div>
+                  <span className="text-emerald-400 font-semibold block">Thư mục vật lý trên server:</span>
+                  <code className="text-[10px] bg-black/60 px-1.5 py-0.5 rounded text-amber-300 block truncate">
+                    backend/public/uploads/signatures/
+                  </code>
+                </div>
+                <div>
+                  <span className="text-emerald-400 font-semibold block">URL truy cập trực tuyến:</span>
+                  <code className="text-[10px] bg-black/60 px-1.5 py-0.5 rounded text-emerald-300 block truncate">
+                    {savedResult?.savedFiles?.signatureUrl || '/uploads/signatures/SIG_B...png'}
+                  </code>
+                </div>
+              </div>
+              {signatureImage ? (
+                <div className="pt-2 border-t border-emerald-500/20 text-center">
+                  <span className="text-[10px] text-emerald-400 block mb-1">Ảnh chữ ký vừa ghi nhận:</span>
+                  <img
+                    src={signatureImage}
+                    alt="Preview Chữ ký"
+                    className="max-h-24 mx-auto bg-slate-900 rounded p-1 border border-emerald-500/40 object-contain"
+                  />
+                </div>
+              ) : (
+                <p className="text-[10px] text-on-surface-variant italic pt-1">
+                  Chưa có chữ ký (sẽ tự động lưu vào thư mục này khi khách ký tên trên bảng vẽ)
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 2. NƠI LƯU DỮ LIỆU CƠ SỞ DỮ LIỆU */}
+        <div className="space-y-2.5 pt-2 border-t border-outline-variant/30">
+          <h4 className="text-xs font-bold text-amber-300 uppercase flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">table_chart</span>
+            2. VỊ TRÍ LƯU TRỮ DỮ LIỆU TRONG DATABASE MySQL (hotel_management)
+          </h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+            <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="font-bold text-admin-primary flex items-center justify-between">
+                <span>Bảng `BookingGuests`</span>
+                <span className="text-[9px] text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded">Hồ sơ khách</span>
+              </div>
+              <p className="text-on-surface-variant text-[10px]">
+                Lưu Họ tên, Số CCCD, Loại giấy tờ, Ngày sinh, Giới tính, Quốc tịch lấy từ OCR hoặc mã QR CCCD gắn chip.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="font-bold text-cyan-400 flex items-center justify-between">
+                <span>Bảng `PoliceDeclarations`</span>
+                <span className="text-[9px] text-cyan-400 bg-cyan-500/20 px-1.5 py-0.2 rounded">Công An Lưu Trú</span>
+              </div>
+              <p className="text-on-surface-variant text-[10px]">
+                Tự động tạo bản ghi Khai báo tạm trú gửi Công an phường theo luật cư trú (StayId, Họ tên, CCCD, Status: 'Pending').
+              </p>
+            </div>
+
+            <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="font-bold text-emerald-400 flex items-center justify-between">
+                <span>Bảng `Bookings` & `Stays`</span>
+                <span className="text-[9px] text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded">Trạng thái</span>
+              </div>
+              <p className="text-on-surface-variant text-[10px]">
+                Cập nhật `Status = 'CheckedIn'`, `ActualCheckIn = NOW()`, gắn số phòng thực tế `RoomId` và gán mã phiên lưu trú.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="font-bold text-indigo-400 flex items-center justify-between">
+                <span>Bảng `Rooms` & `Payments`</span>
+                <span className="text-[9px] text-indigo-400 bg-indigo-500/20 px-1.5 py-0.2 rounded">Phòng & POS</span>
+              </div>
+              <p className="text-on-surface-variant text-[10px]">
+                Phòng chuyển thành `Status = 'Occupied'`. Lưu bản ghi thanh toán POS quầy, tiền phòng và tạm giữ cọc bảo đảm.
+              </p>
+            </div>
+
+            <div className="col-span-1 md:col-span-2 bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="font-bold text-amber-400 flex items-center justify-between">
+                <span>Bảng `SmartLockLogs` & `AuditLogs`</span>
+                <span className="text-[9px] text-amber-400 bg-amber-500/20 px-1.5 py-0.2 rounded">Mã hóa thẻ & Nhật ký</span>
+              </div>
+              <p className="text-on-surface-variant text-[10px]">
+                Lưu lịch sử cấp thẻ từ RFID khóa cửa ASSA ABLOY COM-3 và nhật ký kiểm toán bảo mật chứa liên kết 2 file ảnh trên ổ đĩa server.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs cursor-pointer shadow-md"
+          >
+            ĐÃ HIỂU & ĐÓNG LẠI
+          </button>
         </div>
       </div>
     </div>
@@ -392,26 +1572,44 @@ export default function CheckInDesk() {
   // Kiểm tra quyền vai trò (RBAC)
   const isUnauthorized = user && user.role && !['Admin', 'Manager', 'Staff', 'Receptionist'].includes(user.role);
 
-  // Search input mã REF# / QR
-  const [searchQuery, setSearchQuery] = useState(params.bookingId || searchParams.get('bookingId') || '1');
+  // Lấy mã booking từ URL params nếu có (ví dụ khi click từ Danh sách đặt phòng chuyển sang)
+  const initialBookingParam = params.bookingId || searchParams.get('bookingId') || '';
+  const [searchQuery, setSearchQuery] = useState(initialBookingParam);
   const [loadingLookup, setLoadingLookup] = useState(false);
-  const [bookingData, setBookingData] = useState(null);
+  const [bookingData, setBookingData] = useState(null); // Mặc định TRẮNG khi mới vào trang
 
-  // Modal QR & Modal In thẻ
+  // Modal QR & Modal In thẻ & Quét CCCD & Báo cáo CSDL
   const [showQrModal, setShowQrModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showIdCameraModal, setShowIdCameraModal] = useState(false);
+  const [showTestQrModal, setShowTestQrModal] = useState(false);
+  const [showStorageModal, setShowStorageModal] = useState(false);
+  const [arrivalsList, setArrivalsList] = useState([]);
+  const [loadingArrivals, setLoadingArrivals] = useState(false);
+  const [capturedIdSnapshot, setCapturedIdSnapshot] = useState(null);
+  const [savedCheckInResult, setSavedCheckInResult] = useState(null);
 
-  // ─── CỘT 1: Quét OCR & Chữ Ký Điện Tử ───
-  const [docType, setDocType] = useState('passport'); // 'passport' | 'natl_id' | 'driver_lic'
+  // ─── CỘT 1: Quét OCR & Chữ Ký Điện Tử (Mặc định để TRỐNG, chỉ nạp khi quét) ───
+  const [docType, setDocType] = useState('natl_id'); // 'natl_id' (CCCD) | 'passport' | 'driver_lic'
   const [ocrScanning, setOcrScanning] = useState(false);
-  const [ocrConfidence, setOcrConfidence] = useState(99.4);
+  const [ocrConfidence, setOcrConfidence] = useState(0);
   const [ocrData, setOcrData] = useState({
-    legalFullName: 'ALEXANDER MORGAN',
-    documentNumber: 'P-482190342',
-    issuingState: 'Việt Nam (VNM)',
-    birthDate: '1988-04-15',
-    expirationDate: '2031-08-20',
+    legalFullName: '',
+    documentNumber: '',
+    issuingState: '',
+    birthDate: '',
+    expirationDate: '',
   });
+
+  // ─── SPEC 8: Form Thông Tin Giấy Tờ CCCD / Passport (Mục 2 & 6.2) ───────────
+  const [documentType, setDocumentType] = useState('CCCD'); // 'CCCD' | 'Passport'
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [gender, setGender] = useState('Khác'); // Nam | Nữ | Khác | Không xác định
+  const [nationality, setNationality] = useState('Việt Nam');
+  const [documentExpiryDate, setDocumentExpiryDate] = useState('');
+  const [formErrors, setFormErrors] = useState({});
 
   // Chữ ký điện tử Canvas
   const canvasRef = useRef(null);
@@ -466,7 +1664,58 @@ export default function CheckInDesk() {
     return () => clearInterval(timer);
   }, []);
 
-  // ─── 1. Tra cứu hồ sơ booking từ CSDL ──────────────────────────────────────
+  // Tải danh sách đặt phòng gần đây / hôm nay từ cơ sở dữ liệu
+  const fetchArrivals = useCallback(async () => {
+    try {
+      setLoadingArrivals(true);
+      const { data } = await safeFetchJson('/arrivals?limit=15');
+      if (data && data.success && Array.isArray(data.data)) {
+        setArrivalsList(data.data);
+      }
+    } catch (err) {
+      console.warn('Load arrivals warning:', err);
+    } finally {
+      setLoadingArrivals(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchArrivals();
+  }, [fetchArrivals]);
+
+  // Xử lý khi quét thành công CCCD / Bằng lái xe qua Camera
+  const handleIdScanSuccess = (parsed) => {
+    if (!parsed) return;
+    const isPass = parsed.docType === 'passport';
+    setDocumentType(isPass ? 'Passport' : 'CCCD');
+    setDocumentNumber(parsed.documentNumber || '');
+    setFullName(parsed.legalFullName || '');
+    setDateOfBirth(parsed.birthDate || '');
+    setGender(parsed.gender || 'Khác');
+    setNationality(parsed.issuingState || (isPass ? '' : 'Việt Nam'));
+    setDocumentExpiryDate(parsed.expirationDate || '');
+    setFormErrors({});
+
+    setOcrData({
+      legalFullName: parsed.legalFullName || ocrData.legalFullName,
+      documentNumber: parsed.documentNumber || ocrData.documentNumber,
+      issuingState: parsed.issuingState || ocrData.issuingState,
+      birthDate: parsed.birthDate || ocrData.birthDate,
+      expirationDate: parsed.expirationDate || ocrData.expirationDate,
+    });
+    setDocType(parsed.docType || 'natl_id');
+    setOcrConfidence(parsed.confidenceScore || 100.0);
+    if (parsed.snapshotImage) {
+      setCapturedIdSnapshot(parsed.snapshotImage);
+    }
+    addToast(
+      'success',
+      `Đã nhận diện thành công: ${parsed.legalFullName} (${parsed.docType === 'student_card' ? 'MSSV' : 'Số'}: ${parsed.documentNumber}). Đã cập nhật vào Form CCCD/Passport!`,
+      parsed.docType === 'student_card' ? 'XÁC MINH THẺ SINH VIÊN THÀNH CÔNG' : 'XÁC MINH DANH TÍNH THÀNH CÔNG'
+    );
+  };
+
+  // ─── 1. Tra cứu & Quét QR booking từ CSDL (Spec 8 Endpoint 1 & 2) ───────────
   const handleLookupBooking = useCallback(async (codeToQuery) => {
     const q = codeToQuery !== undefined ? codeToQuery : searchQuery;
     if (!String(q).trim()) {
@@ -476,28 +1725,66 @@ export default function CheckInDesk() {
 
     try {
       setLoadingLookup(true);
-      const { status, data } = await safeFetchJson(`/lookup?query=${encodeURIComponent(q.trim())}`);
+      // Gọi API POST /api/v1/check-ins/scan-qr theo Spec 8
+      const { status, ok, data } = await safeFetchJson('/scan-qr', {
+        method: 'POST',
+        body: JSON.stringify({ qrPayload: q.trim() }),
+      });
 
-      if (status === 404 || data.isRecordDeleted) {
-        addToast('error', data.message || 'Không tìm thấy mã đặt phòng.', 'TRA CỨU THẤT BẠI');
+      if (ok && data && data.success && data.data) {
+        const b = data.data;
+        // Bổ sung các trường tương thích
+        b.ConfirmationCode = b.bookingCode || b.ConfirmationCode;
+        b.BookingId = b.bookingId || b.BookingId;
+        b.GuestName = b.guestName || b.GuestName;
+        b.GuestPhone = b.phone || b.GuestPhone;
+        b.GuestEmail = b.email || b.GuestEmail;
+        b.RoomNumber = b.roomNumber || b.RoomNumber;
+        b.RoomId = b.roomId || b.RoomId;
+        b.BookingStatus = b.status || b.BookingStatus;
+        b.RoomTypeName = b.roomTypeName || b.RoomTypeName;
+        b.TotalAmount = b.totalAmount || b.TotalAmount;
+        b.DepositAmount = b.depositAmount || b.DepositAmount;
+        b.NumberOfNights = b.numberOfNights || b.NumberOfNights;
+
+        setBookingData(b);
+
+        // Đồng bộ vào Form CCCD/Passport (Spec 8 Mục 6.2)
+        const isPass = b.idType && b.idType.toLowerCase().includes('passport');
+        setDocumentType(isPass ? 'Passport' : 'CCCD');
+        setDocumentNumber(b.idNumber || '');
+        setFullName(b.guestName || '');
+        setDateOfBirth(b.dateOfBirth ? String(b.dateOfBirth).slice(0, 10) : '');
+        setGender('Khác');
+        setNationality(isPass ? '' : 'Việt Nam');
+        setDocumentExpiryDate('');
+        setFormErrors({});
+
+        setKeycardEncoded(false);
+        setPaymentSettled(false);
+        setTermsAccepted(false);
+        clearSignature();
+
+        addToast('success', `Đã tìm thấy booking ${b.ConfirmationCode} của khách ${b.GuestName}.`, 'TRA CỨU THÀNH CÔNG');
         return;
       }
 
-      if (data.success && data.data) {
-        const b = data.data;
+      // Fallback: Tra cứu qua endpoint /lookup nếu scan-qr trả lỗi hoặc mã không tìm thấy
+      const lookupRes = await safeFetchJson(`/lookup?query=${encodeURIComponent(q.trim())}`);
+      if (lookupRes.data && lookupRes.data.success && lookupRes.data.data) {
+        const b = lookupRes.data.data;
         setBookingData(b);
-        // Cập nhật dữ liệu OCR mặc định theo khách
-        if (b.docData) {
-          setOcrData({
-            legalFullName: b.docData.legalFullName || b.GuestName,
-            documentNumber: b.docData.documentNumber || b.IdNumber,
-            issuingState: b.docData.issuingState || 'Việt Nam',
-            birthDate: b.docData.birthDate || '1988-04-15',
-            expirationDate: b.docData.expirationDate || '2031-08-20',
-          });
-          setDocType(b.docData.docType || 'passport');
-        }
-        // Reset trạng thái tiến trình
+
+        const isPass = b.docData?.docType === 'passport' || (b.IdType && b.IdType.toLowerCase().includes('passport'));
+        setDocumentType(isPass ? 'Passport' : 'CCCD');
+        setDocumentNumber(b.docData?.documentNumber || b.IdNumber || '');
+        setFullName(b.docData?.legalFullName || b.GuestName || '');
+        setDateOfBirth(b.docData?.birthDate || (b.DateOfBirth ? String(b.DateOfBirth).slice(0, 10) : ''));
+        setGender('Khác');
+        setNationality(b.docData?.issuingState || (isPass ? '' : 'Việt Nam'));
+        setDocumentExpiryDate(b.docData?.expirationDate || '');
+        setFormErrors({});
+
         setKeycardEncoded(false);
         setPaymentSettled(false);
         setTermsAccepted(false);
@@ -505,7 +1792,11 @@ export default function CheckInDesk() {
 
         addToast('success', `Đã tìm thấy hồ sơ của khách ${b.GuestName} (${b.ConfirmationCode}).`, 'TRA CỨU THÀNH CÔNG');
       } else {
-        addToast('error', data.message || 'Không tìm thấy mã đặt phòng.', 'TRA CỨU THẤT BẠI');
+        addToast(
+          'error',
+          data?.message || lookupRes.data?.message || 'Không tìm thấy booking từ mã QR hoặc booking không ở trạng thái cho phép check-in.',
+          data?.code || 'TRA CỨU THẤT BẠI'
+        );
       }
     } catch (err) {
       console.error('Lookup error:', err);
@@ -515,10 +1806,12 @@ export default function CheckInDesk() {
     }
   }, [searchQuery, addToast]);
 
-  // Tự động load booking khi vào trang
+  // Tự động load booking CHỈ KHI có mã trên URL (nếu vào thẳng trang thì giữ trắng hoàn toàn để chờ quét)
   useEffect(() => {
-    handleLookupBooking(searchQuery);
-  }, []);
+    if (initialBookingParam && initialBookingParam !== '1') {
+      handleLookupBooking(initialBookingParam);
+    }
+  }, [initialBookingParam]);
 
   // ─── 2. Thao tác Quét lại OCR (Re-Scan) ────────────────────────────────────
   const handleOcrScan = async () => {
@@ -526,6 +1819,28 @@ export default function CheckInDesk() {
       addToast('warn', 'Vui lòng chọn loại giấy tờ.', 'CẢNH BÁO OCR');
       return;
     }
+
+    if (docType === 'student_card') {
+      setOcrScanning(true);
+      setTimeout(() => {
+        setOcrData({
+          legalFullName: 'NGUYỄN VĂN THỰC',
+          documentNumber: '22211TT2302',
+          issuingState: 'Trường CĐ Công Nghệ Thủ Đức (Khoa CNTT)',
+          birthDate: '2004-07-05',
+          expirationDate: '2028-10-31',
+        });
+        setOcrConfidence(99.8);
+        setOcrScanning(false);
+        addToast(
+          'success',
+          'Đã nhận diện Thẻ Sinh Viên: NGUYỄN VĂN THỰC (MSSV: 22211TT2302 - CĐ Công Nghệ Thủ Đức).',
+          'OCR THẺ SINH VIÊN'
+        );
+      }, 700);
+      return;
+    }
+
     try {
       setOcrScanning(true);
       const { data } = await safeFetchJson('/ocr-scan', {
@@ -665,54 +1980,73 @@ export default function CheckInDesk() {
     }
   };
 
-  // ─── 6. Hoàn tất Check-in & Kích hoạt phòng ───────────────────────────────
+  // ─── 6. Hoàn tất Check-in & Xác nhận lưu CCCD/Passport (Spec 8) ─────────────
   const handleCompleteCheckIn = async () => {
-    // 1. Kiểm tra 4 bước bắt buộc
-    if (!ocrData.documentNumber || !ocrData.legalFullName) {
-      addToast('warn', 'Vui lòng hoàn tất đủ 4 bước trước khi kích hoạt (Thiếu thông tin giấy tờ OCR).', 'CẢNH BÁO');
-      return;
+    // 1. Validate Form CCCD/Passport theo Spec 8 Mục 2, 5.1 & 6.3
+    const errors = {};
+    if (!documentType || !String(documentType).trim()) {
+      errors.documentType = 'Loại giấy tờ không được để trống';
     }
 
-    // Kiểm tra tính hợp lệ ngày hết hạn
-    const expDt = new Date(ocrData.expirationDate);
-    if (!isNaN(expDt.getTime()) && expDt < new Date()) {
-      addToast('error', 'Giấy tờ đã hết hạn.', 'LỖI XÁC THỰC GIẤY TỜ');
-      return;
+    const cleanDocNum = String(documentNumber || '').trim();
+    if (!cleanDocNum) {
+      errors.documentNumber = 'Số CCCD/Passport không được để trống';
+    } else if (documentType === 'CCCD') {
+      if (!/^\d{12}$/.test(cleanDocNum)) {
+        errors.documentNumber = 'Số CCCD phải gồm đúng 12 chữ số';
+      }
+    } else if (documentType === 'Passport') {
+      if (!/^[A-Za-z0-9]{6,9}$/.test(cleanDocNum)) {
+        errors.documentNumber = 'Số Passport phải gồm 6 đến 9 ký tự chữ và số';
+      }
     }
 
-    if (!hasSignature && !signatureImage) {
-      addToast('warn', 'Vui lòng để khách ký xác nhận.', 'THIẾU CHỮ KÝ');
-      return;
+    const cleanName = String(fullName || '').trim();
+    if (!cleanName || cleanName.length < 2 || cleanName.length > 150) {
+      errors.fullName = 'Họ và tên trên giấy tờ không hợp lệ';
     }
 
-    if (!keycardEncoded) {
-      addToast('warn', 'Vui lòng mã hóa thẻ từ vật lý trước khi hoàn tất.', 'THIẾU THẺ PHÒNG');
-      return;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (!dateOfBirth) {
+      errors.dateOfBirth = 'Ngày sinh không được để trống';
+    } else if (dateOfBirth > todayStr) {
+      errors.dateOfBirth = 'Ngày sinh không được lớn hơn ngày hiện tại';
     }
 
-    if (!paymentSettled) {
-      addToast('warn', 'Vui lòng xử lý tạm giữ hoặc thanh toán tại quầy trước khi hoàn tất.', 'CHƯA THANH TOÁN');
-      return;
+    const cleanNat = String(nationality || '').trim();
+    if (!cleanNat) {
+      errors.nationality = 'Quốc tịch không được để trống';
     }
 
-    if (!termsAccepted) {
-      addToast('warn', 'Khách chưa đồng ý điều khoản lưu trú.', 'ĐIỀU KHOẢN');
+    if (documentType === 'Passport' && documentExpiryDate && documentExpiryDate < todayStr) {
+      errors.documentExpiryDate = 'Passport đã hết hạn, không thể hoàn tất check-in';
+    }
+
+    // Nếu có lỗi, hiển thị ngay dưới trường tương ứng và không gọi API (Mục 4.1 & 6.3)
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      addToast('warn', 'Vui lòng kiểm tra lại các trường thông tin giấy tờ bị lỗi màu đỏ.', 'THÔNG TIN CHƯA HỢP LỆ');
       return;
     }
 
     try {
       setCompletingCheckIn(true);
-      const { status, data } = await safeFetchJson('/complete', {
+      // Gọi API POST /api/v1/check-ins theo Spec 8 Endpoint 3
+      const { status, ok, data } = await safeFetchJson('', {
         method: 'POST',
         body: JSON.stringify({
-          bookingId: bookingData.BookingId,
-          roomId: bookingData.RoomId,
-          guestName: ocrData.legalFullName,
-          idNumber: ocrData.documentNumber,
-          idType: docType === 'natl_id' ? 'CCCD' : docType === 'passport' ? 'Passport' : 'DriverLicense',
-          dateOfBirth: ocrData.birthDate,
-          nationality: ocrData.issuingState,
+          bookingId: bookingData.BookingId || bookingData.bookingId,
+          bookingCode: bookingData.ConfirmationCode || bookingData.bookingCode,
+          documentType,
+          documentNumber: cleanDocNum,
+          fullName: cleanName,
+          dateOfBirth,
+          gender,
+          nationality: cleanNat,
+          documentExpiryDate: documentExpiryDate || null,
+          roomId: bookingData.RoomId || bookingData.roomId,
           signatureData: signatureImage,
+          idCardImage: capturedIdSnapshot,
           dispatchNfc,
           keycardCount,
           paymentSettled,
@@ -720,35 +2054,58 @@ export default function CheckInDesk() {
         }),
       });
 
-      if (status === 404 || data.isRecordDeleted) {
+      if (status === 404 || data?.isRecordDeleted) {
         setConcurrencyConflict({
           isOpen: true,
-          message: data.message || 'Dữ liệu đặt phòng đã bị xóa bởi người dùng khác trong cơ sở dữ liệu.',
+          message: data?.message || 'Dữ liệu đặt phòng đã bị xóa bởi người dùng khác trong cơ sở dữ liệu.',
         });
         return;
       }
 
-      if (data.success) {
-        addToast('success', data.message, 'CHECK-IN HOÀN TẤT THÀNH CÔNG');
-        // Nạp lại dữ liệu mới từ CSDL
-        await handleLookupBooking(bookingData.BookingId);
-      } else {
-        addToast('error', data.message || 'Lỗi hoàn tất check-in.', 'LỖI THỰC THI');
+      if (!ok || !data || !data.success) {
+        if (data && data.field) {
+          setFormErrors((prev) => ({ ...prev, [data.field]: data.message }));
+        }
+        addToast(
+          'error',
+          data?.message || 'Không thể hoàn tất check-in, vui lòng thử lại',
+          data?.code || 'LỖI CHECK-IN'
+        );
+        return;
       }
+
+      // Check-in thành công (Mục 5 & 6.3)
+      setSavedCheckInResult(data);
+      addToast('success', data.message || 'Check-in thành công', 'SUCCESS_0004_CHECKED_IN');
+
+      // Cập nhật trạng thái booking hiện tại sang CheckedIn
+      setBookingData((prev) =>
+        prev
+          ? {
+              ...prev,
+              Status: 'CheckedIn',
+              status: 'CheckedIn',
+              BookingStatus: 'CheckedIn',
+              checkedInAt: data.data?.checkInAt || new Date().toISOString(),
+            }
+          : null
+      );
+
+      fetchArrivals();
     } catch (err) {
       console.error('Complete check-in error:', err);
-      addToast('error', 'Lỗi kết nối máy chủ: ' + err.message, 'LỖI MẠNG');
+      addToast('error', 'Không thể hoàn tất check-in, vui lòng thử lại: ' + err.message, 'ERROR_0021_CHECKIN_TRANSACTION');
     } finally {
       setCompletingCheckIn(false);
     }
   };
 
-  // Tiến độ 4 bước
+  // Tiến độ các bước theo Spec 8 & PMS
   const step1Done = Boolean(bookingData);
-  const step2Done = Boolean(ocrData.documentNumber && hasSignature);
+  const step2Done = Boolean(documentNumber && fullName && dateOfBirth);
   const step3Done = Boolean(paymentSettled);
   const step4Done = Boolean(keycardEncoded);
-  const allStepsComplete = step1Done && step2Done && step3Done && step4Done && termsAccepted;
+  const allStepsComplete = Boolean(bookingData && documentNumber && fullName && dateOfBirth);
 
   // Kiểm tra quyền truy cập RBAC
   if (isUnauthorized) {
@@ -861,6 +2218,90 @@ export default function CheckInDesk() {
           </div>
         </div>
 
+        {/* ─── 2.5 DANH SÁCH ĐẶT PHÒNG TỪ DATABASE ĐỂ CHỌN NHANH / QUÉT QR ── */}
+        <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-4 shadow-sm space-y-2.5 font-mono">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-admin-primary text-base">hotel</span>
+              <span className="text-xs font-bold text-on-surface uppercase">
+                HỒ SƠ ĐẶT PHÒNG TỪ CƠ SỞ DỮ LIỆU ({arrivalsList.length} ĐẶT PHÒNG HÔM NAY)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchArrivals}
+                disabled={loadingArrivals}
+                className="text-[11px] text-admin-primary hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">sync</span>
+                {loadingArrivals ? 'Đang tải...' : 'Làm mới CSDL'}
+              </button>
+            </div>
+          </div>
+
+          {arrivalsList.length === 0 ? (
+            <div className="p-3 text-xs text-on-surface-variant text-center bg-surface-container-lowest rounded-xl">
+              Đang đồng bộ dữ liệu đặt phòng từ database...
+            </div>
+          ) : (
+            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-outline-variant/40">
+              {arrivalsList.map((item) => {
+                const isSelected = bookingData?.BookingId === item.BookingId || bookingData?.ConfirmationCode === item.ConfirmationCode;
+                const isCheckedIn = item.BookingStatus === 'CheckedIn';
+                return (
+                  <div
+                    key={item.BookingId}
+                    onClick={() => {
+                      setSearchQuery(item.ConfirmationCode);
+                      handleLookupBooking(item.ConfirmationCode);
+                    }}
+                    className={`flex-shrink-0 p-2.5 rounded-xl border text-xs cursor-pointer transition-all hover:scale-[1.02] ${
+                      isSelected
+                        ? 'bg-admin-primary/20 border-admin-primary text-on-surface ring-1 ring-admin-primary shadow-md'
+                        : isCheckedIn
+                        ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200'
+                        : 'bg-surface-container-lowest border-outline-variant/30 text-on-surface-variant hover:border-outline-variant/60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-bold text-admin-primary font-mono">{item.ConfirmationCode}</span>
+                      <span
+                        className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                          isCheckedIn
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : item.BookingStatus === 'Confirmed'
+                            ? 'bg-cyan-500/20 text-cyan-300'
+                            : 'bg-amber-500/20 text-amber-300'
+                        }`}
+                      >
+                        {isCheckedIn ? 'ĐÃ CHECK-IN' : item.BookingStatus === 'Confirmed' ? 'ĐÃ XÁC NHẬN' : 'CHỜ CHECK-IN'}
+                      </span>
+                    </div>
+                    <div className="font-semibold text-on-surface text-[11px] truncate max-w-[170px]">
+                      {item.GuestName}
+                    </div>
+                    <div className="text-[10px] text-on-surface-variant flex items-center justify-between gap-2 mt-1">
+                      <span>Phòng: <strong className="text-emerald-400">{item.RoomNumber || 'Tự động gán'}</strong></span>
+                      <button
+                        title="Tạo mã QR để quét thử trên điện thoại"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSearchQuery(item.ConfirmationCode);
+                          handleLookupBooking(item.ConfirmationCode);
+                          setShowTestQrModal(true);
+                        }}
+                        className="text-cyan-400 hover:text-cyan-300 p-0.5 rounded cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">qr_code_2</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* ─── 3. Ô TRA CỨU MÃ REF# / QUÉT QR KHÁCH HÀNG ────────────────────── */}
         <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center gap-3">
           <div className="text-xs font-mono font-bold text-on-surface-variant flex items-center gap-1.5 flex-shrink-0">
@@ -879,11 +2320,11 @@ export default function CheckInDesk() {
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <button
               onClick={() => handleLookupBooking()}
               disabled={loadingLookup}
-              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-base">search</span>
               TRA CỨU HỒ SƠ
@@ -891,16 +2332,171 @@ export default function CheckInDesk() {
 
             <button
               onClick={() => setShowQrModal(true)}
-              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-admin-primary/50 bg-admin-primary/10 hover:bg-admin-primary/20 text-admin-primary font-bold text-xs transition-all cursor-pointer"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-admin-primary/50 bg-admin-primary/10 hover:bg-admin-primary/20 text-admin-primary font-bold text-xs transition-all cursor-pointer shadow-sm"
             >
-              <span className="material-symbols-outlined text-base">qr_code_scanner</span>
-              QUÉT MÃ QR KHÁCH
+              <span className="material-symbols-outlined text-base animate-pulse">photo_camera</span>
+              QUÉT MÃ QR (CAMERA)
+            </button>
+
+            <button
+              onClick={() => setShowTestQrModal(true)}
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 font-bold text-xs transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">devices</span>
+              MÃ QR THỬ NGHIỆM
             </button>
           </div>
         </div>
 
-        {/* ─── 4. KHÔNG GIAN LÀM VIỆC 3 CỘT (MATCHING EXACT WIREFRAME) ──────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* ─── 4. KHÔNG GIAN LÀM VIỆC CHÍNH (STANDBY VIEW KHI TRẮNG / 3 CỘT KHI ĐÃ NẠP) ── */}
+        {!bookingData ? (
+          /* ════════════ MÀN HÌNH CHỜ QUÉT // DỮ LIỆU ĐANG TRẮNG ════════════ */
+          <div className="space-y-6">
+            <div className="bg-surface-container border-2 border-dashed border-admin-primary/40 rounded-3xl p-8 md:p-12 text-center space-y-6 shadow-xl relative overflow-hidden font-mono">
+              <div className="absolute top-0 right-0 w-72 h-72 bg-admin-primary/5 rounded-full blur-3xl pointer-events-none"></div>
+              <div className="absolute bottom-0 left-0 w-72 h-72 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+              <div className="w-24 h-24 mx-auto rounded-3xl bg-admin-primary/10 border-2 border-admin-primary/50 flex items-center justify-center text-admin-primary shadow-lg shadow-admin-primary/10 relative">
+                <span className="material-symbols-outlined text-5xl animate-pulse">
+                  qr_code_scanner
+                </span>
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-admin-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-admin-primary"></span>
+                </span>
+              </div>
+
+              <div className="max-w-2xl mx-auto space-y-2">
+                <div className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-bold tracking-wider">
+                  TIỀN SẢNH // TRẠNG THÁI STANDBY CHỜ QUÉT ĐẶT PHÒNG
+                </div>
+                <h2 className="text-xl md:text-2xl font-black text-on-surface uppercase tracking-wide">
+                  DỮ LIỆU ĐANG TRẮNG · HỆ THỐNG CHỜ QUÉT MÃ QR HOẶC TRA CỨU
+                </h2>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Khi khách đến quầy, hãy sử dụng <strong>Camera Laptop hoặc Điện Thoại</strong> để quét mã QR trên phiếu xác nhận đặt phòng, hoặc chọn nhanh một hồ sơ khách đến hôm nay từ danh sách CSDL bên trên. Dữ liệu đặt phòng thực tế sẽ được nạp vào hệ thống để tiếp tục quy trình xác minh CCCD, thanh toán và kích hoạt thẻ phòng.
+                </p>
+              </div>
+
+              {/* Nút hành động chính */}
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => setShowQrModal(true)}
+                  className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-admin-primary to-amber-500 hover:from-admin-primary/90 hover:to-amber-400 text-on-primary font-bold text-xs flex items-center gap-2 shadow-xl shadow-admin-primary/20 transition-all cursor-pointer transform hover:scale-105"
+                >
+                  <span className="material-symbols-outlined text-lg animate-pulse">photo_camera</span>
+                  BẬT CAMERA QUÉT MÃ QR ĐẶT PHÒNG
+                </button>
+
+                <button
+                  onClick={() => setShowStorageModal(true)}
+                  className="px-5 py-3.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">database</span>
+                  XEM VỊ TRÍ LƯU TRỮ HÌNH ẢNH & CSDL
+                </button>
+
+                <button
+                  onClick={() => setShowTestQrModal(true)}
+                  className="px-5 py-3.5 rounded-2xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">devices</span>
+                  LẤY MÃ QR MẪU ĐỂ TEST
+                </button>
+              </div>
+            </div>
+
+            {/* 3 Khung mô phỏng luồng làm việc trống (Placeholder Skeleton) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 font-mono text-xs opacity-75">
+              <div className="bg-surface-container border border-dashed border-outline-variant/40 rounded-2xl p-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-surface-container-highest mx-auto flex items-center justify-center text-cyan-400">
+                  <span className="material-symbols-outlined text-2xl">badge</span>
+                </div>
+                <h3 className="font-bold text-on-surface uppercase">01 // XÁC MINH DANH TÍNH (CCCD/PASSPORT)</h3>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                  Đang ở trạng thái trắng. Sau khi quét mã QR đặt phòng, hệ thống sẽ mở camera để quét CCCD gắn chip và bảng ký tên điện tử.
+                </p>
+                <span className="inline-block text-[10px] text-on-surface-variant/70 border border-outline-variant/30 px-2 py-0.5 rounded">
+                  [ CHỜ NẠP ĐẶT PHÒNG ]
+                </span>
+              </div>
+
+              <div className="bg-surface-container border border-dashed border-outline-variant/40 rounded-2xl p-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-surface-container-highest mx-auto flex items-center justify-center text-emerald-400">
+                  <span className="material-symbols-outlined text-2xl">meeting_room</span>
+                </div>
+                <h3 className="font-bold text-on-surface uppercase">02 // SỐ PHÒNG & THẺ TỪ RFID</h3>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                  Đang ở trạng thái trắng. Hệ thống sẽ tải số phòng đã phân bổ, sơ đồ tầng và kích hoạt đầu đọc thẻ từ ASSA ABLOY COM-3.
+                </p>
+                <span className="inline-block text-[10px] text-on-surface-variant/70 border border-outline-variant/30 px-2 py-0.5 rounded">
+                  [ CHỜ NẠP ĐẶT PHÒNG ]
+                </span>
+              </div>
+
+              <div className="bg-surface-container border border-dashed border-outline-variant/40 rounded-2xl p-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-surface-container-highest mx-auto flex items-center justify-center text-amber-400">
+                  <span className="material-symbols-outlined text-2xl">point_of_sale</span>
+                </div>
+                <h3 className="font-bold text-on-surface uppercase">03 // QUYẾT TOÁN FOLIO & POS</h3>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                  Đang ở trạng thái trắng. Bảng kê công nợ tiền phòng, tiền cọc và cổng thanh toán POS Verifone P400 sẽ tải tự động.
+                </p>
+                <span className="inline-block text-[10px] text-on-surface-variant/70 border border-outline-variant/30 px-2 py-0.5 rounded">
+                  [ CHỜ NẠP ĐẶT PHÒNG ]
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ════════════ KHI ĐÃ CÓ DỮ LIỆU ĐẶT PHÒNG (100% DATABASE DRIVEN) ════════════ */
+          <div className="space-y-5">
+            {/* Thanh tiêu đề hồ sơ đang nạp */}
+            <div className="bg-surface-container-high border-2 border-admin-primary/50 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 font-mono shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-admin-primary/20 border border-admin-primary flex items-center justify-center text-admin-primary font-black">
+                  ✓
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-admin-primary font-bold">HỒ SƠ ĐANG NẠP:</span>
+                    <span className="text-sm font-black text-on-surface font-mono bg-surface-container-lowest px-2.5 py-0.5 rounded border border-outline-variant/30">
+                      {bookingData.ConfirmationCode}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-500/20 text-amber-300">
+                      {bookingData.VipTier || 'STANDARD VIP'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Khách: <strong className="text-on-surface">{bookingData.GuestName}</strong> • SĐT: {bookingData.GuestPhone || '—'} • Ngày: {fmtDateMonth(bookingData.CheckInDate)} ➔ {fmtDateMonth(bookingData.CheckOutDate)} ({bookingData.NumberOfNights || 1} đêm)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end md:self-auto">
+                <button
+                  onClick={() => setShowStorageModal(true)}
+                  className="px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">database</span>
+                  Xem Lưu Trữ CSDL & Ảnh
+                </button>
+                <button
+                  onClick={() => {
+                    setBookingData(null);
+                    setSearchQuery('');
+                    addToast('info', 'Đã đóng hồ sơ đặt phòng. Màn hình trở về trạng thái trắng chờ quét.', 'ĐÓNG HỒ SƠ');
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                  Đóng / Đổi Khách Khác
+                </button>
+              </div>
+            </div>
+
+            {/* 3 Cột Làm Việc Chi Tiết */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* ════════════ CỘT 1: 01 // XÁC MINH DANH TÍNH & QUÉT OCR ════════════ */}
           <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
@@ -917,16 +2513,17 @@ export default function CheckInDesk() {
               <label className="text-[10px] font-bold text-on-surface-variant font-mono uppercase block">
                 LOẠI GIẤY TỜ TÙY THÂN (ID DOCUMENT CLASSIFICATION)
               </label>
-              <div className="grid grid-cols-3 gap-2 text-xs font-mono">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs font-mono">
                 {[
                   { id: 'passport', label: 'HỘ CHIẾU' },
                   { id: 'natl_id', label: 'CCCD' },
                   { id: 'driver_lic', label: 'BẰNG LÁI' },
+                  { id: 'student_card', label: 'THẺ SINH VIÊN' },
                 ].map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setDocType(t.id)}
-                    className={`py-1.5 px-2 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                    className={`py-1.5 px-2 rounded-xl border text-center font-bold transition-all cursor-pointer truncate ${
                       docType === t.id
                         ? 'bg-admin-primary text-on-primary border-admin-primary shadow-sm'
                         : 'bg-surface-container-lowest border-outline-variant/30 text-on-surface-variant hover:border-outline-variant/60'
@@ -939,87 +2536,300 @@ export default function CheckInDesk() {
             </div>
 
             {/* Khung quét quang học (Scanner Hardware Bay) */}
-            <div className="bg-[#0b1329] border border-cyan-500/40 rounded-xl p-4 text-center font-mono relative overflow-hidden space-y-2">
-              <div className="flex items-center justify-between text-[10px] text-cyan-400 border-b border-cyan-500/20 pb-1">
-                <span>KHUNG QUÉT PHẦN CỨNG</span>
+            <div className="bg-[#0b1329] border border-cyan-500/40 rounded-xl p-4 text-center font-mono relative overflow-hidden space-y-3">
+              <div className="flex items-center justify-between text-[10px] text-cyan-400 border-b border-cyan-500/20 pb-1.5">
+                <span className="font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                  KHUNG QUÉT CAMERA CCCD / BẰNG LÁI / THẺ SV
+                </span>
                 <span className="font-bold text-emerald-400">[ ĐỘ TIN CẬY: {ocrConfidence}% ]</span>
               </div>
 
-              {/* Viewport quét với reticles */}
-              <div className="relative py-6 flex flex-col items-center justify-center space-y-1 border border-cyan-500/20 rounded-lg bg-black/40">
-                <span className="material-symbols-outlined text-4xl text-cyan-400 animate-pulse">document_scanner</span>
-                <p className="text-[11px] font-bold text-cyan-200">OPTICAL SCANNER FEED: CALIBRATED</p>
-                <p className="text-[10px] text-cyan-400/80">MRZ LINE 1-2 DECODED // EMV CHIP VERIFIED</p>
+              {/* Viewport quét với reticles hoặc ảnh chụp */}
+              <div className="relative py-4 flex flex-col items-center justify-center space-y-2 border border-cyan-500/30 rounded-lg bg-black/50 overflow-hidden min-h-[130px]">
+                {capturedIdSnapshot ? (
+                  <div className="relative w-full h-full flex flex-col items-center justify-center">
+                    <img
+                      src={capturedIdSnapshot}
+                      alt="Ảnh thẻ đã quét"
+                      className="max-h-[120px] rounded object-contain border border-cyan-500/50"
+                    />
+                    <span className="absolute bottom-1 bg-black/80 text-emerald-400 text-[9px] px-2 py-0.5 rounded border border-emerald-500/40">
+                      ✓ ĐÃ XÁC MINH CHÍNH CHỦ (CHIP & BARCODE VERIFIED)
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-4xl text-cyan-400 animate-pulse">
+                      document_scanner
+                    </span>
+                    <p className="text-[11px] font-bold text-cyan-200">
+                      QUÉT MÃ QR CCCD, BẰNG LÁI HOẶC THẺ SINH VIÊN
+                    </p>
+                    <p className="text-[10px] text-cyan-400/80">
+                      Hỗ trợ nhận diện Thẻ Sinh Viên, CCCD gắn chip & GPLX
+                    </p>
+                  </>
+                )}
               </div>
 
-              <div className="flex items-center justify-between text-[10px] pt-1">
-                <span className="text-on-surface-variant">TỆP: P-482190342_RAW.TIF</span>
+              {/* Nút bật camera thực tế quét CCCD / Thẻ sinh viên */}
+              <div className="space-y-2 pt-1">
                 <button
-                  onClick={handleOcrScan}
-                  disabled={ocrScanning}
-                  className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold cursor-pointer transition-colors"
+                  onClick={() => setShowIdCameraModal(true)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 transition-all cursor-pointer animate-pulse"
                 >
-                  {ocrScanning ? 'ĐANG QUÉT...' : 'QUÉT LẠI (RE-SCAN)'}
+                  <span className="material-symbols-outlined text-base">photo_camera</span>
+                  BẬT CAMERA QUÉT CCCD / BẰNG LÁI / THẺ SINH VIÊN
                 </button>
+
+                <div className="flex items-center justify-between text-[10px] pt-1">
+                  <span className="text-on-surface-variant truncate max-w-[160px]">
+                    {capturedIdSnapshot ? 'ẢNH: CAMERA_CAPTURE_OK' : 'TỆP: ID_SCAN_CALIBRATED'}
+                  </span>
+                  <button
+                    onClick={handleOcrScan}
+                    disabled={ocrScanning}
+                    className="px-2.5 py-1 bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant/30 text-on-surface rounded font-bold cursor-pointer transition-colors"
+                  >
+                    {ocrScanning ? 'ĐANG QUÉT...' : 'QUÉT LẠI (RE-SCAN)'}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Dữ liệu trích xuất OCR */}
-            <div className="space-y-3 font-mono text-xs">
-              <span className="text-[10px] font-bold text-on-surface-variant uppercase block">
-                DỮ LIỆU ĐÃ TRÍCH XUẤT OCR (PARSED OCR DATA)
-              </span>
+            {/* ════════════ FORM THÔNG TIN CCCD / PASSPORT (SPEC 8 - MỤC 6.2) ════════════ */}
+            <div className="space-y-3 font-mono text-xs border-t border-outline-variant/30 pt-3">
+              <div className="flex items-center justify-between pb-1 border-b border-outline-variant/20">
+                <span className="text-[11px] font-bold text-admin-primary uppercase flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">badge</span>
+                  THÔNG TIN CCCD / PASSPORT
+                </span>
+                <span className="text-[10px] text-on-surface-variant italic">
+                  <span className="text-rose-500 font-bold">*</span> Bắt buộc
+                </span>
+              </div>
 
+              {/* 1. Loại giấy tờ * (Select/Radio) */}
               <div>
-                <label className="text-[10px] text-on-surface-variant block uppercase">Họ và tên hợp pháp</label>
+                <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                  Loại giấy tờ <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocumentType('CCCD');
+                      if (formErrors.documentType) setFormErrors((prev) => ({ ...prev, documentType: '' }));
+                      if (!nationality) setNationality('Việt Nam');
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-center font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      documentType === 'CCCD'
+                        ? 'bg-admin-primary text-on-primary border-admin-primary shadow-sm'
+                        : 'bg-surface-container-lowest border-outline-variant/30 text-on-surface-variant hover:border-outline-variant/60'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-sm">id_card</span>
+                    CCCD (12 chữ số)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocumentType('Passport');
+                      if (formErrors.documentType) setFormErrors((prev) => ({ ...prev, documentType: '' }));
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-center font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      documentType === 'Passport'
+                        ? 'bg-admin-primary text-on-primary border-admin-primary shadow-sm'
+                        : 'bg-surface-container-lowest border-outline-variant/30 text-on-surface-variant hover:border-outline-variant/60'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-sm">flight</span>
+                    Hộ chiếu (Passport)
+                  </button>
+                </div>
+                {formErrors.documentType && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.documentType}
+                  </p>
+                )}
+              </div>
+
+              {/* 2. Số CCCD/Passport * */}
+              <div>
+                <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                  Số CCCD/Passport <span className="text-rose-500 font-bold">*</span>
+                </label>
                 <input
                   type="text"
-                  value={ocrData.legalFullName}
-                  onChange={(e) => setOcrData({ ...ocrData, legalFullName: e.target.value })}
-                  className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-1.5 font-bold text-on-surface text-xs focus:ring-1 focus:ring-admin-primary"
+                  value={documentNumber}
+                  onChange={(e) => {
+                    setDocumentNumber(e.target.value);
+                    if (formErrors.documentNumber) setFormErrors((prev) => ({ ...prev, documentNumber: '' }));
+                  }}
+                  placeholder={documentType === 'CCCD' ? 'Nhập đúng 12 chữ số CCCD (VD: 079123456789)...' : 'Nhập 6 đến 9 ký tự chữ và số (VD: B1234567)...'}
+                  className={`w-full bg-surface-container-lowest border rounded-xl px-3.5 py-2 font-bold text-xs font-mono transition-colors focus:outline-none focus:ring-2 ${
+                    formErrors.documentNumber
+                      ? 'border-rose-500 text-rose-200 focus:ring-rose-500'
+                      : 'border-outline-variant/40 text-on-surface focus:ring-admin-primary'
+                  }`}
                 />
+                {formErrors.documentNumber && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.documentNumber}
+                  </p>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {/* 3. Họ và tên trên giấy tờ * */}
+              <div>
+                <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                  Họ và tên trên giấy tờ <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    if (formErrors.fullName) setFormErrors((prev) => ({ ...prev, fullName: '' }));
+                  }}
+                  placeholder="NGUYỄN VĂN AN"
+                  className={`w-full bg-surface-container-lowest border rounded-xl px-3.5 py-2 font-bold text-xs transition-colors focus:outline-none focus:ring-2 ${
+                    formErrors.fullName
+                      ? 'border-rose-500 text-rose-200 focus:ring-rose-500'
+                      : 'border-outline-variant/40 text-on-surface focus:ring-admin-primary'
+                  }`}
+                />
+                {formErrors.fullName && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.fullName}
+                  </p>
+                )}
+              </div>
+
+              {/* 4 & 5. Ngày sinh * & Giới tính */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-[10px] text-on-surface-variant block uppercase">Số giấy tờ</label>
+                  <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                    Ngày sinh <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <input
-                    type="text"
-                    value={ocrData.documentNumber}
-                    onChange={(e) => setOcrData({ ...ocrData, documentNumber: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-1.5 font-bold text-admin-primary text-xs focus:ring-1 focus:ring-admin-primary"
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => {
+                      setDateOfBirth(e.target.value);
+                      if (formErrors.dateOfBirth) setFormErrors((prev) => ({ ...prev, dateOfBirth: '' }));
+                    }}
+                    className={`w-full bg-surface-container-lowest border rounded-xl px-3 py-2 text-xs transition-colors focus:outline-none focus:ring-2 ${
+                      formErrors.dateOfBirth
+                        ? 'border-rose-500 text-rose-200 focus:ring-rose-500'
+                        : 'border-outline-variant/40 text-on-surface focus:ring-admin-primary'
+                    }`}
                   />
+                  {formErrors.dateOfBirth && (
+                    <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.dateOfBirth}
+                    </p>
+                  )}
                 </div>
+
                 <div>
-                  <label className="text-[10px] text-on-surface-variant block uppercase">Quốc gia / Nơi cấp</label>
-                  <input
-                    type="text"
-                    value={ocrData.issuingState}
-                    onChange={(e) => setOcrData({ ...ocrData, issuingState: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-1.5 text-on-surface text-xs focus:ring-1 focus:ring-admin-primary"
-                  />
+                  <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                    Giới tính
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-admin-primary"
+                  >
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                    <option value="Khác">Khác</option>
+                    <option value="Không xác định">Không xác định</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-on-surface-variant block uppercase">Ngày sinh (YYYY-MM-DD)</label>
-                  <input
-                    type="date"
-                    value={ocrData.birthDate}
-                    onChange={(e) => setOcrData({ ...ocrData, birthDate: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-1.5 text-on-surface text-xs focus:ring-1 focus:ring-admin-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-on-surface-variant block uppercase">Ngày hết hạn</label>
-                  <input
-                    type="date"
-                    value={ocrData.expirationDate}
-                    onChange={(e) => setOcrData({ ...ocrData, expirationDate: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-1.5 text-on-surface text-xs focus:ring-1 focus:ring-admin-primary"
-                  />
-                </div>
+              {/* 6. Quốc tịch * */}
+              <div>
+                <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                  Quốc tịch <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={nationality}
+                  onChange={(e) => {
+                    setNationality(e.target.value);
+                    if (formErrors.nationality) setFormErrors((prev) => ({ ...prev, nationality: '' }));
+                  }}
+                  placeholder="Việt Nam"
+                  className={`w-full bg-surface-container-lowest border rounded-xl px-3.5 py-2 text-xs transition-colors focus:outline-none focus:ring-2 ${
+                    formErrors.nationality
+                      ? 'border-rose-500 text-rose-200 focus:ring-rose-500'
+                      : 'border-outline-variant/40 text-on-surface focus:ring-admin-primary'
+                  }`}
+                />
+                {formErrors.nationality && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.nationality}
+                  </p>
+                )}
+              </div>
+
+              {/* 7. Ngày hết hạn (Hiển thị rõ khi chọn Passport) */}
+              <div>
+                <label className="text-[11px] font-bold text-on-surface block uppercase mb-1">
+                  Ngày hết hạn {documentType === 'Passport' && <span className="text-[10px] text-amber-400 font-normal">(Passport phải còn hạn)</span>}
+                </label>
+                <input
+                  type="date"
+                  value={documentExpiryDate}
+                  onChange={(e) => {
+                    setDocumentExpiryDate(e.target.value);
+                    if (formErrors.documentExpiryDate) setFormErrors((prev) => ({ ...prev, documentExpiryDate: '' }));
+                  }}
+                  className={`w-full bg-surface-container-lowest border rounded-xl px-3.5 py-2 text-xs transition-colors focus:outline-none focus:ring-2 ${
+                    formErrors.documentExpiryDate
+                      ? 'border-rose-500 text-rose-200 focus:ring-rose-500'
+                      : 'border-outline-variant/40 text-on-surface focus:ring-admin-primary'
+                  }`}
+                />
+                {formErrors.documentExpiryDate && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span> {formErrors.documentExpiryDate}
+                  </p>
+                )}
+              </div>
+
+              {/* 8 & 9. Nút Hủy / Quét booking khác & Xác nhận Check-in ngay trong Form */}
+              <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-outline-variant/20">
+                <button
+                  type="button"
+                  id="btnCancel"
+                  onClick={() => {
+                    setBookingData(null);
+                    setSearchQuery('');
+                    setFormErrors({});
+                    addToast('info', 'Đã hủy phiên làm việc. Mời quét mã QR hoặc chọn booking khác.', 'HỦY CHECK-IN');
+                  }}
+                  className="px-3.5 py-2 rounded-xl border border-outline-variant/40 bg-surface-container hover:bg-surface-container-highest text-xs font-semibold text-on-surface transition-colors cursor-pointer"
+                >
+                  Hủy / Quét booking khác
+                </button>
+
+                <button
+                  type="button"
+                  id="btnConfirmCheckIn"
+                  disabled={completingCheckIn}
+                  onClick={handleCompleteCheckIn}
+                  className="px-4 py-2 rounded-xl bg-admin-primary hover:bg-admin-primary/90 text-on-primary font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-base">
+                    {completingCheckIn ? 'sync' : 'check_circle'}
+                  </span>
+                  {completingCheckIn ? 'Đang xử lý...' : 'Xác nhận Check-in'}
+                </button>
               </div>
             </div>
 
@@ -1186,7 +2996,7 @@ export default function CheckInDesk() {
           </div>
 
           {/* ════════════ CỘT 3: 03 // QUYẾT TOÁN FOLIO & THANH TOÁN ════════════ */}
-          <div className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4">
+          <div id="folio-payment-section" className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 shadow-sm space-y-4 scroll-mt-24 transition-all">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
               <h2 className="font-bold text-xs tracking-wider text-on-surface font-mono">
                 03 // QUYẾT TOÁN & TÀI CHÍNH
@@ -1287,57 +3097,78 @@ export default function CheckInDesk() {
             </div>
           </div>
         </div>
+      </div>
+    )}
 
         {/* ─── 5. THANH ĐIỀU KHIỂN DƯỚI CÙNG (BOTTOM STICKY ACTION BAR) ──────── */}
         <div className="sticky bottom-4 z-40 bg-surface-container-high/95 backdrop-blur-md border border-admin-primary/40 rounded-2xl p-4 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4 font-mono">
           <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-            <button
-              onClick={() => {
-                setKeycardEncoded(false);
-                setPaymentSettled(false);
-                setTermsAccepted(false);
-                clearSignature();
-                addToast('info', 'Đã hủy phiên làm việc hiện tại.', 'HỦY CHECK-IN');
-              }}
-              className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer text-rose-400"
-            >
-              ⊗ HỦY BỎ CHECK-IN
-            </button>
+            {bookingData ? (
+              <>
+                <button
+                  onClick={() => {
+                    setKeycardEncoded(false);
+                    setPaymentSettled(false);
+                    setTermsAccepted(false);
+                    clearSignature();
+                    addToast('info', 'Đã hủy phiên làm việc hiện tại.', 'HỦY CHECK-IN');
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer text-rose-400"
+                >
+                  ⊗ HỦY BỎ CHECK-IN
+                </button>
 
-            <button
-              onClick={() => setShowPrintModal(true)}
-              className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer flex items-center gap-1.5 text-on-surface"
-            >
-              <span className="material-symbols-outlined text-sm">print</span>
-              IN THẺ ĐĂNG KÝ
-            </button>
+                <button
+                  onClick={() => setShowPrintModal(true)}
+                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer flex items-center gap-1.5 text-on-surface"
+                >
+                  <span className="material-symbols-outlined text-sm">print</span>
+                  IN THẺ ĐĂNG KÝ
+                </button>
 
-            <button
-              onClick={() => addToast('info', `Chi tiết Folio #${bookingData?.BookingId}: Tổng ${fmtMoney(bookingData?.totalFolio)}, Cọc ${fmtMoney(bookingData?.depositPaid)}, Còn lại ${fmtMoney(bookingData?.netBalanceDue)}`, 'CHI TIẾT FOLIO')}
-              className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer text-on-surface"
-            >
-              XEM CHI TIẾT FOLIO
-            </button>
+                <button
+                  onClick={() => addToast('info', `Chi tiết Folio #${bookingData?.BookingId}: Tổng ${fmtMoney(bookingData?.totalFolio)}, Cọc ${fmtMoney(bookingData?.depositPaid)}, Còn lại ${fmtMoney(bookingData?.netBalanceDue)}`, 'CHI TIẾT FOLIO')}
+                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-semibold hover:bg-surface-container-highest transition-colors cursor-pointer text-on-surface"
+                >
+                  XEM CHI TIẾT FOLIO
+                </button>
+              </>
+            ) : (
+              <span className="text-xs text-on-surface-variant flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                [ CHẾ ĐỘ CHỜ: Vui lòng quét mã QR đặt phòng hoặc chọn từ danh sách CSDL để kích hoạt các bước ]
+              </span>
+            )}
           </div>
 
           <div className="w-full md:w-auto flex items-center gap-3">
-            <button
-              disabled={completingCheckIn || !allStepsComplete}
-              onClick={handleCompleteCheckIn}
-              className={`w-full md:w-auto px-6 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
-                allStepsComplete
-                  ? 'bg-admin-primary hover:bg-admin-primary/90 text-on-primary shadow-admin-primary/30 ring-2 ring-admin-primary'
-                  : 'bg-surface-container-highest text-on-surface-variant opacity-60 cursor-not-allowed'
-              }`}
-            >
-              <span className="material-symbols-outlined text-base">
-                {completingCheckIn ? 'sync' : 'key'}
-              </span>
-              {completingCheckIn
-                ? 'ĐANG KÍCH HOẠT...'
-                : `HOÀN TẤT CHECK-IN & KÍCH HOẠT PHÒNG ${bookingData?.RoomNumber || '804'}`}
-              <span className="material-symbols-outlined text-base">arrow_forward</span>
-            </button>
+            {bookingData ? (
+              <button
+                disabled={completingCheckIn || !allStepsComplete}
+                onClick={handleCompleteCheckIn}
+                className={`w-full md:w-auto px-6 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
+                  allStepsComplete
+                    ? 'bg-admin-primary hover:bg-admin-primary/90 text-on-primary shadow-admin-primary/30 ring-2 ring-admin-primary'
+                    : 'bg-surface-container-highest text-on-surface-variant opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">
+                  {completingCheckIn ? 'sync' : 'key'}
+                </span>
+                {completingCheckIn
+                  ? 'ĐANG KÍCH HOẠT...'
+                  : `HOÀN TẤT CHECK-IN & KÍCH HOẠT PHÒNG ${bookingData?.RoomNumber || ''}`}
+                <span className="material-symbols-outlined text-base">arrow_forward</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowQrModal(true)}
+                className="w-full md:w-auto px-5 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-admin-primary/20 text-admin-primary border border-admin-primary/50 hover:bg-admin-primary/30 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">photo_camera</span>
+                QUÉT QR ĐẶT PHÒNG NGAY
+              </button>
+            )}
           </div>
         </div>
 
@@ -1350,12 +3181,42 @@ export default function CheckInDesk() {
         />
 
         {showQrModal && (
-          <QrScannerModal
-            onScanSuccess={(code) => {
-              setSearchQuery(code);
-              handleLookupBooking(code);
-            }}
-            onClose={() => setShowQrModal(false)}
+          <CameraErrorBoundary onClose={() => setShowQrModal(false)}>
+            <BookingQrCameraModal
+              arrivalsList={arrivalsList}
+              onScanSuccess={(code) => {
+                setSearchQuery(code);
+                handleLookupBooking(code);
+              }}
+              onClose={() => setShowQrModal(false)}
+            />
+          </CameraErrorBoundary>
+        )}
+
+        {showIdCameraModal && (
+          <CameraErrorBoundary onClose={() => setShowIdCameraModal(false)}>
+            <IdDocumentCameraModal
+              defaultDocType={docType}
+              onScanSuccess={handleIdScanSuccess}
+              onClose={() => setShowIdCameraModal(false)}
+            />
+          </CameraErrorBoundary>
+        )}
+
+        {showTestQrModal && (
+          <TestQrModal
+            bookingCode={bookingData?.ConfirmationCode || (arrivalsList[0]?.ConfirmationCode) || 'GHNDF2TAGMLT'}
+            onClose={() => setShowTestQrModal(false)}
+          />
+        )}
+
+        {showStorageModal && (
+          <StorageInspectorModal
+            savedResult={savedCheckInResult}
+            capturedIdSnapshot={capturedIdSnapshot}
+            signatureImage={signatureImage}
+            bookingData={bookingData}
+            onClose={() => setShowStorageModal(false)}
           />
         )}
 

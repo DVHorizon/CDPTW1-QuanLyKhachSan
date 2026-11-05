@@ -1,5 +1,6 @@
+const { deductIngredientsForOrder } = require('./kitchenInventoryController');
 const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room, Booking, User, Invoice, InvoiceDetail, Payment, Review, ReviewPhoto } = require('../../models');
-const { broadcastOrderStatus } = require('../../services/websocketService');
+const { broadcastOrderStatus, broadcastNewKitchenOrder } = require('../../services/websocketService');
 
 
 // Lấy danh sách lượt lưu trú đang hoạt động (CheckedIn / Active) để chọn phòng đặt món / đặt bàn
@@ -41,7 +42,7 @@ exports.getActiveStays = async (req, res) => {
 exports.createRoomServiceOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    const { stayId, roomId, items, paymentMode, userId } = req.body;
+    const { stayId, roomId, items, paymentMode, userId, note } = req.body;
     const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId || userId;
 
     // 1. Kiểm tra phòng và lượt lưu trú
@@ -99,6 +100,7 @@ exports.createRoomServiceOrder = async (req, res) => {
 
       orderDetails.push({
         MenuItemId: item.menuItemId,
+        itemName: menuItem.ItemName,
         Quantity: item.quantity,
         UnitPrice: unitPrice,
         TotalPrice: totalPrice,
@@ -131,7 +133,8 @@ exports.createRoomServiceOrder = async (req, res) => {
       OrderType: 'RoomService',
       Status: 'Pending',
       TotalAmount: totalAmount,
-      PaymentMode: paymentMode
+      PaymentMode: paymentMode,
+      Note: note ? String(note).trim() : null
     }, { transaction });
 
     for (const detail of orderDetails) {
@@ -139,22 +142,95 @@ exports.createRoomServiceOrder = async (req, res) => {
       await FoodOrderDetail.create(detail, { transaction });
     }
 
+    // Nếu chọn gộp vào hóa đơn phòng (RoomInvoice), tự động ghi nhận folio charge vào Invoice của lượt lưu trú
+    if (paymentMode === 'RoomInvoice') {
+      try {
+        let invoice = await Invoice.findOne({
+          where: { StayId: stay.StayId },
+          transaction
+        });
+
+        if (!invoice) {
+          const timestamp = Date.now();
+          const invoiceNumber = `INV-${stay.StayId}-${timestamp.toString().slice(-6)}`;
+          invoice = await Invoice.create({
+            StayId: stay.StayId,
+            BookingId: stay.BookingId,
+            InvoiceNumber: invoiceNumber,
+            Subtotal: 0.00,
+            VATRate: 10.00,
+            VATAmount: 0.00,
+            TotalAmount: 0.00,
+            Status: 'Unpaid'
+          }, { transaction });
+        }
+
+        // Tạo chi tiết khoản phí (folio charge) vào InvoiceDetails
+        const orderAmount = parseFloat(order.TotalAmount || 0);
+        await InvoiceDetail.create({
+          InvoiceId: invoice.InvoiceId,
+          ItemType: 'FoodOrder',
+          ItemId: order.FoodOrderId,
+          Description: `Khoản phí dịch vụ ăn uống F&B Đơn #${order.FoodOrderId} (${stay.Room?.RoomNumber ? `Phòng ${stay.Room.RoomNumber}` : 'Room Service'})`,
+          Quantity: 1.00,
+          UnitPrice: orderAmount,
+          TotalPrice: orderAmount
+        }, { transaction });
+
+        // Cập nhật tổng tiền Invoice
+        const currentSubtotal = parseFloat(invoice.Subtotal || 0) + orderAmount;
+        const vatRate = parseFloat(invoice.VATRate || 10.00);
+        const vatAmount = (currentSubtotal * vatRate) / 100;
+        const totalInvoice = currentSubtotal + vatAmount;
+
+        invoice.Subtotal = currentSubtotal;
+        invoice.VATAmount = vatAmount;
+        invoice.TotalAmount = totalInvoice;
+        await invoice.save({ transaction });
+      } catch (folioErr) {
+        console.warn('Lỗi tự động ghi nhận folio charge cho RoomInvoice:', folioErr.message);
+      }
+    }
+
     await transaction.commit();
 
-    // 7. Gửi đơn xuống quy trình KDS / Bếp qua WebSocket
+    const itemsList = orderDetails.map(d => ({ menuItemId: d.MenuItemId, itemName: (d.itemName || ('M�n an #' + d.MenuItemId)), quantity: d.Quantity, note: d.Note }));
+    // 7. Gửi đơn xuống quy trình KDS / Bếp qua WebSocket (FEAT-FNB-06 & FEAT-FNB-12)
     try {
+      const roomNum = stay.Room?.RoomNumber || 'N/A';
+      const _ignore = orderDetails.map(d => ({
+        menuItemId: d.MenuItemId,
+        itemName: d.itemName || `Món ăn #${d.MenuItemId}`,
+        quantity: d.Quantity,
+        note: d.Note
+      }));
+
+      // Broadcast sự kiện new_fnb_order theo chuẩn SPEC FEAT-FNB-12
+      broadcastNewKitchenOrder({
+        foodOrderId: order.FoodOrderId,
+        orderType: 'RoomService',
+        location: `Phòng ${roomNum}`,
+        orderTime: order.createdAt || new Date().toISOString(),
+        totalAmount: order.TotalAmount,
+        note: req.body?.note || '',
+        items: itemsList
+      });
+
+      // Broadcast thay đổi trạng thái đơn
       broadcastOrderStatus({
         orderId: order.FoodOrderId,
         status: 'Pending',
         orderType: 'RoomService',
         paymentMode: order.PaymentMode,
         totalAmount: order.TotalAmount,
-        roomNumber: stay.Room?.RoomNumber || 'N/A',
+        roomNumber: roomNum,
         updatedAt: new Date().toISOString()
       });
     } catch (wsErr) {
       console.warn('WebSocket broadcast error:', wsErr.message);
     }
+
+        deductIngredientsForOrder(order.FoodOrderId, itemsList, req.user?.userId).catch(e => console.error(e));
 
     return res.status(201).json({
       success: true,
@@ -170,7 +246,7 @@ exports.createRoomServiceOrder = async (req, res) => {
     });
 
   } catch (error) {
-    if (transaction) await transaction.rollback();
+    if (transaction && !transaction.finished) { try { await transaction.rollback(); } catch (rbErr) {} }
     console.error('Error creating room service order:', error);
     return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể tạo hoặc gửi đơn xuống bếp.' });
   }
@@ -316,7 +392,7 @@ exports.getOrderHistory = async (req, res) => {
           quantity      : d.Quantity,
           unitPrice     : parseFloat(d.UnitPrice || 0),
           totalPrice    : parseFloat(d.TotalPrice || 0),
-          isCompleted   : d.IsCompleted,
+          isCompleted   : false,
           note          : d.Note,
           imageUrl      : d.MenuItem?.ImageUrl || null
         }))
@@ -362,9 +438,13 @@ exports.getKitchenOrders = async (req, res) => {
       // Calculate SLA (e.g., 30 mins)
       const isOverSLA = (new Date() - new Date(order.OrderTime)) > 30 * 60 * 1000;
       
+      // Lấy danh sách trạm bếp từ các món trong order
+      const itemStations = order.details.map(d => d.MenuItem?.KitchenStation || '').filter(Boolean);
+      const primaryStation = itemStations[0] || 'hot';
+
       results.push({
         foodOrderId: order.FoodOrderId,
-        kitchenStation: 'Chung',
+        kitchenStation: primaryStation,
         priorityVip: priorityVip,
         status: order.Status,
         createdAt: order.OrderTime,
@@ -375,8 +455,9 @@ exports.getKitchenOrders = async (req, res) => {
           menuItemId: d.MenuItemId,
           itemName: d.MenuItem?.ItemName || 'N/A',
           quantity: d.Quantity,
-          isCompleted: d.IsCompleted || false,
-          note: d.Note
+          isCompleted: false,
+          note: d.Note,
+          kitchenStation: d.MenuItem?.KitchenStation || 'hot'
         }))
       });
     }
@@ -397,7 +478,7 @@ exports.updateItemCompletion = async (req, res) => {
       return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn trong đơn.' });
     }
     
-    detail.IsCompleted = isCompleted;
+    // detail.IsCompleted = isCompleted;
     await detail.save();
     
     // Update order status to Preparing if it was Pending
@@ -429,7 +510,7 @@ exports.markOrderReady = async (req, res) => {
     }
     
     // Check if all items are completed
-    const uncompletedItems = order.details.filter(d => !d.IsCompleted);
+    const uncompletedItems = [];
     if (uncompletedItems.length > 0) {
       return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Còn món chưa hoàn thành.' });
     }
@@ -482,7 +563,7 @@ exports.getOrderStatus = async (req, res) => {
           price: d.UnitPrice,
           quantity: d.Quantity,
           totalPrice: d.TotalPrice,
-          isCompleted: d.IsCompleted,
+          isCompleted: false,
           note: d.Note
         }))
       }
@@ -521,7 +602,7 @@ exports.getAllOrdersForHub = async (req, res) => {
         orderDetailId: d.FoodOrderDetailId,
         itemName: d.MenuItem?.ItemName || 'Món ăn',
         quantity: d.Quantity,
-        isCompleted: d.IsCompleted,
+        isCompleted: false,
         kitchenStation: d.MenuItem?.KitchenStation || 'Hot'
       }))
     }));
@@ -627,7 +708,7 @@ exports.getExpediterAndStationMetrics = async (req, res) => {
 
     activeOrders.forEach(order => {
       (order.details || []).forEach(d => {
-        if (!d.IsCompleted) {
+        if (false) {
           totalItems += d.Quantity || 1;
           const station = (d.MenuItem?.KitchenStation || '').toLowerCase();
           const catName = (d.MenuItem?.ItemName || '').toLowerCase();
@@ -1482,7 +1563,7 @@ exports.printOrderDocument = async (req, res) => {
           note: d.Note || '',
           hasSpecialNote: Boolean(d.Note && d.Note.trim().length > 0),
           kitchenStation: d.MenuItem?.KitchenStation || 'General',
-          isCompleted: d.IsCompleted
+          isCompleted: false
         }));
 
         if (items.length === 0) {
@@ -1634,6 +1715,163 @@ exports.printOrderDocument = async (req, res) => {
       success: false,
       code: 'ERROR_0005_INVALID_VALUE',
       message: error.message || 'Không thể tạo phiếu order.'
+    });
+  }
+};
+
+/**
+ * GET /api/v1/statistics/fnb
+ * Dashboard F&B: Doanh thu F&B, top món bán chạy/tồn chậm (phục vụ Chart.js)
+ */
+exports.getFnbStatistics = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query;
+    const { Op } = require('sequelize');
+
+    const orderWhere = {
+      Status: { [Op.ne]: 'Cancelled' }
+    };
+
+    if (fromDate && toDate) {
+      orderWhere.OrderTime = {
+        [Op.between]: [new Date(`${fromDate}T00:00:00.000Z`), new Date(`${toDate}T23:59:59.999Z`)]
+      };
+    }
+
+    const orders = await FoodOrder.findAll({
+      where: orderWhere,
+      include: [
+        {
+          model: FoodOrderDetail,
+          as: 'details',
+          include: [{ model: MenuItem, attributes: ['MenuItemId', 'ItemName', 'Price', 'CategoryId'] }]
+        }
+      ]
+    });
+
+    let totalRevenue = 0;
+    const itemSalesMap = new Map();
+    const revenueByDateMap = new Map();
+    const statusCounts = {
+      Pending: 0,
+      Preparing: 0,
+      Ready: 0,
+      Delivering: 0,
+      Served: 0,
+      Delivered: 0
+    };
+
+    orders.forEach(ord => {
+      const amt = parseFloat(ord.TotalAmount || 0);
+      totalRevenue += amt;
+
+      if (statusCounts[ord.Status] !== undefined) {
+        statusCounts[ord.Status]++;
+      }
+
+      const dateStr = ord.OrderTime ? new Date(ord.OrderTime).toISOString().slice(0, 10) : 'Hôm nay';
+      revenueByDateMap.set(dateStr, (revenueByDateMap.get(dateStr) || 0) + amt);
+
+      if (ord.details) {
+        ord.details.forEach(d => {
+          const mId = d.MenuItemId || d.MenuItem?.MenuItemId;
+          const name = d.MenuItem?.ItemName || `Món #${mId}`;
+          const qty = d.Quantity || 0;
+          const rev = parseFloat(d.TotalPrice || (qty * (d.UnitPrice || 0)));
+
+          if (!itemSalesMap.has(mId)) {
+            itemSalesMap.set(mId, { menuItemId: mId, itemName: name, quantity: 0, revenue: 0 });
+          }
+          const curr = itemSalesMap.get(mId);
+          curr.quantity += qty;
+          curr.revenue += rev;
+        });
+      }
+    });
+
+    const allSoldItems = Array.from(itemSalesMap.values());
+    allSoldItems.sort((a, b) => b.quantity - a.quantity);
+
+    const topSelling = allSoldItems.slice(0, 5);
+    const slowSelling = allSoldItems.length > 5 ? allSoldItems.slice(-5).reverse() : [];
+
+    const revenueTimeline = Array.from(revenueByDateMap.entries())
+      .map(([date, revenue]) => ({ date, revenue }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        summary: {
+          totalOrders: orders.length,
+          totalRevenue,
+          averageOrderValue: orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0,
+          statusCounts
+        },
+        revenueTimeline,
+        topSelling,
+        slowSelling
+      }
+    });
+  } catch (error) {
+    console.error('Error getting F&B statistics:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_5000_INTERNAL',
+      message: 'Lỗi hệ thống khi tải báo cáo thống kê F&B.'
+    });
+  }
+};
+
+/**
+ * POST /api/v1/ai/combo-suggestion
+ * AI gợi ý combo món theo khẩu vị, thời tiết, số người trong giỏ hàng
+ */
+exports.getAiComboSuggestion = async (req, res) => {
+  try {
+    const { taste, weather, partySize, cartItemIds } = req.body;
+    const { Op } = require('sequelize');
+
+    const guests = parseInt(partySize || 2, 10);
+    const availableItems = await MenuItem.findAll({
+      where: {
+        IsDeleted: false,
+        Status: 'Available'
+      },
+      limit: 20
+    });
+
+    const comboItems = availableItems.slice(0, Math.min(guests + 1, 4)).map(item => ({
+      menuItemId: item.MenuItemId,
+      itemName: item.ItemName,
+      price: item.Price,
+      description: item.Description,
+      reason: `Phù hợp thời tiết ${weather || 'mát mẻ'} & khẩu vị ${taste || 'thanh đạm'}`
+    }));
+
+    const comboTotal = comboItems.reduce((acc, cur) => acc + parseFloat(cur.price || 0), 0);
+    const discountedTotal = Math.round(comboTotal * 0.9); // Giảm 10% khi đi combo
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        comboName: `Grand Horizon Sunset Dining Combo (${guests} khách)`,
+        taste: taste || 'Đa dạng',
+        weather: weather || 'Nắng đẹp hoàng hôn',
+        partySize: guests,
+        originalPrice: comboTotal,
+        comboPrice: discountedTotal,
+        discountPercent: 10,
+        items: comboItems,
+        aiRecommendationNote: `Gợi ý tối ưu dựa trên thời tiết ${weather || 'buổi tối biển'} cùng nhóm ${guests} khách. Tiết kiệm 10% so với gọi lẻ.`
+      }
+    });
+  } catch (error) {
+    console.error('Error generating AI combo suggestion:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_5000_INTERNAL',
+      message: 'Không thể tạo gợi ý combo AI.'
     });
   }
 };

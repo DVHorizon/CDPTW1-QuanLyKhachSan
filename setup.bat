@@ -15,18 +15,24 @@ if errorlevel 1 (
 echo.
 echo [2/7] ⏳ Đang đợi MySQL sẵn sàng kết nối...
 set /a retries=0
+
 :wait_mysql
 set /a retries+=1
-if %retries% geq 30 (
-    echo ❌ Quá thời gian chờ MySQL (60 giây). Vui lòng kiểm tra Docker container!
-    goto finish
-)
+if %retries% geq 30 goto timeout_mysql
+
 docker exec hotel_mysql mysqladmin ping -h localhost --silent >nul 2>&1
 if errorlevel 1 (
-    timeout /t 2 /nobreak >nul
+    ping 127.0.0.1 -n 3 >nul
     goto wait_mysql
 )
 echo    ✅ MySQL đã sẵn sàng!
+goto continue_setup
+
+:timeout_mysql
+echo ❌ Quá thời gian chờ MySQL sau 60 giây. Vui lòng kiểm tra Docker Desktop!
+goto finish
+
+:continue_setup
 
 echo.
 echo [3/7] 🧹 Dọn dẹp CSDL cũ để chuẩn hóa cấu trúc...

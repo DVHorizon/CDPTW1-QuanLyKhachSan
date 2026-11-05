@@ -3,18 +3,25 @@ import AdminLayout from '../../../components/admin/layout/AdminLayout';
 import OrderPrintModal from '../../../components/admin/fnb/OrderPrintModal';
 
 
-const Ticket = ({ order, onCheck, onReady, onPrint }) => {
+const Ticket = ({ order, onCheck, onReady, onPrint, isNew, onAcknowledgeNew }) => {
   const isOverSLA = order.isOverSLA;
   const color = order.priorityVip ? 'admin-primary' : (isOverSLA ? 'tertiary' : 'secondary');
-  const bgHeader = order.priorityVip ? 'bg-admin-primary/5' : (isOverSLA ? 'bg-tertiary-fixed/30' : 'bg-surface-container');
-  const badgeClass = order.priorityVip ? 'bg-admin-primary text-on-admin-primary' : (isOverSLA ? 'bg-tertiary text-on-tertiary animate-pulse' : 'bg-secondary/15 text-secondary');
-  const badgeText = order.priorityVip ? 'VIP PLATINUM' : (isOverSLA ? 'HỎA TỐC' : 'TIÊU CHUẨN');
+  const bgHeader = isNew
+    ? 'bg-amber-100 border-b-2 border-amber-400 animate-pulse'
+    : (order.priorityVip ? 'bg-admin-primary/5' : (isOverSLA ? 'bg-tertiary-fixed/30' : 'bg-surface-container'));
+  const badgeClass = isNew
+    ? 'bg-amber-500 text-white font-bold ring-2 ring-amber-300 animate-bounce'
+    : (order.priorityVip ? 'bg-admin-primary text-on-admin-primary' : (isOverSLA ? 'bg-tertiary text-on-tertiary animate-pulse' : 'bg-secondary/15 text-secondary'));
+  const badgeText = isNew ? 'MỚI TỚI' : (order.priorityVip ? 'VIP PLATINUM' : (isOverSLA ? 'HỎA TỐC' : 'TIÊU CHUẨN'));
 
   const allCompleted = order.items.every(i => i.isCompleted);
 
   return (
-    <article className={`flex flex-col bg-surface-container-lowest rounded-xl shadow-md overflow-hidden relative ${order.priorityVip ? 'ring-1 ring-admin-primary/20' : ''}`}>
-      <div className={`h-1.5 w-full bg-${color}`}></div>
+    <article
+      onClick={() => isNew && onAcknowledgeNew && onAcknowledgeNew(order.foodOrderId)}
+      className={`flex flex-col bg-surface-container-lowest rounded-xl shadow-md overflow-hidden relative transition-all duration-300 ${isNew ? 'ring-2 ring-amber-400 shadow-xl scale-[1.01]' : ''} ${order.priorityVip ? 'ring-1 ring-admin-primary/20' : ''}`}
+    >
+      <div className={`h-1.5 w-full ${isNew ? 'bg-amber-500' : `bg-${color}`}`}></div>
       <div className={`p-space-md ${bgHeader} flex flex-col gap-space-xs`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-space-xs">
@@ -114,6 +121,7 @@ const KitchenDisplay = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [restoreModal, setRestoreModal] = useState({ isOpen: false, list: [] });
+  const [selectedStation, setSelectedStation] = useState('all');
 
   // Modal in ấn phiếu bếp & hóa đơn tạm tính (FEAT-FNB-11)
   const [printModal, setPrintModal] = useState({
@@ -228,36 +236,204 @@ const KitchenDisplay = () => {
     setMessageModal({ isOpen: true, type, title, message });
   };
 
-  const fetchOrders = async () => {
+  // FEAT-FNB-12: Thông báo chuông / Popup Real-time khi có đơn mới tới Bếp
+  const [newOrderPopup, setNewOrderPopup] = useState(null); // { order, remainingSeconds }
+  const [unviewedOrderIds, setUnviewedOrderIds] = useState(new Set());
+  const [wsConnected, setWsConnected] = useState(true);
+  const [wsWarning, setWsWarning] = useState('');
+  const [audioError, setAudioError] = useState('');
+  const popupTimerRef = useRef(null);
+  const socketRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+
+  // Phát chuông báo âm thanh
+  const playNewOrderChime = () => {
+    if (isMuted) return;
+    try {
+      const chime = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+      chime.volume = 1.0;
+      const playPromise = chime.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Trình duyệt chặn autoplay âm thanh
+          setAudioError('Không thể phát âm thanh thông báo.');
+        });
+      }
+    } catch (_) {
+      setAudioError('Không thể phát âm thanh thông báo.');
+    }
+  };
+
+  // Mở popup order card khi có đơn mới với đếm ngược tự đóng (TC01, TC03)
+  const triggerNewOrderNotification = (orderData) => {
+    // 1. Phát âm thanh chuông
+    playNewOrderChime();
+
+    // 2. Thêm vào danh sách đơn chưa xem (TC04)
+    setUnviewedOrderIds(prev => new Set(prev).add(orderData.foodOrderId));
+
+    // 3. Mở popup hiển thị Order Card mới
+    const TIMEOUT_SECONDS = 15;
+    setNewOrderPopup({
+      ...orderData,
+      remainingSeconds: TIMEOUT_SECONDS
+    });
+
+    if (popupTimerRef.current) clearInterval(popupTimerRef.current);
+    popupTimerRef.current = setInterval(() => {
+      setNewOrderPopup(prev => {
+        if (!prev) {
+          clearInterval(popupTimerRef.current);
+          return null;
+        }
+        if (prev.remainingSeconds <= 1) {
+          clearInterval(popupTimerRef.current);
+          // Tự đóng sau X giây nhưng vẫn giữ order card và badge đếm số đơn chưa xem (TC03)
+          return null;
+        }
+        return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
+      });
+    }, 1000);
+  };
+
+  // Bếp bấm Đóng thông báo (hoặc tự tắt) → chỉ ẩn popup, VẪN GIỮ badge "Đơn mới chưa xem"
+  const handleClosePopupOnly = () => {
+    if (popupTimerRef.current) clearInterval(popupTimerRef.current);
+    setNewOrderPopup(null);
+  };
+
+  // Bếp bấm "XÁC NHẬN & GHIM ĐƠN" → đóng popup, đánh dấu ĐÃ XEM và trừ badge
+  const handleAcknowledgePopup = (foodOrderId) => {
+    if (popupTimerRef.current) clearInterval(popupTimerRef.current);
+    setNewOrderPopup(null);
+    setUnviewedOrderIds(prev => {
+      const next = new Set(prev);
+      next.delete(foodOrderId);
+      return next;
+    });
+  };
+
+  // Bếp bấm vào ticket trên màn hình → bỏ đánh dấu "MỚI TỚI"
+  const handleAcknowledgeTicket = (foodOrderId) => {
+    setUnviewedOrderIds(prev => {
+      const next = new Set(prev);
+      next.delete(foodOrderId);
+      return next;
+    });
+  };
+
+  // Tải lại danh sách đơn hàng từ Server (TC06)
+  const fetchOrders = async (isReconnect = false) => {
     try {
       const response = await fetch('http://localhost:5000/api/v1/fnb-orders/kitchen');
       const data = await response.json();
       if (data.success) {
-        if (!isMuted && data.data.length > prevOrderCountRef.current && prevOrderCountRef.current !== 0) {
-          try { beepSound.current.play(); } catch(e){}
-        }
-        prevOrderCountRef.current = data.data.length;
         setOrders(data.data);
+        if (isReconnect) {
+          setWsWarning('');
+        }
       } else {
-        setErrorMsg(data.message || 'Lỗi tải danh sách order.');
-        showMessageModal('error', 'LỖI', data.message || 'Lỗi tải danh sách order.');
+        const msg = isReconnect
+          ? 'Không thể tải danh sách đơn chưa xử lý.'
+          : (data.message || 'Lỗi tải danh sách order.');
+        setErrorMsg(msg);
+        showMessageModal('error', 'LỖI', msg);
       }
     } catch (error) {
-      setErrorMsg('Không thể kết nối đến máy chủ.');
-      showMessageModal('error', 'LỖI HỆ THỐNG', 'Không thể kết nối đến máy chủ.');
+      const msg = isReconnect
+        ? 'Không thể tải danh sách đơn chưa xử lý.'
+        : 'Không thể kết nối đến máy chủ.';
+      setErrorMsg(msg);
+      showMessageModal('error', 'LỖI HỆ THỐNG', msg);
     } finally {
       setLoading(false);
     }
   };
 
+  // Kết nối WebSocket Real-time: WS /ws/v1/kitchen-notifications (FEAT-FNB-12)
   useEffect(() => {
-    fetchOrders();
+    const connectWebSocket = () => {
+      const token = localStorage.getItem('hotel_token') || localStorage.getItem('token');
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? `${window.location.hostname}:5000`
+        : `${window.location.hostname}:5000`;
+      const wsUrl = `${wsProtocol}//${wsHost}/ws/v1/kitchen-notifications${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+
+      try {
+        const ws = new WebSocket(wsUrl);
+        socketRef.current = ws;
+
+        ws.onopen = () => {
+          console.log('🔌 [KDS] Đã kết nối WebSocket thông báo bếp:', wsUrl);
+          setWsConnected(true);
+          setWsWarning('');
+          // Khi kết nối lại thành công, tự động tải lại các đơn chưa xử lý (TC06)
+          fetchOrders(true);
+          fetchExpediterMetrics();
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+
+            // Sự kiện new_fnb_order theo chuẩn SPEC FEAT-FNB-12
+            if (message.event === 'new_fnb_order' || message.type === 'new_fnb_order') {
+              const payload = message.data || message;
+              triggerNewOrderNotification(payload);
+              // Tự động làm mới danh sách đơn trên giao diện KDS
+              fetchOrders();
+              fetchExpediterMetrics();
+            }
+
+            // Đồng bộ trạng thái đơn
+            if (message.type === 'ORDER_STATUS_CHANGED') {
+              fetchOrders();
+              fetchExpediterMetrics();
+            }
+          } catch (e) {
+            console.warn('Lỗi phân tích WebSocket message:', e);
+          }
+        };
+
+        ws.onerror = () => {
+          // TC05: Cảnh báo khi mất kết nối WebSocket
+          setWsConnected(false);
+          setWsWarning('Không thể kết nối đến hệ thống thông báo đơn mới.');
+        };
+
+        ws.onclose = () => {
+          setWsConnected(false);
+          setWsWarning('Không thể kết nối đến hệ thống thông báo đơn mới.');
+          // Thử kết nối lại sau 4s
+          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connectWebSocket();
+          }, 4000);
+        };
+      } catch (err) {
+        setWsConnected(false);
+        setWsWarning('Không thể kết nối đến hệ thống thông báo đơn mới.');
+      }
+    };
+
+    connectWebSocket();
     fetchExpediterMetrics();
+
+    // Fallback polling mỗi 15s để đảm bảo không sót đơn
     const interval = setInterval(() => {
       fetchOrders();
       fetchExpediterMetrics();
-    }, 10000);
-    return () => clearInterval(interval);
+    }, 15000);
+
+    return () => {
+      clearInterval(interval);
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (popupTimerRef.current) clearInterval(popupTimerRef.current);
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+    };
   }, []);
 
   const handleItemCheck = async (orderId, detailId, currentStatus) => {
@@ -366,6 +542,38 @@ const KitchenDisplay = () => {
           </div>
         )}
 
+        {/* KDS CONNECTION WARNING (TC05) */}
+        {!wsConnected && (
+          <div className="w-full bg-amber-500 text-white px-gutter-lg py-2 flex items-center justify-between text-xs font-bold shadow-sm animate-pulse">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">wifi_off</span>
+              <span>{wsWarning || 'Không thể kết nối đến hệ thống thông báo đơn mới.'}</span>
+            </div>
+            <button
+              onClick={() => fetchOrders(true)}
+              className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-white text-[11px] uppercase tracking-wider font-extrabold cursor-pointer transition-all"
+            >
+              Thử kết nối lại
+            </button>
+          </div>
+        )}
+
+        {/* AUDIO ERROR TOAST (TC07) */}
+        {audioError && (
+          <div className="w-full bg-red-600 text-white px-gutter-lg py-1.5 flex items-center justify-between text-xs font-semibold">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px]">volume_off</span>
+              <span>{audioError} (Trình duyệt có thể đã chặn tự động phát âm thanh, vui lòng tương tác với trang).</span>
+            </div>
+            <button
+              onClick={() => setAudioError('')}
+              className="text-white hover:opacity-80 text-xs font-bold px-2 py-0.5"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* TOP KDS EXPEDITER BAR */}
         <section className="w-full bg-surface-container-lowest shadow-sm px-gutter-lg py-space-md">
           <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between gap-space-md">
@@ -376,23 +584,75 @@ const KitchenDisplay = () => {
                 <div className="flex flex-col">
                   <div className="flex items-center gap-space-xs">
                     <span className="font-label-lg text-label-lg text-admin-primary font-bold tracking-tight">EXP-MAIN-01</span>
-                    <span className="w-2 h-2 rounded-full bg-admin-primary-container"></span>
+                    <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-admin-primary-container animate-pulse' : 'bg-amber-500'}`} title={wsConnected ? 'WebSocket Live' : 'Mất kết nối'}></span>
                   </div>
                   <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">Bếp Trưởng Điều Phối (Master Expediter &amp; Line Controller)</span>
                 </div>
               </div>
               {/* Quick filter chips */}
               <div className="flex items-center flex-wrap gap-space-xs bg-surface-container rounded-lg p-1" id="station-filter-group">
-                <button onClick={() => showMessageModal('info', 'LỌC TRẠM', 'Đang hiển thị Tất cả trạm bếp (08).')} className="px-space-md py-1.5 rounded bg-surface-container-lowest text-admin-primary font-label-md text-label-md shadow-sm" type="button">Tất cả trạm bếp (08)</button>
-                <button onClick={() => showMessageModal('info', 'LỌC TRẠM', 'Lọc theo Bếp Nóng 01 đang được cập nhật.')} className="px-space-md py-1.5 rounded hover:bg-surface-container-lowest/60 text-on-surface-variant font-label-md text-label-md transition-colors" type="button">Bếp Nóng 01 (Chảo &amp; Xào)</button>
-                <button onClick={() => showMessageModal('info', 'LỌC TRẠM', 'Lọc theo Bếp Nóng 02 đang được cập nhật.')} className="px-space-md py-1.5 rounded hover:bg-surface-container-lowest/60 text-on-surface-variant font-label-md text-label-md transition-colors" type="button">Bếp Nóng 02 (Nướng &amp; Lò)</button>
-                <button onClick={() => showMessageModal('info', 'LỌC TRẠM', 'Lọc theo Bếp Lạnh đang được cập nhật.')} className="px-space-md py-1.5 rounded hover:bg-surface-container-lowest/60 text-on-surface-variant font-label-md text-label-md transition-colors" type="button">Bếp Lạnh (Salad &amp; Raw)</button>
-                <button onClick={() => showMessageModal('info', 'LỌC TRẠM', 'Lọc theo Bếp Bánh đang được cập nhật.')} className="px-space-md py-1.5 rounded hover:bg-surface-container-lowest/60 text-on-surface-variant font-label-md text-label-md transition-colors" type="button">Bếp Bánh &amp; Tráng Miệng</button>
-                <button onClick={() => showMessageModal('info', 'LỌC TRẠM', 'Lọc theo Quầy Bar đang được cập nhật.')} className="px-space-md py-1.5 rounded hover:bg-surface-container-lowest/60 text-on-surface-variant font-label-md text-label-md transition-colors" type="button">Quầy Bar</button>
+                {[
+                  { id: 'all', label: 'Tất cả trạm bếp' },
+                  { id: 'Bếp Nóng 01', label: 'Bếp Nóng 01 (Chảo & Xào)' },
+                  { id: 'Bếp Nóng 02', label: 'Bếp Nóng 02 (Nướng & Lò)' },
+                  { id: 'Bếp Lạnh', label: 'Bếp Lạnh (Salad & Raw)' },
+                  { id: 'Bếp Bánh', label: 'Bếp Bánh & Tráng Miệng' },
+                  { id: 'Quầy Bar', label: 'Quầy Bar Sommelier' }
+                ].map(st => {
+                  const isActive = selectedStation === st.id;
+                  return (
+                    <button
+                      key={st.id}
+                      onClick={() => setSelectedStation(st.id)}
+                      className={`px-space-md py-1.5 rounded font-label-md text-label-md transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-surface-container-lowest text-admin-primary font-bold shadow-sm'
+                          : 'text-on-surface-variant hover:bg-surface-container-lowest/60'
+                      }`}
+                      type="button"
+                    >
+                      {st.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            {/* Action buttons & Sound trigger */}
+            {/* Action buttons, Unviewed Badge & Sound trigger */}
             <div className="flex items-center gap-space-sm w-full 2xl:w-auto justify-end">
+              {/* BADGE ĐẾM SỐ ĐƠN CHƯA XEM (TC03, TC04) - CÓ THỂ BẤM ĐỂ MỞ XEM HOẶC CUỘN TỚI ĐƠN */}
+              {unviewedOrderIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Lấy ra đơn đầu tiên trong danh sách chưa xem
+                    const firstUnviewedId = Array.from(unviewedOrderIds)[0];
+                    const targetOrder = orders.find(o => o.foodOrderId === firstUnviewedId);
+                    if (targetOrder) {
+                      setNewOrderPopup({
+                        foodOrderId: targetOrder.foodOrderId,
+                        orderType: targetOrder.orderType || 'RoomService',
+                        location: targetOrder.roomNumber || `Đơn #${targetOrder.foodOrderId}`,
+                        orderTime: targetOrder.createdAt,
+                        note: targetOrder.note || '',
+                        items: targetOrder.items.map(it => ({
+                          itemName: it.itemName,
+                          quantity: it.quantity,
+                          note: it.note
+                        })),
+                        remainingSeconds: 15
+                      });
+                    } else {
+                      // Nếu đơn chưa kịp render thì tải lại và clear badge
+                      fetchOrders();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-lg text-xs font-bold animate-pulse shadow-sm cursor-pointer transition-all border border-amber-300"
+                  title="Nhấn vào đây để mở lại popup chi tiết đơn mới chưa xem"
+                >
+                  <span className="material-symbols-outlined text-[18px]">notifications_active</span>
+                  <span>{unviewedOrderIds.size} Đơn Mới Chưa Xem</span>
+                </button>
+              )}
               <button onClick={openRestoreModal} className="flex items-center gap-space-xs px-space-md py-1.5 bg-surface-container-low text-on-surface hover:bg-surface-container rounded-lg text-label-md font-label-md transition-colors" type="button">
                 <span className="material-symbols-outlined text-[18px]">history</span>
                 <span>Khôi phục phiếu</span>
@@ -405,7 +665,7 @@ const KitchenDisplay = () => {
                 <span className="material-symbols-outlined text-[18px]">{isPaused ? 'play_circle' : 'pause_circle'}</span>
                 <span>{isPaused ? 'Tiếp tục nhận đơn' : 'Tạm dừng nhận đơn'}</span>
               </button>
-              <button onClick={fetchOrders} className="p-1.5 bg-admin-primary text-on-admin-primary rounded-lg shadow-sm hover:opacity-90 transition-opacity" type="button" title="Tải lại đơn hàng">
+              <button onClick={() => fetchOrders(false)} className="p-1.5 bg-admin-primary text-on-admin-primary rounded-lg shadow-sm hover:opacity-90 transition-opacity" type="button" title="Tải lại đơn hàng">
                 <span className="material-symbols-outlined text-[20px] {loading ? 'animate-spin' : ''}">refresh</span>
               </button>
             </div>
@@ -474,22 +734,42 @@ const KitchenDisplay = () => {
         {/* KDS CHITS GRID (4-COLUMN HIGH PRECISION TICKET RACK) */}
         <section className="p-gutter-lg">
           <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-gutter">
-            {orders.length === 0 ? (
-              <div className="col-span-full py-12 flex flex-col items-center justify-center text-outline">
-                <span className="material-symbols-outlined text-[48px] mb-4">check_circle</span>
-                <p className="font-label-lg text-label-lg">Không có đơn hàng nào chờ xử lý.</p>
-              </div>
-            ) : (
-              orders.map(order => (
+            {(() => {
+              const filteredOrders = selectedStation === 'all'
+                ? orders
+                : orders.filter(order => {
+                    const matchPrimary = (order.kitchenStation || '').toLowerCase().includes(selectedStation);
+                    const matchItem = order.items.some(it => 
+                      (it.kitchenStation || '').toLowerCase().includes(selectedStation)
+                    );
+                    return matchPrimary || matchItem;
+                  });
+
+              if (filteredOrders.length === 0) {
+                return (
+                  <div className="col-span-full py-12 flex flex-col items-center justify-center text-outline">
+                    <span className="material-symbols-outlined text-[48px] mb-4">check_circle</span>
+                    <p className="font-label-lg text-label-lg">
+                      {selectedStation === 'all'
+                        ? 'Không có đơn hàng nào chờ xử lý.'
+                        : 'Không có đơn hàng nào thuộc trạm bếp này.'}
+                    </p>
+                  </div>
+                );
+              }
+
+              return filteredOrders.map(order => (
                 <Ticket
                   key={order.foodOrderId}
                   order={order}
+                  isNew={unviewedOrderIds.has(order.foodOrderId)}
+                  onAcknowledgeNew={handleAcknowledgeTicket}
                   onCheck={handleItemCheck}
                   onReady={handleMarkReady}
                   onPrint={handleOpenPrintDoc}
                 />
-              ))
-            )}
+              ));
+            })()}
           </div>
         </section>
         {/* LOWER OPS: EXPEDITER PASS & KITCHEN STATION LOAD METRICS (CONNECTED TO DATABASE) */}
@@ -684,6 +964,91 @@ const KitchenDisplay = () => {
             <button onClick={() => setRestoreModal({ isOpen: false, list: [] })} className="mt-6 w-full py-3 bg-surface-container-high text-on-surface rounded-lg font-bold">
               Đóng
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP ORDER CARD KHI CÓ ĐƠN MỚI (FEAT-FNB-12: TC01, TC02, TC03) */}
+      {newOrderPopup && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-surface-container-lowest w-full max-w-lg rounded-2xl shadow-2xl border-2 border-amber-400 overflow-hidden flex flex-col relative">
+            {/* Thanh đếm ngược tự đóng (TC03) */}
+            <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between text-xs font-bold">
+              <div className="flex items-center gap-1.5 animate-pulse">
+                <span className="material-symbols-outlined text-[18px]">notifications_active</span>
+                <span className="uppercase tracking-wider">ĐƠN ĐẶT MÓN MỚI TỚI BẾP</span>
+              </div>
+              <div className="flex items-center gap-1 bg-black/20 px-2 py-0.5 rounded-full font-mono text-[11px]">
+                <span className="material-symbols-outlined text-[14px]">timer</span>
+                <span>Tự đóng sau: {newOrderPopup.remainingSeconds}s</span>
+              </div>
+            </div>
+
+            {/* Nội dung Order Card chi tiết */}
+            <div className="p-space-lg flex flex-col gap-space-sm bg-surface-container-low/40">
+              <div className="flex items-center justify-between border-b border-outline-variant/30 pb-3">
+                <div>
+                  <span className="text-label-sm font-label-sm text-outline uppercase tracking-wider block">Vị trí phục vụ</span>
+                  <span className="text-headline-sm font-bold text-on-surface uppercase">
+                    {newOrderPopup.location || 'Phòng Khách'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-label-sm font-label-sm text-outline uppercase tracking-wider block">Mã đơn</span>
+                  <span className="text-headline-sm font-bold text-admin-primary">
+                    #{newOrderPopup.foodOrderId}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs py-1 text-on-surface-variant font-medium">
+                <span>Loại đơn: <strong>{newOrderPopup.orderType === 'DineIn' ? 'Tại bàn (Dine-In)' : 'Dịch vụ phòng (Room Service)'}</strong></span>
+                <span>Giờ đặt: <strong>{new Date(newOrderPopup.orderTime).toLocaleTimeString('vi-VN')}</strong></span>
+              </div>
+
+              {newOrderPopup.note && (
+                <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-amber-900 text-xs font-semibold flex items-start gap-1.5">
+                  <span className="material-symbols-outlined text-[16px] text-amber-600 shrink-0">edit_note</span>
+                  <span>Ghi chú: {newOrderPopup.note}</span>
+                </div>
+              )}
+
+              {/* Danh sách món ăn nếu có */}
+              {newOrderPopup.items && newOrderPopup.items.length > 0 && (
+                <div className="mt-1 bg-surface-container-lowest p-3 rounded-xl border border-outline-variant/20 max-h-40 overflow-y-auto">
+                  <div className="text-[11px] font-bold text-outline uppercase mb-1.5">Món ăn yêu cầu:</div>
+                  <div className="divide-y divide-surface-container">
+                    {newOrderPopup.items.map((it, idx) => (
+                      <div key={idx} className="py-1.5 flex items-center justify-between text-xs">
+                        <span className="font-semibold text-on-surface">
+                          {it.quantity}x {it.itemName || `Món #${it.menuItemId}`}
+                        </span>
+                        {it.note && <span className="text-[11px] text-tertiary italic">{it.note}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Nút hành động Bếp bấm xem/xác nhận (TC02) */}
+            <div className="p-4 bg-surface-container-lowest border-t border-outline-variant/20 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleClosePopupOnly}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+              >
+                Đóng thông báo
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAcknowledgePopup(newOrderPopup.foodOrderId)}
+                className="px-6 py-2.5 bg-admin-primary text-on-admin-primary font-bold text-xs uppercase tracking-wider rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                <span>Xác nhận & Ghim đơn</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

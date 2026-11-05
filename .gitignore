@@ -57,3 +57,7 @@ database.sqlite
 
 # 11. Các file nháp và ticket giao việc tạm thời của AI Agent (Matt Pocock Skills)
 .scratch/
+
+# 12. Uploads ảnh của người dùng
+backend/uploads/*
+!backend/uploads/.gitkeep

@@ -20,7 +20,7 @@ jobs:
       - name: Thiết lập Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18" # Bạn có thể đổi sang '20' tùy vào dự án của mình
+          node-version: "20" # Bạn có thể đổi sang '20' tùy vào dự án của mình
 
       - name: Kiểm tra Backend
         run: |

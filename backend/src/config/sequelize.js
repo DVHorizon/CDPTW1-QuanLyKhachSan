@@ -1,11 +1,13 @@
+const path = require('path');
 const { Sequelize } = require('sequelize');
 const dbConfig = require('./config').development;
 
 let sequelize;
 if (dbConfig.dialect === 'sqlite') {
+  const sqlitePath = path.resolve(__dirname, '../../database.sqlite');
   sequelize = new Sequelize({
     dialect: 'sqlite',
-    storage: dbConfig.storage || './database.sqlite',
+    storage: sqlitePath,
     logging: dbConfig.logging
   });
 } else {
@@ -18,13 +20,6 @@ if (dbConfig.dialect === 'sqlite') {
       port: dbConfig.port || process.env.DB_PORT,
       dialect: dbConfig.dialect || 'mysql',
       logging: dbConfig.logging,
-      dialectOptions: {
-        charset: 'utf8mb4'
-      },
-      define: {
-        charset: 'utf8mb4',
-        collate: 'utf8mb4_unicode_ci'
-      },
       pool: {
         max: 10,
         min: 0,
