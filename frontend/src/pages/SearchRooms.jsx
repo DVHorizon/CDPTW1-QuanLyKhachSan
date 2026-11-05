@@ -298,7 +298,7 @@ export default function SearchRooms() {
         {/* ══════════════════════════════════════════════════════════════
             DYNAMIC SEARCH STRIP (STICKY TOP-20)
         ══════════════════════════════════════════════════════════════ */}
-        <section className="sticky top-20 z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-md py-space-md px-margin border-b border-[#dedad0]/50">
+        <section className="w-full bg-surface-container-lowest py-space-md px-margin border-b border-[#dedad0]/50 shadow-sm">
           <div className="max-w-[1440px] mx-auto flex flex-col gap-space-sm">
             
             {/* Thanh tìm kiếm chính */}
