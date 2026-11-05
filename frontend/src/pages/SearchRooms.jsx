@@ -1101,7 +1101,7 @@ export default function SearchRooms() {
               </div>
 
               {/* Pagination & Direct Assistance Strip */}
-              <div className="flex flex-col md:flex-row items-center justify-between gap-space-md pt-space-md border-t border-[#dedad0]/40">
+              <div className="flex items-center justify-center pt-space-md border-t border-[#dedad0]/40">
                 {/* Page Selectors */}
                 <div className="flex items-center gap-space-xs">
                   <button
@@ -1138,45 +1138,7 @@ export default function SearchRooms() {
                   </button>
                 </div>
 
-                {/* Direct Concierge Help Desk Callout */}
-                <div className="flex items-center gap-space-md bg-surface-container-lowest px-space-lg py-space-sm rounded-xl shadow-sm border border-[#dedad0]/40">
-                  <div className="w-10 h-10 rounded-full bg-secondary-container/50 flex items-center justify-center text-secondary">
-                    <span className="material-symbols-outlined text-[22px]">phone_in_talk</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="font-label-sm text-label-sm text-outline">Cần hỗ trợ tùy chỉnh lịch trình?</span>
-                    <a className="font-title-md text-title-md text-secondary hover:underline font-bold" href="tel:19006868">
-                      1900 6868 • Đội ngũ Quản gia
-                    </a>
-                  </div>
-                </div>
-              </div>
-
-              {/* Location Context Card / Map Preview */}
-              <div className="mt-space-md p-space-lg bg-surface-container-lowest rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-space-lg border border-[#dedad0]/40">
-                <div className="flex flex-col gap-space-xs">
-                  <span className="font-label-sm text-label-sm text-secondary uppercase tracking-wider font-bold">
-                    Vị Trí Độc Tôn
-                  </span>
-                  <h4 className="font-headline-sm text-headline-sm text-on-surface">
-                    {currentBranchName} Resort & Suites
-                  </h4>
-                  <p className="font-body-md text-body-md text-on-surface-variant max-w-xl">
-                    Tọa lạc tại vị trí riêng tư trên Bãi Khem, chỉ cách Sân bay Quốc tế 20 phút di chuyển bằng xe đưa đón riêng của khu nghỉ dưỡng.
-                  </p>
-                </div>
-                <div
-                  className="w-full md:w-64 h-32 bg-cover bg-center rounded-xl overflow-hidden relative shadow-sm shrink-0 flex items-end p-space-sm"
-                  style={{
-                    backgroundImage:
-                      "url('https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=800&auto=format&fit=crop')"
-                  }}
-                >
-                  <div className="w-full bg-surface-container-lowest/90 backdrop-blur-md px-space-sm py-1 rounded flex items-center justify-between text-on-surface">
-                    <span className="font-label-sm text-label-sm font-semibold">Xem Bản Đồ Resort</span>
-                    <span className="material-symbols-outlined text-[16px] text-secondary">open_in_new</span>
-                  </div>
-                </div>
+                
               </div>
 
             </main>
