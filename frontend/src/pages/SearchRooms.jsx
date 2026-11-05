@@ -458,8 +458,8 @@ export default function SearchRooms() {
                 ref={searchInputContainerRef}
                 className="relative w-full sm:w-auto flex-1"
               >
-                <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-lg border border-transparent focus-within:border-secondary/40">
-                  <span className="material-symbols-outlined text-[18px] text-secondary">manage_search</span>
+                <div className="flex items-center gap-3 bg-surface-container-low px-4 py-2.5 rounded-xl border border-[#dedad0]/60 focus-within:border-secondary/60 focus-within:bg-white transition-all shadow-sm">
+                  <span className="material-symbols-outlined text-[22px] text-secondary">manage_search</span>
                   <input
                     type="text"
                     placeholder="Tìm theo từ khóa (Deluxe, Villa, Hồ bơi, Bãi biển, Jacuzzi, Buffet...)"
@@ -476,7 +476,7 @@ export default function SearchRooms() {
                         setShowSuggestions(false);
                       }
                     }}
-                    className="bg-transparent text-xs w-full text-on-surface focus:outline-none placeholder:text-outline"
+                    className="bg-transparent text-sm w-full text-on-surface focus:outline-none placeholder:text-outline font-medium"
                   />
                   {keyword && (
                     <button
@@ -600,30 +600,15 @@ export default function SearchRooms() {
                 )}
               </div>
 
-                            {/* Search Engine Badge & Action Button */}
-              <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
-                {searchEngineMeta && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5 text-[11px] text-on-tertiary-container font-semibold bg-[#e8f7f0] px-3 py-1 rounded-full shrink-0 border border-[#b7eb8f]/40">
-                      <span className="material-symbols-outlined text-[15px]">neurology</span>
-                      <span>Search Engine: {searchEngineMeta.engine} ({searchEngineMeta.executionTimeMs}ms)</span>
-                    </div>
-                    {searchEngineMeta.isFullWidthInput && (
-                      <div className="flex items-center gap-1 text-[11px] text-[#d48806] font-semibold bg-[#fffbe6] border border-[#ffe58f] px-2.5 py-1 rounded-full shrink-0 animate-fade-in">
-                        <span className="material-symbols-outlined text-[14px]">translate</span>
-                        <span>Full-width (全角): "{searchEngineMeta.query}" ➔ Half-width: "{searchEngineMeta.normalizedQuery}"</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
+                            {/* Action Button */}
+              <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto justify-end">
                 <button
                   type="button"
                   onClick={() => executeSearch()}
                   disabled={loading}
-                  className="h-9 px-5 flex items-center justify-center gap-1.5 bg-primary text-on-primary rounded-xl font-bold text-xs hover:bg-secondary transition-all shadow-sm active:scale-98 disabled:opacity-50 shrink-0 cursor-pointer"
+                  className="h-11 px-7 flex items-center justify-center gap-2 bg-primary text-on-primary rounded-xl font-bold text-sm hover:bg-secondary transition-all shadow-md active:scale-98 disabled:opacity-50 shrink-0 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[18px]">
+                  <span className="material-symbols-outlined text-[20px]">
                     {loading ? 'sync' : 'search'}
                   </span>
                   <span>{loading ? 'Đang quét...' : 'Cập Nhật'}</span>
