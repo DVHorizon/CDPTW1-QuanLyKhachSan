@@ -83,6 +83,7 @@ export default function SearchRooms() {
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
+  const [isFilterExpanded, setIsFilterExpanded] = useState(true);
 
   // Suggester Autocomplete state (hỗ trợ hiển thị gợi ý từ 1-2 ký tự)
   const [suggestions, setSuggestions] = useState(null);
@@ -664,20 +665,37 @@ export default function SearchRooms() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
             
             {/* ─── LEFT SIDEBAR FILTERS (25% -> 3 of 12 cols) ─── */}
-            <aside className="lg:col-span-3 flex flex-col gap-space-lg bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-[#dedad0]/40">
-              <div className="flex items-center justify-between pb-space-sm border-b border-surface-container">
+            <aside className="lg:col-span-3 flex flex-col bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-[#dedad0]/40 transition-all duration-300">
+              <div className="flex items-center justify-between pb-space-sm border-b border-surface-container cursor-pointer select-none" onClick={() => setIsFilterExpanded(!isFilterExpanded)}>
                 <div className="flex items-center gap-space-xs">
                   <span className="material-symbols-outlined text-secondary text-[20px]">tune</span>
                   <h2 className="font-title-md text-title-md text-on-surface">Bộ Lọc Tùy Chọn</h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="font-label-sm text-label-sm text-secondary hover:underline cursor-pointer"
-                >
-                  Thiết lập lại
-                </button>
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="font-label-sm text-label-sm text-secondary hover:underline cursor-pointer"
+                    title="Thiết lập lại bộ lọc"
+                  >
+                    Thiết lập lại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                    className="w-7 h-7 rounded-lg bg-surface-container hover:bg-secondary/10 flex items-center justify-center text-secondary transition-all cursor-pointer"
+                    title={isFilterExpanded ? 'Thu gọn bộ lọc' : 'Giãn ra bộ lọc'}
+                  >
+                    <span className="material-symbols-outlined text-[20px] transition-transform duration-300">
+                      {isFilterExpanded ? 'expand_less' : 'expand_more'}
+                    </span>
+                  </button>
+                </div>
               </div>
+
+              {/* Nội dung bộ lọc có thể thu gọn / giãn ra */}
+              {isFilterExpanded && (
+                <div className="flex flex-col gap-space-lg pt-space-lg animate-fade-in">
 
               {/* Price Range Slider */}
               <div className="flex flex-col gap-space-sm">
@@ -847,6 +865,8 @@ export default function SearchRooms() {
                   </a>
                 </div>
               </div>
+                </div>
+              )}
             </aside>
 
             {/* ─── RIGHT RESULTS CONTENT (75% -> 9 of 12 cols) ─── */}
