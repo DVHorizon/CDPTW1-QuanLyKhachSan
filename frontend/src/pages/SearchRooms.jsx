@@ -305,7 +305,7 @@ export default function SearchRooms() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-md items-center">
               
               {/* 1. Destination / Khu nghỉ dưỡng */}
-              <div className="lg:col-span-3 flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-low rounded-xl border border-transparent hover:border-secondary/30 transition-colors">
+              <div className="lg:col-span-4 flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-low rounded-xl border border-transparent hover:border-secondary/30 transition-colors">
                 <span className="material-symbols-outlined text-secondary text-[24px]">location_on</span>
                 <div className="flex flex-col min-w-0 w-full">
                   <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Khu nghỉ dưỡng</span>
@@ -333,7 +333,7 @@ export default function SearchRooms() {
               </div>
 
               {/* 2. Date Interval Selector */}
-              <div className="lg:col-span-4 flex items-center justify-between px-space-md py-space-sm bg-surface-container-low rounded-xl hover:bg-surface-container transition-colors border border-transparent hover:border-secondary/30">
+              <div className="lg:col-span-5 flex items-center justify-between px-space-md py-space-sm bg-surface-container-low rounded-xl hover:bg-surface-container transition-colors border border-transparent hover:border-secondary/30">
                 <div className="flex items-center gap-space-sm flex-1">
                   <span className="material-symbols-outlined text-secondary text-[24px]">calendar_today</span>
                   <div className="flex flex-col flex-1">
@@ -449,21 +449,6 @@ export default function SearchRooms() {
                     </button>
                   </div>
                 )}
-              </div>
-
-              {/* 4. Action Button */}
-              <div className="lg:col-span-2">
-                <button
-                  type="button"
-                  onClick={() => executeSearch()}
-                  disabled={loading}
-                  className="w-full h-12 flex items-center justify-center gap-space-xs bg-primary text-on-primary rounded-xl font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm active:scale-98 disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-[20px]">
-                    {loading ? 'sync' : 'search'}
-                  </span>
-                  <span>{loading ? 'Đang quét...' : 'Cập Nhật'}</span>
-                </button>
               </div>
             </div>
 
@@ -615,53 +600,35 @@ export default function SearchRooms() {
                 )}
               </div>
 
-                            {/* Dual Search Engine Switcher */}
-              <div className="flex items-center gap-2 flex-wrap pt-1">
-                <span className="text-xs font-semibold text-outline flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[15px]">manage_search</span>
-                  Cỗ máy tìm kiếm:
-                </span>
-                <div className="inline-flex rounded-lg border border-outline-variant/30 p-0.5 bg-surface-container-low text-xs shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedEngine('solr'); executeSearch({ engine: 'solr' }); }}
-                    className={`px-3 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
-                      selectedEngine === 'solr'
-                        ? 'bg-amber-500 text-white shadow-sm'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    <span>☀️ Apache Solr</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedEngine('elasticsearch'); executeSearch({ engine: 'elasticsearch' }); }}
-                    className={`px-3 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
-                      selectedEngine === 'elasticsearch'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    <span>⚡ Elasticsearch</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Search Engine Badge */}
-              {searchEngineMeta && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 text-[11px] text-on-tertiary-container font-semibold bg-[#e8f7f0] px-3 py-1 rounded-full shrink-0 border border-[#b7eb8f]/40">
-                    <span className="material-symbols-outlined text-[15px]">neurology</span>
-                    <span>Search Engine: {searchEngineMeta.engine} ({searchEngineMeta.executionTimeMs}ms)</span>
-                  </div>
-                  {searchEngineMeta.isFullWidthInput && (
-                    <div className="flex items-center gap-1 text-[11px] text-[#d48806] font-semibold bg-[#fffbe6] border border-[#ffe58f] px-2.5 py-1 rounded-full shrink-0 animate-fade-in">
-                      <span className="material-symbols-outlined text-[14px]">translate</span>
-                      <span>Full-width (全角): "{searchEngineMeta.query}" ➔ Half-width: "{searchEngineMeta.normalizedQuery}"</span>
+                            {/* Search Engine Badge & Action Button */}
+              <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
+                {searchEngineMeta && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-[11px] text-on-tertiary-container font-semibold bg-[#e8f7f0] px-3 py-1 rounded-full shrink-0 border border-[#b7eb8f]/40">
+                      <span className="material-symbols-outlined text-[15px]">neurology</span>
+                      <span>Search Engine: {searchEngineMeta.engine} ({searchEngineMeta.executionTimeMs}ms)</span>
                     </div>
-                  )}
-                </div>
-              )}
+                    {searchEngineMeta.isFullWidthInput && (
+                      <div className="flex items-center gap-1 text-[11px] text-[#d48806] font-semibold bg-[#fffbe6] border border-[#ffe58f] px-2.5 py-1 rounded-full shrink-0 animate-fade-in">
+                        <span className="material-symbols-outlined text-[14px]">translate</span>
+                        <span>Full-width (全角): "{searchEngineMeta.query}" ➔ Half-width: "{searchEngineMeta.normalizedQuery}"</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => executeSearch()}
+                  disabled={loading}
+                  className="h-9 px-5 flex items-center justify-center gap-1.5 bg-primary text-on-primary rounded-xl font-bold text-xs hover:bg-secondary transition-all shadow-sm active:scale-98 disabled:opacity-50 shrink-0 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {loading ? 'sync' : 'search'}
+                  </span>
+                  <span>{loading ? 'Đang quét...' : 'Cập Nhật'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Thông báo lỗi validation nguyên văn */}
