@@ -49,7 +49,17 @@ async function searchRooms(keyword, filters = {}) {
   });
 
   // 5. Trả về danh sách kết quả kèm điểm tương quan BM25 (_score)
-  return response.hits.hits.map(hit => ({
+  let hits = response.hits.hits || [];
+
+  // Lọc theo ngưỡng tương quan (Score Cutoff): Nếu có truy vấn từ khóa cụ thể,
+  // chỉ giữ các kết quả có điểm >= 35% điểm cao nhất để loại bỏ các kết quả chỉ ăn khớp vớt từ phụ.
+  if (keyword && keyword.trim() !== '' && hits.length > 0) {
+    const maxScore = response.hits.max_score || (hits[0] && hits[0]._score) || 0;
+    const scoreThreshold = maxScore * 0.35;
+    hits = hits.filter(hit => hit._score >= scoreThreshold);
+  }
+
+  return hits.map(hit => ({
     ...hit._source,
     score: hit._score
   }));
