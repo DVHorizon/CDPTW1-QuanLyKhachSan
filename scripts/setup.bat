@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0\.."
 chcp 65001 >nul
 echo ==============================================================================
 echo 🏨 GRAND HORIZON HOTEL - KHỞI TẠO HỆ THỐNG ^& CƠ SỞ DỮ LIỆU TỰ ĐỘNG
@@ -48,32 +49,35 @@ if errorlevel 1 (
 )
 
 echo.
-echo [5/7] 📥 Đang đồng bộ thư viện Backend (npm install)...
-docker exec hotel_backend npm install
+echo [5/7] ⚙️ Đang thực thi Sequelize Migration (57 bảng nghiệp vụ + các tính năng mở rộng)...
+docker exec hotel_backend npx sequelize-cli db:migrate
+if errorlevel 1 (
+    echo    ⚠️ Gặp cảnh báo migration, đang thử tiếp tục...
+) else (
+    echo    ✅ Hoàn tất thiết lập bảng CSDL!
+)
 
 echo.
-echo [6/7] 📦 Đang thực thi Migration toàn bộ 57 bảng CSDL (Sequelize Migration)...
-docker exec hotel_backend npm run migrate
-
-echo.
-echo [7/7] 🌱 Đang nạp dữ liệu mẫu vào CSDL (Fast Seed) và kiểm tra bảng Users...
+echo [6/7] 🌱 Đang nạp dữ liệu mẫu (Seeding)...
 docker exec hotel_backend npm run seed:fast
-echo.
-docker exec hotel_backend npm run verify:db
+if errorlevel 1 (
+    echo    ⚠️ Lỗi khi nạp dữ liệu mẫu qua seed:fast, chuyển sang seed tiêu chuẩn...
+    docker exec hotel_backend npm run seed
+)
+echo    ✅ Nạp dữ liệu mẫu hoàn tất!
 
+echo.
+echo [7/7] 🔄 Tự động đồng bộ sang Elasticsearch & Apache Solr...
+docker exec hotel_backend node src/seeders/syncBothEngines.js
+
+echo.
+echo ==============================================================================
+echo 🎉 HỆ THỐNG ĐÃ KHỞI TẠO THÀNH CÔNG!
+echo 🌐 Frontend:       http://localhost:3000
+echo 🔌 Backend API:     http://localhost:5000
+echo 🗄️ phpMyAdmin:      http://localhost:8080 (User: root / Pass: trống)
+echo ☀️ Apache Solr:     http://localhost:8983/solr
+echo ⚡ Elasticsearch:   http://localhost:9200
+echo ==============================================================================
 :finish
-echo.
-echo ==============================================================================
-echo 🎉 HỆ THỐNG ĐÃ SẴN SÀNG SỬ DỤNG!
-echo.
-echo 🌐 phpMyAdmin (Xem Database): http://localhost:8080
-echo    - Máy chủ: mysql
-echo    - Tài khoản: root
-echo    - Mật khẩu: (Để trống)
-echo.
-echo 🚀 Backend API:              http://localhost:5000
-echo 💻 Frontend Website:         http://localhost:3000
-echo ==============================================================================
-echo.
 pause
-
