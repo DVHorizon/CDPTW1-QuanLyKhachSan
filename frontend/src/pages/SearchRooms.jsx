@@ -86,19 +86,21 @@ export default function SearchRooms() {
   const [suggestions, setSuggestions] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputContainerRef = useRef(null);
+  const isUserTypingRef = useRef(false);
 
-  // Lắng nghe thay đổi từ khóa để sinh gợi ý Autocomplete tức thì (từ 1-2 ký tự)
+  // Lắng nghe thay đổi từ khóa khi người dùng gõ trực tiếp vào ô input để sinh gợi ý Autocomplete tức thì
   useEffect(() => {
-    if (!keyword || keyword.trim().length === 0) {
+    // Chỉ kích hoạt popup gợi ý khi người dùng đang chủ động gõ phím, không hiện khi mới load/F5 lại trang
+    if (!isUserTypingRef.current || !keyword || keyword.trim().length === 0) {
       setSuggestions(null);
-      setShowSuggestions(false);
+      setShowSuggestions(false); isUserTypingRef.current = false;
       return;
     }
 
     const timer = setTimeout(async () => {
       try {
         const data = await suggestRoomsApi(keyword);
-        if (data && data.totalCount > 0) {
+        if (isUserTypingRef.current && data && data.totalCount > 0) {
           setSuggestions(data);
           setShowSuggestions(true);
         } else {
@@ -464,7 +466,10 @@ export default function SearchRooms() {
                     type="text"
                     placeholder="Tìm theo từ khóa (Deluxe, Villa, Hồ bơi, Bãi biển, Jacuzzi, Buffet...)"
                     value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
+                    onChange={(e) => {
+                      isUserTypingRef.current = true;
+                      setKeyword(e.target.value);
+                    }}
                     onFocus={() => {
                       if (suggestions && suggestions.totalCount > 0) setShowSuggestions(true);
                     }}
