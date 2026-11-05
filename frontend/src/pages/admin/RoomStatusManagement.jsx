@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import AdminLayout from '../components/admin/layout/AdminLayout';
-import { useSocket } from '../context/SocketContext';
+import AdminLayout from '../../components/admin/layout/AdminLayout';
+import { useSocket } from '../../context/SocketContext';
 
 // ─── Cấu hình API Backend ──────────────────────────────────────────────────
 const API_BASE = 'http://localhost:5000/api/phong';

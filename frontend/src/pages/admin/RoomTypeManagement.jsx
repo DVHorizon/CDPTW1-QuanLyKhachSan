@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import AdminLayout from '../components/admin/layout/AdminLayout';
-import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
+import AdminLayout from '../../components/admin/layout/AdminLayout';
+import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 
 const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '3000'
   ? '/api/v1/room-types'

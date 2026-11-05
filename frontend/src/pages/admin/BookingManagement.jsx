@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import AdminLayout from '../components/admin/layout/AdminLayout';
-import { useAuth } from '../context/AuthContext';
-import BookingChargesModal from '../components/admin/BookingChargesModal';
+import AdminLayout from '../../components/admin/layout/AdminLayout';
+import { useAuth } from '../../context/AuthContext';
+import BookingChargesModal from '../../components/admin/BookingChargesModal';
 
 const API_BASE = typeof window !== 'undefined' && window.location.port === '3000'
   ? '/api/v1/bookings'

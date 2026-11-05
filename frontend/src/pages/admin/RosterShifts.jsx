@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import AdminLayout from '../components/admin/layout/AdminLayout';
+import AdminLayout from '../../components/admin/layout/AdminLayout';
 
 const RosterShifts = () => {
   // --- STATE BỘ LỌC & TUẦN ---

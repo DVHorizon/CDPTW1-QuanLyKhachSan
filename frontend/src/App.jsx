@@ -3,17 +3,17 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import Home from './pages/client/Home';
-import SearchRooms from './pages/SearchRooms';
+import SearchRooms from './pages/client/SearchRooms';
 import RoomDetail from './pages/client/RoomDetail';
 import BookingEngine from './pages/client/BookingEngine';
 import DepositPayment from './pages/client/DepositPayment';
 import BookingConfirmation from './pages/client/BookingConfirmation';
-import Auth from './pages/Auth';
+import Auth from './pages/auth/Auth';
 import MenuManagement from './pages/admin/menu/MenuManagement';
 import RoomAvailability from './pages/admin/menu/RoomAvailability';
-import RoomTypeManagement from './pages/RoomTypeManagement';
-import RoomManagement from './pages/RoomManagement';
-import StaffManagement from './pages/StaffManagement';
+import RoomTypeManagement from './pages/admin/RoomTypeManagement';
+import RoomManagement from './pages/admin/RoomManagement';
+import StaffManagement from './pages/admin/StaffManagement';
 import RoomService from './pages/client/RoomService';
 import Profile from './pages/client/Profile';
 import MyBookings from './pages/client/MyBookings';
@@ -24,12 +24,12 @@ import FnbOrderHistory from './pages/admin/fnb/FnbOrderHistory';
 import TableMap from './pages/admin/fnb/TableMap';
 import GuestOrderHistory from './pages/client/GuestOrderHistory';
 import TableReservation from './pages/client/TableReservation';
-import LoyaltyManagement from './pages/LoyaltyManagement';
+import LoyaltyManagement from './pages/admin/LoyaltyManagement';
 import ServiceManagement from './pages/admin/services/ServiceManagement';
 import ServiceDispatchTerminal from './pages/admin/services/ServiceDispatchTerminal';
 import ServiceOrdersKanban from './pages/admin/services/ServiceOrdersKanban';
-import RoomStatusManagement from './pages/RoomStatusManagement';
-import BookingManagement from './pages/BookingManagement';
+import RoomStatusManagement from './pages/admin/RoomStatusManagement';
+import BookingManagement from './pages/admin/BookingManagement';
 import RoomAssignment from './pages/admin/RoomAssignment';
 import CheckInDesk from './pages/admin/CheckInDesk';
 import CheckOutDesk from './pages/admin/CheckOutDesk';
@@ -48,8 +48,8 @@ import LostAndFoundManagement from './pages/admin/housekeeping/LostAndFoundManag
 import SmartLockManagement from './pages/admin/security/SmartLockManagement';
 import MaintenanceDashboard from './pages/admin/engineering/MaintenanceDashboard';
 import MaintenanceTicketCreate from './pages/admin/engineering/MaintenanceTicketCreate';
-import AuditLogs from './pages/AuditLogs';
-import RosterShifts from './pages/RosterShifts';
+import AuditLogs from './pages/admin/AuditLogs';
+import RosterShifts from './pages/admin/RosterShifts';
 
 function App() {
   return (

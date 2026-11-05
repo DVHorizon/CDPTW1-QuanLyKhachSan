@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import AdminLayout from '../components/admin/layout/AdminLayout';
-import { useAuth } from '../context/AuthContext';
+import AdminLayout from '../../components/admin/layout/AdminLayout';
+import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '3000'
   ? '/api/v1/rooms'

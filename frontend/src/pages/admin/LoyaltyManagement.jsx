@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import AdminLayout from '../components/admin/layout/AdminLayout';
+import AdminLayout from '../../components/admin/layout/AdminLayout';
 import {
   processTransaction,
   calculateBookingPrice,
   LOYALTY_TIERS
-} from '../utils/loyaltyRules';
+} from '../../utils/loyaltyRules';
 
 // --- MOCK DATA ---
 const statsData = [

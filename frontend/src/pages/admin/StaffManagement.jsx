@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import AdminLayout from '../components/admin/layout/AdminLayout';
-import { useAuth } from '../context/AuthContext';
+import AdminLayout from '../../components/admin/layout/AdminLayout';
+import { useAuth } from '../../context/AuthContext';
 import {
   fetchUsers,
   fetchRoles,
@@ -9,7 +9,7 @@ import {
   updateUserStatus,
   resetUserPassword,
   deleteUser
-} from '../api/userManagementApi';
+} from '../../api/userManagementApi';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HẰNG SỐ & GIAO DIỆN THEO SPEC 3

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import AdminLayout from '../components/admin/layout/AdminLayout';
+import AdminLayout from '../../components/admin/layout/AdminLayout';
 
 const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
