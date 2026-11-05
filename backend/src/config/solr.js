@@ -40,10 +40,29 @@ const solrClient = {
     if (!cleanKw || cleanKw === '*:*') {
       url.searchParams.append('q', '*:*');
     } else {
-      // 1. Tách từng từ và hỗ trợ Fuzzy Search (~1) để chịu lỗi gõ sai/thiếu ký tự (vd: Neyar -> Neymar)
+      // 1. Tách từng từ và hỗ trợ đa tầng: Khớp chính xác, Tiền tố Wildcard (*), và Fuzzy (~2)
       const words = cleanKw.split(/\s+/).filter(Boolean);
-      const fuzzyWords = words.map(w => (w.includes('~') || w.includes('*')) ? w : `${w}~1`);
-      const finalQuery = `${cleanKw} OR (${fuzzyWords.join(' AND ')})`;
+      
+      const queryParts = [
+        // A. Khớp chính xác cụm từ (điểm ưu tiên cao nhất)
+        `"${cleanKw}"^5.0`,
+        // B. Khớp từng từ chính xác
+        `(${cleanKw})^3.0`
+      ];
+
+      // C. Khớp tiền tố (Prefix / Gõ dở dang: vd Ney -> Ney*)
+      const prefixWords = words.map(w => (w.includes('*') || w.includes('~')) ? w : `${w}*`);
+      queryParts.push(`(${prefixWords.join(' AND ')})^2.0`);
+
+      // D. Khớp mờ chịu sai/thiếu tối đa 2 ký tự (Fuzzy ~2: vd Neym -> Neymar)
+      const fuzzyWords = words.map(w => {
+        if (w.includes('~') || w.includes('*')) return w;
+        // Từ dài từ 4 ký tự trở lên cho phép lệch 2 ký tự (~2), từ ngắn lệch 1 ký tự (~1)
+        return w.length >= 4 ? `${w}~2` : `${w}~1`;
+      });
+      queryParts.push(`(${fuzzyWords.join(' AND ')})^1.0`);
+
+      const finalQuery = queryParts.join(' OR ');
 
       // Dùng edismax parser tìm kiếm đa cột (name, description, amenities)
       url.searchParams.append('defType', 'edismax');

@@ -4,6 +4,28 @@ const { searchRooms: searchES } = require('../services/esSearchService');
 const solrClient = require('../config/solr');
 
 /**
+ * CJKWidthCharFilter: Chuẩn hóa toàn diện Full-width (Zenkaku 全角) <-> Half-width (Hankaku 半角)
+ * - Chuyển toàn bộ ký tự ASCII full-width (U+FF01 đến U+FF5E: Ａ-Ｚ, ａ-ｚ, ０-９) về half-width chuẩn
+ * - Chuyển khoảng trắng full-width (U+3000) về khoảng trắng tiêu chuẩn (U+0020)
+ * - Chuẩn hóa Unicode NFKC
+ * Ví dụ: 'Ｄｅｌｕｘｅ' -> 'Deluxe', 'Ｎｅｙｍａｒ' -> 'Neymar', '１０１' -> '101'
+ */
+function normalizeFullHalfWidth(str) {
+  if (!str || typeof str !== 'string') return '';
+  let normalized = str.normalize('NFKC');
+  normalized = normalized.replace(/\u3000/g, ' ');
+  normalized = normalized.replace(/[\uFF01-\uFF5E]/g, (ch) => {
+    return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+  });
+  return normalized;
+}
+
+function containsFullWidth(str) {
+  if (!str || typeof str !== 'string') return false;
+  return /[\uFF01-\uFF5E\u3000]/.test(str);
+}
+
+/**
  * Unified Search Controller (Dual-Engine: Elasticsearch & Apache Solr)
  * GET /api/rooms/search?keyword=...&engine=...&maxPrice=...&adults=...
  */
@@ -11,7 +33,11 @@ async function unifiedSearchRooms(req, res) {
   const startTime = Date.now();
   const { keyword, engine, maxPrice, adults, capacity } = req.query;
 
-  // 1. Xác định engine được chọn (mặc định là 'elasticsearch' hoặc 'solr')
+  // 1. Tự động nhận diện và chuẩn hóa Full-width (全角) -> Half-width (半角)
+  const isFullWidthInput = containsFullWidth(keyword);
+  const cleanKeyword = normalizeFullHalfWidth(keyword);
+
+  // 2. Xác định engine được chọn (mặc định là 'elasticsearch' hoặc 'solr')
   const selectedEngine = (engine || 'elasticsearch').toLowerCase().trim();
 
   try {
@@ -33,7 +59,7 @@ async function unifiedSearchRooms(req, res) {
         filterQuery = filters.join(' AND ');
       }
 
-      const solrRes = await solrClient.search(keyword, {
+      const solrRes = await solrClient.search(cleanKeyword, {
         rows: 20,
         filterQuery
       });
@@ -55,6 +81,9 @@ async function unifiedSearchRooms(req, res) {
         success: true,
         engine: 'Apache Solr 10.1.0',
         activeEngine: 'solr',
+        originalKeyword: keyword || '',
+        normalizedKeyword: cleanKeyword,
+        isFullWidthInput,
         executionTimeMs,
         total: solrRes.response ? solrRes.response.numFound : 0,
         data: formattedData
@@ -64,13 +93,16 @@ async function unifiedSearchRooms(req, res) {
     // ------------------------------------------------------------------
     // B. NHÁNH 2: ELASTICSEARCH (MẶC ĐỊNH)
     // ------------------------------------------------------------------
-    const esResults = await searchES(keyword, { maxPrice, adults: adults || capacity });
+    const esResults = await searchES(cleanKeyword, { maxPrice, adults: adults || capacity });
     const executionTimeMs = Date.now() - startTime;
 
     return res.status(200).json({
       success: true,
       engine: 'Elasticsearch 9.5.6',
       activeEngine: 'elasticsearch',
+      originalKeyword: keyword || '',
+      normalizedKeyword: cleanKeyword,
+      isFullWidthInput,
       executionTimeMs,
       total: esResults.length,
       data: esResults
