@@ -32,6 +32,8 @@ const ALL_NAV_ITEMS = [
   { icon: "event_available", label: "Tiếp Nhận & Đặt Dịch Vụ", to: "/admin/services/dispatch", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "pending_actions", label: "Tiến Độ Đơn Dịch Vụ", to: "/admin/services/orders", allowedRoles: ['Admin', 'Receptionist', 'Housekeeping'] },
   { icon: "restaurant", label: "Quản Lý Thực Đơn (F&B)", to: "/admin/menu", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
+  { icon: "inventory_2", label: "Kho Nguyên Liệu Bếp", to: "/admin/fnb/kitchen-inventory", allowedRoles: ['Admin', 'Kitchen'] },
+  { icon: "table_restaurant", label: "Sơ Đồ Bàn Ăn (Table Map)", to: "/admin/fnb/table-map", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
   { icon: "soup_kitchen", label: "Màn Hình Bếp (KDS)", to: "/admin/fnb/kitchen", allowedRoles: ['Admin', 'Kitchen'] },
   { icon: "local_shipping", label: "Theo Dõi & Giao Món", to: "/admin/fnb/dispatch", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
   { icon: "receipt_long", label: "Lịch Sử & Tổng Hợp F&B", to: "/admin/fnb/history", allowedRoles: ['Admin', 'Kitchen', 'Receptionist'] },
@@ -40,7 +42,7 @@ const ALL_NAV_ITEMS = [
   { icon: "loyalty", label: "Khách Hàng & Hội Viên", to: "/admin/loyalty", allowedRoles: ['Admin', 'Receptionist'] },
   // Quản lý tài khoản (USER_MANAGE) — Spec 3: CHỈ ADMIN mới nhìn thấy menu này!
   { icon: "manage_accounts", label: "Quản Lý Tài Khoản & Phân Quyền", to: "/admin/staff", allowedRoles: ['Admin'], requiredPermission: 'USER_MANAGE' },
-  { icon: "admin_panel_settings", label: "Quản Trị Hệ Thống", to: "/admin/quan-tri", allowedRoles: ['Admin'] },
+
 ];
 
 const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
@@ -76,13 +78,31 @@ const AdminSidebar = ({ isCollapsed = false, toggleSidebar }) => {
 
   const badgeInfo = getRoleBadge(userRole);
 
+  // Lưu và phục hồi vị trí cuộn của sidebar để không bị nhảy lên đầu trang khi bấm chuyển trang
+  const navScrollRef = React.useRef(null);
+
+  const handleScroll = (e) => {
+    sessionStorage.setItem('admin_sidebar_scroll_top', e.currentTarget.scrollTop);
+  };
+
+  React.useLayoutEffect(() => {
+    const savedTop = sessionStorage.getItem('admin_sidebar_scroll_top');
+    if (savedTop && navScrollRef.current) {
+      navScrollRef.current.scrollTop = parseInt(savedTop, 10);
+    }
+  }, []);
+
   return (
     <aside
       className={`fixed left-0 top-0 h-screen ${
         isCollapsed ? "w-20" : "w-72"
       } bg-surface-container-lowest z-50 shadow-[0_1px_8px_rgba(0,0,0,0.04)] transition-all duration-300 ease-in-out border-r border-outline-variant/20`}
     >
-      <div className="h-full flex flex-col justify-between overflow-y-auto overflow-x-hidden">
+      <div 
+        ref={navScrollRef}
+        onScroll={handleScroll}
+        className="h-full flex flex-col justify-between overflow-y-auto overflow-x-hidden"
+      >
         <div className="flex flex-col">
           {/* Logo / Brand */}
           <div

@@ -2,7 +2,10 @@
 
 const API_ENDPOINTS = [
   '/api/v1/bookings',
+  '/api/bookings',
   'http://localhost:5000/api/v1/bookings',
+  'http://localhost:5000/api/bookings',
+  'http://localhost:5000/bookings',
 ];
 
 async function safeFetchJson(path, options = {}) {

@@ -2,10 +2,10 @@
 
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const cors = require('cors');
 require('dotenv').config();
 
-const path = require('path');
 const { initSocket } = require('./sockets/socketHandler');
 
 const app = express();
@@ -14,8 +14,8 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-// Phục vụ tệp tĩnh ảnh CCCD, thẻ khách và chữ ký số
+// Phục vụ tệp tĩnh ảnh phòng, CCCD, thẻ khách và chữ ký số
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // ─── Health check ──────────────────────────────────────────────────────────
@@ -46,6 +46,7 @@ app.use('/api/v1', require('./routes/admin/menuRoutes'));
 
 // Route F&B Orders (Room Service, KDS, History)
 app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/v1/kitchen-inventory', require('./routes/admin/kitchenInventoryRoutes'));
 
 // Route Quản lý tình trạng phòng trống (Room Availability)
 app.use('/api/admin/room-availability', require('./routes/admin/roomAvailability'));
@@ -148,6 +149,8 @@ app.use('/api/v1/fnb-orders',         require('./routes/admin/fnbOrderRoutes'));
 app.use('/api/fnb-orders',            require('./routes/admin/fnbOrderRoutes'));
 app.use('/api/v1/table-reservations', require('./routes/admin/tableReservationRoutes'));
 app.use('/api/table-reservations',    require('./routes/admin/tableReservationRoutes'));
+app.get('/api/v1/statistics/fnb',     require('./controllers/admin/fnbOrderController').getFnbStatistics);
+app.post('/api/v1/ai/combo-suggestion', require('./controllers/admin/fnbOrderController').getAiComboSuggestion);
 
 // 👤 Tuyền — Back-office Operations
 app.use('/api/v1/operations', require('./modules/operations'));
@@ -175,6 +178,8 @@ app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController')
 app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 
 // FEAT-INVOICE-01: Booking Charges Aggregation (C6)
+app.get('/api/v1/bookings/:bookingId/charges', require('./middlewares/authMiddleware').verifyToken, require('./modules/services/controllers/bookingChargesController').getBookingCharges);
+app.get('/api/bookings/:bookingId/charges', require('./middlewares/authMiddleware').verifyToken, require('./modules/services/controllers/bookingChargesController').getBookingCharges);
 app.get('/bookings/:bookingId/charges', require('./middlewares/authMiddleware').verifyToken, require('./modules/services/controllers/bookingChargesController').getBookingCharges);
 
 // FEAT-GUEST-09: Xem lịch sử đặt phòng & Hủy phòng (Mã truy vết: A9)
@@ -199,6 +204,15 @@ try {
 }
 
 const { AuditLog } = require('./models');
+
+// ─── Global Unhandled Error Prevention (Ngăn chặn tiến trình Node.js bị crash) ───
+process.on('uncaughtException', (err) => {
+  console.error('🔥 [CRITICAL] Uncaught Exception:', err.message, err.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 [CRITICAL] Unhandled Rejection:', reason);
+});
 
 // ─── Start server ──────────────────────────────────────────────────────────
 server.listen(PORT, async () => {

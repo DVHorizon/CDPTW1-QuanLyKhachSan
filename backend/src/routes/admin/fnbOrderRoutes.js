@@ -39,6 +39,12 @@ router.get('/:orderId/reviews', fnbOrderController.getOrderReview);
 // FEAT-FNB-11 (Mã truy vết: A4.11): In phiếu order chuyển bếp và hóa đơn tạm tính
 router.get('/:orderId/print', optionalVerifyToken, fnbOrderController.printOrderDocument);
 
+// Dashboard F&B (Doanh thu & top món bán chạy/tồn chậm)
+router.get('/statistics', fnbOrderController.getFnbStatistics);
+
+// AI gợi ý combo món
+router.post('/ai/combo-suggestion', fnbOrderController.getAiComboSuggestion);
+
 
 
 // Cập nhật đơn hàng (Update)

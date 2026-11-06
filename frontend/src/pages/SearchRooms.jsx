@@ -76,6 +76,7 @@ export default function SearchRooms() {
   const [errorMessage, setErrorMessage] = useState('');
   const [validationError, setValidationError] = useState('');
   const [searchEngineMeta, setSearchEngineMeta] = useState(null);
+  const [selectedEngine, setSelectedEngine] = useState('solr');
   const [wishlist, setWishlist] = useState([]);
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
@@ -210,7 +211,8 @@ export default function SearchRooms() {
       view: selectedView,
       amenities: selectedAmenities,
       rating: selectedRating === '4.5' ? '4.5' : selectedRating === '4.0' ? '4.0' : undefined,
-      sortBy
+      sortBy,
+      engine: selectedEngine
     };
 
     // Cập nhật search params trên URL
@@ -241,13 +243,15 @@ export default function SearchRooms() {
 
     if (result.searchEngine) {
       setSearchEngineMeta(result.searchEngine);
+    } else if (result.engine) {
+      setSearchEngineMeta({ engine: result.engine, executionTimeMs: result.executionTimeMs, query: result.originalKeyword, normalizedQuery: result.normalizedKeyword, isFullWidthInput: result.isFullWidthInput });
     }
   };
 
   // Tự động tìm kiếm lần đầu khi mount
   useEffect(() => {
     executeSearch();
-  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, priceMax]);
+  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, priceMax, selectedEngine]);
 
   // Xử lý Wishlist
   const toggleWishlist = (roomId) => {
@@ -294,14 +298,14 @@ export default function SearchRooms() {
         {/* ══════════════════════════════════════════════════════════════
             DYNAMIC SEARCH STRIP (STICKY TOP-20)
         ══════════════════════════════════════════════════════════════ */}
-        <section className="sticky top-20 z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-md py-space-md px-margin border-b border-[#dedad0]/50">
+        <section className="w-full bg-surface-container-lowest py-space-md px-margin border-b border-[#dedad0]/50 shadow-sm">
           <div className="max-w-[1440px] mx-auto flex flex-col gap-space-sm">
             
             {/* Thanh tìm kiếm chính */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-md items-center">
               
               {/* 1. Destination / Khu nghỉ dưỡng */}
-              <div className="lg:col-span-3 flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-low rounded-xl border border-transparent hover:border-secondary/30 transition-colors">
+              <div className="lg:col-span-4 flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-low rounded-xl border border-transparent hover:border-secondary/30 transition-colors">
                 <span className="material-symbols-outlined text-secondary text-[24px]">location_on</span>
                 <div className="flex flex-col min-w-0 w-full">
                   <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Khu nghỉ dưỡng</span>
@@ -329,7 +333,7 @@ export default function SearchRooms() {
               </div>
 
               {/* 2. Date Interval Selector */}
-              <div className="lg:col-span-4 flex items-center justify-between px-space-md py-space-sm bg-surface-container-low rounded-xl hover:bg-surface-container transition-colors border border-transparent hover:border-secondary/30">
+              <div className="lg:col-span-5 flex items-center justify-between px-space-md py-space-sm bg-surface-container-low rounded-xl hover:bg-surface-container transition-colors border border-transparent hover:border-secondary/30">
                 <div className="flex items-center gap-space-sm flex-1">
                   <span className="material-symbols-outlined text-secondary text-[24px]">calendar_today</span>
                   <div className="flex flex-col flex-1">
@@ -446,21 +450,6 @@ export default function SearchRooms() {
                   </div>
                 )}
               </div>
-
-              {/* 4. Action Button */}
-              <div className="lg:col-span-2">
-                <button
-                  type="button"
-                  onClick={() => executeSearch()}
-                  disabled={loading}
-                  className="w-full h-12 flex items-center justify-center gap-space-xs bg-primary text-on-primary rounded-xl font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm active:scale-98 disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-[20px]">
-                    {loading ? 'sync' : 'search'}
-                  </span>
-                  <span>{loading ? 'Đang quét...' : 'Cập Nhật'}</span>
-                </button>
-              </div>
             </div>
 
             {/* Keyword Input & Search Engine indicator strip */}
@@ -469,8 +458,8 @@ export default function SearchRooms() {
                 ref={searchInputContainerRef}
                 className="relative w-full sm:w-auto flex-1"
               >
-                <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-lg border border-transparent focus-within:border-secondary/40">
-                  <span className="material-symbols-outlined text-[18px] text-secondary">manage_search</span>
+                <div className="flex items-center gap-3 bg-surface-container-low px-4 py-2.5 rounded-xl border border-[#dedad0]/60 focus-within:border-secondary/60 focus-within:bg-white transition-all shadow-sm">
+                  <span className="material-symbols-outlined text-[22px] text-secondary">manage_search</span>
                   <input
                     type="text"
                     placeholder="Tìm theo từ khóa (Deluxe, Villa, Hồ bơi, Bãi biển, Jacuzzi, Buffet...)"
@@ -487,7 +476,7 @@ export default function SearchRooms() {
                         setShowSuggestions(false);
                       }
                     }}
-                    className="bg-transparent text-xs w-full text-on-surface focus:outline-none placeholder:text-outline"
+                    className="bg-transparent text-sm w-full text-on-surface focus:outline-none placeholder:text-outline font-medium"
                   />
                   {keyword && (
                     <button
@@ -611,21 +600,20 @@ export default function SearchRooms() {
                 )}
               </div>
 
-              {/* Search Engine Badge */}
-              {searchEngineMeta && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 text-[11px] text-on-tertiary-container font-semibold bg-[#e8f7f0] px-3 py-1 rounded-full shrink-0 border border-[#b7eb8f]/40">
-                    <span className="material-symbols-outlined text-[15px]">neurology</span>
-                    <span>Search Engine: {searchEngineMeta.engine} ({searchEngineMeta.executionTimeMs}ms)</span>
-                  </div>
-                  {searchEngineMeta.isFullWidthInput && (
-                    <div className="flex items-center gap-1 text-[11px] text-[#d48806] font-semibold bg-[#fffbe6] border border-[#ffe58f] px-2.5 py-1 rounded-full shrink-0 animate-fade-in">
-                      <span className="material-symbols-outlined text-[14px]">translate</span>
-                      <span>Full-width (全角): "{searchEngineMeta.query}" ➔ Half-width: "{searchEngineMeta.normalizedQuery}"</span>
-                    </div>
-                  )}
-                </div>
-              )}
+                            {/* Action Button */}
+              <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => executeSearch()}
+                  disabled={loading}
+                  className="h-11 px-7 flex items-center justify-center gap-2 bg-primary text-on-primary rounded-xl font-bold text-sm hover:bg-secondary transition-all shadow-md active:scale-98 disabled:opacity-50 shrink-0 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">
+                    {loading ? 'sync' : 'search'}
+                  </span>
+                  <span>{loading ? 'Đang quét...' : 'Cập Nhật'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Thông báo lỗi validation nguyên văn */}
