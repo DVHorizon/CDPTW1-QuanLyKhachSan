@@ -7,6 +7,11 @@ const solrBaseUrl = `http://${solrHost}:${solrPort}/solr`;
 const COLLECTION_NAME = 'hotel_rooms';
 
 const solrClient = {
+  collection: COLLECTION_NAME,
+
+  async update(docs) {
+    return this.addDocuments(docs);
+  },
   /**
    * Kiểm tra kết nối Solr
    */
