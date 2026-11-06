@@ -359,3 +359,235 @@ exports.updateMenuItemStatus = async (req, res) => {
     return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể cập nhật trạng thái món.' });
   }
 };
+
+// ============================================================================
+// FEAT-SEARCH-01: TÌM KIẾM THỰC ĐƠN ĐA NỀN TẢNG (ELASTICSEARCH & APACHE SOLR)
+// ============================================================================
+
+const { expandQuerySemantics } = require('../../utils/searchSemanticHelper');
+
+// 1. Tìm kiếm bằng Elasticsearch (Full-text + Semantic Expansion + Typo Fuzzy)
+exports.searchMenuWithElastic = async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { keyword, category, status } = req.query;
+    const esClient = require('../../config/elasticsearch');
+
+    if (!keyword || keyword.trim() === '') {
+      return exports.getMenuItems(req, res);
+    }
+
+    const cleanKw = keyword.trim();
+    // Phân tích ngữ nghĩa theo phong cách Google (bỏ stop words, tìm từ đồng nghĩa)
+    const { filteredText, coreTerms, expandedTerms } = expandQuerySemantics(cleanKw);
+
+    const shouldClauses = [
+      // 1. Khớp cụm nguyên bản hoặc cụm đã lọc stop words (ưu tiên điểm cao nhất)
+      {
+        multi_match: {
+          query: cleanKw,
+          fields: ['ItemName^8.0', 'Description^4.0', 'CategoryName^2.5'],
+          fuzziness: 'AUTO',
+          boost: 4.0
+        }
+      }
+    ];
+
+    if (filteredText && filteredText !== cleanKw.toLowerCase()) {
+      shouldClauses.push({
+        multi_match: {
+          query: filteredText,
+          fields: ['ItemName^6.0', 'Description^3.0', 'CategoryName^2.0'],
+          fuzziness: 'AUTO',
+          boost: 3.0
+        }
+      });
+    }
+
+    // 2. Thêm các từ cốt lõi (Core Terms) và từ đồng nghĩa ngữ nghĩa (VD: 'thích' <-> 'yêu', 'bò' <-> 'wagyu/beef')
+    expandedTerms.forEach(term => {
+      if (term !== cleanKw.toLowerCase() && term !== filteredText) {
+        shouldClauses.push({
+          multi_match: {
+            query: term,
+            fields: ['ItemName^3.0', 'Description^1.5', 'CategoryName^1.0'],
+            fuzziness: 'AUTO',
+            boost: 1.2
+          }
+        });
+      }
+    });
+
+    const esQuery = {
+      bool: {
+        should: shouldClauses,
+        minimum_should_match: 1,
+        filter: []
+      }
+    };
+
+    if (category) {
+      esQuery.bool.filter.push({ term: { CategoryName: category } });
+    }
+    if (status) {
+      esQuery.bool.filter.push({ term: { Status: status } });
+    }
+
+    const esResponse = await esClient.search({
+      index: 'menu_items',
+      body: {
+        query: esQuery,
+        size: 50
+      }
+    });
+
+    const hits = (esResponse.hits && esResponse.hits.hits) || [];
+    const maxScore = esResponse.hits && esResponse.hits.max_score ? esResponse.hits.max_score : 1;
+    const scoreThreshold = maxScore * 0.2; // Ngưỡng tương quan 20%
+
+    const filteredHits = hits.filter(h => (h._score || 0) >= scoreThreshold);
+    const data = filteredHits.map(hit => ({
+      ...hit._source,
+      _score: hit._score,
+      _engine: 'Elasticsearch'
+    }));
+
+    return res.status(200).json({
+      success: true,
+      engine: 'Elasticsearch 9.5.6',
+      total: data.length,
+      qTimeMs: Date.now() - startTime,
+      semanticExpansions: expandedTerms,
+      data
+    });
+  } catch (error) {
+    console.error('Lỗi tìm kiếm Elasticsearch:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể kết nối máy chủ Elasticsearch: ' + error.message
+    });
+  }
+};
+
+// 2. Tìm kiếm bằng Apache Solr (Hỗ trợ Semantic Expansion + Tiếng Việt không dấu + Typo Fuzzy & Đa từ)
+exports.searchMenuWithSolr = async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { keyword, category, status } = req.query;
+    const solrHost = (process.env.SOLR_HOST) || (process.env.DB_HOST === 'mysql' ? 'host.docker.internal' : '127.0.0.1');
+    const solrPort = process.env.SOLR_PORT || 8983;
+
+    if (!keyword || keyword.trim() === '') {
+      return exports.getMenuItems(req, res);
+    }
+
+    const cleanKw = keyword.trim();
+    const noToneKw = removeVietnameseTones(cleanKw);
+    // 2. Phân tích ngữ nghĩa theo phong cách Google
+    const { filteredText, coreTerms, expandedTerms } = expandQuerySemantics(cleanKw);
+
+    // Tách các từ riêng lẻ
+    const rawTokens = cleanKw.toLowerCase().split(/\s+/).filter(Boolean);
+    const tokens = Array.from(new Set([...rawTokens, ...coreTerms]));
+
+    // Xây dựng danh sách mệnh đề truy vấn chuẩn Solr
+    const queryParts = [
+      // A. Khớp chính xác cụm nguyên bản (điểm cao nhất)
+      `"${cleanKw}"^15.0`
+    ];
+
+    if (filteredText && filteredText !== cleanKw.toLowerCase()) {
+      queryParts.push(`"${filteredText}"^12.0`);
+    }
+
+    // B. Khớp tất cả các từ cùng xuất hiện
+    if (tokens.length > 1) {
+      queryParts.push(`(${tokens.join(' AND ')})^8.0`);
+    }
+
+    // C. Khớp tiền tố (Prefix / Gõ dở dang: vd me -> me*)
+    const prefixWords = tokens.map(w => (w.includes('*') || w.includes('~')) ? w : `${w}*`);
+    queryParts.push(`(${prefixWords.join(' OR ')})^5.0`);
+
+    // D. Khớp mờ chịu sai/thiếu/dư ký tự (Fuzzy ~1, ~2)
+    // Tự động nhận diện lỗi typo như 'mesi' -> 'messi', 'tuyéet' -> 'tuyết', 'ronaldoo' -> 'ronaldo'
+    tokens.forEach(w => {
+      // Đẩy trực tiếp vào queryParts với edismax
+      queryParts.push(`${w}~1^6.0`);
+      queryParts.push(`${w}~2^4.0`);
+      queryParts.push(`*${w}*^5.0`);
+
+      const noTone = removeVietnameseTones(w);
+      if (noTone !== w) {
+        queryParts.push(`${noTone}~1^5.0`);
+        queryParts.push(`${noTone}~2^3.5`);
+        queryParts.push(`*${noTone}*^4.0`);
+      }
+    });
+
+    // E. Bổ sung các từ khóa ngữ nghĩa / đồng nghĩa (Semantic Expansions)
+    expandedTerms.forEach(term => {
+      if (term !== cleanKw.toLowerCase() && term !== filteredText) {
+        queryParts.push(`"${term}"^3.0`);
+        const noToneSyn = removeVietnameseTones(term);
+        queryParts.push(`*${noToneSyn}*^2.0`);
+      }
+    });
+
+    const finalQuery = queryParts.join(' OR ');
+
+    // Sử dụng edismax parser của Solr với qf đa trường
+    const url = new URL(`http://${solrHost}:${solrPort}/solr/menu_items/select`);
+    url.searchParams.append('defType', 'edismax');
+    url.searchParams.append('q', finalQuery);
+    url.searchParams.append('qf', 'item_name^5.0 description^2.5 category^1.5');
+    url.searchParams.append('wt', 'json');
+    url.searchParams.append('rows', '50');
+    url.searchParams.append('fl', '*,score');
+
+    if (category) {
+      url.searchParams.append('fq', `category:${category}`);
+    }
+    if (status) {
+      url.searchParams.append('fq', `status:${status}`);
+    }
+
+    console.log(`[SOLR SEARCH] Kw: "${cleanKw}" | URL: ${url.toString()}`);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Solr HTTP ${response.status}: ${errText}`);
+    }
+
+    const solrJson = await response.json();
+    const docs = (solrJson.response && solrJson.response.docs) || [];
+    console.log(`[SOLR FOUND] Docs count: ${docs.length}`);
+
+    const data = docs.map(doc => ({
+      MenuItemId: Number(doc.id),
+      ItemName: Array.isArray(doc.item_name) ? doc.item_name[0] : doc.item_name,
+      Description: Array.isArray(doc.description) ? doc.description[0] : (doc.description || ''),
+      CategoryName: Array.isArray(doc.category) ? doc.category[0] : (doc.category || 'Khác'),
+      Price: Array.isArray(doc.price) ? Number(doc.price[0]) : Number(doc.price || 0),
+      Status: Array.isArray(doc.status) ? doc.status[0] : (doc.status || 'Available'),
+      _score: doc.score || null,
+      _engine: 'Apache Solr'
+    }));
+
+    return res.status(200).json({
+      success: true,
+      engine: 'Apache Solr 9.11.0',
+      total: data.length,
+      qTimeMs: Date.now() - startTime,
+      semanticExpansions: expandedTerms,
+      data
+    });
+  } catch (error) {
+    console.error('Lỗi tìm kiếm Apache Solr:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể kết nối máy chủ Apache Solr: ' + error.message
+    });
+  }
+};

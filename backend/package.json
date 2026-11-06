@@ -14,6 +14,8 @@
     "seed:legacy": "node src/seeders/seedAll.js",
     "seed:stays": "node src/seeders/seedInHouseStays.js",
     "verify:db": "node src/seeders/verifyTables.js",
+    "sync:rooms": "node src/seeders/syncBothEngines.js",
+    "sync:menu": "node src/seeders/syncMenuBoth.js",
     "test:pricing": "node tests/test_feat_guest_06_pricing_calculation.js",
     "test:voucher": "node tests/test_feat_guest_07_voucher_redemption.js",
     "test:booking": "node tests/test_feat_guest_05_booking_engine.js",

@@ -8,6 +8,8 @@ const MenuManagement = () => {
   const [keyword, setKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [status, setStatus] = useState('');
+  const [searchEngine, setSearchEngine] = useState('standard'); // 'standard' | 'elastic' | 'solr'
+  const [searchMeta, setSearchMeta] = useState(null);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, itemId: null });
   const [messageModal, setMessageModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,9 +25,20 @@ const MenuManagement = () => {
 
   const fetchMenu = () => {
     setLoading(true);
+
     let url = 'http://localhost:5000/api/v1/menu-items';
+    const cleanKw = keyword ? keyword.trim() : '';
+
+    if (cleanKw !== '') {
+      if (searchEngine === 'elastic') {
+        url = 'http://localhost:5000/api/v1/search-elastic';
+      } else if (searchEngine === 'solr') {
+        url = 'http://localhost:5000/api/v1/search-solr';
+      }
+    }
+
     const params = new URLSearchParams();
-    if (keyword) params.append('keyword', keyword);
+    if (cleanKw) params.append('keyword', cleanKw);
     if (selectedCategory) params.append('category', selectedCategory);
     if (status) params.append('status', status);
     if (params.toString()) url += `?${params.toString()}`;
@@ -35,14 +48,25 @@ const MenuManagement = () => {
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
           setMenuItems(res.data);
+          if (res.engine) {
+            setSearchMeta({
+              engine: res.engine,
+              qTimeMs: res.qTimeMs,
+              total: res.total
+            });
+          } else {
+            setSearchMeta(null);
+          }
         } else {
           setMenuItems([]);
+          setSearchMeta(null);
         }
         setLoading(false);
       })
       .catch((error) => {
         console.error("Fetch error:", error);
         setMenuItems([]);
+        setSearchMeta(null);
         setLoading(false);
       });
   };
@@ -53,7 +77,7 @@ const MenuManagement = () => {
       fetchMenu();
     }, 300); // Debounce search
     return () => clearTimeout(timer);
-  }, [keyword, selectedCategory, status]);
+  }, [keyword, selectedCategory, status, searchEngine]);
 
   const openAddModal = () => {
     setEditingItem(null);
@@ -262,16 +286,16 @@ const MenuManagement = () => {
                   <button onClick={() => setSelectedCategory('')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
                     Tất Cả Món
                   </button>
-                  <button onClick={() => setSelectedCategory('1')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '1' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                  <button onClick={() => setSelectedCategory('Bếp Nóng')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === 'Bếp Nóng' || selectedCategory === '1' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
                     Bếp Nóng
                   </button>
-                  <button onClick={() => setSelectedCategory('2')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '2' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                  <button onClick={() => setSelectedCategory('Bếp Lạnh')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === 'Bếp Lạnh' || selectedCategory === '2' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
                     Bếp Lạnh
                   </button>
-                  <button onClick={() => setSelectedCategory('3')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '3' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                  <button onClick={() => setSelectedCategory('Tráng Miệng')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === 'Tráng Miệng' || selectedCategory === '3' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
                     Tráng Miệng
                   </button>
-                  <button onClick={() => setSelectedCategory('4')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '4' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                  <button onClick={() => setSelectedCategory('Đồ Uống / Bar')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === 'Đồ Uống / Bar' || selectedCategory === '4' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
                     Đồ Uống / Bar
                   </button>
                 </div>
@@ -302,6 +326,69 @@ const MenuManagement = () => {
                     <span className="absolute right-2 top-2 font-mono text-[10px] text-outline-variant bg-surface-container px-1 rounded">⌘K</span>
                   </div>
                 </div>
+              </div>
+
+              {/* BỘ CHỌN CÔNG CỤ TÌM KIẾM (Search Engine Selector: Thường vs Elasticsearch vs Solr) */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-surface-container/60">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-label-sm font-medium text-on-surface-variant flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px] text-primary">tune</span>
+                    Công nghệ tìm kiếm:
+                  </span>
+                  <div className="inline-flex p-0.5 bg-surface-container rounded-lg border border-surface-container-high">
+                    <button
+                      type="button"
+                      onClick={() => setSearchEngine('standard')}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${
+                        searchEngine === 'standard'
+                          ? 'bg-white shadow-sm text-on-surface text-primary border border-surface-container-high'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">database</span>
+                      Tìm thường (SQL)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSearchEngine('elastic')}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${
+                        searchEngine === 'elastic'
+                          ? 'bg-amber-500 text-white shadow-sm font-bold'
+                          : 'text-on-surface-variant hover:text-amber-600'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">bolt</span>
+                      Elasticsearch
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSearchEngine('solr')}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${
+                        searchEngine === 'solr'
+                          ? 'bg-orange-600 text-white shadow-sm font-bold'
+                          : 'text-on-surface-variant hover:text-orange-600'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">flare</span>
+                      Apache Solr
+                    </button>
+                  </div>
+                </div>
+
+                {searchMeta && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-mono bg-surface-container-low px-2.5 py-1 rounded border border-surface-container">
+                    <span className="font-semibold text-primary">{searchMeta.engine}</span>
+                    <span className="text-outline">•</span>
+                    <span className="text-on-surface-variant">Khớp: <strong className="text-on-surface">{searchMeta.total}</strong> món</span>
+                    <span className="text-outline">•</span>
+                    <span className="text-emerald-600 font-bold">⚡ {searchMeta.qTimeMs}ms</span>
+                    {searchMeta.semanticExpansions && searchMeta.semanticExpansions.length > 1 && (
+                      <span className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded text-[11px] font-sans" title={searchMeta.semanticExpansions.join(', ')}>
+                        ✨ Gợi ý ngữ nghĩa: {searchMeta.semanticExpansions.slice(1, 4).join(', ')}...
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               {/*  Catalog Data Table  */}
               <div className="overflow-x-auto">
@@ -381,7 +468,8 @@ const MenuManagement = () => {
                           </td>
                           <td className="py-3 px-3">
                             <span className="inline-flex items-center gap-1 font-label-sm text-label-sm bg-surface-container text-on-surface px-2 py-0.5 rounded">
-                              <span className="w-1.5 h-1.5 rounded-full bg-tertiary"></span> {item.MenuCategory ? item.MenuCategory.CategoryName : 'Chưa phân loại'}
+                              <span className="w-1.5 h-1.5 rounded-full bg-tertiary"></span> 
+                              {(item.MenuCategory && item.MenuCategory.CategoryName) || item.CategoryName || 'Bếp Nóng'}
                             </span>
                           </td>
                           <td className="py-3 px-3 text-right font-mono font-bold text-on-surface">
