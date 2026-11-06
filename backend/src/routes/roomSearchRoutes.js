@@ -27,7 +27,6 @@ router.get('/suggest', roomSearchController.suggestRooms);
 // POST /api/v1/rooms/book (FEAT-GUEST-05: Online Booking Engine)
 router.post('/book', verifyToken, bookingEngineController.createOnlineBooking);
 
-
 // GET /api/v1/rooms/:roomId/pricing (FEAT-GUEST-12 / A12: Dynamic Pricing Engine)
 router.get('/:roomId/pricing', dynamicPricingController.getRoomDynamicPricing);
 
