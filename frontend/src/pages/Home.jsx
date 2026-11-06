@@ -17,11 +17,18 @@ function formatPrice(price) {
   return new Intl.NumberFormat('vi-VN').format(price) + '₫';
 }
 
+const ROOM_API_URL = typeof window !== 'undefined' && window.location.port === '3000'
+  ? '/api/loai-phong'
+  : 'http://localhost:5000/api/loai-phong';
+
 function Home() {
   const [roomTypes, setRoomTypes] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [roomError, setRoomError] = useState(null);
+
+  // State tìm kiếm trực tiếp trong Bộ Sưu Tập Phòng trên Home
+  const [homeSearchKeyword, setHomeSearchKeyword] = useState('');
 
   // State cho Modal Khách Xem Chi Tiết Phòng
   const [selectedRoomDetail, setSelectedRoomDetail] = useState(null);
@@ -32,47 +39,59 @@ function Home() {
   const [loadingAllRooms, setLoadingAllRooms] = useState(false);
   const [searchModalKeyword, setSearchModalKeyword] = useState('');
 
-  // Fetch danh sách loại phòng từ backend
+  // Fetch danh sách loại phòng từ backend (Hỗ trợ tìm kiếm theo từ khóa)
   useEffect(() => {
     const controller = new AbortController();
     setLoadingRooms(true);
-    fetch('http://localhost:5000/api/loai-phong?trang_thai=active&limit=12', { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error('Không thể tải dữ liệu loại phòng.');
-        return res.json();
-      })
-      .then((json) => {
-        if (json.success) {
-          setRoomTypes(json.data || []);
-          setTotalCount(json.total || (json.data ? json.data.length : 0));
-        } else {
-          setRoomError(json.message || 'Lỗi tải dữ liệu.');
-        }
-      })
-      .catch((err) => {
-        if (err.name !== 'AbortError') {
-          setRoomError('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
-        }
-      })
-      .finally(() => setLoadingRooms(false));
-    return () => controller.abort();
-  }, []);
 
-  // Mở modal toàn bộ phòng dành cho khách
-  const handleOpenAllRooms = () => {
-    setShowAllRoomsModal(true);
-    if (allRooms.length === 0) {
-      setLoadingAllRooms(true);
-      fetch('http://localhost:5000/api/loai-phong?trang_thai=active')
-        .then((res) => res.json())
+    const timer = setTimeout(() => {
+      const q = homeSearchKeyword.trim();
+      const endpoint = q
+        ? `${ROOM_API_URL}?trang_thai=active&q=${encodeURIComponent(q)}`
+        : `${ROOM_API_URL}?trang_thai=active&limit=12`;
+
+      fetch(endpoint, { signal: controller.signal })
+        .then((res) => {
+          if (!res.ok) throw new Error('Không thể tải dữ liệu loại phòng.');
+          return res.json();
+        })
         .then((json) => {
           if (json.success) {
-            setAllRooms(json.data || []);
+            setRoomTypes(json.data || []);
+            if (!q) {
+              setTotalCount(json.stats?.active || json.total || (json.data ? json.data.length : 0));
+            }
+          } else {
+            setRoomError(json.message || 'Lỗi tải dữ liệu.');
           }
         })
-        .catch(() => {})
-        .finally(() => setLoadingAllRooms(false));
-    }
+        .catch((err) => {
+          if (err.name !== 'AbortError') {
+            setRoomError('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
+          }
+        })
+        .finally(() => setLoadingRooms(false));
+    }, homeSearchKeyword ? 250 : 0);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [homeSearchKeyword]);
+
+  // Mở modal toàn bộ phòng dành cho khách (luôn tải mới nhất để cập nhật phòng mới thêm từ Admin)
+  const handleOpenAllRooms = () => {
+    setShowAllRoomsModal(true);
+    setLoadingAllRooms(true);
+    fetch(`${ROOM_API_URL}?trang_thai=active`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success) {
+          setAllRooms(json.data || []);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingAllRooms(false));
   };
 
   useEffect(() => {
@@ -163,7 +182,14 @@ function Home() {
                     </div>
                   </div>
                   <div className="lg:col-span-2">
-                    <button className="w-full h-14 rounded-lg bg-secondary hover:bg-on-secondary-container text-on-secondary flex items-center justify-center gap-space-xs font-label-lg text-label-lg transition-all shadow-md hover:shadow-lg" type="button">
+                    <button
+                      onClick={() => {
+                        const el = document.getElementById('bo-suu-tap-phong');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="w-full h-14 rounded-lg bg-secondary hover:bg-on-secondary-container text-on-secondary flex items-center justify-center gap-space-xs font-label-lg text-label-lg transition-all shadow-md hover:shadow-lg cursor-pointer"
+                      type="button"
+                    >
                       <span className="material-symbols-outlined text-[20px]">search</span>
                       <span className="">Tìm Phòng Trống</span>
                     </button>
@@ -211,17 +237,50 @@ function Home() {
             </div>
           </section>
 
-          <section className="w-full py-space-xl bg-background">
+          <section className="w-full py-space-xl bg-background" id="bo-suu-tap-phong">
             <div className="w-full px-margin max-w-7xl mx-auto">
-              <div className="flex flex-col md:flex-row md:items-end justify-between mb-space-xl gap-space-md">
+              <div className="flex flex-col md:flex-row md:items-end justify-between mb-space-md gap-space-md">
                 <div>
                   <span className="font-label-sm text-label-sm uppercase tracking-widest text-secondary font-bold">Không Gian Nghỉ Dưỡng Thượng Đỉnh</span>
-                  <h2 className="font-headline-lg text-headline-lg text-on-surface mt-space-xs">Bộ Sưu Tập Biệt Thự & Phòng Suite</h2>
+                  <h2 className="font-headline-lg text-headline-lg text-on-surface mt-space-xs">Bộ Sưu Tập Biệt Thự &amp; Phòng Suite</h2>
                 </div>
                 <p className="font-body-md text-body-md text-on-surface-variant max-w-md">
                   Mỗi không gian là một tác phẩm kiến trúc hòa quyện cùng thiên nhiên nhiệt đới, kiến tạo sự riêng tư vô hạn và thư thái an nhiên.
                 </p>
               </div>
+
+              {/* Thanh Tìm Kiếm Trực Tiếp trong Bộ Sưu Tập */}
+              <div className="mb-space-xl bg-surface-container-low p-space-md rounded-2xl border border-outline-variant/30 shadow-xs flex flex-col md:flex-row items-center gap-space-md">
+                <div className="relative flex-1 w-full">
+                  <span className="material-symbols-outlined absolute left-3.5 top-3 text-secondary text-[22px]">
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    value={homeSearchKeyword}
+                    onChange={(e) => setHomeSearchKeyword(e.target.value)}
+                    placeholder="Tìm nhanh hạng phòng theo tên hoặc từ khóa (VD: 09876, Suite, Villa, Deluxe...)"
+                    className="w-full bg-surface-container-lowest pl-11 pr-10 py-2.5 rounded-xl text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary border border-outline-variant/40 shadow-xs transition"
+                  />
+                  {homeSearchKeyword && (
+                    <button
+                      type="button"
+                      onClick={() => setHomeSearchKeyword('')}
+                      className="absolute right-3.5 top-3 text-on-surface-variant hover:text-on-surface transition cursor-pointer"
+                      title="Xóa tìm kiếm"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                  )}
+                </div>
+                {homeSearchKeyword.trim() && (
+                  <div className="flex items-center gap-2 text-body-sm font-semibold text-secondary shrink-0">
+                    <span className="material-symbols-outlined text-[18px]">filter_list</span>
+                    <span>Tìm thấy {roomTypes.length} loại phòng</span>
+                  </div>
+                )}
+              </div>
+
               {/* === LOADING STATE === */}
               {loadingRooms && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
@@ -245,7 +304,7 @@ function Home() {
                   <span className="material-symbols-outlined text-error text-[48px]">wifi_off</span>
                   <p className="font-title-md text-title-md text-on-surface-variant">{roomError}</p>
                   <button
-                    onClick={() => { setRoomError(null); setLoadingRooms(true); fetch('http://localhost:5000/api/loai-phong?trang_thai=active').then(r=>r.json()).then(j=>{ if(j.success) setRoomTypes(j.data||[]); }).catch(()=>setRoomError('Không thể kết nối.')).finally(()=>setLoadingRooms(false)); }}
+                    onClick={() => { setRoomError(null); setLoadingRooms(true); fetch(`${ROOM_API_URL}?trang_thai=active`).then(r=>r.json()).then(j=>{ if(j.success) setRoomTypes(j.data||[]); }).catch(()=>setRoomError('Không thể kết nối.')).finally(()=>setLoadingRooms(false)); }}
                     className="px-space-lg py-space-sm rounded-lg bg-secondary text-on-secondary font-label-md text-label-md"
                   >
                     Thử lại
@@ -257,15 +316,29 @@ function Home() {
               {!loadingRooms && !roomError && roomTypes.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 gap-space-md text-center">
                   <span className="material-symbols-outlined text-outline text-[48px]">hotel</span>
-                  <p className="font-title-md text-title-md text-on-surface-variant">Chưa có loại phòng nào được thêm vào hệ thống.</p>
+                  <p className="font-title-md text-title-md text-on-surface-variant">
+                    {homeSearchKeyword.trim()
+                      ? `Không tìm thấy loại phòng nào phù hợp với từ khóa "${homeSearchKeyword}" trong bộ sưu tập.`
+                      : 'Chưa có loại phòng nào được thêm vào hệ thống.'}
+                  </p>
+                  {homeSearchKeyword.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setHomeSearchKeyword('')}
+                      className="px-space-md py-space-sm rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-label-md cursor-pointer transition"
+                    >
+                      Xóa bộ lọc tìm kiếm
+                    </button>
+                  )}
                 </div>
               )}
 
               {/* === ROOM CARDS TỪ DATABASE === */}
               {!loadingRooms && !roomError && roomTypes.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
-                  {roomTypes.slice(0, 6).map((room, index) => {
-                    const imgSrc = room.hinh_anh || FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
+                  {(homeSearchKeyword.trim() ? roomTypes : roomTypes.slice(0, 6)).map((room, index) => {
+                    const rawImg = room.hinh_anh || room.image || (room.images && room.images[0]);
+                    const imgSrc = rawImg || FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
                     const isFirst = index === 0;
                     return (
                       <div key={room.id} className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
@@ -620,14 +693,17 @@ function Home() {
               {!loadingAllRooms && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-space-md">
                   {(allRooms.length > 0 ? allRooms : roomTypes)
-                    .filter((r) =>
-                      !searchModalKeyword.trim() ||
-                      r.ten_loai?.toLowerCase().includes(searchModalKeyword.toLowerCase()) ||
-                      r.mo_ta?.toLowerCase().includes(searchModalKeyword.toLowerCase()) ||
-                      r.ma_loai?.toLowerCase().includes(searchModalKeyword.toLowerCase())
-                    )
+                    .filter((r) => {
+                      if (!searchModalKeyword.trim()) return true;
+                      const kw = searchModalKeyword.trim().toLowerCase();
+                      const name = String(r.ten_loai || r.typeName || r.name || '').toLowerCase();
+                      const desc = String(r.mo_ta || r.description || '').toLowerCase();
+                      const code = String(r.ma_loai || r.TypeCode || r.code || '').toLowerCase();
+                      return name.includes(kw) || desc.includes(kw) || code.includes(kw);
+                    })
                     .map((room, idx) => {
-                      const imgSrc = room.hinh_anh || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];
+                      const rawImg = room.hinh_anh || room.image || (room.images && room.images[0]);
+                      const imgSrc = rawImg || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];
                       return (
                         <div
                           key={room.id}

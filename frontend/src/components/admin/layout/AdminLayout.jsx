@@ -27,7 +27,9 @@ const AdminLayout = ({ children }) => {
     <div className="admin-theme bg-background font-body-md text-on-surface antialiased min-h-screen">
       <AdminSidebar isCollapsed={isCollapsed} toggleSidebar={toggleSidebar} />
       <div
-        className={`transition-all duration-300 ease-in-out ${isCollapsed ? "pl-20" : "pl-72"}`}
+        className={`transition-all duration-300 ease-in-out ${
+          isCollapsed ? "pl-20" : "pl-72"
+        }`}
       >
         <AdminHeader isCollapsed={isCollapsed} toggleSidebar={toggleSidebar} />
         <main className="w-full pt-16 bg-surface min-h-screen px-space-lg pb-margin-lg transition-all duration-300">

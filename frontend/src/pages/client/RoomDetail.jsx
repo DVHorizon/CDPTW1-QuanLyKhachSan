@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../../components/layout/Header';
-import { checkRoomAvailabilityApi, lockRoomSessionApi, releaseRoomLockApi, getRoomDetailApi, createBookingApi } from '../../api/roomApi';
+import { checkRoomAvailabilityApi, lockRoomSessionApi, releaseRoomLockApi, getRoomDetailApi, createBookingApi, getDynamicPricingApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 
@@ -55,6 +55,12 @@ export default function RoomDetail() {
   const [availabilityData, setAvailabilityData] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorCode, setErrorCode] = useState('');
+  // TÍNH NĂNG 12: ĐIỀU CHỈNH GIÁ PHÒNG LINH HOẠT THEO THỜI ĐIỂM (DYNAMIC PRICING ENGINE - FEAT-GUEST-12 / A12)
+  const [dynamicPricingData, setDynamicPricingData] = useState(null);
+  const [isDynamicPricingLoading, setIsDynamicPricingLoading] = useState(false);
+  const [dynamicPricingError, setDynamicPricingError] = useState('');
+  const [pricingSuccessMsg, setPricingSuccessMsg] = useState('');
+
 
   // Phiên khóa phòng tạm thời 15 phút (Anti-Overbooking Lock)
   const [lockSession, setLockSession] = useState(null);
@@ -153,6 +159,42 @@ export default function RoomDetail() {
       clearTimeout(timer);
     };
   }, [roomType?.RoomTypeId, id, checkInDate, checkOutDate, quantity, lockSession?.lockSessionId]);
+
+  
+  // FEAT-GUEST-12: Gọi GET /api/v1/rooms/{roomId}/pricing để lấy giá linh hoạt theo thời điểm
+  useEffect(() => {
+    let isMounted = true;
+    const activeRoomTypeId = roomType?.RoomTypeId || id || 1;
+    if (!activeRoomTypeId || !checkInDate || !checkOutDate) return;
+
+    async function fetchDynamicPricing() {
+      setIsDynamicPricingLoading(true);
+      setDynamicPricingError('');
+      setPricingSuccessMsg('');
+      try {
+        const res = await getDynamicPricingApi(activeRoomTypeId, { checkInDate, checkOutDate });
+        if (!isMounted) return;
+        if (res && res.success && res.data) {
+          setDynamicPricingData(res.data);
+          setPricingSuccessMsg(res.message || 'Tính toán giá phòng theo thời điểm thành công');
+        } else if (res && res.code === 'ERROR_0043_PRICING_RULE_ERROR') {
+          setDynamicPricingError(res.message || 'Không thể áp dụng bảng giá động cho khoảng thời gian này');
+        }
+      } catch (err) {
+        if (isMounted) {
+          setDynamicPricingError('Không thể áp dụng bảng giá động cho khoảng thời gian này');
+        }
+      } finally {
+        if (isMounted) setIsDynamicPricingLoading(false);
+      }
+    }
+
+    const t = setTimeout(fetchDynamicPricing, 350);
+    return () => {
+      isMounted = false;
+      clearTimeout(t);
+    };
+  }, [roomType?.RoomTypeId, id, checkInDate, checkOutDate]);
 
   // Lắng nghe WebSocket Realtime: tự động gọi lại checkRealtime() khi có người đặt phòng, khóa phòng hoặc đổi trạng thái
   useEffect(() => {
@@ -329,15 +371,25 @@ export default function RoomDetail() {
     return diff > 0 ? diff : 1;
   }, [checkInDate, checkOutDate]);
 
-  const pricing = availabilityData?.pricingSummary || {
-    basePricePerNight: roomType?.BasePrice || 8500000,
-    numberOfNights,
+  // FEAT-GUEST-12: Ưu tiên dữ liệu tính toán từ Dynamic Pricing Engine API nếu có
+  const effectiveBaseRate = dynamicPricingData?.baseRate || roomType?.BasePrice || 8500000;
+  const effectiveCalculatedTotal = dynamicPricingData?.totalRoomPrice
+    ? (dynamicPricingData.totalRoomPrice * quantity)
+    : ((dynamicPricingData?.averageDailyRate ? dynamicPricingData.averageDailyRate * numberOfNights : effectiveBaseRate * numberOfNights) * quantity);
+
+  const pricing = {
+    basePricePerNight: dynamicPricingData?.averageDailyRate || effectiveBaseRate,
+    originalBaseRate: effectiveBaseRate,
+    numberOfNights: dynamicPricingData?.numberOfNights || numberOfNights,
     roomQuantity: quantity,
-    roomSubtotal: (roomType?.BasePrice || 8500000) * numberOfNights * quantity,
-    discountAmount: Math.round((roomType?.BasePrice || 8500000) * numberOfNights * quantity * 0.1),
-    vatTaxAmount: Math.round(((roomType?.BasePrice || 8500000) * numberOfNights * quantity * 0.9) * 0.08),
-    serviceFeeAmount: Math.round(((roomType?.BasePrice || 8500000) * numberOfNights * quantity * 0.9) * 0.05),
-    totalAmount: Math.round(((roomType?.BasePrice || 8500000) * numberOfNights * quantity * 0.9) * 1.13),
+    roomSubtotal: effectiveCalculatedTotal,
+    discountAmount: Math.round(effectiveCalculatedTotal * 0.1),
+    vatTaxAmount: Math.round((effectiveCalculatedTotal * 0.9) * 0.08),
+    serviceFeeAmount: Math.round((effectiveCalculatedTotal * 0.9) * 0.05),
+    totalAmount: Math.round((effectiveCalculatedTotal * 0.9) * 1.13),
+    appliedRule: dynamicPricingData?.appliedRule || null,
+    dailyBreakdown: dynamicPricingData?.dailyBreakdown || [],
+    pricingSummary: dynamicPricingData
   };
 
   const isSoldOut = availabilityData && !availabilityData.isAvailable && availabilityData.availableRoomsCount === 0;
@@ -795,15 +847,48 @@ export default function RoomDetail() {
                   )}
                 </div>
 
-                {/* Nightly Rate */}
-                <div className="space-y-0.5">
-                  <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Giá mỗi đêm tiêu chuẩn</p>
-                  <div className="flex items-baseline gap-1.5">
+                {/* FEAT-GUEST-12 (A12) / Hình 12: Nightly Dynamic Rate Display */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">
+                      {dynamicPricingData?.appliedRule ? 'Giá linh hoạt theo thời điểm' : 'Giá mỗi đêm tiêu chuẩn'}
+                    </p>
+                    {dynamicPricingData?.appliedRule && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                        ⚡ {dynamicPricingData.appliedRule.RuleName || 'Dynamic Pricing'}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-baseline gap-2">
                     <span className="text-3xl font-serif font-bold text-[#0b1c30]">
-                      {formatVND(roomType?.BasePrice || 8500000)}
+                      {formatVND(pricing.basePricePerNight)}
                     </span>
                     <span className="text-xs text-gray-500">/ đêm</span>
+
+                    {/* Hiển thị giá gạch ngang nếu có điều chỉnh tăng/giảm theo Dynamic Pricing */}
+                    {dynamicPricingData && dynamicPricingData.baseRate && Math.round(pricing.basePricePerNight) !== Math.round(dynamicPricingData.baseRate) && (
+                      <span className="text-xs text-gray-400 line-through">
+                        {formatVND(dynamicPricingData.baseRate)}
+                      </span>
+                    )}
                   </div>
+
+                  {/* Thông báo chi tiết quy tắc định giá động */}
+                  {pricingSuccessMsg && (
+                    <div className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200/70 flex items-center gap-1">
+                      <span>✓</span>
+                      <span>{pricingSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  {dynamicPricingError && (
+                    <div className="text-[11px] text-rose-600 bg-rose-50 px-2 py-1 rounded-md border border-rose-200 flex items-center gap-1">
+                      <span>⚠️</span>
+                      <span>{dynamicPricingError}</span>
+                    </div>
+                  )}
+
                   <p className="text-[11px] text-gray-400">Đã bao gồm 8% thuế VAT & 5% phí phục vụ cao cấp</p>
                 </div>
 
@@ -878,12 +963,37 @@ export default function RoomDetail() {
                   </div>
                 )}
 
-                {/* Price Breakdown */}
+                {/* FEAT-GUEST-12: Wireframe Hình 12 - Hiển thị giá phòng linh hoạt tự động theo số đêm lưu trú */}
                 <div className="space-y-2 pt-1 text-xs">
                   <div className="flex items-center justify-between text-gray-600">
                     <span>{formatVND(pricing.basePricePerNight)} × {pricing.numberOfNights} đêm {quantity > 1 ? `× ${quantity} phòng` : ''}</span>
                     <span className="text-[#0b1c30] font-semibold">{formatVND(pricing.roomSubtotal)}</span>
                   </div>
+
+                  {/* Chi tiết từng đêm lưu trú (Cuối tuần / Lễ / Ngày thường) nếu có breakdown */}
+                  {pricing.dailyBreakdown && pricing.dailyBreakdown.length > 0 && (
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 space-y-1.5 my-1">
+                      <div className="flex items-center justify-between font-bold text-[10px] text-slate-500 uppercase tracking-wider">
+                        <span>Chi tiết giá từng đêm lưu trú</span>
+                        <span>Đơn giá</span>
+                      </div>
+                      {pricing.dailyBreakdown.map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-[11px] text-slate-700">
+                          <span className="flex items-center gap-1">
+                            <span className="font-mono text-slate-500">{item.date}</span>
+                            {item.isHoliday ? (
+                              <span className="px-1 py-0.2 bg-rose-100 text-rose-700 text-[9px] rounded font-bold">Lễ/Tết</span>
+                            ) : item.isWeekend ? (
+                              <span className="px-1 py-0.2 bg-amber-100 text-amber-800 text-[9px] rounded font-bold">Cuối tuần +15%</span>
+                            ) : (
+                              <span className="text-slate-400 text-[10px]">(Thường)</span>
+                            )}
+                          </span>
+                          <span className="font-semibold text-slate-900">{formatVND(item.rate)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Gold Member Discount */}
                   <div className="flex items-center justify-between text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg font-medium">

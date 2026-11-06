@@ -337,7 +337,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                       className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
                     >
                       <span className="material-symbols-outlined text-base text-[#b9a277]">dashboard</span>
-                      <span>Bàn Làm Việc / Quản Trị ({user.roleName || 'Nội Bộ'})</span>
+                      <span>Quản Trị Khách Sạn</span>
                     </Link>
                   )}
 
@@ -468,7 +468,6 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                     Đăng xuất
                   </button>
                 </div>
-                
                 <Link
                   to="/profile"
                   onClick={() => setIsMobileMenuOpen(false)}
@@ -491,10 +490,9 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                   <Link
                     to="/admin"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="w-full py-2 px-3 rounded-lg bg-[#203044] text-[#fedeb2] text-xs font-bold text-center flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 rounded-lg bg-[#203044] text-[#fedeb2] text-xs font-bold text-center"
                   >
-                    <span className="material-symbols-outlined text-[16px]">dashboard</span>
-                    <span>Bàn Làm Việc / Quản Trị ({user.roleName || 'Nội Bộ'})</span>
+                    Vào Trang Quản Trị Khách Sạn
                   </Link>
                 )}
               </div>

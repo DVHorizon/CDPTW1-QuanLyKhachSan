@@ -388,6 +388,17 @@ exports.getServiceOrders = async (req, res) => {
               model: Room,
               attributes: ['RoomId', 'RoomNumber'],
             },
+            {
+              model: Booking,
+              attributes: ['BookingId', 'ConfirmationCode'],
+              include: [
+                {
+                  model: User,
+                  as: 'user',
+                  attributes: ['UserId', 'FullName', 'Phone', 'Email'],
+                },
+              ],
+            },
           ],
         },
       ],
@@ -409,3 +420,164 @@ exports.getServiceOrders = async (req, res) => {
     });
   }
 };
+
+// ─── 5. CẬP NHẬT TIẾN ĐỘ ĐƠN DỊCH VỤ (PATCH /api/v1/service-orders/:orderId/status) ────
+exports.updateServiceOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { newStatus, cancelReason } = req.body;
+
+    const userId = req.user?.userId || req.user?.UserId || req.user?.id;
+    const userRole = req.user?.roleName || req.user?.role?.RoleName || req.user?.Role || '';
+    const isStaffOrAdmin = ['Admin', 'Staff', 'Receptionist', 'Manager', 'Kitchen', 'Housekeeping'].includes(userRole);
+
+    // 1. Tra cứu đơn dịch vụ theo orderId
+    const order = await ServiceOrder.findByPk(orderId, {
+      include: [
+        {
+          model: Stay,
+          as: 'stay',
+          include: [{ model: Booking }],
+        },
+        {
+          model: Service,
+          as: 'service',
+          include: [{ model: ServiceCategory, as: 'category' }],
+        },
+      ],
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0011_NOT_FOUND',
+        message: 'Đơn dịch vụ không tồn tại hoặc đã bị xoá',
+      });
+    }
+
+    // Chuẩn hóa trạng thái hiện tại (Processing xem như InProgress theo D9)
+    let currentStatus = order.Status;
+    if (currentStatus === 'Processing') {
+      currentStatus = 'InProgress';
+    }
+
+    // 2. Phân quyền và điều kiện Actor
+    if (!isStaffOrAdmin) {
+      // Guest
+      const stayOwnerId = order.stay?.booking?.UserId || order.stay?.Booking?.UserId;
+      let isOwner = stayOwnerId && Number(stayOwnerId) === Number(userId);
+
+      if (!isOwner && BookingGuest && order.stay?.BookingId) {
+        const userEmail = req.user?.email || req.user?.Email;
+        if (userEmail) {
+          const guestMatch = await BookingGuest.findOne({
+            where: {
+              BookingId: order.stay.BookingId,
+              Email: userEmail,
+            },
+          });
+          if (guestMatch) {
+            isOwner = true;
+          }
+        }
+      }
+
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          code: 'ERROR_0010_FORBIDDEN',
+          message: 'Bạn không có quyền thực hiện chức năng này',
+        });
+      }
+
+      // Guest chỉ được phép huỷ đơn (newStatus === Cancelled)
+      if (newStatus !== 'Cancelled') {
+        return res.status(403).json({
+          success: false,
+          code: 'ERROR_0010_FORBIDDEN',
+          message: 'Khách hàng chỉ có quyền yêu cầu huỷ đơn dịch vụ',
+        });
+      }
+
+      // Guest chỉ được huỷ khi đơn còn ở Received
+      if (currentStatus === 'InProgress') {
+        return res.status(403).json({
+          success: false,
+          code: 'ERROR_0010_FORBIDDEN',
+          message: 'Đơn đang được xử lý, vui lòng liên hệ lễ tân để huỷ',
+        });
+      }
+    }
+
+    // 3. Ma trận chuyển trạng thái hợp lệ (Mục 4.3)
+    const validTransitions = {
+      Received: ['InProgress', 'Completed', 'Cancelled'],
+      InProgress: ['Completed', 'Cancelled'],
+      Completed: [],
+      Cancelled: [],
+    };
+
+    const allowedNext = validTransitions[currentStatus] || [];
+    if (!allowedNext.includes(newStatus)) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0013_INVALID_STATE_TRANSITION',
+        message: `Không thể chuyển trạng thái từ ${currentStatus} sang ${newStatus}`,
+      });
+    }
+
+    // 4. Nếu newStatus === 'Cancelled': Validate cancelReason (2-500 ký tự)
+    let trimmedReason = null;
+    if (newStatus === 'Cancelled') {
+      if (!cancelReason || typeof cancelReason !== 'string' || !cancelReason.trim()) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0001_REQUIRED',
+          message: 'Lý do huỷ không được để trống',
+          field: 'cancelReason',
+        });
+      }
+
+      trimmedReason = cancelReason.trim();
+      if (trimmedReason.length < 2) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0002_MIN_LENGTH',
+          message: 'Lý do huỷ phải có ít nhất 2 ký tự',
+          field: 'cancelReason',
+        });
+      }
+
+      if (trimmedReason.length > 500) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0003_MAX_LENGTH',
+          message: 'Lý do huỷ không được vượt quá 500 ký tự',
+          field: 'cancelReason',
+        });
+      }
+    }
+
+    // 5. Cập nhật dữ liệu
+    order.Status = newStatus;
+    if (newStatus === 'Cancelled' && trimmedReason) {
+      order.Note = trimmedReason;
+    }
+    await order.save();
+
+    return res.status(200).json({
+      success: true,
+      code: 'SUCCESS_0001_CREATED',
+      message: 'Cập nhật trạng thái đơn dịch vụ thành công',
+      data: order,
+    });
+  } catch (error) {
+    console.error('Error in updateServiceOrderStatus:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi hệ thống khi cập nhật trạng thái đơn dịch vụ.',
+      error: error.message,
+    });
+  }
+};
+

@@ -90,6 +90,33 @@ const ProtectedRoute = ({ children, requiredRole, requiredPermission }) => {
     }
   }
 
+  // 4. Nếu route yêu cầu quyền BOOKING_VIEW (Mục 3.1 & Test Case 1, 2)
+  if (requiredPermission === 'BOOKING_VIEW') {
+    const role = (user.roleName || '').toLowerCase();
+    const isAllowed = user.roleId === 1 || user.roleId === 2 || role === 'admin' || role === 'receptionist' || role === 'lễ tân';
+    if (!isAllowed) {
+      return (
+        <div className="min-h-screen bg-[#07131e] flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-[#0d2135] border border-red-500/30 rounded-2xl p-8 text-center shadow-2xl">
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/40">
+              <span className="material-symbols-outlined text-3xl text-red-400">gpp_maybe</span>
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">TRUY CẬP BỊ TỪ CHỐI</h2>
+            <p className="text-slate-300 text-sm mb-6 leading-relaxed">
+              Bạn không có quyền thực hiện chức năng này (<span className="text-red-400 font-mono">ERROR_0010_FORBIDDEN</span>). Chức năng Quản lý danh sách booking chỉ dành cho Quản trị viên và Lễ tân.
+            </p>
+            <button
+              onClick={() => window.location.href = '/admin'}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium text-sm transition-all cursor-pointer"
+            >
+              Quay lại Bàn Làm Việc
+            </button>
+          </div>
+        </div>
+      );
+    }
+  }
+
   return children;
 };
 

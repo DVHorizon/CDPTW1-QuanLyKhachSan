@@ -21,6 +21,7 @@ const ServiceDispatchTerminal = () => {
   // Danh mục & Dịch vụ
   const [categories, setCategories] = useState([]);
   const [activeCategoryId, setActiveCategoryId] = useState("all");
+  const [searchServiceTerm, setSearchServiceTerm] = useState("");
   const [allServices, setAllServices] = useState([]);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
 
@@ -67,7 +68,7 @@ const ServiceDispatchTerminal = () => {
         });
         setActiveStays(mapped);
         setSelectedStay(mapped[0]);
-        setSearchStayTerm(`Phòng ${mapped[0].roomNumber} // ${mapped[0].fullName}`);
+        setSearchStayTerm("");
       } else {
         setActiveStays([]);
         setSelectedStay(null);
@@ -169,13 +170,22 @@ const ServiceDispatchTerminal = () => {
     setCart((prev) => prev.filter((item) => item.ServiceId !== serviceId));
   };
 
-  // 4. Lọc dịch vụ theo danh mục đang chọn
+  // 4. Lọc dịch vụ theo danh mục đang chọn và từ khóa tìm kiếm
   const filteredServices = useMemo(() => {
-    if (activeCategoryId === "all") return allServices;
-    return allServices.filter(
-      (s) => String(s.CategoryId) === String(activeCategoryId)
-    );
-  }, [allServices, activeCategoryId]);
+    let list = allServices;
+    if (activeCategoryId !== "all") {
+      list = list.filter((s) => String(s.CategoryId) === String(activeCategoryId));
+    }
+    if (searchServiceTerm.trim()) {
+      const term = searchServiceTerm.toLowerCase();
+      list = list.filter(
+        (s) =>
+          (s.ServiceName && s.ServiceName.toLowerCase().includes(term)) ||
+          (s.ServiceCode && s.ServiceCode.toLowerCase().includes(term))
+      );
+    }
+    return list;
+  }, [allServices, activeCategoryId, searchServiceTerm]);
 
   // 5. Lọc danh sách phòng theo từ khóa tìm kiếm
   const filteredStays = useMemo(() => {
@@ -185,7 +195,8 @@ const ServiceDispatchTerminal = () => {
       (s) =>
         s.roomNumber.toLowerCase().includes(term) ||
         s.fullName.toLowerCase().includes(term) ||
-        s.folioCode.toLowerCase().includes(term)
+        s.folioCode.toLowerCase().includes(term) ||
+        (s.phoneNumber && s.phoneNumber.toLowerCase().includes(term))
     );
   }, [activeStays, searchStayTerm]);
 
@@ -316,6 +327,15 @@ const ServiceDispatchTerminal = () => {
               </span>
             </div>
 
+            <Link
+              to="/admin/services/orders"
+              className={styles.actionBtnPrimary}
+              title="Xem bảng Kanban tiến độ đơn dịch vụ"
+            >
+              <span className="material-symbols-outlined text-[16px]">pending_actions</span>
+              <span>Tiến Độ Đơn Dịch Vụ</span>
+            </Link>
+
             <button
               type="button"
               onClick={handleOpenHistory}
@@ -376,7 +396,7 @@ const ServiceDispatchTerminal = () => {
               </div>
             ) : (
               <>
-                {/* Ô tìm kiếm phòng */}
+                {/* Ô tìm kiếm phòng & khách */}
                 <div className={styles.searchBoxWrapper}>
                   <div className={styles.searchInputRow}>
                     <span className="material-symbols-outlined text-slate-400 text-[18px]">
@@ -385,44 +405,65 @@ const ServiceDispatchTerminal = () => {
                     <input
                       type="text"
                       value={searchStayTerm}
-                      onChange={(e) => {
-                        setSearchStayTerm(e.target.value);
-                        setShowStayDropdown(true);
-                      }}
-                      onFocus={() => setShowStayDropdown(true)}
-                      placeholder="Tìm số phòng hoặc tên khách..."
+                      onChange={(e) => setSearchStayTerm(e.target.value)}
+                      placeholder="Tìm số phòng, tên khách, SĐT..."
                       className={styles.searchInput}
                     />
-                    <span className={styles.selectedTag}>Đã Chọn</span>
+                    {searchStayTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchStayTerm("")}
+                        className={styles.clearBtn}
+                        title="Xoá tìm kiếm"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">close</span>
+                      </button>
+                    )}
                   </div>
+                </div>
 
-                  {/* Dropdown danh sách phòng in-house */}
-                  {showStayDropdown && (
-                    <div className={styles.dropdownStays}>
-                      {filteredStays.map((st) => (
+                {/* Danh sách phòng đang lưu trú dạng thanh cuộn (List View) */}
+                <div className="flex items-center justify-between mt-1 mb-0.5">
+                  <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                    Danh Sách Khách Lưu Trú ({filteredStays.length})
+                  </span>
+                  <span className="text-[10px] text-slate-400 italic">Click để chọn</span>
+                </div>
+
+                <div className={styles.stayListContainer}>
+                  {filteredStays.length === 0 ? (
+                    <div className="text-center py-4 text-xs text-slate-400">
+                      Không tìm thấy phòng/khách phù hợp
+                    </div>
+                  ) : (
+                    filteredStays.map((st) => {
+                      const isSelected = selectedStay?.StayId === st.StayId;
+                      return (
                         <div
                           key={st.StayId}
-                          className={styles.stayItem}
-                          onClick={() => {
-                            setSelectedStay(st);
-                            setSearchStayTerm(`Phòng ${st.roomNumber} // ${st.fullName}`);
-                            setShowStayDropdown(false);
-                          }}
+                          className={`${styles.stayCardItem} ${
+                            isSelected ? styles.stayCardItemActive : ""
+                          }`}
+                          onClick={() => setSelectedStay(st)}
                         >
-                          <div>
-                            <div className="font-bold text-xs text-slate-800">
-                              Phòng {st.roomNumber} - {st.fullName}
-                            </div>
-                            <div className="text-[10px] text-slate-500">
+                          <div className={styles.stayCardHeader}>
+                            <span className={styles.roomBadge}>P.{st.roomNumber}</span>
+                            <span className={styles.vipTag}>{st.vipTier}</span>
+                          </div>
+                          <div className={styles.stayCardBody}>
+                            <div className={styles.guestName}>{st.fullName}</div>
+                            <div className={styles.guestSub}>
                               {st.roomType} • {st.folioCode}
                             </div>
                           </div>
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                            {st.vipTier}
-                          </span>
+                          {isSelected && (
+                            <span className="material-symbols-outlined text-emerald-600 text-[18px]">
+                              check_circle
+                            </span>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })
                   )}
                 </div>
 
@@ -515,6 +556,30 @@ const ServiceDispatchTerminal = () => {
               <span className="text-xs text-slate-500 font-semibold">
                 {filteredServices.length} Dịch vụ khả dụng
               </span>
+            </div>
+
+            {/* Ô tìm kiếm nhanh dịch vụ */}
+            <div className={styles.serviceSearchWrapper}>
+              <span className="material-symbols-outlined text-slate-400 text-[18px]">
+                search
+              </span>
+              <input
+                type="text"
+                value={searchServiceTerm}
+                onChange={(e) => setSearchServiceTerm(e.target.value)}
+                placeholder="Tìm nhanh dịch vụ theo tên, mã..."
+                className={styles.serviceSearchInput}
+              />
+              {searchServiceTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchServiceTerm("")}
+                  className={styles.clearBtn}
+                  title="Xoá tìm kiếm"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              )}
             </div>
 
             {/* Thanh chọn danh mục động */}

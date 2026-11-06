@@ -112,54 +112,80 @@ const optionalVerifyToken = async (req, res, next) => {
 };
 
 /**
- * Middleware kiểm tra quyền cụ thể theo ma trận Permission trong Database
- * Admin (RoleId 1 hoặc RoleName 'Admin') mặc định có toàn quyền.
+ * Middleware kiểm tra phân quyền tài khoản (RBAC) theo mã quyền
+ * Hỗ trợ cả 1 quyền hoặc mảng quyền: requirePermissions('BOOKING_CONFIRM') hoặc requirePermissions(['BOOKING_CONFIRM', 'ROOM_ALLOCATION'])
  */
-const requirePermission = (permissionName) => async (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      code: 'ERROR_0009_UNAUTHENTICATED',
-      message: 'Bạn cần đăng nhập để thực hiện chức năng này'
-    });
-  }
+const requirePermissions = (requiredPermissions) => {
+  const perms = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
 
-  // Quản trị viên hệ thống (Admin) có toàn quyền
-  if (req.user.roleId === 1 || req.user.roleName === 'Admin') {
-    return next();
-  }
+  return async (req, res, next) => {
+    if (!req.user) {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({
+          success: false,
+          code: 'ERROR_0009_UNAUTHENTICATED',
+          message: 'Bạn cần đăng nhập để thực hiện chức năng này'
+        });
+      }
 
-  try {
-    // Kiểm tra trong bảng RolePermissions liên kết với Permissions
-    const [perms] = await pool.query(
-      `SELECT p.PermissionName
-       FROM RolePermissions rp
-       JOIN Permissions p ON rp.PermissionId = p.PermissionId
-       WHERE rp.RoleId = ? AND p.PermissionName = ?
-       LIMIT 1`,
-      [req.user.roleId, permissionName]
-    );
-
-    if (perms.length === 0) {
-      return res.status(403).json({
-        success: false,
-        code: 'ERROR_0010_FORBIDDEN',
-        message: 'Bạn không có quyền thực hiện chức năng này'
-      });
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+      } catch (error) {
+        return res.status(401).json({
+          success: false,
+          code: 'ERROR_0009_UNAUTHENTICATED',
+          message: 'Bạn cần đăng nhập để thực hiện chức năng này'
+        });
+      }
     }
 
-    next();
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi kiểm tra quyền truy cập: ' + err.message
-    });
-  }
+    const { roleId, roleName } = req.user;
+
+    // Quản trị viên (Admin) luôn có toàn quyền
+    if (roleId === 1 || roleName === 'Admin') {
+      return next();
+    }
+
+    // Kiểm tra quyền cụ thể trong CSDL
+    try {
+      const [rows] = await pool.query(
+        `SELECT p.PermissionName
+         FROM RolePermissions rp
+         JOIN Permissions p ON rp.PermissionId = p.PermissionId
+         WHERE rp.RoleId = ? AND p.PermissionName IN (?)`,
+        [roleId, perms]
+      );
+
+      const heldNames = rows.map((r) => r.PermissionName);
+      const hasAll = perms.every((p) => heldNames.includes(p));
+
+      if (!hasAll) {
+        return res.status(403).json({
+          success: false,
+          code: 'ERROR_0010_FORBIDDEN',
+          message: 'Bạn không có quyền thực hiện chức năng này'
+        });
+      }
+
+      next();
+    } catch (err) {
+      console.error('Lỗi kiểm tra quyền truy cập:', err);
+      return res.status(500).json({
+        success: false,
+        code: 'ERROR_0030_ALLOCATION_TRANSACTION',
+        message: 'Lỗi kiểm tra quyền hạn hệ thống'
+      });
+    }
+  };
 };
+
+const requirePermission = requirePermissions;
 
 /**
  * Middleware chỉ cho phép các vai trò nhân viên nội bộ (Admin, Lễ tân, Bếp, Dọn phòng)
- * Chặn khách hàng thông thường (Guest / RoleId 5) truy cập API quản trị
  */
 const requireInternalStaff = (req, res, next) => {
   if (!req.user) {
@@ -210,6 +236,7 @@ const requireAdmin = (req, res, next) => {
 module.exports = {
   verifyToken,
   optionalVerifyToken,
+  requirePermissions,
   requirePermission,
   requireInternalStaff,
   requireAdmin,

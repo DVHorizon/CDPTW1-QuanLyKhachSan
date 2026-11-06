@@ -11,6 +11,7 @@
 const { Op } = require('sequelize');
 const { sequelize, Booking, BookingGuest, RoomType, User, Voucher } = require('../models');
 const availabilityService = require('../services/availabilityService');
+const dynamicPricingService = require('../services/dynamicPricingService');
 const { broadcastRoomEvent } = require('../sockets/socketHandler');
 
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
@@ -543,8 +544,22 @@ exports.calculatePricing = async (req, res) => {
       effectiveRate = 240.00; // Tiêu chuẩn theo wireframe
     }
 
-    // Tiền phòng gốc: NumberOfNights * baseRate * roomQuantity
-    const roomSubtotal = Math.round((numberOfNights * effectiveRate * numRooms) * 100) / 100;
+    // FEAT-GUEST-12 (A12): Tích hợp Dynamic Pricing Engine cho ngày cuối tuần, lễ, và mùa cao điểm
+    let dynamicPricingResult = null;
+    let roomSubtotal = Math.round((numberOfNights * effectiveRate * numRooms) * 100) / 100;
+    try {
+      dynamicPricingResult = await dynamicPricingService.calculateDynamicPricing({
+        roomId: roomTypeId || 1,
+        checkInDate,
+        checkOutDate
+      });
+      if (dynamicPricingResult && dynamicPricingResult.totalRoomPrice) {
+        // Áp dụng giá động cho số lượng phòng
+        roomSubtotal = Math.round((dynamicPricingResult.totalRoomPrice * numRooms) * 100) / 100;
+      }
+    } catch (dpErr) {
+      console.warn('Fallback standard calculation:', dpErr.message);
+    }
 
     // 3. Phụ thu thêm người lớn / trẻ em vượt chuẩn phòng
     const maxStandardAdults = standardAdultCapacity * numRooms;
@@ -774,9 +789,13 @@ exports.calculatePricing = async (req, res) => {
         checkInDate,
         checkOutDate,
         numberOfNights,
-        baseRate: effectiveRate,
+        baseRate: dynamicPricingResult?.averageDailyRate || effectiveRate,
+        originalBaseRate: effectiveRate,
         roomQuantity: numRooms,
         roomSubtotal,
+        dailyBreakdown: dynamicPricingResult?.dailyBreakdown || [],
+        appliedRule: dynamicPricingResult?.appliedRule || null,
+        dynamicPricingApplied: !!(dynamicPricingResult && dynamicPricingResult.appliedRule),
         extraAdults,
         extraChildren,
         extraGuestSurcharge,

@@ -317,7 +317,7 @@ async function seedInHouseData() {
           stayIdx: 0, // Penthouse 501
           service: activeServices[4] || activeServices[0],
           quantity: 1,
-          status: 'Processing',
+          status: 'InProgress',
           note: '[Khung giờ: 19:30 tối nay] [Địa điểm: Bãi biển riêng biệt] - Bữa tối nến lãng mạn kèm rượu vang đỏ',
         },
         {

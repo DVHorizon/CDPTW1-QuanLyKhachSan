@@ -10,10 +10,12 @@ async function safeFetchJson(path, options = {}) {
   for (const base of API_ENDPOINTS) {
     try {
       const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+      const token = typeof window !== 'undefined' ? (localStorage.getItem('hotel_token') || localStorage.getItem('token')) : null;
       const res = await fetch(url, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
           ...(options.headers || {}),
         },
         ...options,

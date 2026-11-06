@@ -117,6 +117,7 @@ export const searchRoomsApi = async (params = {}) => {
     }
     if (params.rating) query.append('rating', params.rating);
     if (params.sortBy) query.append('sortBy', params.sortBy);
+    if (params.engine) query.append('engine', params.engine);
 
     // Thử gọi /api/v1/rooms/search trước, fallback về /api/rooms/search
     let endpoint = `${API_BASE_URL}/v1/rooms/search?${query.toString()}`;
@@ -183,15 +184,15 @@ export const getRoomDetailApi = async (id) => {
  * GET /api/v1/rooms/suggest?q=...
  */
 export const suggestRoomsApi = async (q) => {
+  if (!q || !q.trim()) return null;
   try {
-    if (!q || !q.trim()) return { data: null };
     const res = await fetch(`${API_BASE_URL}/v1/rooms/suggest?q=${encodeURIComponent(q.trim())}`);
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) return null;
     const json = await res.json();
     return json.data || json;
   } catch (err) {
-    console.error('Lỗi khi fetch suggester:', err);
-    return { data: null };
+    console.error('Lỗi khi fetch gợi ý:', err);
+    return null;
   }
 };
 
@@ -492,5 +493,66 @@ export const cancelMyBookingApi = async (bookingId, body = {}, token = null) => 
   }
 };
 
+/**
+ * TÍNH NĂNG 12: ĐIỀU CHỈNH GIÁ PHÒNG LINH HOẠT THEO THỜI ĐIỂM (DYNAMIC PRICING ENGINE)
+ * Mã tính năng: FEAT-GUEST-12 | Mã truy vết: A12
+ * GET /api/v1/rooms/{roomId}/pricing?checkInDate=YYYY-MM-DD&checkOutDate=YYYY-MM-DD
+ * @param {number|string} roomId - ID loại phòng hoặc phòng cần tính toán
+ * @param {Object} params - { checkInDate, checkOutDate }
+ */
+export const getDynamicPricingApi = async (roomId, { checkInDate, checkOutDate }) => {
+  try {
+    const query = new URLSearchParams();
+    if (checkInDate) query.append('checkInDate', checkInDate);
+    if (checkOutDate) query.append('checkOutDate', checkOutDate);
 
+    let res = await fetch(`${API_BASE_URL}/v1/rooms/${roomId}/pricing?${query.toString()}`);
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/${roomId}/pricing?${query.toString()}`);
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi getDynamicPricingApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_0043_PRICING_RULE_ERROR',
+      message: 'Không thể áp dụng bảng giá động cho khoảng thời gian này'
+    };
+  }
+};
+
+
+/**
+ * FEAT-GUEST-11: Room Review & Rating API
+ */
+export const submitRoomReviewApi = async (roomId, payload, token = null) => {
+  try {
+    const authToken = token || localStorage.getItem('hotel_token');
+    const res = await fetch(`${API_BASE_URL}/v1/rooms/${roomId}/reviews`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi submitRoomReviewApi:', err);
+    return { success: false, message: 'Không thể kết nối máy chủ gửi đánh giá' };
+  }
+};
+
+export const getRoomReviewsApi = async (roomId, params = {}) => {
+  try {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_BASE_URL}/v1/rooms/${roomId}/reviews?${query}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi getRoomReviewsApi:', err);
+    return { success: false, message: 'Không thể tải danh sách đánh giá' };
+  }
+};
 

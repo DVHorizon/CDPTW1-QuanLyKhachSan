@@ -31,7 +31,16 @@ export const loginUser = async ({ identifier, password }) => {
       body: JSON.stringify({ identifier, password })
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = {
+        success: false,
+        message: res.status >= 500 ? 'Lỗi máy chủ nội bộ. Vui lòng thử lại sau.' : text || 'Phản hồi không hợp lệ từ máy chủ.'
+      };
+    }
     return data;
   } catch (error) {
     console.error('Lỗi API login:', error);
@@ -171,3 +180,4 @@ export const updateCurrentUser = async (token, userData) => {
     return { success: false, message: 'Lỗi mạng khi cập nhật hồ sơ' };
   }
 };
+

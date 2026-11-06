@@ -138,7 +138,7 @@ router.get('/branches', async (req, res) => {
   }
 });
 
-router.get('/room-types', async (req, res) => {
+router.get(['/room-types', '/types'], async (req, res) => {
   try {
     const list = await RoomType.findAll({
       where: { Status: 'Active', IsDeleted: false },
@@ -568,7 +568,7 @@ const handleUpdateRoom = async (req, res) => {
     if (!room) {
       return res.status(404).json({
         success: false,
-        message: 'Phòng không tồn tại hoặc đã bị xóa!',
+        message: 'Phòng không tồn tại hoặc đã bị xóa, cần load lại trang!',
         isRecordDeleted: true,
       });
     }
@@ -765,7 +765,7 @@ const handleDeleteRoom = async (req, res) => {
     if (!room) {
       return res.status(404).json({
         success: false,
-        message: 'Phòng không tồn tại hoặc đã bị xóa!',
+        message: 'Phòng không tồn tại hoặc đã bị xóa, cần load lại trang!',
         isRecordDeleted: true,
       });
     }
@@ -1041,7 +1041,7 @@ const handleSingleStatusUpdate = async (req, res) => {
     if (!room) {
       return res.status(404).json({
         success: false,
-        message: 'Phòng không tồn tại hoặc đã bị xóa!',
+        message: 'Phòng không tồn tại hoặc đã bị xóa, cần load lại trang!',
         isRecordDeleted: true,
       });
     }

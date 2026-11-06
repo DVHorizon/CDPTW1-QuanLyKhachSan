@@ -30,6 +30,8 @@ const {
   Stay,
   Payment,
   Invoice,
+  Review,
+  ReviewPhoto,
   InvoiceDetail,
   User
 } = require('../models');
@@ -173,6 +175,7 @@ exports.getMyBookings = async (req, res) => {
           model: Stay,
           attributes: ['StayId', 'RoomId', 'ActualCheckIn', 'ExpectedCheckOut', 'ActualCheckOut', 'Status', 'DepositAmount'],
           include: [
+            { model: Review, as: 'review', include: [{ model: ReviewPhoto, as: 'photos' }] },
             {
               model: Room,
               attributes: ['RoomId', 'RoomNumber', 'Floor', 'BranchId'],
@@ -221,6 +224,7 @@ exports.getMyBookings = async (req, res) => {
       const primaryGuest = (bJson.guests && bJson.guests.find((g) => g.IsPrimaryGuest)) || (bJson.guests && bJson.guests[0]) || null;
       const stay = (bJson.Stays && bJson.Stays[0]) || null;
       const assignedRoom = stay && stay.Room ? stay.Room : null;
+      const review = stay && stay.review ? stay.review : null;
       const branch = assignedRoom && assignedRoom.branch ? assignedRoom.branch : null;
 
       // Tính tổng số tiền đã thanh toán (qua Payments)
@@ -252,6 +256,7 @@ exports.getMyBookings = async (req, res) => {
         hoursUntilCheckIn: Math.round(hoursUntilCheckIn * 10) / 10,
         isEligibleForFullRefund: hoursUntilCheckIn >= 72,
         note: bJson.Note,
+        bookingQrCode: bJson.BookingQrCode || null,
         createdAt: bJson.CreatedAt,
         roomType: bJson.roomType,
         primaryGuest,
@@ -271,7 +276,9 @@ exports.getMyBookings = async (req, res) => {
           : null,
         payments: bJson.payments || [],
         invoices: bJson.Invoices || [],
-        stays: bJson.Stays || []
+        stays: bJson.Stays || [],
+        review: review || null,
+        hasReviewed: Boolean(review)
       };
     });
 
@@ -344,6 +351,7 @@ exports.getMyBookingDetail = async (req, res) => {
         {
           model: Stay,
           include: [
+            { model: Review, as: 'review', include: [{ model: ReviewPhoto, as: 'photos' }] },
             {
               model: Room,
               include: [{ model: Branch, as: 'branch' }]
@@ -400,12 +408,15 @@ exports.getMyBookingDetail = async (req, res) => {
         hoursUntilCheckIn: Math.round(hoursUntilCheckIn * 10) / 10,
         isEligibleForFullRefund: hoursUntilCheckIn >= 72,
         note: bJson.Note,
+        bookingQrCode: bJson.BookingQrCode || null,
         createdAt: bJson.CreatedAt,
         roomType: bJson.roomType,
         guests: bJson.guests || [],
         primaryGuest,
         assignedRoom,
         branch,
+        review: (bJson.Stays && bJson.Stays[0] && bJson.Stays[0].review) || null,
+        hasReviewed: Boolean(bJson.Stays && bJson.Stays[0] && bJson.Stays[0].review),
         payments: bJson.payments || [],
         invoices: bJson.Invoices || [],
         stays: bJson.Stays || []

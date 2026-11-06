@@ -410,73 +410,34 @@ export default function BookingEngine() {
 
   return (
     <div className="bg-[#f8f9ff] min-h-screen flex flex-col font-sans text-[#0b1c30]">
-      {/* Universal Luxury Navigation */}
+      {/* Thanh Header chính */}
       <Header />
 
       <main className="w-full pt-24 bg-[#f8f9ff] flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        {/* Banner editorial context */}
-        <div className="relative w-full rounded-2xl overflow-hidden shadow-xl mb-8 bg-[#131b2e] text-white">
-          <div 
-            className="absolute inset-0 opacity-30 bg-cover bg-center mix-blend-luminosity" 
-            style={{ backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuBpNvT_tiMvztgtaSSXZSbJZeHcO4CmTIga0KvWFTw2qD-CStV5suuUS4Z2BWH-3jkJTnxwXJWeg2Rl-Nfq9_tTtZTp3Qy0ydhGI93HgyaNXRsIhp07rRsE9NeNUx9pj-cOPVbD-f5JqzJt8dnrur5ybGlqT3uJJHlj4yPwLqOHcouLTBMDTG6-Iff-r8JvaXCDjhtgFS3t3v_6ze3zdog3V1Qcw5WFHdUb80txiDk7BOINf_NvKDBq')` }}
-          />
-          <div className="relative z-10 p-6 sm:p-8 md:p-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#fedeb2] text-[#78603e] text-xs font-bold uppercase tracking-wider">
-                <span className="material-symbols-outlined text-[16px]">stars</span>
-                <span>ĐẶC QUYỀN HỘI VIÊN GOLD</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight">
-                Hoàn Tất Yêu Cầu Đặt Phòng
-              </h1>
-              <p className="text-sm sm:text-base text-[#bec6e0] max-w-xl">
-                Trải nghiệm kỳ nghỉ dưỡng an nhiên tại bán đảo riêng tư với những dịch vụ cá nhân hóa chuẩn mực 5 sao quốc tế.
-              </p>
-            </div>
-            <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md px-5 py-3.5 rounded-xl text-white shrink-0 border border-white/15">
-              <span className="material-symbols-outlined text-[#fedeb2] text-[32px]">verified_user</span>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-[#fedeb2]">Giá Đảm Bảo Tốt Nhất</div>
-                <div className="text-xs text-[#cbdbf5]">Xác nhận trực tiếp từ khu nghỉ dưỡng</div>
-              </div>
+        {/* Thanh tiêu đề phòng & Quy trình đặt phòng thu nhỏ ở góc phải (Style Traveloka) */}
+        <div className="flex flex-wrap items-center justify-between gap-4 py-3 mb-6 bg-white px-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          {/* Thông tin phòng đặt */}
+          <div className="space-y-0.5">
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">
+              {roomDisplayName}
+            </h1>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <span className="flex text-amber-500 text-[13px]">⭐⭐⭐⭐⭐</span>
+              <span className="font-bold text-[#0064d2] bg-blue-50 px-1.5 py-0.5 rounded text-[11px]">9.4/10</span>
+              <span className="text-slate-400 text-[11px]">(355 đánh giá thực tế)</span>
             </div>
           </div>
-        </div>
 
-        {/* Stepper Progress Bar (Chuẩn 3 Bước: 1. Chọn ngày & phòng -> 2. Thanh toán cọc -> 3. Hoàn tất) */}
-        <div className="mb-8 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative">
-            {/* Step 1 - Active */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-[#eff4ff] text-[#0b1c30] border border-blue-100">
-              <div className="w-8 h-8 rounded-full bg-[#725b38] text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
-                1
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase text-[#725b38]">Bước 1</div>
-                <div className="text-sm truncate font-bold text-[#0b1c30]">Chọn ngày &amp; phòng</div>
-              </div>
+          {/* Quy trình đặt phòng thu nhỏ ở góc phải chuẩn hình Traveloka: 1 Xem lại ── 2 Thanh toán */}
+          <div className="flex items-center gap-2.5 text-xs sm:text-sm font-medium">
+            <div className="flex items-center gap-1.5 text-[#0064d2] font-bold">
+              <span className="w-6 h-6 rounded-full bg-[#0064d2] text-white flex items-center justify-center text-xs font-bold shadow-xs">1</span>
+              <span>Xem lại</span>
             </div>
-
-            {/* Step 2 */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-500 opacity-80 border border-transparent">
-              <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm shrink-0">
-                2
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase text-slate-400">Bước 2</div>
-                <div className="text-sm truncate font-medium text-slate-600">Thanh toán cọc</div>
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-400 opacity-60 border border-transparent">
-              <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm shrink-0">
-                3
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase text-slate-400">Bước 3</div>
-                <div className="text-sm truncate font-medium">Hoàn tất kỳ nghỉ</div>
-              </div>
+            <span className="text-slate-400 w-4 border-t border-slate-400"></span>
+            <div className="flex items-center gap-1.5 text-slate-600 font-semibold">
+              <span className="w-6 h-6 rounded-full bg-slate-600 text-white flex items-center justify-center text-xs font-bold">2</span>
+              <span>Thanh toán</span>
             </div>
           </div>
         </div>
@@ -624,140 +585,100 @@ export default function BookingEngine() {
               )}
             </section>
 
-            {/* Section 1: Guest Information */}
-            <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-6 bg-[#725b38] rounded-full inline-block"></span>
-                  <h2 className="font-serif text-xl font-bold text-slate-900">Thông Tin Khách Lưu Trú Chính</h2>
+            {/* Section 1: Thông tin Khách hàng & Liên hệ đặt chỗ (Chuẩn tối giản theo yêu cầu) */}
+            <div className="space-y-5">
+              {/* Khối 1: Thông tin Khách hàng */}
+              <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="material-symbols-outlined text-slate-800 text-[22px]">person</span>
+                  <h2 className="text-lg font-bold text-slate-900">Thông tin Khách hàng</h2>
                 </div>
-                <span className="inline-flex items-center gap-1 text-xs text-[#725b38] bg-[#eff4ff] px-3 py-1 rounded-full font-medium">
-                  <span className="material-symbols-outlined text-[16px]">lock</span>
-                  Bảo mật SSL 256-bit
-                </span>
-              </div>
+                <p className="text-xs text-slate-500 mb-4">Vui lòng điền đầy đủ các thông tin để nhận xác nhận đơn hàng</p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="last-name">
-                    Họ đệm *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">person</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="last-name">
+                      Họ (vd: NGUYEN)<span className="text-rose-500">*</span>
+                    </label>
                     <input 
                       id="last-name"
                       type="text"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Nguyễn Văn"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
+                      placeholder=""
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:border-transparent transition-all"
                       required
                     />
+                    <p className="text-[11px] text-slate-400 mt-1">như trên CMND (không dấu)</p>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="first-name">
-                    Tên chính *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">person</span>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="first-name">
+                      Chữ đệm và tên (vd: VAN ANH)<span className="text-rose-500">*</span>
+                    </label>
                     <input 
                       id="first-name"
                       type="text"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="An"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
+                      placeholder=""
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:border-transparent transition-all"
                       required
                     />
+                    <p className="text-[11px] text-slate-400 mt-1">như trên CMND (không dấu)</p>
                   </div>
                 </div>
+              </section>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="email">
-                    Địa chỉ Email nhận thư xác nhận *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">mail</span>
+              {/* Khối 2: Liên hệ đặt chỗ */}
+              <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="material-symbols-outlined text-slate-800 text-[20px]">mail</span>
+                  <h2 className="text-lg font-bold text-slate-900">Liên hệ đặt chỗ</h2>
+                </div>
+                <p className="text-xs text-slate-500 mb-4">Thêm liên hệ để nhận xác nhận đặt chỗ.</p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="email">
+                      Email<span className="text-rose-500">*</span>
+                    </label>
                     <input 
                       id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="an.nguyen@grandhorizon.vn"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
+                      placeholder="email_cua_ban@gmail.com"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:border-transparent transition-all"
                       required
                     />
+                    <p className="text-[11px] text-slate-400 mt-1">VD: email@example.com</p>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="phone">
-                    Số điện thoại liên lạc *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">call</span>
-                    <input 
-                      id="phone"
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="+84 908 123 456"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
-                      required
-                    />
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="phone">
+                      Điện thoại di động<span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between px-3 py-2.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-700 text-sm shrink-0 min-w-[76px]">
+                        <span>+84</span>
+                        <span className="material-symbols-outlined text-[16px] text-slate-400">expand_more</span>
+                      </div>
+                      <input 
+                        id="phone"
+                        type="tel"
+                        value={phoneNumber.replace(/^\+84\s?/, '')}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        placeholder=""
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:border-transparent transition-all"
+                        required
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">Nhập số điện thoại không bao gồm mã điện thoại quốc gia/khu vực đã chọn</p>
                   </div>
                 </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="arrival-time">
-                    Khung giờ dự kiến đến khách sạn
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">schedule</span>
-                    <select
-                      id="arrival-time"
-                      value={estimatedArrivalTime}
-                      onChange={(e) => setEstimatedArrivalTime(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
-                    >
-                      <option value="14:00 - Tiêu chuẩn nhận phòng">14:00 - Tiêu chuẩn nhận phòng</option>
-                      <option value="15:00 - 17:00 - Khung giờ chiều">15:00 - 17:00 - Khung giờ chiều</option>
-                      <option value="18:00 - Early Evening Reception">18:00 - Early Evening Reception (Khuyên dùng)</option>
-                      <option value="Sau 20:00 - Nhận phòng muộn">Sau 20:00 - Nhận phòng đêm / Đón muộn</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="special-requests">
-                    Ghi chú đặc biệt cho Quản Gia &amp; Lễ Tân
-                  </label>
-                  <textarea 
-                    id="special-requests"
-                    rows="3"
-                    value={specialRequests}
-                    onChange={(e) => setSpecialRequests(e.target.value)}
-                    placeholder="Ví dụ: Giờ bay dự kiến, yêu cầu nôi em bé, chế độ ăn kiêng hoặc trang trí phòng kỷ niệm ngày cưới..."
-                    className="w-full p-3 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all resize-none"
-                    maxLength={500}
-                  />
-                  <div className="text-right text-[11px] text-slate-400 mt-1">
-                    {specialRequests.length}/500 ký tự
-                  </div>
-                </div>
-
-                {/* Default Bed & Room Configuration Info */}
-                <div className="sm:col-span-2 p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between text-xs text-slate-700">
-                  <div className="flex items-center gap-2.5">
-                    <span className="material-symbols-outlined text-[#725b38] text-[20px]">king_bed</span>
-                    <span>Quy cách giường mặc định: <strong className="text-slate-900 font-semibold">1 Giường King Lớn</strong> (Đệm lông vũ cao cấp 2m0 × 2m2) • <strong className="text-slate-900 font-semibold">Khu vực không hút thuốc</strong></span>
-                  </div>
-                  <span className="text-slate-400 text-[11px] hidden md:inline">Nếu cần 2 giường đơn (Twin), quý khách vui lòng ghi chú bên trên</span>
-                </div>
-              </div>
-            </section>
+              </section>
+            </div>
 
             {/* Section 3: Add-on Experiences (Enhance Your Stay) */}
             <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
@@ -1020,8 +941,8 @@ export default function BookingEngine() {
             </section>
           </div>
 
-          {/* RIGHT COLUMN: Sticky Summary & Breakdown Card (4-5 cols) */}
-          <div className="lg:col-span-5 xl:col-span-4 sticky top-28">
+          {/* RIGHT COLUMN: Summary & Breakdown Card (4-5 cols) */}
+          <div className="lg:col-span-5 xl:col-span-4">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
               
               {/* Room Card Image */}
@@ -1079,17 +1000,62 @@ export default function BookingEngine() {
 
                 {/* Calculation List */}
                 <div className="space-y-2.5 text-xs sm:text-sm text-slate-600 border-b border-slate-100 pb-4">
-                  {/* Tiền phòng gốc */}
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-medium text-slate-800">Tiền phòng gốc</div>
-                      <div className="text-[11px] text-slate-400">
-                        {pricingData?.numberOfNights || numberOfNights} đêm × {formatMoney(pricingData?.baseRate || basePricePerNight, pricingData?.currency)} × {unitsAllocated} phòng
+                  {/* FEAT-GUEST-12 (A12) / Hình 12: Tiền phòng linh hoạt theo thời điểm */}
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-medium text-slate-800">
+                          <div className="leading-snug">{pricingData?.appliedRule ? "Tiền phòng theo thời điểm" : "Tiền phòng gốc"}</div>
+                          {pricingData?.appliedRule && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                                ⚡ {pricingData.appliedRule.RuleName || "Giá linh hoạt"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                          <span>
+                            {pricingData?.numberOfNights || numberOfNights} đêm × {formatMoney(pricingData?.baseRate || basePricePerNight, pricingData?.currency)} {unitsAllocated > 1 ? `× ${unitsAllocated} phòng` : ""}
+                          </span>
+                          {pricingData?.originalBaseRate && Math.round(pricingData.baseRate) !== Math.round(pricingData.originalBaseRate) && (
+                            <span className="line-through text-slate-400 text-[10px]">
+                              {formatMoney(pricingData.originalBaseRate, pricingData?.currency)}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <span className="font-semibold text-slate-900">
+                        {formatMoney(pricingData?.roomSubtotal || roomSubtotal, pricingData?.currency)}
+                      </span>
                     </div>
-                    <span className="font-semibold text-slate-900">
-                      {formatMoney(pricingData?.roomSubtotal || roomSubtotal, pricingData?.currency)}
-                    </span>
+
+                    {/* Breakdown từng đêm theo ngày thường, cuối tuần (+15%), ngày lễ */}
+                    {pricingData?.dailyBreakdown && pricingData.dailyBreakdown.length > 0 && (
+                      <div className="mt-2 bg-slate-50/90 rounded-lg p-2 border border-slate-200/60 space-y-1">
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          <span>Lịch giá từng đêm</span>
+                          <span>Đơn giá/đêm</span>
+                        </div>
+                        {pricingData.dailyBreakdown.map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600">
+                            <span className="flex items-center gap-1">
+                              <span className="font-mono text-slate-500">{item.date}</span>
+                              {item.isHoliday ? (
+                                <span className="px-1 py-0.2 bg-rose-100 text-rose-700 text-[9px] rounded font-bold">Lễ/Tết</span>
+                              ) : item.isWeekend ? (
+                                <span className="px-1 py-0.2 bg-amber-100 text-amber-800 text-[9px] rounded font-bold">Cuối tuần +15%</span>
+                              ) : (
+                                <span className="text-slate-400 text-[10px]">(Thường)</span>
+                              )}
+                            </span>
+                            <span className="font-medium text-slate-800">
+                              {formatMoney(item.rate, pricingData?.currency)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Phụ thu khách phát sinh vượt chuẩn */}
