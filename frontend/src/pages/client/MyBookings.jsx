@@ -463,6 +463,7 @@ export default function MyBookings() {
                         </div>
 
                         {/* Action Buttons Grid */}
+                        {/* Action Buttons Grid */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 border-t border-[#d3e4fe]/40 mt-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <button
