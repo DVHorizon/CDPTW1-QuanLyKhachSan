@@ -1,0 +1,118 @@
+================================================================================
+HUONG DAN QUY TRINH KHOI DONG & VAN HANH HE THONG DUAL SEARCH ENGINE
+(APACHE SOLR 10.1.0 & ELASTICSEARCH 9.5.6)
+Du an: He Thong Quan Ly Khach San Grand Horizon
+================================================================================
+
+I. TONG QUAN KIEN TRUC TIM KIEM (DUAL ENGINE)
+--------------------------------------------------------------------------------
+He thong tich hop song song 2 co may tim kiem chuyen nghiep hang dau hien nay:
+1. Apache Solr 10.1.0 (Port: 8983)
+   - Collection name: hotel_rooms
+   - Parser: eDisMax da truong (name, description, amenities)
+   - Thuat toan: BM25 ket hop Exact Phrase, Prefix Wildcard (*), Fuzzy Matching.
+2. Elasticsearch 9.5.6 (Port: 9200)
+   - Index name: room_types
+   - Thuat toan: BM25, Multi-match, Fuzziness AUTO, Score Cutoff 35%.
+3. Dong bo du lieu:
+   - 1.000 phong khach san tu MySQL duoc dong bo dong thoi sang ca Solr & Elasticsearch.
+4. Co che Failover & Chuan hoa ky tu:
+   - Tu dong fallback neu 1 trong 2 co may tam thoi gap su co.
+   - Ho tro chuan hoa Unicode Zenkaku (Full-width / Toan giac) sang Half-width (Ban giac).
+
+================================================================================
+II. CACH 1: KHOI DONG 1-CLICK (KHUYEN DUNG NHAT - NHANH & TIEN LOI)
+--------------------------------------------------------------------------------
+Trong thu muc du an da duoc tich hop san script tu dong:
+
+1. Buoc 1: Vao thu muc `scripts/`
+2. Buoc 2: Chay file `start-all.bat` bang cach:
+   - Double click vao file `scripts/start-all.bat`
+   - Hoac mo Terminal/CMD tai thu muc goc du an va go:
+     .\scripts\start-all.bat
+
+3. Tac vu ma script tu dong thuc hien:
+   [1] Khoi dong Apache Solr 10.1 tai background tren cong 8983.
+   [2] Khoi dong Elasticsearch 9.5 tai background tren cong 9200.
+   [3] Khoi dong Docker Compose: MySQL (3306), Backend (5000), Frontend (3000), phpMyAdmin (8080).
+
+================================================================================
+III. CACH 2: KHOI DONG THU CONG TUNG THANH PHAN (KHI CAN DEBUG / TEST)
+--------------------------------------------------------------------------------
+Neu ban can bat tung dich vu rieng biet de xem log chi tiet:
+
+1. KHOI DONG APACHE SOLR:
+   - Mo CMD hoac PowerShell:
+     cd "D:\SEARCH ENGINE\Solr\solr-10.1.0\solr-10.1.0\bin"
+     solr.cmd start
+   - Kiem tra tren trinh duyet:
+     http://localhost:8983/solr
+
+2. KHOI DONG ELASTICSEARCH:
+   - Mo CMD hoac PowerShell moi:
+     cd "D:\SEARCH ENGINE\ElasticSearch\elasticsearch-9.5.6-windows-x86_64\elasticsearch-9.5.6\bin"
+     elasticsearch.bat
+   - Kiem tra tren trinh duyet hoac curl:
+     http://localhost:9200
+
+3. KHOI DONG DOCKER CHO HE THONG (MYSQL, BACKEND, FRONTEND):
+   - Mo CMD tai thu muc goc du an (`D:\CDPTW1-QuanLyKhachSan`):
+     docker compose up -d
+
+================================================================================
+IV. DONG BO DU LIEU SANG CA 2 ENGINE (SEED / SYNC DATA)
+--------------------------------------------------------------------------------
+Khi database MySQL co them phong moi hoac ban muon nap lai 1.000 phong mau vao
+ca Solr va Elasticsearch:
+
+1. Chay lenh dong bo ben trong container Backend:
+   docker exec -it hotel_backend node src/seeders/syncBothEngines.js
+
+2. Ket qua hien thi thanh cong:
+   - MySQL: Doc du lieu 1.000 phong
+   - Apache Solr: Index thanh cong 1000/1000 tai lieu vao collection 'hotel_rooms'
+   - Elasticsearch: Bulk index thanh cong 1000/1000 tai lieu vao index 'room_types'
+
+================================================================================
+V. CAC DIA CHI TRUY CAP & KIEM TRA HE THONG
+--------------------------------------------------------------------------------
+- Giao dien nguoi dung (Frontend):  http://localhost:3000/rooms
+- May chu API (Backend):            http://localhost:5000
+- Bang quan tri Apache Solr:        http://localhost:8983/solr
+- Endpoint kiem tra Elasticsearch:  http://localhost:9200
+- Quan tri co so du lieu (phpMyAdmin): http://localhost:8080 (User: root / Pass: de trong)
+
+================================================================================
+VI. HUONG DAN TEST CAC TINH NANG NANG CAO
+--------------------------------------------------------------------------------
+1. Test tim kiem phong cu the (chinh xac 1 phong duy nhat):
+   - Tu khoa: "Phòng Neymar Hướng Biển"
+   - Ket qua: Chi tra ve dung 1 phong duy nhat nho bo loc nguong diem (Score Cutoff 35%),
+     khong bi keo theo 19 phong trung tu phu.
+
+2. Test chong loi go thieu / go sai chinh ta (Fuzzy & Wildcard):
+   - Tu khoa: "Neym", "Delux", "Vila"
+   - Ket qua: He thong tu dong nhan dien va tra dung "Phòng Neymar", "Deluxe", "Villa".
+
+3. Test ky tu Full-width / Toan giac (CJK / Tieng Nhat / Ban phim dac biet):
+   - Tu khoa: "Ｄｅｌｕｘｅ" (Full-width)
+   - Ket qua: He thong tu dong chuyen thanh "Deluxe" va tra ve danh sach phong Deluxe.
+
+4. Test tim kiem theo engine qua API:
+   - Goi Solr:          http://localhost:5000/api/rooms/search?keyword=Deluxe&engine=solr
+   - Goi Elasticsearch: http://localhost:5000/api/rooms/search?keyword=Deluxe&engine=elasticsearch
+
+================================================================================
+VII. CACH TAT HE THONG KHI DUNG XONG
+--------------------------------------------------------------------------------
+1. Tat Apache Solr:
+   cd "D:\SEARCH ENGINE\Solr\solr-10.1.0\solr-10.1.0\bin"
+   solr.cmd stop -all
+
+2. Tat Elasticsearch:
+   Nhan Ctrl + C tai cua so console chay Elasticsearch, hoac dong cua so CMD.
+
+3. Tat Docker:
+   cd "D:\CDPTW1-QuanLyKhachSan"
+   docker compose down
+================================================================================
