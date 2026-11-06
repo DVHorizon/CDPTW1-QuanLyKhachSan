@@ -2,6 +2,8 @@
 
 const { searchRooms: searchES } = require('../services/esSearchService');
 const solrClient = require('../config/solr');
+const { RoomType, Amenity } = require('../models');
+const { Op } = require('sequelize');
 
 /**
  * CJKWidthCharFilter: Chuẩn hóa toàn diện Full-width (Zenkaku 全角) <-> Half-width (Hankaku 半角)
@@ -41,6 +43,66 @@ async function unifiedSearchRooms(req, res) {
   const selectedEngine = (engine || 'elasticsearch').toLowerCase().trim();
 
   try {
+    // ------------------------------------------------------------------
+    // NHÁNH 0: CHẾ ĐỘ THƯỜNG (MYSQL DATABASE)
+    // ------------------------------------------------------------------
+    if (selectedEngine === 'standard' || selectedEngine === 'normal' || selectedEngine === 'thuong' || selectedEngine === 'database' || selectedEngine === 'db') {
+      const whereClause = {
+        IsDeleted: false
+      };
+
+      if (cleanKeyword) {
+        whereClause[Op.or] = [
+          { TypeName: { [Op.like]: `%${cleanKeyword}%` } },
+          { Description: { [Op.like]: `%${cleanKeyword}%` } }
+        ];
+      }
+
+      if (maxPrice) {
+        whereClause.BasePrice = { [Op.lte]: Number(maxPrice) };
+      }
+
+      const cap = capacity || adults;
+      if (cap) {
+        whereClause.AdultCapacity = { [Op.gte]: Number(cap) };
+      }
+
+      const roomTypes = await RoomType.findAll({
+        where: whereClause,
+        include: [
+          {
+            model: Amenity,
+            as: 'amenityList',
+            through: { attributes: [] },
+            required: false
+          }
+        ],
+        limit: 20
+      });
+
+      const executionTimeMs = Date.now() - startTime;
+      const formattedData = roomTypes.map(r => ({
+        RoomTypeId: r.RoomTypeId,
+        TypeName: r.TypeName,
+        Description: r.Description,
+        BasePrice: r.BasePrice,
+        AdultCapacity: r.AdultCapacity,
+        Amenities: Array.isArray(r.amenityList) ? r.amenityList.map(a => a.Name || a.AmenityName).join(', ') : ''
+      }));
+
+      return res.status(200).json({
+        success: true,
+        engine: 'MySQL Database (Chế độ thường)',
+        activeEngine: 'standard',
+        originalKeyword: keyword || '',
+        normalizedKeyword: cleanKeyword,
+        isFullWidthInput,
+        executionTimeMs,
+        total: formattedData.length,
+        data: formattedData
+      });
+    }
+
     // ------------------------------------------------------------------
     // A. NHÁNH 1: APACHE SOLR
     // ------------------------------------------------------------------
@@ -96,10 +158,11 @@ async function unifiedSearchRooms(req, res) {
     const esResults = await searchES(cleanKeyword, { maxPrice, adults: adults || capacity });
     const executionTimeMs = Date.now() - startTime;
 
+    const isDual = selectedEngine === 'dual' || selectedEngine === 'auto';
     return res.status(200).json({
       success: true,
-      engine: 'Elasticsearch 9.5.6',
-      activeEngine: 'elasticsearch',
+      engine: isDual ? 'Dual Engine (Elasticsearch 9.5 & Solr 10.1)' : 'Elasticsearch 9.5.6',
+      activeEngine: isDual ? 'dual' : 'elasticsearch',
       originalKeyword: keyword || '',
       normalizedKeyword: cleanKeyword,
       isFullWidthInput,
