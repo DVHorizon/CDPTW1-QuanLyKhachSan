@@ -17,6 +17,8 @@
  */
 
 const { Op } = require('sequelize');
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../middlewares/authMiddleware');
 const {
   sequelize,
   Review,
@@ -55,6 +57,15 @@ const ERROR_MESSAGES = {
 function resolveUserId(req) {
   if (req.user && (req.user.userId || req.user.id || req.user.UserId)) {
     return Number(req.user.userId || req.user.id || req.user.UserId);
+  }
+  if (req.headers && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    try {
+      const token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      if (decoded && (decoded.userId || decoded.id || decoded.UserId)) {
+        return Number(decoded.userId || decoded.id || decoded.UserId);
+      }
+    } catch (_) {}
   }
   if (req.headers && req.headers['x-user-id']) {
     return Number(req.headers['x-user-id']);

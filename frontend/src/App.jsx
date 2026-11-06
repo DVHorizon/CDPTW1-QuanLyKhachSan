@@ -34,6 +34,7 @@ import RoomAssignment from './pages/admin/RoomAssignment';
 import CheckInDesk from './pages/admin/CheckInDesk';
 import CheckOutDesk from './pages/admin/CheckOutDesk';
 import FnbReview from './pages/client/FnbReview';
+import RoomReview from './pages/client/RoomReview';
 import MockPaymentGateway from './pages/client/MockPaymentGateway';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ExtendStayAndMove from './pages/admin/ExtendStayAndMove';
@@ -79,6 +80,13 @@ function App() {
             <Route path="/lich-su-dat-mon" element={<GuestOrderHistory />} />
             <Route path="/fnb/danh-gia" element={<FnbReview />} />
             <Route path="/danh-gia" element={<FnbReview />} />
+            {/* FEAT-GUEST-11: Room Review & Rating (Màn hình 10 - Post-Stay Evaluation & Verified Guest Review) */}
+            <Route path="/rooms/:roomId/reviews/new" element={<RoomReview />} />
+            <Route path="/rooms/:roomId/review" element={<RoomReview />} />
+            <Route path="/reviews/new" element={<RoomReview />} />
+            <Route path="/danh-gia-phong" element={<RoomReview />} />
+            <Route path="/danh-gia-phong/:roomId" element={<RoomReview />} />
+            <Route path="/danh-gia-ky-nghi" element={<RoomReview />} />
             <Route path="/fnb/dat-ban" element={<TableReservation />} />
             <Route path="/dat-ban" element={<TableReservation />} />
             <Route path="/profile" element={<Profile />} />

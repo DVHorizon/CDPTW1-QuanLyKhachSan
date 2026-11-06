@@ -50,4 +50,10 @@ router.get('/branches',              roomSearchController.getBranches);
 const bookingQrNotificationController = require('../../controllers/bookingQrNotificationController');
 router.get('/bookings/:bookingId/qr-code', bookingQrNotificationController.getBookingQRCode);
 router.post('/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
+
+// ─── TÍNH NĂNG 11: ĐÁNH GIÁ VÀ CHẤM ĐIỂM SAO PHÒNG LƯU TRÚ (FEAT-GUEST-11 / A11) ───
+const roomReviewController = require('../../controllers/roomReviewController');
+router.post('/rooms/:roomId/reviews', roomReviewController.createRoomReview);
+router.get('/rooms/:roomId/reviews', roomReviewController.getRoomReviews);
+
 module.exports = router;
