@@ -180,7 +180,7 @@ const login = async (req, res) => {
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
        LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
-       WHERE (u.Email = ? OR u.Phone = ?) AND u.IsDeleted = 0
+       WHERE (u.Email = ? OR u.Phone = ?) AND (u.IsDeleted = 0 OR u.IsDeleted IS NULL)
        LIMIT 1`,
       [cleanIdentifier.toLowerCase(), cleanIdentifier]
     );
