@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+  import React, { useState, useEffect, useMemo } from 'react';
 import AdminLayout from '../../../components/admin/layout/AdminLayout';
 
 const MIcon = ({ name, className = 'w-4 h-4' }) => (
@@ -756,20 +756,31 @@ const PoliceDeclarationExport = () => {
         if (!match) return false;
       }
 
-      if (groupFilter === 'INTERNATIONAL' && !item.isForeigner) return false;
-      if (groupFilter === 'DOMESTIC' && item.isForeigner) return false;
+      const itemIsForeigner = Boolean(
+        item.isForeigner || (item.nationalityCode && item.nationalityCode !== 'VNM')
+      );
+      const itemIsPhuQuoc30D = Boolean(
+        item.isPhuQuocVisaFree ||
+          String(item.visaType || '')
+            .toLowerCase()
+            .includes('phú quốc')
+      );
+
+      if (groupFilter === 'INTERNATIONAL' && !itemIsForeigner) return false;
+      if (groupFilter === 'DOMESTIC' && itemIsForeigner) return false;
 
       if (statusFilter !== 'ALL' && item.status !== statusFilter) return false;
 
-      if (quickFilter === 'FOREIGN_A08' && !item.isForeigner) return false;
-      if (quickFilter === 'VN_CITIZEN' && item.isForeigner) return false;
+      if (quickFilter === 'FOREIGN_A08' && !itemIsForeigner) return false;
+      if (quickFilter === 'VN_CITIZEN' && itemIsForeigner) return false;
       if (
         quickFilter === 'INCOMPLETE' &&
         item.status !== 'MISSING_VISA' &&
         item.status !== 'PENDING_SIGN'
       )
         return false;
-      if (quickFilter === 'PHU_QUOC_30D' && !item.isPhuQuocVisaFree) return false;
+      if (quickFilter === 'PHU_QUOC_30D' && !itemIsPhuQuoc30D)
+        return false;
 
       return true;
     });
@@ -780,22 +791,91 @@ const PoliceDeclarationExport = () => {
     [declarations]
   );
 
-  const pendingVisaCount = useMemo(() => {
-    const missingInList = declarations.filter(
-      (d) => d.status === 'MISSING_VISA'
-    ).length;
-    return missingInList > 0 ? 4 : 3;
-  }, [declarations]);
+  const totalGuestsCount = declarations.length;
 
-  const validDocsCount = useMemo(() => {
-    const extraAdded = Math.max(0, declarations.length - INITIAL_DECLARATIONS.length);
-    return 244 + extraAdded;
-  }, [declarations]);
+  const inHouseRoomsCount = useMemo(
+    () => new Set(declarations.map((d) => String(d.roomNumber || '').trim()).filter(Boolean)).size,
+    [declarations]
+  );
 
-  const totalGuestsCount = useMemo(() => {
-    const extraAdded = Math.max(0, declarations.length - INITIAL_DECLARATIONS.length);
-    return 248 + extraAdded;
-  }, [declarations]);
+  const foreignGuestsCount = useMemo(
+    () =>
+      declarations.filter(
+        (d) => d.isForeigner || (d.nationalityCode && d.nationalityCode !== 'VNM')
+      ).length,
+    [declarations]
+  );
+
+  const foreignNationalitiesCount = useMemo(
+    () =>
+      new Set(
+        declarations
+          .filter(
+            (d) => d.isForeigner || (d.nationalityCode && d.nationalityCode !== 'VNM')
+          )
+          .map((d) => d.nationalityCode)
+      ).size,
+    [declarations]
+  );
+
+  const foreignPercent = useMemo(
+    () =>
+      totalGuestsCount > 0
+        ? ((foreignGuestsCount / totalGuestsCount) * 100).toFixed(1)
+        : '0.0',
+    [foreignGuestsCount, totalGuestsCount]
+  );
+
+  const vnCitizensCount = useMemo(
+    () =>
+      declarations.filter(
+        (d) => !d.isForeigner && (!d.nationalityCode || d.nationalityCode === 'VNM')
+      ).length,
+    [declarations]
+  );
+
+  const pendingVisaCount = useMemo(
+    () =>
+      declarations.filter(
+        (d) => d.status === 'MISSING_VISA' || d.status === 'PENDING_SIGN'
+      ).length,
+    [declarations]
+  );
+
+  const missingVisaOnlyCount = useMemo(
+    () => declarations.filter((d) => d.status === 'MISSING_VISA').length,
+    [declarations]
+  );
+
+  const pendingSignOnlyCount = useMemo(
+    () => declarations.filter((d) => d.status === 'PENDING_SIGN').length,
+    [declarations]
+  );
+
+  const validDocsCount = useMemo(
+    () => declarations.filter((d) => d.status !== 'MISSING_VISA').length,
+    [declarations]
+  );
+
+  const validDocsPercent = useMemo(
+    () =>
+      totalGuestsCount > 0
+        ? ((validDocsCount / totalGuestsCount) * 100).toFixed(1)
+        : '100.0',
+    [validDocsCount, totalGuestsCount]
+  );
+
+  const phuQuocVisaFreeCount = useMemo(
+    () =>
+      declarations.filter(
+        (d) =>
+          d.isPhuQuocVisaFree ||
+          String(d.visaType || '')
+            .toLowerCase()
+            .includes('phú quốc')
+      ).length,
+    [declarations]
+  );
 
   const handleToggleSelect = (id, e) => {
     e.stopPropagation();
@@ -1337,7 +1417,7 @@ ${guestNodes}
               <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-500">Quy mô phòng in-house:</span>
                 <span className="font-bold text-emerald-800">
-                  142 phòng (84% OCC)
+                  {inHouseRoomsCount} phòng đang lưu trú
                 </span>
               </div>
             </div>
@@ -1358,15 +1438,19 @@ ${guestNodes}
                   className="text-3xl font-bold text-slate-900"
                   style={{ fontFamily: 'Georgia, serif' }}
                 >
-                  116
+                  {foreignGuestsCount}
                 </span>
                 <span className="text-xs font-bold uppercase text-slate-500">
                   KHÁCH
                 </span>
               </div>
               <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500">42 Quốc tịch quốc tế</span>
-                <span className="font-bold text-sky-700">Chiếm 46.8%</span>
+                <span className="text-slate-500">
+                  {foreignNationalitiesCount} Quốc tịch quốc tế
+                </span>
+                <span className="font-bold text-sky-700">
+                  Chiếm {foreignPercent}%
+                </span>
               </div>
             </div>
 
@@ -1393,7 +1477,7 @@ ${guestNodes}
               <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-500">Chuẩn hóa dữ liệu C06:</span>
                 <span className="font-bold text-emerald-700">
-                  98.4% Đạt chuẩn
+                  {validDocsPercent}% Đạt chuẩn
                 </span>
               </div>
             </div>
@@ -1414,7 +1498,7 @@ ${guestNodes}
                   className="text-3xl font-bold text-rose-700"
                   style={{ fontFamily: 'Georgia, serif' }}
                 >
-                  0{pendingVisaCount}
+                  {String(pendingVisaCount).padStart(2, '0')}
                 </span>
                 <span className="text-xs font-bold uppercase text-rose-700">
                   HỒ SƠ TỒN ĐỌNG
@@ -1429,7 +1513,10 @@ ${guestNodes}
                   }
                   className="text-rose-700 hover:underline font-medium flex items-center justify-between w-full"
                 >
-                  <span>02 chưa quét MRZ • 02 thiếu E-visa</span>
+                  <span>
+                    {String(pendingSignOnlyCount).padStart(2, '0')} chờ ký số •{' '}
+                    {String(missingVisaOnlyCount).padStart(2, '0')} thiếu E-visa
+                  </span>
                   <span>→</span>
                 </button>
               </div>
@@ -1504,20 +1591,34 @@ ${guestNodes}
               </span>
 
               <button
+                onClick={() => setQuickFilter('ALL')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition border cursor-pointer ${
+                  quickFilter === 'ALL'
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300 font-semibold'
+                    : 'bg-[#f2f5f3] text-slate-700 border-slate-200 hover:bg-slate-200/70'
+                }`}
+              >
+                <span>Tất cả hồ sơ</span>
+                <span className="px-1.5 py-0.2 rounded-full bg-emerald-800 text-white text-[10px]">
+                  {totalGuestsCount}
+                </span>
+              </button>
+
+              <button
                 onClick={() =>
                   setQuickFilter((prev) =>
                     prev === 'FOREIGN_A08' ? 'ALL' : 'FOREIGN_A08'
                   )
                 }
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition border ${
-                  quickFilter === 'FOREIGN_A08' || quickFilter === 'ALL'
-                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition border cursor-pointer ${
+                  quickFilter === 'FOREIGN_A08'
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300 font-semibold'
+                    : 'bg-[#f2f5f3] text-slate-700 border-slate-200 hover:bg-slate-200/70'
                 }`}
               >
                 <span>Khách nước ngoài (A08)</span>
                 <span className="px-1.5 py-0.2 rounded-full bg-emerald-800 text-white text-[10px]">
-                  116
+                  {foreignGuestsCount}
                 </span>
               </button>
 
@@ -1527,14 +1628,16 @@ ${guestNodes}
                     prev === 'VN_CITIZEN' ? 'ALL' : 'VN_CITIZEN'
                   )
                 }
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition border ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition border cursor-pointer ${
                   quickFilter === 'VN_CITIZEN'
                     ? 'bg-emerald-50 text-emerald-900 border-emerald-300 font-semibold'
                     : 'bg-[#f2f5f3] text-slate-700 border-slate-200 hover:bg-slate-200/70'
                 }`}
               >
                 <span>Công dân VN (VNeID/CCCD)</span>
-                <span className="font-bold text-slate-800">132</span>
+                <span className="font-bold text-slate-800">
+                  {vnCitizensCount}
+                </span>
               </button>
 
               <button
@@ -1543,7 +1646,7 @@ ${guestNodes}
                     prev === 'INCOMPLETE' ? 'ALL' : 'INCOMPLETE'
                   )
                 }
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition border ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition border cursor-pointer ${
                   quickFilter === 'INCOMPLETE'
                     ? 'bg-rose-100 text-rose-900 border-rose-300 font-semibold'
                     : 'bg-rose-50/80 text-rose-800 border-rose-200 hover:bg-rose-100/70'
@@ -1551,7 +1654,9 @@ ${guestNodes}
               >
                 <span className="w-2 h-2 rounded-full bg-rose-600" />
                 <span>Chưa hoàn tất hồ sơ</span>
-                <span className="font-bold">0{pendingVisaCount}</span>
+                <span className="font-bold">
+                  {String(pendingVisaCount).padStart(2, '0')}
+                </span>
               </button>
 
               <button
@@ -1560,14 +1665,16 @@ ${guestNodes}
                     prev === 'PHU_QUOC_30D' ? 'ALL' : 'PHU_QUOC_30D'
                   )
                 }
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition border ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition border cursor-pointer ${
                   quickFilter === 'PHU_QUOC_30D'
                     ? 'bg-emerald-50 text-emerald-900 border-emerald-300 font-semibold'
                     : 'bg-[#f2f5f3] text-slate-700 border-slate-200 hover:bg-slate-200/70'
                 }`}
               >
                 <span>Miễn thị thực Phú Quốc (30N)</span>
-                <span className="font-bold text-slate-800">58</span>
+                <span className="font-bold text-slate-800">
+                  {phuQuocVisaFreeCount}
+                </span>
               </button>
             </div>
 
@@ -1940,7 +2047,9 @@ ${guestNodes}
                   </div>
 
                   <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
-                    <span>Trang 1 / 42</span>
+                    <span>
+                      Trang 1 / {Math.max(1, Math.ceil(filteredDeclarations.length / 10))}
+                    </span>
                     <button className="p-1 rounded border border-slate-200 hover:bg-white">
                       <ChevronLeft className="w-3.5 h-3.5" />
                     </button>
