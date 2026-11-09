@@ -38,6 +38,9 @@ export default function Wishlist() {
   const [roomItems, setRoomItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Danh sách các phòng được tick chọn để xóa (Select to Delete)
+  const [selectedIds, setSelectedIds] = useState([]);
+
   // Modal xác nhận Clear Wishlist
   const [showClearModal, setShowClearModal] = useState(false);
 
@@ -100,8 +103,11 @@ export default function Wishlist() {
         const res = await getWishlistApi(params, token);
 
         if (isMounted) {
+          const currentWishlistIds = wishlist.map(id => Number(id));
           if (res.success && res.data && Array.isArray(res.data.items) && res.data.items.length > 0) {
-            setRoomItems(res.data.items);
+            // Chỉ giữ lại những phòng thực sự nằm trong wishlist của client
+            const validItems = res.data.items.filter(item => currentWishlistIds.includes(Number(item.roomTypeId)));
+            setRoomItems(validItems);
           } else {
             // Cứu hộ tự động: nếu API wishlist chưa có dữ liệu, nạp trực tiếp danh sách loại phòng chuẩn
             try {
@@ -110,7 +116,6 @@ export default function Wishlist() {
               if (!fbRes.ok) fbRes = await fetch(`${API_BASE}/v1/rooms/types`);
               const fbJson = await fbRes.json();
               const allTypes = Array.isArray(fbJson) ? fbJson : (fbJson.data || []);
-              const currentWishlistIds = wishlist.map(id => Number(id));
 
               const matched = allTypes
                 .filter(rt => currentWishlistIds.includes(Number(rt.RoomTypeId || rt.MaLoaiPhong || rt.id)))
@@ -174,9 +179,55 @@ export default function Wishlist() {
     return list.sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0));
   }, [roomItems, sortOption]);
 
-  // Xử lý khi nhấn nút Clear Wishlist (Xóa sạch)
+  // 1. Chọn / Bỏ chọn 1 phòng cụ thể
+  const toggleSelectRoom = (roomTypeId) => {
+    const id = Number(roomTypeId);
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  // 2. Chọn tất cả / Bỏ chọn tất cả các phòng hiển thị
+  const handleSelectAll = () => {
+    if (selectedIds.length === sortedItems.length && sortedItems.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(sortedItems.map(item => item.roomTypeId));
+    }
+  };
+
+  // 3. Xóa trực tiếp 1 phòng (Optimistic Update phản hồi tức thì)
+  const handleRemoveSingle = async (roomTypeId) => {
+    const id = Number(roomTypeId);
+    if (isNaN(id) || id <= 0) return;
+
+    // Phản hồi giao diện ngay lập tức
+    setRoomItems(prev => prev.filter(item => item.roomTypeId !== id));
+    setSelectedIds(prev => prev.filter(selId => selId !== id));
+
+    // Đồng bộ lên Context, LocalStorage và Database
+    await removeFromWishlist(id);
+  };
+
+  // 4. Xóa tất cả các phòng đã được tick chọn (Select to Delete)
+  const handleRemoveSelected = async () => {
+    if (selectedIds.length === 0) return;
+    const idsToRemove = [...selectedIds];
+
+    // Cập nhật UI ngay lập tức
+    setRoomItems(prev => prev.filter(item => !idsToRemove.includes(item.roomTypeId)));
+    setSelectedIds([]);
+
+    // Xóa từng phòng trong danh sách đã chọn
+    for (const id of idsToRemove) {
+      await removeFromWishlist(id);
+    }
+  };
+
+  // 5. Xử lý khi nhấn nút Clear Wishlist (Xóa toàn bộ)
   const handleConfirmClear = async () => {
     setShowClearModal(false);
+    setSelectedIds([]);
     await clearWishlist();
     setRoomItems([]);
   };
@@ -212,12 +263,27 @@ export default function Wishlist() {
             </h1>
           </div>
 
-          {/* Action bar: Bộ đếm & Nút Clear Wishlist */}
+          {/* Action bar: Bộ đếm & Các nút thao tác xóa */}
           {wishlistCount > 0 && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="text-xs text-[#8a8782] font-medium bg-white px-3.5 py-2 rounded-lg border border-[#dedad0] shadow-xs">
                 Đang lưu <span className="font-bold text-[#b9a277] text-sm">{wishlistCount}</span> hạng phòng
               </div>
+
+              {/* Nút xóa các phòng đã được tick chọn */}
+              {selectedIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleRemoveSelected}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs hover:shadow-md transition-all cursor-pointer animate-in fade-in"
+                  title={`Xóa ${selectedIds.length} phòng đã chọn khỏi danh sách`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                  XÓA ĐÃ CHỌN ({selectedIds.length})
+                </button>
+              )}
+
+              {/* Nút xóa toàn bộ (Clear All) */}
               <button
                 type="button"
                 onClick={() => setShowClearModal(true)}
@@ -231,12 +297,50 @@ export default function Wishlist() {
           )}
         </div>
 
-        {/* Controls Bar: Sắp xếp (sortOption) khi có phòng */}
+        {/* Controls Bar: Chọn nhiều phòng & Sắp xếp (sortOption) khi có phòng */}
         {wishlistCount > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 bg-white p-4 rounded-xl border border-[#dedad0] shadow-xs">
-            <div className="text-sm font-medium text-[#203044] flex items-center gap-2 font-serif font-bold">
-              <span className="material-symbols-outlined text-[#b9a277] text-[20px]">tune</span>
-              Bộ Sưu Tập Đã Lưu Của Quý Khách
+            <div className="flex items-center gap-3">
+              {/* Checkbox chọn tất cả */}
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#dedad0] hover:border-[#b9a277] bg-[#fbf8f2] hover:bg-white text-xs font-semibold text-[#203044] transition-all cursor-pointer"
+                title={selectedIds.length === sortedItems.length ? "Bỏ chọn tất cả" : "Chọn tất cả các phòng"}
+              >
+                <span className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${
+                  selectedIds.length > 0 && selectedIds.length === sortedItems.length
+                    ? 'bg-[#b9a277] border-[#b9a277] text-white'
+                    : selectedIds.length > 0
+                    ? 'bg-[#fedeb2] border-[#b9a277] text-[#725b38]'
+                    : 'border-gray-400 bg-white text-transparent'
+                }`}>
+                  <span className="material-symbols-outlined text-[14px] font-bold">
+                    {selectedIds.length > 0 && selectedIds.length === sortedItems.length ? 'check' : selectedIds.length > 0 ? 'remove' : ''}
+                  </span>
+                </span>
+                <span>
+                  {selectedIds.length === sortedItems.length && sortedItems.length > 0
+                    ? 'Bỏ chọn tất cả'
+                    : 'Chọn tất cả'}
+                </span>
+              </button>
+
+              {/* Thông báo số lượng phòng đang được tick chọn */}
+              {selectedIds.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-[#b9a277] bg-[#fedeb2]/30 px-2.5 py-1 rounded-md border border-[#b9a277]/30">
+                    Đã chọn {selectedIds.length} phòng
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds([])}
+                    className="text-xs text-[#8a8782] hover:text-[#203044] underline cursor-pointer"
+                  >
+                    Bỏ chọn
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -270,96 +374,136 @@ export default function Wishlist() {
         ) : wishlistCount > 0 && sortedItems.length > 0 ? (
           /* GIAO DIỆN LƯỚI 3 CỘT (3-COLUMN GRID) */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {sortedItems.map((room) => (
-              <div
-                key={room.roomTypeId}
-                className="group bg-white rounded-2xl overflow-hidden border border-[#dedad0] hover:border-[#b9a277] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col relative"
-              >
-                {/* Khung ảnh & Nút Heart SAVED */}
-                <div className="relative h-60 w-full overflow-hidden bg-[#203044]">
-                  <img
-                    src={room.imageUrl || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80'}
-                    alt={room.typeName}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out opacity-95 group-hover:opacity-100"
-                    loading="lazy"
-                  />
-                  {/* Badge đặc quyền vàng nâu */}
-                  <span className="absolute top-3 left-3 bg-[#203044]/90 backdrop-blur-md text-[#ffd985] text-[11px] font-bold tracking-wider px-3 py-1 rounded-full uppercase border border-[#b9a277]/40 shadow-xs">
-                    Grand Horizon 5 Sao
-                  </span>
+            {sortedItems.map((room) => {
+              const isSelected = selectedIds.includes(room.roomTypeId);
 
-                  {/* Nút Heart (Icon Trái Tim - Đang ở trạng thái SAVED) */}
-                  <button
-                    type="button"
-                    onClick={() => removeFromWishlist(room.roomTypeId)}
-                    className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/95 backdrop-blur-md hover:bg-white text-rose-500 flex items-center justify-center transition-all shadow-md hover:scale-110 active:scale-95 cursor-pointer"
-                    title="Bỏ khỏi danh sách yêu thích"
-                    aria-label={`Bỏ yêu thích ${room.typeName}`}
-                  >
-                    <span className="material-symbols-outlined text-[22px] font-bold fill-current">
-                      favorite
-                    </span>
-                  </button>
-                </div>
+              return (
+                <div
+                  key={room.roomTypeId}
+                  className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-300 flex flex-col relative ${
+                    isSelected
+                      ? 'border-[#b9a277] ring-2 ring-[#b9a277]/60 shadow-md bg-[#fbf8f2]/30'
+                      : 'border-[#dedad0] hover:border-[#b9a277] shadow-sm hover:shadow-xl'
+                  }`}
+                >
+                  {/* Khung ảnh, Ô chọn (Checkbox) & Nút Xóa phòng */}
+                  <div className="relative h-60 w-full overflow-hidden bg-[#203044]">
+                    <img
+                      src={room.imageUrl || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80'}
+                      alt={room.typeName}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out opacity-95 group-hover:opacity-100"
+                      loading="lazy"
+                    />
 
-                {/* Nội dung thông tin phòng */}
-                <div className="p-6 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h2 className="text-xl font-serif font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors leading-snug line-clamp-1">
-                      {room.typeName}
-                    </h2>
-                    <p className="mt-2 text-xs text-[#8a8782] line-clamp-2 leading-relaxed">
-                      {room.description || 'Không gian nghỉ dưỡng sang trọng với tầm nhìn ngoạn mục và các dịch vụ cá nhân hóa chuẩn thượng lưu.'}
-                    </p>
+                    {/* Vùng chọn Checkbox & Badge Grand Horizon ở góc trên bên trái */}
+                    <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
+                      {/* Ô Tick Checkbox để chọn phòng này */}
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectRoom(room.roomTypeId)}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all shadow-md backdrop-blur-md cursor-pointer border ${
+                          isSelected
+                            ? 'bg-[#b9a277] text-white border-[#b9a277] scale-105'
+                            : 'bg-white/90 text-transparent border-white/80 hover:bg-white hover:text-gray-400'
+                        }`}
+                        title={isSelected ? "Bỏ chọn phòng này" : "Chọn phòng này để xóa"}
+                        aria-label={`Chọn phòng ${room.typeName}`}
+                      >
+                        <span className="material-symbols-outlined text-[20px] font-bold">
+                          check
+                        </span>
+                      </button>
 
-                    {/* Tiện ích nổi bật (3 badges) */}
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#fbf8f2] text-[#725b38] text-[11px] font-medium border border-[#dedad0]">
-                        <span className="material-symbols-outlined text-[14px] text-[#b9a277]">aspect_ratio</span>
-                        {room.area || '120 m²'}
-                      </span>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#fbf8f2] text-[#725b38] text-[11px] font-medium border border-[#dedad0]">
-                        <span className="material-symbols-outlined text-[14px] text-[#b9a277]">group</span>
-                        {room.adultCapacity || 2} Khách
-                      </span>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#fbf8f2] text-[#725b38] text-[11px] font-medium border border-[#dedad0]">
-                        <span className="material-symbols-outlined text-[14px] text-[#b9a277]">bed</span>
-                        Giường King
+                      {/* Badge phân hạng */}
+                      <span className="bg-[#203044]/90 backdrop-blur-md text-[#ffd985] text-[11px] font-bold tracking-wider px-2.5 py-1 rounded-full uppercase border border-[#b9a277]/40 shadow-xs">
+                        Grand Horizon 5 Sao
                       </span>
                     </div>
+
+                    {/* Nút Xóa trực tiếp 1 phòng (Góc trên bên phải) */}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSingle(room.roomTypeId)}
+                      className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/95 backdrop-blur-md hover:bg-rose-50 text-rose-500 hover:text-rose-600 flex items-center justify-center transition-all shadow-md hover:scale-110 active:scale-95 cursor-pointer border border-rose-100 group/btn z-10"
+                      title="Xóa phòng này khỏi danh sách yêu thích"
+                      aria-label={`Xóa phòng ${room.typeName}`}
+                    >
+                      <span className="material-symbols-outlined text-[20px] font-bold transition-transform group-hover/btn:scale-115">
+                        delete
+                      </span>
+                    </button>
                   </div>
 
-                  {/* Giá tiền & Các nút hành động */}
-                  <div className="mt-6 pt-4 border-t border-[#dedad0]">
-                    <div className="flex items-baseline justify-between mb-4">
-                      <span className="text-xs text-[#8a8782] uppercase tracking-wider font-medium">Giá khởi điểm</span>
-                      <div className="text-right">
-                        <span className="text-xl font-bold text-[#b9a277]">
-                          {formatVND(room.basePrice)}
+                  {/* Nội dung thông tin phòng */}
+                  <div className="p-6 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h2 className="text-xl font-serif font-bold text-[#203044] group-hover:text-[#b9a277] transition-colors leading-snug line-clamp-1">
+                        {room.typeName}
+                      </h2>
+                      <p className="mt-2 text-xs text-[#8a8782] line-clamp-2 leading-relaxed">
+                        {room.description || 'Không gian nghỉ dưỡng sang trọng với tầm nhìn ngoạn mục và các dịch vụ cá nhân hóa chuẩn thượng lưu.'}
+                      </p>
+
+                      {/* Tiện ích nổi bật (3 badges) */}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#fbf8f2] text-[#725b38] text-[11px] font-medium border border-[#dedad0]">
+                          <span className="material-symbols-outlined text-[14px] text-[#b9a277]">aspect_ratio</span>
+                          {room.area || '120 m²'}
                         </span>
-                        <span className="text-xs text-[#8a8782] ml-1">/ đêm</span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#fbf8f2] text-[#725b38] text-[11px] font-medium border border-[#dedad0]">
+                          <span className="material-symbols-outlined text-[14px] text-[#b9a277]">group</span>
+                          {room.adultCapacity || 2} Khách
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#fbf8f2] text-[#725b38] text-[11px] font-medium border border-[#dedad0]">
+                          <span className="material-symbols-outlined text-[14px] text-[#b9a277]">bed</span>
+                          Giường King
+                        </span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <Link
-                        to={`/rooms/${room.roomTypeId}`}
-                        className="w-full py-2.5 text-center text-xs font-semibold text-[#203044] bg-[#fbf8f2] hover:bg-[#f5f4ef] border border-[#dedad0] hover:border-[#b9a277] hover:text-[#b9a277] rounded-xl transition-all"
+                    {/* Giá tiền & Các nút hành động */}
+                    <div className="mt-6 pt-4 border-t border-[#dedad0]">
+                      <div className="flex items-baseline justify-between mb-4">
+                        <span className="text-xs text-[#8a8782] uppercase tracking-wider font-medium">Giá khởi điểm</span>
+                        <div className="text-right">
+                          <span className="text-xl font-bold text-[#b9a277]">
+                            {formatVND(room.basePrice)}
+                          </span>
+                          <span className="text-xs text-[#8a8782] ml-1">/ đêm</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <Link
+                          to={`/rooms/${room.roomTypeId}`}
+                          className="w-full py-2.5 text-center text-xs font-semibold text-[#203044] bg-[#fbf8f2] hover:bg-[#f5f4ef] border border-[#dedad0] hover:border-[#b9a277] hover:text-[#b9a277] rounded-xl transition-all"
+                        >
+                          Xem Chi Tiết
+                        </Link>
+                        <Link
+                          to={`/booking?roomTypeId=${room.roomTypeId}`}
+                          className="w-full py-2.5 text-center text-xs font-bold text-white bg-[#b9a277] hover:bg-[#a68e64] rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">calendar_today</span>
+                          Đặt Phòng
+                        </Link>
+                      </div>
+
+                      {/* Nút Xóa nhanh trực quan ở chân thẻ phòng */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSingle(room.roomTypeId)}
+                        className="w-full py-1.5 flex items-center justify-center gap-1 text-[11px] font-medium text-rose-500 hover:text-rose-700 hover:bg-rose-50/60 rounded-lg transition-colors cursor-pointer"
+                        title="Bỏ lưu phòng này khỏi danh sách"
                       >
-                        Xem Chi Tiết
-                      </Link>
-                      <Link
-                        to={`/booking?roomTypeId=${room.roomTypeId}`}
-                        className="w-full py-2.5 text-center text-xs font-bold text-white bg-[#b9a277] hover:bg-[#a68e64] rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-1"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">calendar_today</span>
-                        Đặt Phòng
-                      </Link>
+                        <span className="material-symbols-outlined text-[15px]">delete_outline</span>
+                        Xóa khỏi danh sách yêu thích
+                      </button>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           /* ═══════════════════════════════════════════════════════════════ */
