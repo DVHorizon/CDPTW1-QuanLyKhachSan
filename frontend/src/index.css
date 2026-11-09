@@ -5,7 +5,7 @@
 @layer base {
   :root {
     --font-family-primary: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    --font-family-serif: 'Playfair Display', Georgia, serif;
+    --font-family-serif: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     --font-size-base: 16px;
     --font-line-height-base: 1.5;
     --font-weight-base: 400;
