@@ -95,6 +95,24 @@ function matchesSearchEngine(text, keyword) {
   return allMatch;
 }
 
+// Get Menu Categories (FEAT-FNB-03)
+exports.getMenuCategories = async (req, res) => {
+  try {
+    // Lấy các danh mục chính đang có món ăn trong thực đơn để hiển thị trên thanh tab
+    const categories = await MenuCategory.findAll({
+      where: { 
+        IsDeleted: false,
+        CategoryId: { [Op.in]: [5, 6, 7, 8] }
+      },
+      order: [['CategoryId', 'ASC']]
+    });
+    return res.status(200).json({ success: true, data: categories });
+  } catch (error) {
+    console.error('Error fetching menu categories:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi tải danh mục món.' });
+  }
+};
+
 // Get all Menu Items (FEAT-FNB-02)
 exports.getMenuItems = async (req, res) => {
   try {
@@ -110,14 +128,15 @@ exports.getMenuItems = async (req, res) => {
     
     if (category) {
       if (isNaN(category)) {
-        // Nếu truyền tên danh mục (VD: Khai vị, Món chính, Đồ uống)
-        const cat = await MenuCategory.findOne({
+        // Tìm kiếm danh mục theo tên, ưu tiên khớp chính xác hoặc danh mục có món ăn
+        const matchedCats = await MenuCategory.findAll({
           where: {
             CategoryName: { [Op.like]: `%${category}%` }
-          }
+          },
+          attributes: ['CategoryId']
         });
-        if (cat) {
-          whereClause.CategoryId = cat.CategoryId;
+        if (matchedCats.length > 0) {
+          whereClause.CategoryId = { [Op.in]: matchedCats.map(c => c.CategoryId) };
         } else {
           whereClause.CategoryId = -1; // Không tìm thấy danh mục
         }
@@ -128,23 +147,20 @@ exports.getMenuItems = async (req, res) => {
 
     // Nếu không có keyword, lấy toàn bộ món theo thứ tự ID giảm dần
     if (!keyword || keyword.trim() === '') {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 100; // Mặc định trả về 100 món thay vì 10.000 món để giao diện mượt mà
+      const offset = (pageNum - 1) * limitNum;
+
       const queryOptions = {
         where: whereClause,
         include: [{ model: MenuCategory, attributes: ['CategoryId', 'CategoryName'] }],
-        attributes: ['MenuItemId', 'CategoryId', 'ItemName', 'Price', 'Description', 'ImageUrl', 'Status', 'IsDeleted', 'CreatedAt'],
-        order: [['MenuItemId', 'DESC']]
+        attributes: ['MenuItemId', 'CategoryId', 'ItemName', 'Price', 'Description', 'ImageUrl', 'Status', 'IsDeleted', 'CreatedAt', 'Version'],
+        order: [['MenuItemId', 'DESC']],
+        limit: limitNum,
+        offset: offset
       };
 
       const items = await MenuItem.findAll(queryOptions);
-
-      if (items.length === 0) {
-        if (category) {
-          return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn trong danh mục đã chọn.' });
-        }
-        if (status) {
-          return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không có món ăn phù hợp với trạng thái đã chọn.' });
-        }
-      }
 
       return res.status(200).json({ success: true, data: items });
     }
@@ -154,7 +170,7 @@ exports.getMenuItems = async (req, res) => {
     const items = await MenuItem.findAll({
       where: whereClause,
       include: [{ model: MenuCategory, attributes: ['CategoryId', 'CategoryName'] }],
-      attributes: ['MenuItemId', 'CategoryId', 'ItemName', 'Price', 'Description', 'ImageUrl', 'Status', 'IsDeleted', 'CreatedAt'],
+      attributes: ['MenuItemId', 'CategoryId', 'ItemName', 'Price', 'Description', 'ImageUrl', 'Status', 'IsDeleted', 'CreatedAt', 'Version'],
       order: [['MenuItemId', 'DESC']]
     });
 
@@ -232,15 +248,26 @@ exports.createMenuItem = async (req, res) => {
   }
 };
 
-// Update Item (FEAT-FNB-01)
+// Update Item (FEAT-FNB-01) with Optimistic Locking
 exports.updateMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const { CategoryId, ItemName, Price, Description, ImageUrl, Status } = req.body;
+    const { CategoryId, ItemName, Price, Description, ImageUrl, Status, Version } = req.body;
 
     const item = await MenuItem.findByPk(id);
     if (!item) {
       return res.status(404).json({ code: 'ERROR_0004_NOT_FOUND', message: 'Không tìm thấy món ăn' });
+    }
+
+    // 🔒 OPTIMISTIC LOCKING CHECK:
+    // Nếu client truyền Version lên, kiểm tra xem Version có khớp với DB hay không
+    if (Version !== undefined && Version !== null && String(Version) !== String(item.Version)) {
+      return res.status(409).json({
+        code: 'ERROR_0409_VERSION_CONFLICT',
+        message: `Xung đột dữ liệu! Món ăn đã được cập nhật bởi một người dùng khác (Phiên bản hiện tại: v${item.Version}, phiên bản bạn đang sửa: v${Version}). Vui lòng tải lại trang để nhận dữ liệu mới nhất.`,
+        currentVersion: item.Version,
+        expectedVersion: Version
+      });
     }
 
     if (ItemName !== undefined) {
@@ -265,6 +292,9 @@ exports.updateMenuItem = async (req, res) => {
       }
     }
 
+    // Tăng Version lên 1 khi update thành công (Khóa lạc quan)
+    const nextVersion = Number(item.Version || 1) + 1;
+
     await item.update({
       CategoryId: CategoryId || item.CategoryId,
       ItemName: ItemName !== undefined ? ItemName.trim() : item.ItemName,
@@ -272,12 +302,50 @@ exports.updateMenuItem = async (req, res) => {
       Description: Description !== undefined ? Description : item.Description,
       ImageUrl: ImageUrl !== undefined ? ImageUrl : item.ImageUrl,
       Status: Status || item.Status,
+      Version: nextVersion,
       UpdatedAt: new Date()
     });
 
+    // Tự động đồng bộ món này vào Elasticsearch & Solr (nếu có kết nối)
+    try {
+      const esClient = require('../../config/elasticsearch');
+      const cat = await MenuCategory.findByPk(item.CategoryId);
+      const catName = cat ? cat.CategoryName : 'Khác';
+
+      esClient.index({
+        index: 'menu_items',
+        id: String(item.MenuItemId),
+        document: {
+          MenuItemId: item.MenuItemId,
+          ItemName: item.ItemName,
+          Description: item.Description || '',
+          CategoryName: catName,
+          Price: Number(item.Price) || 0,
+          Status: item.Status || 'Available'
+        }
+      }).catch(err => console.error('[ES UPDATE ERROR]:', err.message));
+
+      const SOLR_HOST = process.env.SOLR_HOST || (process.env.DB_HOST === 'mysql' ? 'host.docker.internal' : '127.0.0.1');
+      const SOLR_PORT = process.env.SOLR_PORT || 8983;
+      fetch(`http://${SOLR_HOST}:${SOLR_PORT}/solr/menu_items/update?commit=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([{
+          id: String(item.MenuItemId),
+          item_name: item.ItemName,
+          description: item.Description || '',
+          category: catName,
+          price: Number(item.Price) || 0,
+          status: item.Status || 'Available'
+        }])
+      }).catch(err => console.error('[SOLR UPDATE ERROR]:', err.message));
+    } catch (syncErr) {
+      // Bỏ qua lỗi đồng bộ nền, không làm fail API update
+    }
+
     return res.status(200).json({
       code: 'SUCCESS_0002_UPDATED',
-      message: 'Cập nhật thông tin thành công',
+      message: 'Cập nhật thông tin thành công (Version: v' + nextVersion + ')',
       data: item
     });
 
@@ -357,5 +425,255 @@ exports.updateMenuItemStatus = async (req, res) => {
   } catch (error) {
     console.error('Error updating status:', error);
     return res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không thể cập nhật trạng thái món.' });
+  }
+};
+
+// ============================================================================
+// FEAT-SEARCH-01: TÌM KIẾM THỰC ĐƠN ĐA NỀN TẢNG (ELASTICSEARCH & APACHE SOLR)
+// ============================================================================
+
+const { expandQuerySemantics } = require('../../utils/searchSemanticHelper');
+
+// 1. Tìm kiếm bằng Elasticsearch (Full-text + Semantic Expansion + Typo Fuzzy)
+exports.searchMenuWithElastic = async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { keyword, category, status } = req.query;
+    const esClient = require('../../config/elasticsearch');
+
+    let esQuery;
+    let expandedTerms = [];
+
+    // Nếu không nhập từ khóa nhưng có lọc danh mục hoặc trạng thái:
+    if (!keyword || keyword.trim() === '') {
+      esQuery = {
+        bool: {
+          must: [{ match_all: {} }],
+          filter: []
+        }
+      };
+    } else {
+      const cleanKw = keyword.trim();
+      // Phân tích ngữ nghĩa theo phong cách Google (bỏ stop words, tìm từ đồng nghĩa)
+      const expansion = expandQuerySemantics(cleanKw);
+      const filteredText = expansion.filteredText;
+      expandedTerms = expansion.expandedTerms || [];
+
+      const shouldClauses = [
+        // 1. Khớp cụm nguyên bản hoặc cụm đã lọc stop words (ưu tiên điểm cao nhất)
+        {
+          multi_match: {
+            query: cleanKw,
+            fields: ['ItemName^8.0', 'Description^4.0', 'CategoryName^2.5'],
+            fuzziness: 'AUTO',
+            boost: 4.0
+          }
+        }
+      ];
+
+      if (filteredText && filteredText !== cleanKw.toLowerCase()) {
+        shouldClauses.push({
+          multi_match: {
+            query: filteredText,
+            fields: ['ItemName^6.0', 'Description^3.0', 'CategoryName^2.0'],
+            fuzziness: 'AUTO',
+            boost: 3.0
+          }
+        });
+      }
+
+      // 2. Thêm các từ cốt lõi (Core Terms) và từ đồng nghĩa ngữ nghĩa (VD: 'thích' <-> 'yêu', 'bò' <-> 'wagyu/beef')
+      expandedTerms.forEach(term => {
+        if (term !== cleanKw.toLowerCase() && term !== filteredText) {
+          shouldClauses.push({
+            multi_match: {
+              query: term,
+              fields: ['ItemName^3.0', 'Description^1.5', 'CategoryName^1.0'],
+              fuzziness: 'AUTO',
+              boost: 1.2
+            }
+          });
+        }
+      });
+
+      esQuery = {
+        bool: {
+          should: shouldClauses,
+          minimum_should_match: 1,
+          filter: []
+        }
+      };
+    }
+
+    if (category) {
+      esQuery.bool.filter.push({ match_phrase: { CategoryName: category } });
+    }
+    if (status) {
+      esQuery.bool.filter.push({ term: { Status: status } });
+    }
+
+    const esResponse = await esClient.search({
+      index: 'menu_items',
+      body: {
+        query: esQuery,
+        size: 50
+      }
+    });
+
+    const hits = (esResponse.hits && esResponse.hits.hits) || [];
+    const maxScore = esResponse.hits && esResponse.hits.max_score ? esResponse.hits.max_score : 1;
+    const scoreThreshold = maxScore * 0.2; // Ngưỡng tương quan 20%
+
+    const filteredHits = hits.filter(h => (h._score || 0) >= scoreThreshold);
+    const data = filteredHits.map(hit => ({
+      ...hit._source,
+      _score: hit._score,
+      _engine: 'Elasticsearch'
+    }));
+
+    return res.status(200).json({
+      success: true,
+      engine: 'Elasticsearch 9.5.6',
+      total: data.length,
+      qTimeMs: Date.now() - startTime,
+      semanticExpansions: expandedTerms,
+      data
+    });
+  } catch (error) {
+    console.error('Lỗi tìm kiếm Elasticsearch:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể kết nối máy chủ Elasticsearch: ' + error.message
+    });
+  }
+};
+
+// 2. Tìm kiếm bằng Apache Solr (Hỗ trợ Semantic Expansion + Tiếng Việt không dấu + Typo Fuzzy & Đa từ)
+exports.searchMenuWithSolr = async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { keyword, category, status } = req.query;
+    const solrHost = (process.env.SOLR_HOST) || (process.env.DB_HOST === 'mysql' ? 'host.docker.internal' : '127.0.0.1');
+    const solrPort = process.env.SOLR_PORT || 8983;
+
+    // Xử lý truy vấn Solr: Nếu không có keyword thì lấy tất cả theo bộ lọc (*:*)
+    let finalQuery = '*:*';
+    let expandedTerms = [];
+
+    if (keyword && keyword.trim() !== '') {
+      const cleanKw = keyword.trim();
+      const noToneKw = removeVietnameseTones(cleanKw);
+      // 2. Phân tích ngữ nghĩa theo phong cách Google
+      const expansion = expandQuerySemantics(cleanKw);
+      const filteredText = expansion.filteredText;
+      expandedTerms = expansion.expandedTerms || [];
+      const coreTerms = expansion.coreTerms || [];
+
+      // Tách các từ riêng lẻ
+      const rawTokens = cleanKw.toLowerCase().split(/\s+/).filter(Boolean);
+      const tokens = Array.from(new Set([...rawTokens, ...coreTerms]));
+
+      // Xây dựng danh sách mệnh đề truy vấn chuẩn Solr
+      const queryParts = [
+        // A. Khớp chính xác cụm nguyên bản (điểm cao nhất)
+        `"${cleanKw}"^15.0`
+      ];
+
+      if (filteredText && filteredText !== cleanKw.toLowerCase()) {
+        queryParts.push(`"${filteredText}"^12.0`);
+      }
+
+      // B. Khớp tất cả các từ cùng xuất hiện
+      if (tokens.length > 1) {
+        queryParts.push(`(${tokens.join(' AND ')})^8.0`);
+      }
+
+      // C. Khớp tiền tố (Prefix / Gõ dở dang: vd me -> me*)
+      const prefixWords = tokens.map(w => (w.includes('*') || w.includes('~')) ? w : `${w}*`);
+      queryParts.push(`(${prefixWords.join(' OR ')})^5.0`);
+
+      // D. Khớp mờ chịu sai/thiếu/dư ký tự (Fuzzy ~1, ~2)
+      // Tự động nhận diện lỗi typo như 'mesi' -> 'messi', 'tuyéet' -> 'tuyết', 'ronaldoo' -> 'ronaldo'
+      tokens.forEach(w => {
+        // Đẩy trực tiếp vào queryParts với edismax
+        queryParts.push(`${w}~1^6.0`);
+        queryParts.push(`${w}~2^4.0`);
+        queryParts.push(`*${w}*^5.0`);
+
+        const noTone = removeVietnameseTones(w);
+        if (noTone !== w) {
+          queryParts.push(`${noTone}~1^5.0`);
+          queryParts.push(`${noTone}~2^3.5`);
+          queryParts.push(`*${noTone}*^4.0`);
+        }
+      });
+
+      // E. Bổ sung các từ khóa ngữ nghĩa / đồng nghĩa (Semantic Expansions)
+      expandedTerms.forEach(term => {
+        if (term !== cleanKw.toLowerCase() && term !== filteredText) {
+          queryParts.push(`"${term}"^3.0`);
+          const noToneSyn = removeVietnameseTones(term);
+          queryParts.push(`*${noToneSyn}*^2.0`);
+        }
+      });
+
+      finalQuery = queryParts.join(' OR ');
+    }
+
+    // Sử dụng edismax parser của Solr với qf đa trường
+    const url = new URL(`http://${solrHost}:${solrPort}/solr/menu_items/select`);
+    url.searchParams.append('defType', 'edismax');
+    url.searchParams.append('q', finalQuery);
+    url.searchParams.append('qf', 'item_name^5.0 description^2.5 category^1.5');
+    url.searchParams.append('wt', 'json');
+    url.searchParams.append('rows', '50');
+    url.searchParams.append('fl', '*,score');
+
+    if (category) {
+      // Đối với Solr: Bọc ngoặc kép để hỗ trợ các danh mục có dấu cách và gạch chéo như "Đồ Uống / Bar"
+      url.searchParams.append('fq', `category:"${category}"`);
+    }
+    if (status) {
+      url.searchParams.append('fq', `status:${status}`);
+    }
+
+    const cleanKw = keyword ? keyword.trim() : '';
+    console.log(`[SOLR SEARCH] Kw: "${cleanKw}" | URL: ${url.toString()}`);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Solr HTTP ${response.status}: ${errText}`);
+    }
+
+    const solrJson = await response.json();
+    const docs = (solrJson.response && solrJson.response.docs) || [];
+    console.log(`[SOLR FOUND] Docs count: ${docs.length}`);
+
+    const data = docs.map(doc => ({
+      MenuItemId: Number(doc.id),
+      ItemName: Array.isArray(doc.item_name) ? doc.item_name[0] : doc.item_name,
+      Description: Array.isArray(doc.description) ? doc.description[0] : (doc.description || ''),
+      CategoryName: Array.isArray(doc.category) ? doc.category[0] : (doc.category || 'Khác'),
+      Price: Array.isArray(doc.price) ? Number(doc.price[0]) : Number(doc.price || 0),
+      Status: Array.isArray(doc.status) ? doc.status[0] : (doc.status || 'Available'),
+      _score: doc.score || null,
+      _engine: 'Apache Solr'
+    }));
+
+    return res.status(200).json({
+      success: true,
+      engine: 'Apache Solr 9.11.0',
+      total: data.length,
+      qTimeMs: Date.now() - startTime,
+      semanticExpansions: expandedTerms,
+      data
+    });
+  } catch (error) {
+    console.error('Lỗi tìm kiếm Apache Solr:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể kết nối máy chủ Apache Solr: ' + error.message
+    });
   }
 };

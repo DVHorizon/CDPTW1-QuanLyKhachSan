@@ -164,13 +164,13 @@ export default {
         "label-lg": FONT_SANS,
         "title-md": FONT_SANS,
         "title-lg": FONT_SANS,
-        "headline-sm": FONT_SERIF,
-        "headline-md": FONT_SERIF,
-        "headline-lg": FONT_SERIF,
-        "display-sm": FONT_SERIF,
-        "display-lg": FONT_SERIF,
-        "display-sm-mobile": FONT_SERIF,
-        "display-lg-mobile": FONT_SERIF
+        "headline-sm": FONT_SANS,
+        "headline-md": FONT_SANS,
+        "headline-lg": FONT_SANS,
+        "display-sm": FONT_SANS,
+        "display-lg": FONT_SANS,
+        "display-sm-mobile": FONT_SANS,
+        "display-lg-mobile": FONT_SANS
       },
 
       fontSize: {
