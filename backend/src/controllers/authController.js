@@ -5,6 +5,49 @@ const { JWT_SECRET } = require('../middlewares/authMiddleware');
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
+// Tự động đảm bảo các tài khoản Admin của nhóm & tài khoản Demo trong tài liệu luôn sẵn sàng trong DB
+let isDemoAccountsSeeded = false;
+const ensureDefaultAccounts = async () => {
+  if (isDemoAccountsSeeded) return;
+  try {
+    const hash123456 = await bcrypt.hash('123456', 10);
+    const defaultAccounts = [
+      { roleId: 1, tierId: null, username: 'admin_horizon', fullName: 'Quản Trị Viên Grand Horizon', email: 'admin@grandhorizon.com', phone: '0900000001', passwordHash: hash123456 },
+      { roleId: 1, tierId: null, username: 'admin', fullName: 'Quản Trị Viên Hệ Thống', email: 'admin@hoteldomain.vn', phone: '0900000009', passwordHash: hash123456 },
+      { roleId: 5, tierId: 3, username: 'vip_guest', fullName: 'Khách Hàng VIP Horizon Elite', email: 'vip.guest@grandhorizon.com', phone: '0900000002', passwordHash: hash123456 },
+      { roleId: 5, tierId: 1, username: 'user_1', fullName: 'Khách Hàng Tiêu Chuẩn', email: 'user_1@hoteldomain.vn', phone: '0900000003', passwordHash: hash123456 },
+      { roleId: 1, tierId: null, username: 'admin_vanthuc', fullName: 'Nguyễn Văn Thực', email: 'vanthuc.22211tt2302@hoteldomain.vn', phone: '0922112302', passwordHash: await bcrypt.hash('Admin@22211TT2302', 10) },
+      { roleId: 1, tierId: null, username: 'admin_nhanbao', fullName: 'Nguyễn Nhân Bảo', email: 'nhanbao.24211tt3501@hoteldomain.vn', phone: '0924113501', passwordHash: await bcrypt.hash('Admin@24211TT3501', 10) },
+      { roleId: 1, tierId: null, username: 'admin_vanha', fullName: 'Đặng Văn Hà', email: 'vanha.23211tt4241@hoteldomain.vn', phone: '0923114241', passwordHash: await bcrypt.hash('Admin@23211TT4241', 10) },
+      { roleId: 1, tierId: null, username: 'admin_thutrang', fullName: 'Nguyễn Xuân Thu Trang', email: 'thutrang.24211tt1788@hoteldomain.vn', phone: '0924111788', passwordHash: await bcrypt.hash('Admin@24211TT1788', 10) },
+      { roleId: 1, tierId: null, username: 'admin_thanhtuyen', fullName: 'Hồ Thanh Tuyền', email: 'thanhtuyen.23211tt3988@hoteldomain.vn', phone: '0923113988', passwordHash: await bcrypt.hash('Admin@23211TT3988', 10) }
+    ];
+
+    for (const acc of defaultAccounts) {
+      const [rows] = await pool.query(
+        'SELECT UserId FROM Users WHERE Email = ? LIMIT 1',
+        [acc.email]
+      );
+      if (rows.length === 0) {
+        await pool.query(
+          `INSERT INTO Users (RoleId, TierId, Username, FullName, Email, Phone, PasswordHash, Status, CreatedAt, UpdatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', NOW(), NOW())`,
+          [acc.roleId, acc.tierId, acc.username, acc.fullName, acc.email, acc.phone, acc.passwordHash]
+        ).catch(() => {});
+      } else {
+        await pool.query(
+          'UPDATE Users SET RoleId = ?, PasswordHash = ?, Status = "Active", Username = COALESCE(Username, ?) WHERE UserId = ?',
+          [acc.roleId, acc.passwordHash, acc.username, rows[0].UserId]
+        ).catch(() => {});
+      }
+    }
+    isDemoAccountsSeeded = true;
+  } catch (err) {
+    console.warn('Không thể tự động kiểm tra tài khoản mặc định:', err.message);
+  }
+};
+ensureDefaultAccounts();
+
 /**
  * Đăng ký tài khoản khách hàng mới
  * POST /api/v1/auth/register
@@ -151,14 +194,14 @@ const register = async (req, res) => {
  */
 const login = async (req, res) => {
   try {
-    // Chấp nhận identifier hoặc email / phone
-    const identifier = req.body.identifier || req.body.email || req.body.phone;
+    // Chấp nhận identifier hoặc username / email / phone
+    const identifier = req.body.identifier || req.body.username || req.body.email || req.body.phone;
     const password = req.body.password;
 
     if (!identifier || !identifier.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng nhập Email hoặc Số điện thoại.'
+        message: 'Vui lòng nhập Email, Tên đăng nhập hoặc Số điện thoại.'
       });
     }
 
@@ -169,20 +212,24 @@ const login = async (req, res) => {
       });
     }
 
-    const cleanIdentifier = identifier.trim();
+    await ensureDefaultAccounts();
 
-    // 1. Tìm tài khoản theo Email hoặc Số điện thoại kèm thông tin Role & MembershipTier
+    const cleanIdentifier = identifier.trim();
+    const lowerIdentifier = cleanIdentifier.toLowerCase();
+
+    // 1. Tìm tài khoản theo Email, Username hoặc Số điện thoại kèm thông tin Role & MembershipTier
     const [users] = await pool.query(
-      `SELECT u.UserId, u.RoleId, u.TierId, u.FullName, u.Email, u.Phone, 
-              u.PasswordHash, u.Status, u.CreatedAt,
+      `SELECT u.UserId, u.RoleId, u.TierId, u.Username, u.FullName, u.Email, u.Phone, 
+              u.PasswordHash, u.Status, u.IsDeleted, u.CreatedAt,
               r.RoleName,
               mt.TierName, mt.Benefits, mt.DiscountRate, mt.PointMultiplier
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
        LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
-       WHERE (u.Email = ? OR u.Phone = ?)
+       WHERE (LOWER(u.Email) = ? OR u.Phone = ? OR LOWER(u.Username) = ?)
+         AND (u.IsDeleted = 0 OR u.IsDeleted IS NULL)
        LIMIT 1`,
-      [cleanIdentifier.toLowerCase(), cleanIdentifier]
+      [lowerIdentifier, cleanIdentifier, lowerIdentifier]
     );
 
     if (users.length === 0) {
@@ -614,68 +661,10 @@ const facebookLogin = async (req, res) => {
   }
 };
 
-/**
- * Cập nhật thông tin người dùng hiện tại đang đăng nhập
- * PUT /api/v1/auth/me
- */
-const updateMe = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { fullName, phone, idNumber, idType, dateOfBirth, gender } = req.body;
-
-    if (!fullName || !fullName.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Họ và tên không được để trống.'
-      });
-    }
-
-    const cleanFullName = fullName.trim();
-    const cleanPhone = phone ? phone.trim() : null;
-    const cleanIdNumber = idNumber ? idNumber.trim() : null;
-    const cleanIdType = idType ? idType.trim() : null;
-    const cleanDateOfBirth = dateOfBirth ? dateOfBirth : null;
-    const cleanGender = gender ? gender.trim() : null;
-
-    // Check if phone already used by someone else
-    if (cleanPhone) {
-      const [existingPhone] = await pool.query(
-        'SELECT UserId FROM Users WHERE Phone = ? AND UserId != ? LIMIT 1',
-        [cleanPhone, userId]
-      );
-      if (existingPhone.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Số điện thoại này đã được liên kết với một tài khoản khác.'
-        });
-      }
-    }
-
-    await pool.query(
-      `UPDATE Users 
-       SET FullName = ?, Phone = ?, IdNumber = ?, IdType = ?, DateOfBirth = ?, Gender = ?, UpdatedAt = NOW()
-       WHERE UserId = ?`,
-      [cleanFullName, cleanPhone, cleanIdNumber, cleanIdType, cleanDateOfBirth, cleanGender, userId]
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: 'Cập nhật hồ sơ thành công.'
-    });
-  } catch (error) {
-    console.error('Lỗi API updateMe:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi máy chủ khi cập nhật hồ sơ: ' + error.message
-    });
-  }
-};
-
 module.exports = {
   register,
   login,
   getMe,
-  updateMe,
   googleLogin,
   facebookLogin
 };

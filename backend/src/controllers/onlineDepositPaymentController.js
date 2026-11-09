@@ -293,7 +293,8 @@ exports.processDepositPayment = async (req, res) => {
     await booking.update({
       Status: 'Confirmed',
       DepositAmount: updatedDeposit,
-      BookingQrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${booking.ConfirmationCode}`
+      BookingQrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${booking.ConfirmationCode}`,
+      ConfirmationSentAt: new Date()
     }, { transaction });
 
     await transaction.commit();
@@ -314,6 +315,12 @@ exports.processDepositPayment = async (req, res) => {
         confirmationCode: booking.ConfirmationCode,
         status: 'Confirmed'
       });
+
+      // FEAT-GUEST-10: Tự động kích hoạt gửi Email xác nhận đặt phòng kèm mã QR
+      try {
+        const { sendBookingConfirmationEmail } = require('../services/qrEmailService');
+        sendBookingConfirmationEmail(booking.BookingId).catch(mailErr => console.warn('[Email] Async mail warn:', mailErr.message));
+      } catch (err) {}
     } catch (wsErr) {
       console.warn('Warning: Socket broadcast failed:', wsErr.message);
     }

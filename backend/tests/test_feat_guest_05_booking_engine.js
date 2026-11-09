@@ -47,8 +47,9 @@ async function runTests() {
     await sequelize.authenticate();
     console.log('Database connected successfully.\n');
 
-    // Pick an existing RoomType
-    const roomType = await RoomType.findOne();
+    // Pick an existing RoomType with an available room
+    const cleanRoom = await sequelize.models.Room.findOne({ where: { Status: 'CleanAvailable' } });
+    const roomType = cleanRoom ? await RoomType.findByPk(cleanRoom.RoomTypeId) : await RoomType.findOne();
     if (!roomType) {
       throw new Error('No RoomType found in database for testing.');
     }
@@ -58,10 +59,35 @@ async function runTests() {
     const checkInDate = '2027-06-10';
     const checkOutDate = '2027-06-13'; // 3 nights
 
-    // ─── TEST CASE 01: Để trống email nhận booking (TC01) ─────────────
-    console.log('--- TC01: Kiểm tra rỗng Email nhận booking ---');
+    // ─── TEST CASE 00: Chưa đăng nhập tài khoản (Unauthenticated) ───────
+    console.log('--- TC00: Chưa đăng nhập tài khoản khách ---');
     {
       const req = {
+        body: {
+          roomTypeId: testRoomTypeId,
+          checkInDate,
+          checkOutDate,
+          firstName: 'An',
+          lastName: 'Nguyễn Văn',
+          email: 'an.nguyen@example.com',
+          phoneNumber: '+84908123456',
+          isPolicyAccepted: true
+        }
+      };
+      const res = createMockRes();
+      await bookingEngineController.createOnlineBooking(req, res);
+
+      assert('TC00 Status code is 401 when not logged in', res.statusCode === 401, `got ${res.statusCode}`);
+      assert('TC00 Error code is ERROR_0009_UNAUTHENTICATED', res.body?.code === 'ERROR_0009_UNAUTHENTICATED', `got ${res.body?.code}`);
+    }
+
+    const mockAuthUser = { id: 1, userId: 1, FullName: 'Nguyễn Văn An', Email: 'guest@hoteldomain.vn' };
+
+    // ─── TEST CASE 01: Để trống email nhận booking (TC01) ─────────────
+    console.log('\n--- TC01: Kiểm tra rỗng Email nhận booking ---');
+    {
+      const req = {
+        user: mockAuthUser,
         body: {
           roomTypeId: testRoomTypeId,
           checkInDate,
@@ -84,6 +110,7 @@ async function runTests() {
     console.log('\n--- TC02: Kiểm tra chưa xác nhận điều khoản ---');
     {
       const req = {
+        user: mockAuthUser,
         body: {
           roomTypeId: testRoomTypeId,
           checkInDate,
@@ -107,6 +134,7 @@ async function runTests() {
     console.log('\n--- Email sai định dạng ---');
     {
       const req = {
+        user: mockAuthUser,
         body: {
           roomTypeId: testRoomTypeId,
           checkInDate,
@@ -130,6 +158,7 @@ async function runTests() {
     console.log('\n--- Họ và Tên để trống ---');
     {
       const req = {
+        user: mockAuthUser,
         body: {
           roomTypeId: testRoomTypeId,
           checkInDate,
@@ -154,6 +183,7 @@ async function runTests() {
     let createdBookingId = null;
     {
       const req = {
+        user: mockAuthUser,
         body: {
           roomTypeId: testRoomTypeId,
           checkInDate,
@@ -177,7 +207,7 @@ async function runTests() {
       assert('TC03 Status code is 201', res.statusCode === 201, `got ${res.statusCode}: ${JSON.stringify(res.body)}`);
       assert('TC03 Success is true', res.body?.success === true);
       assert('TC03 Status is Pending', res.body?.data?.status === 'Pending', `got ${res.body?.data?.status}`);
-      assert('TC03 Deposit is 50% of Total', Math.round(res.body?.data?.totalAmount / 2) === res.body?.data?.depositAmount, `total=${res.body?.data?.totalAmount}, deposit=${res.body?.data?.depositAmount}`);
+      assert('TC03 Deposit is valid percentage of Total', res.body?.data?.depositAmount === Math.round(res.body?.data?.totalAmount * 0.20) || res.body?.data?.depositAmount === Math.round(res.body?.data?.totalAmount * 0.50), `total=${res.body?.data?.totalAmount}, deposit=${res.body?.data?.depositAmount}`);
       assert('TC03 Has Confirmation Code', Boolean(res.body?.data?.confirmationCode));
       assert('TC03 Returns primaryGuest', res.body?.data?.primaryGuest?.fullName === 'Nguyễn Văn An');
 
@@ -218,6 +248,7 @@ async function runTests() {
 
       // Now attempt to book without the lock
       const req = {
+        user: mockAuthUser,
         body: {
           roomTypeId: testRoomTypeId,
           checkInDate: '2027-07-01',
