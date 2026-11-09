@@ -377,9 +377,19 @@ const INITIAL_CHAUFFEURS = [
 ];
 
 const GANTT_HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+const STORAGE_KEY = 'grand_horizon_transfers_v1';
 
 export default function AirportTransferManagement() {
-  const [transfers, setTransfers] = useState(INITIAL_TRANSFERS);
+  const [transfers, setTransfers] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return INITIAL_TRANSFERS;
+  });
   const [fleet, setFleet] = useState(INITIAL_FLEET);
   const [chauffeurs, setChauffeurs] = useState(INITIAL_CHAUFFEURS);
 
@@ -448,13 +458,47 @@ export default function AirportTransferManagement() {
     return () => clearInterval(timer);
   }, []);
 
-  // Tải dữ liệu từ API Backend (nếu có)
+  // Tự động lưu lịch trình vào localStorage mỗi khi thay đổi
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(transfers));
+    } catch (_) {}
+  }, [transfers]);
+
+  // Tải dữ liệu từ API Backend (MySQL) và đồng bộ với dữ liệu đã lưu
   useEffect(() => {
     fetch('/api/transportation/overview')
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
         if (data && data.success && Array.isArray(data.transfers) && data.transfers.length > 0) {
-          // Giữ cấu trúc hiển thị chuẩn từ state hoặc đồng bộ thêm
+          setTransfers(prev => {
+            const serverMap = new Map(data.transfers.map(item => [item.id, item]));
+            const mergedIds = new Set();
+            const merged = [];
+
+            // Giữ thứ tự ưu tiên các chuyến mới tạo ở đầu danh sách
+            prev.forEach(localItem => {
+              const item = serverMap.get(localItem.id) || localItem;
+              merged.push(item);
+              mergedIds.add(item.id);
+            });
+
+            data.transfers.forEach(serverItem => {
+              if (!mergedIds.has(serverItem.id)) {
+                if (serverItem.sortOrder === 0) {
+                  merged.unshift(serverItem);
+                } else {
+                  merged.push(serverItem);
+                }
+                mergedIds.add(serverItem.id);
+              }
+            });
+
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+            } catch (_) {}
+            return merged;
+          });
         }
       })
       .catch(() => {});
@@ -573,7 +617,11 @@ export default function AirportTransferManagement() {
 
     const vehicle = fleet.find(v => v.id === newTripForm.vehicleId) || fleet[0];
     const driver = chauffeurs.find(c => c.id === newTripForm.driverId) || chauffeurs[0];
-    const nextIdx = 800 + transfers.length + 1;
+    const existingNums = transfers
+      .map(t => parseInt(String(t.id).replace(/\D/g, ''), 10))
+      .filter(n => !isNaN(n));
+    const maxNum = existingNums.length > 0 ? Math.max(...existingNums) : 806;
+    const nextIdx = maxNum + 1;
     const newId = `TR-${nextIdx}`;
 
     const [hhStr, mmStr] = (newTripForm.flightTime || '15:30').split(':');
@@ -631,7 +679,14 @@ export default function AirportTransferManagement() {
       gpsCoords: { progress: 8, speed: 'Chờ xuất phát', etaMinutes: 32, distanceKm: 24.0 }
     };
 
-    setTransfers(prev => [createdTrip, ...prev]);
+    const payloadToSubmit = { ...newTripForm };
+    setTransfers(prev => {
+      const updated = [createdTrip, ...prev];
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
     setActiveRadarTripId(newId);
     setIsNewTripModalOpen(false);
     setNewTripForm(prev => ({ ...prev, guestName: '' }));
@@ -645,7 +700,7 @@ export default function AirportTransferManagement() {
       await fetch('/api/transportation/transfers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newTripForm)
+        body: JSON.stringify(payloadToSubmit)
       });
     } catch (_) {}
   };
