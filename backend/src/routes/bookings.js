@@ -1393,4 +1393,9 @@ router.get('/:id', async (req, res) => {
 // ─── TÍNH NĂNG 10: TẠO MÃ QR BOOKING & GỬI EMAIL XÁC NHẬN (FEAT-GUEST-10 / A10) ───
 const bookingQrNotificationController = require('../controllers/bookingQrNotificationController');
 router.get('/:bookingId/qr-code', bookingQrNotificationController.getBookingQRCode);
+
+// ─── FEAT-INVOICE-01 (C6): Tự động gom chi phí lưu trú (Booking Charges Aggregation) ───
+const bookingChargesCtrl = require('../modules/services/controllers/bookingChargesController');
+const { verifyToken } = require('../middlewares/authMiddleware');
+router.get('/:bookingId/charges', verifyToken, bookingChargesCtrl.getBookingCharges);
 module.exports = router;

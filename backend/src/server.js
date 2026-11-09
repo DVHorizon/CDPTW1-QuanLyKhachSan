@@ -116,6 +116,22 @@ app.use('/api/housekeeping/lost-and-found', require('./routes/lostAndFoundRoutes
 // Route Khóa Cửa Điện Tử Thông Minh IoT (E-Key & Smart Lock Management)
 app.use('/api/smart-lock', require('./routes/smartLockRoutes'));
 
+// Route Quản lý Đón tiễn sân bay & Lịch trình xe đưa đón (Airport Transfer & Shuttle Fleet - Module 50)
+app.use('/api/transportation', require('./routes/transportationRoutes'));
+app.use('/api/v1/transportation', require('./routes/transportationRoutes'));
+
+// Route Quy trình Kiểm toán đêm tự động & Đóng sổ tài chính (Automated Night Audit - Module 49)
+app.use('/api/night-audit', require('./routes/nightAuditRoutes'));
+app.use('/api/v1/night-audit', require('./routes/nightAuditRoutes'));
+
+// Route Tự động kết xuất dữ liệu Khai báo tạm trú Công an (Police Guest Declaration Export - Module 51)
+app.use('/api/police-declaration', require('./routes/policeDeclarationRoutes'));
+app.use('/api/v1/police-declaration', require('./routes/policeDeclarationRoutes'));
+
+// Route Đồng bộ Kênh bán phòng trực tuyến OTA 2 chiều (Channel Manager Two-Way Sync - Module 52)
+app.use('/api/channel-manager', require('./routes/channelManagerRoutes'));
+app.use('/api/v1/channel-manager', require('./routes/channelManagerRoutes'));
+
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
 app.use('/api/v1/guest',      require('./modules/guest'));
@@ -178,7 +194,14 @@ app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController')
 app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 
 // FEAT-INVOICE-01: Booking Charges Aggregation (C6)
+app.get('/api/v1/bookings/:bookingId/charges', require('./middlewares/authMiddleware').verifyToken, require('./modules/services/controllers/bookingChargesController').getBookingCharges);
+app.get('/api/bookings/:bookingId/charges', require('./middlewares/authMiddleware').verifyToken, require('./modules/services/controllers/bookingChargesController').getBookingCharges);
 app.get('/bookings/:bookingId/charges', require('./middlewares/authMiddleware').verifyToken, require('./modules/services/controllers/bookingChargesController').getBookingCharges);
+
+// FEAT-GUEST-09: Xem lịch sử đặt phòng & Hủy phòng (Mã truy vết: A9)
+app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));
+app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
+app.use('/me',        require('./routes/bookingHistoryRoutes'));
 
 // FEAT-GUEST-09: Xem lịch sử đặt phòng & Hủy phòng (Mã truy vết: A9)
 app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));

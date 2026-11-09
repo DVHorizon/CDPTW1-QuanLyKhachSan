@@ -50,6 +50,11 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true,
       defaultValue: DataTypes.NOW,
+    },
+    Version: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      defaultValue: 1,
     }
   }, {
     tableName: 'MenuItems',
