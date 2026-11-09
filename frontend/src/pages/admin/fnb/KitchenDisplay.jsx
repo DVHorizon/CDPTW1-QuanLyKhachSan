@@ -377,9 +377,10 @@ const KitchenDisplay = () => {
           try {
             const message = JSON.parse(event.data);
 
-            // Sự kiện new_fnb_order theo chuẩn SPEC FEAT-FNB-12
-            if (message.event === 'new_fnb_order' || message.type === 'new_fnb_order') {
-              const payload = message.data || message;
+            // Sự kiện new_fnb_order theo chuẩn SPEC FEAT-FNB-12 hoặc NEW_KITCHEN_ORDER
+            if (message.event === 'new_fnb_order' || message.type === 'new_fnb_order' || message.type === 'NEW_KITCHEN_ORDER') {
+              const rawData = message.data || message;
+              const payload = (rawData && rawData.order) ? rawData.order : rawData;
               triggerNewOrderNotification(payload);
               // Tự động làm mới danh sách đơn trên giao diện KDS
               fetchOrders();
@@ -1003,7 +1004,7 @@ const KitchenDisplay = () => {
 
               <div className="flex items-center justify-between text-xs py-1 text-on-surface-variant font-medium">
                 <span>Loại đơn: <strong>{newOrderPopup.orderType === 'DineIn' ? 'Tại bàn (Dine-In)' : 'Dịch vụ phòng (Room Service)'}</strong></span>
-                <span>Giờ đặt: <strong>{new Date(newOrderPopup.orderTime).toLocaleTimeString('vi-VN')}</strong></span>
+                <span>Giờ đặt: <strong>{newOrderPopup.orderTime && !isNaN(new Date(newOrderPopup.orderTime).getTime()) ? new Date(newOrderPopup.orderTime).toLocaleTimeString('vi-VN') : new Date().toLocaleTimeString('vi-VN')}</strong></span>
               </div>
 
               {newOrderPopup.note && (
