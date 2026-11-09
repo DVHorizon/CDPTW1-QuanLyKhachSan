@@ -11,7 +11,7 @@ const Footer = () => {
 
   return (
     <footer className="w-full bg-[#fbf8f2] text-[#373435] pt-14 pb-8 border-t border-[#dedad0]">
-      <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div className="w-full px-4 sm:px-6 lg:px-8 max-w-[1440px] mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 mb-12">
           
           {/* Brand Info & Vision (col-span-4) */}
