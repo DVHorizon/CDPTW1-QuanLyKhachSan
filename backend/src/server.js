@@ -191,6 +191,11 @@ app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));
 app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
 app.use('/me',        require('./routes/bookingHistoryRoutes'));
 
+// FEAT-GUEST-09: Xem lịch sử đặt phòng & Hủy phòng (Mã truy vết: A9)
+app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));
+app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
+app.use('/me',        require('./routes/bookingHistoryRoutes'));
+
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 
 // FEAT-GUEST-10: Cổng gửi Email xác nhận & Thông báo

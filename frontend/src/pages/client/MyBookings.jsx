@@ -55,7 +55,6 @@ export default function MyBookings() {
   const [qrModalBooking, setQrModalBooking] = useState(null);
   const [loadingQr, setLoadingQr] = useState(false);
   const [qrCodeData, setQrCodeData] = useState(null);
-
   // Debounce tìm kiếm
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -132,7 +131,6 @@ export default function MyBookings() {
       setLoadingQr(false);
     }
   };
-
   // Xử lý Hủy đặt phòng
   const handleOpenCancelModal = (booking, e) => {
     if (e) e.stopPropagation();
@@ -804,7 +802,6 @@ export default function MyBookings() {
                   </button>
                 </div>
               )}
-
               {/* Thông tin phòng & lưu trú */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-[#eff4ff]/60 border border-[#d3e4fe]/50">
                 <div>
