@@ -52,7 +52,9 @@ async function ensureWishlistTableExists() {
         RoomTypeId INT NOT NULL,
         CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_wishlist_user (UserId),
-        INDEX idx_wishlist_roomtype (RoomTypeId)
+        INDEX idx_wishlist_roomtype (RoomTypeId),
+        CONSTRAINT fk_wishlist_user FOREIGN KEY (UserId) REFERENCES Users(UserId) ON DELETE CASCADE,
+        CONSTRAINT fk_wishlist_roomtype FOREIGN KEY (RoomTypeId) REFERENCES RoomTypes(RoomTypeId) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
     tableChecked = true;
@@ -501,3 +503,4 @@ module.exports = {
   syncWishlist,
   resolveUserId
 };
+
