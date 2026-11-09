@@ -240,7 +240,7 @@ export default function Wishlist() {
         onWishlistClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
       />
 
-      <main className="flex-1 pt-28 pb-20 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 pt-28 pb-20 w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Breadcrumb Navigation */}
         <nav aria-label="Breadcrumb" className="mb-6 flex items-center gap-2 text-xs text-[#8a8782]">
           <Link to="/" className="hover:text-[#b9a277] transition-colors flex items-center gap-1">
