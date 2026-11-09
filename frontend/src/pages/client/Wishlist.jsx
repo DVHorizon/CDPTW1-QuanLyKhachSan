@@ -207,16 +207,9 @@ export default function Wishlist() {
         {/* Hero Title Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-[#dedad0] mb-8">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#fedeb2]/40 text-[#725b38] border border-[#b9a277]/40 text-xs font-semibold uppercase tracking-wider mb-3">
-              <span className="material-symbols-outlined text-[16px] text-[#b9a277]">bookmark_heart</span>
-              Màn Hình 59 • WSH-059
-            </div>
             <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#203044] tracking-tight">
               Danh Sách Phòng Yêu Thích
             </h1>
-            <p className="mt-2 text-sm text-[#8a8782] max-w-2xl leading-relaxed">
-              Lưu giữ những không gian nghỉ dưỡng đỉnh cao tại Grand Horizon Phú Quốc. Dễ dàng so sánh, cân nhắc và tiến hành giữ chỗ với mức giá ưu đãi độc quyền.
-            </p>
           </div>
 
           {/* Action bar: Bộ đếm & Nút Clear Wishlist */}
