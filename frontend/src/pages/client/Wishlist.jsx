@@ -419,21 +419,6 @@ export default function Wishlist() {
                         Grand Horizon 5 Sao
                       </span>
                     </div>
-
-                    {/* Nút Xóa trực tiếp 1 phòng (Góc trên bên phải) - Ẩn khi phòng này đã được tick chọn */}
-                    {!isSelected && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSingle(room.roomTypeId)}
-                        className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/95 backdrop-blur-md hover:bg-rose-50 text-rose-500 hover:text-rose-600 flex items-center justify-center transition-all shadow-md hover:scale-110 active:scale-95 cursor-pointer border border-rose-100 group/btn z-10 animate-in fade-in"
-                        title="Xóa phòng này khỏi danh sách yêu thích"
-                        aria-label={`Xóa phòng ${room.typeName}`}
-                      >
-                        <span className="material-symbols-outlined text-[20px] font-bold transition-transform group-hover/btn:scale-115">
-                          delete
-                        </span>
-                      </button>
-                    )}
                   </div>
 
                   {/* Nội dung thông tin phòng */}
@@ -475,7 +460,7 @@ export default function Wishlist() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="grid grid-cols-2 gap-3">
                         <Link
                           to={`/rooms/${room.roomTypeId}`}
                           className="w-full py-2.5 text-center text-xs font-semibold text-[#203044] bg-[#fbf8f2] hover:bg-[#f5f4ef] border border-[#dedad0] hover:border-[#b9a277] hover:text-[#b9a277] rounded-xl transition-all"
@@ -490,24 +475,6 @@ export default function Wishlist() {
                           Đặt Phòng
                         </Link>
                       </div>
-
-                      {/* Trạng thái đã chọn hoặc Nút Xóa nhanh trực quan ở chân thẻ phòng */}
-                      {isSelected ? (
-                        <div className="w-full py-1.5 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[#b9a277] bg-[#fedeb2]/20 rounded-lg animate-in fade-in">
-                          <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                          Đã chọn phòng này để xóa
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSingle(room.roomTypeId)}
-                          className="w-full py-1.5 flex items-center justify-center gap-1 text-[11px] font-medium text-rose-500 hover:text-rose-700 hover:bg-rose-50/60 rounded-lg transition-colors cursor-pointer"
-                          title="Bỏ lưu phòng này khỏi danh sách"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">delete_outline</span>
-                          Xóa khỏi danh sách yêu thích
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>
