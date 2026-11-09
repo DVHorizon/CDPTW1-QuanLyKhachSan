@@ -52,6 +52,7 @@ import MaintenanceDashboard from './pages/admin/engineering/MaintenanceDashboard
 import MaintenanceTicketCreate from './pages/admin/engineering/MaintenanceTicketCreate';
 import AuditLogs from './pages/AuditLogs';
 import RosterShifts from './pages/RosterShifts';
+import AcademicDisclaimerWatermark from './components/common/AcademicDisclaimerWatermark';
 
 function App() {
   return (
@@ -179,6 +180,9 @@ function App() {
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
+
+          {/* Thông báo đồ án môn học lơ lửng phong cách desktop Windows */}
+          <AcademicDisclaimerWatermark />
         </Router>
         </WishlistProvider>
       </SocketProvider>
