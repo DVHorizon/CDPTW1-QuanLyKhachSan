@@ -236,6 +236,12 @@ const NAV_GROUPS = [
         to: "/admin/transportation",
         allowedRoles: ["Admin", "Receptionist"],
       },
+      {
+        icon: "local_police",
+        label: "Khai Báo Tạm Trú Công An (A08)",
+        to: "/admin/police-declaration",
+        allowedRoles: ["Admin", "Receptionist"],
+      },
     ],
   },
   {

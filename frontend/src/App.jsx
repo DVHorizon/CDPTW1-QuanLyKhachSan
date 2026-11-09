@@ -52,6 +52,7 @@ import AuditLogs from './pages/AuditLogs';
 import RosterShifts from './pages/RosterShifts';
 import AirportTransferManagement from './pages/admin/transportation/AirportTransferManagement';
 import NightAuditManagement from './pages/admin/finance/NightAuditManagement';
+import PoliceDeclarationExport from './pages/admin/security/PoliceDeclarationExport';
 
 function App() {
   return (
@@ -180,6 +181,9 @@ function App() {
             <Route path="/admin/night-audit" element={<ProtectedRoute><NightAuditManagement /></ProtectedRoute>} />
             <Route path="/admin/kiem-toan-dem" element={<ProtectedRoute><NightAuditManagement /></ProtectedRoute>} />
             <Route path="/admin/tai-chinh" element={<ProtectedRoute><NightAuditManagement /></ProtectedRoute>} />
+            <Route path="/admin/police-declaration" element={<ProtectedRoute><PoliceDeclarationExport /></ProtectedRoute>} />
+            <Route path="/admin/khai-bao-tam-tru" element={<ProtectedRoute><PoliceDeclarationExport /></ProtectedRoute>} />
+            <Route path="/admin/xuat-nhap-canh" element={<ProtectedRoute><PoliceDeclarationExport /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

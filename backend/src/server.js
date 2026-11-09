@@ -124,6 +124,10 @@ app.use('/api/v1/transportation', require('./routes/transportationRoutes'));
 app.use('/api/night-audit', require('./routes/nightAuditRoutes'));
 app.use('/api/v1/night-audit', require('./routes/nightAuditRoutes'));
 
+// Route Tự động kết xuất dữ liệu Khai báo tạm trú Công an (Police Guest Declaration Export - Module 51)
+app.use('/api/police-declaration', require('./routes/policeDeclarationRoutes'));
+app.use('/api/v1/police-declaration', require('./routes/policeDeclarationRoutes'));
+
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
 app.use('/api/v1/guest',      require('./modules/guest'));
