@@ -597,6 +597,7 @@ function broadcastOrderStatus(orderOrOrderId, status, payload = {}) {
 
 function broadcastNewKitchenOrder(order) {
   broadcastRoomEvent('NEW_KITCHEN_ORDER', { order });
+  broadcastRoomEvent('new_fnb_order', order);
 }
 
 function getWss() {

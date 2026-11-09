@@ -18,6 +18,7 @@ import RoomService from './pages/client/RoomService';
 import Profile from './pages/client/Profile';
 import MyBookings from './pages/client/MyBookings';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
+import KitchenInventory from './pages/admin/fnb/KitchenInventory';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
 import FnbOrderHistory from './pages/admin/fnb/FnbOrderHistory';
 import TableMap from './pages/admin/fnb/TableMap';
@@ -49,6 +50,10 @@ import MaintenanceDashboard from './pages/admin/engineering/MaintenanceDashboard
 import MaintenanceTicketCreate from './pages/admin/engineering/MaintenanceTicketCreate';
 import AuditLogs from './pages/AuditLogs';
 import RosterShifts from './pages/RosterShifts';
+import AirportTransferManagement from './pages/admin/transportation/AirportTransferManagement';
+import NightAuditManagement from './pages/admin/finance/NightAuditManagement';
+import PoliceDeclarationExport from './pages/admin/security/PoliceDeclarationExport';
+import ChannelManagerSync from './pages/admin/operations/ChannelManagerSync';
 
 function App() {
   return (
@@ -138,6 +143,8 @@ function App() {
             <Route path="/admin/staff-accounts" element={<Navigate to="/admin/staff" replace />} />
 
             <Route path="/admin/fnb/kitchen" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} />
+            <Route path="/admin/fnb/kitchen-inventory" element={<ProtectedRoute><KitchenInventory /></ProtectedRoute>} />
+            <Route path="/admin/fnb/nguyen-lieu" element={<ProtectedRoute><KitchenInventory /></ProtectedRoute>} />
             <Route path="/admin/fnb/dispatch" element={<ProtectedRoute><OrderDispatchHub /></ProtectedRoute>} />
             <Route path="/admin/fnb/room-service" element={<ProtectedRoute><RoomService /></ProtectedRoute>} />
             <Route path="/admin/fnb/history" element={<ProtectedRoute><FnbOrderHistory /></ProtectedRoute>} />
@@ -167,6 +174,20 @@ function App() {
             <Route path="/admin/roster" element={<ProtectedRoute><RosterShifts /></ProtectedRoute>} />
             <Route path="/admin/shifts" element={<ProtectedRoute><RosterShifts /></ProtectedRoute>} />
             <Route path="/admin/dieu-do-ca" element={<ProtectedRoute><RosterShifts /></ProtectedRoute>} />
+            <Route path="/admin/transportation" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
+            <Route path="/admin/airport-transfer" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
+            <Route path="/admin/shuttle" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
+            <Route path="/admin/doi-xe" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
+            <Route path="/admin/don-tien-san-bay" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
+            <Route path="/admin/night-audit" element={<ProtectedRoute><NightAuditManagement /></ProtectedRoute>} />
+            <Route path="/admin/kiem-toan-dem" element={<ProtectedRoute><NightAuditManagement /></ProtectedRoute>} />
+            <Route path="/admin/tai-chinh" element={<ProtectedRoute><NightAuditManagement /></ProtectedRoute>} />
+            <Route path="/admin/police-declaration" element={<ProtectedRoute><PoliceDeclarationExport /></ProtectedRoute>} />
+            <Route path="/admin/khai-bao-tam-tru" element={<ProtectedRoute><PoliceDeclarationExport /></ProtectedRoute>} />
+            <Route path="/admin/xuat-nhap-canh" element={<ProtectedRoute><PoliceDeclarationExport /></ProtectedRoute>} />
+            <Route path="/admin/channel-manager" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
+            <Route path="/admin/ota-sync" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
+            <Route path="/admin/kenh-ban-phong" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

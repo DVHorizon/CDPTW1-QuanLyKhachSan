@@ -4,12 +4,15 @@ import MenuForm from './MenuForm';
 
 const MenuManagement = () => {
   const [menuItems, setMenuItems] = useState([]);
+  const [categoriesList, setCategoriesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [status, setStatus] = useState('');
+  const [searchEngine, setSearchEngine] = useState('standard'); // 'standard' | 'elastic' | 'solr'
+  const [searchMeta, setSearchMeta] = useState(null);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, itemId: null });
-  const [messageModal, setMessageModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
+  const [messageModal, setMessageModal] = useState({ isOpen: false, type: 'success', title: '', message: '', isConflict: false });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
@@ -23,9 +26,20 @@ const MenuManagement = () => {
 
   const fetchMenu = () => {
     setLoading(true);
+
     let url = 'http://localhost:5000/api/v1/menu-items';
+    const cleanKw = keyword ? keyword.trim() : '';
+
+    // Khi người dùng chọn công nghệ tìm kiếm chuyên biệt (Elastic hoặc Solr)
+    // HOẶC có nhập từ khóa tìm kiếm:
+    if (searchEngine === 'elastic') {
+      url = 'http://localhost:5000/api/v1/search-elastic';
+    } else if (searchEngine === 'solr') {
+      url = 'http://localhost:5000/api/v1/search-solr';
+    }
+
     const params = new URLSearchParams();
-    if (keyword) params.append('keyword', keyword);
+    if (cleanKw) params.append('keyword', cleanKw);
     if (selectedCategory) params.append('category', selectedCategory);
     if (status) params.append('status', status);
     if (params.toString()) url += `?${params.toString()}`;
@@ -35,17 +49,53 @@ const MenuManagement = () => {
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
           setMenuItems(res.data);
+          if (res.engine) {
+            setSearchMeta({
+              engine: res.engine,
+              qTimeMs: res.qTimeMs,
+              total: res.total
+            });
+          } else {
+            setSearchMeta(null);
+          }
         } else {
           setMenuItems([]);
+          setSearchMeta(null);
         }
         setLoading(false);
       })
       .catch((error) => {
         console.error("Fetch error:", error);
         setMenuItems([]);
+        setSearchMeta(null);
         setLoading(false);
       });
   };
+
+  useEffect(() => {
+    fetch('http://localhost:5000/api/v1/menu-categories')
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setCategoriesList(res.data);
+        } else {
+          // Nếu database chưa có danh mục nào hoặc lỗi, tự động lấy danh mục duy nhất từ các món ăn hiện có
+          fetch('http://localhost:5000/api/v1/menu-items')
+            .then(r => r.json())
+            .then(r => {
+              if (r.success && Array.isArray(r.data)) {
+                const uniqueCats = Array.from(new Set(r.data.map(item => item.MenuCategory?.CategoryName || item.CategoryName).filter(Boolean)));
+                if (uniqueCats.length > 0) {
+                  setCategoriesList(uniqueCats.map((name, idx) => ({ CategoryId: idx + 1, CategoryName: name })));
+                }
+              }
+            }).catch(() => {});
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching categories:', err);
+      });
+  }, []);
 
   useEffect(() => { 
     setCurrentPage(1);
@@ -53,7 +103,7 @@ const MenuManagement = () => {
       fetchMenu();
     }, 300); // Debounce search
     return () => clearTimeout(timer);
-  }, [keyword, selectedCategory, status]);
+  }, [keyword, selectedCategory, status, searchEngine]);
 
   const openAddModal = () => {
     setEditingItem(null);
@@ -89,15 +139,28 @@ const MenuManagement = () => {
         body: JSON.stringify(formData)
       });
       const result = await response.json();
+      
+      if (response.status === 409) {
+        // Xung đột phiên bản (Optimistic Locking Conflict)
+        setMessageModal({ 
+          isOpen: true, 
+          type: 'error', 
+          isConflict: true,
+          title: 'XUNG ĐỘT PHIÊN BẢN (OPTIMISTIC LOCK)', 
+          message: result.message || 'Món ăn này vừa được cập nhật bởi một người khác. Vui lòng tải lại dữ liệu mới nhất.' 
+        });
+        return;
+      }
+
       if (response.ok) {
-        setMessageModal({ isOpen: true, type: 'success', title: 'THÀNH CÔNG', message: result.message });
+        setMessageModal({ isOpen: true, type: 'success', isConflict: false, title: 'THÀNH CÔNG', message: result.message });
         setIsModalOpen(false);
         fetchMenu();
       } else {
-        setMessageModal({ isOpen: true, type: 'error', title: 'LỖI', message: result.message });
+        setMessageModal({ isOpen: true, type: 'error', isConflict: false, title: 'LỖI', message: result.message });
       }
     } catch (error) {
-      setMessageModal({ isOpen: true, type: 'error', title: 'LỖI HỆ THỐNG', message: 'Không thể kết nối.' });
+      setMessageModal({ isOpen: true, type: 'error', isConflict: false, title: 'LỖI HỆ THỐNG', message: 'Không thể kết nối.' });
     }
   };
 
@@ -257,23 +320,33 @@ const MenuManagement = () => {
             {/*  Filter Segmented Tabs & Instant Keyword Search  */}
             <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-space-md">
               <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-space-sm">
-                {/*  Meal Period Badges / Categories  */}
-                <div className="inline-flex p-1 bg-surface-container rounded-lg gap-1 overflow-x-auto">
-                  <button onClick={() => setSelectedCategory('')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
+                {/*  Meal Period Badges / Categories động từ Database  */}
+                <div className="inline-flex p-1 bg-surface-container rounded-lg gap-1 overflow-x-auto max-w-full">
+                  <button 
+                    onClick={() => setSelectedCategory('')} 
+                    className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap transition-all ${
+                      selectedCategory === '' 
+                        ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' 
+                        : 'hover:bg-surface-container-high text-on-surface-variant'
+                    }`} 
+                    type="button"
+                  >
                     Tất Cả Món
                   </button>
-                  <button onClick={() => setSelectedCategory('1')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '1' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
-                    Bếp Nóng
-                  </button>
-                  <button onClick={() => setSelectedCategory('2')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '2' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
-                    Bếp Lạnh
-                  </button>
-                  <button onClick={() => setSelectedCategory('3')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '3' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
-                    Tráng Miệng
-                  </button>
-                  <button onClick={() => setSelectedCategory('4')} className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap ${selectedCategory === '4' ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' : 'hover:bg-surface-container-high text-on-surface-variant'}`} type="button">
-                    Đồ Uống / Bar
-                  </button>
+                  {categoriesList.length > 0 && categoriesList.map(cat => (
+                    <button 
+                      key={cat.CategoryId || cat.CategoryName} 
+                      onClick={() => setSelectedCategory(cat.CategoryName)} 
+                      className={`px-space-sm py-1 rounded font-label-md text-label-md whitespace-nowrap transition-all ${
+                        selectedCategory === cat.CategoryName 
+                          ? 'bg-surface-container-lowest shadow-sm text-admin-primary font-bold' 
+                          : 'hover:bg-surface-container-high text-on-surface-variant'
+                      }`} 
+                      type="button"
+                    >
+                      {cat.CategoryName}
+                    </button>
+                  ))}
                 </div>
                 
                 {/* Filters */}
@@ -302,6 +375,69 @@ const MenuManagement = () => {
                     <span className="absolute right-2 top-2 font-mono text-[10px] text-outline-variant bg-surface-container px-1 rounded">⌘K</span>
                   </div>
                 </div>
+              </div>
+
+              {/* BỘ CHỌN CÔNG CỤ TÌM KIẾM (Search Engine Selector: Thường vs Elasticsearch vs Solr) */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-surface-container/60">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-label-sm font-medium text-on-surface-variant flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px] text-primary">tune</span>
+                    Công nghệ tìm kiếm:
+                  </span>
+                  <div className="inline-flex p-0.5 bg-surface-container rounded-lg border border-surface-container-high">
+                    <button
+                      type="button"
+                      onClick={() => setSearchEngine('standard')}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${
+                        searchEngine === 'standard'
+                          ? 'bg-white shadow-sm text-on-surface text-primary border border-surface-container-high'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">database</span>
+                      Tìm thường (SQL)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSearchEngine('elastic')}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${
+                        searchEngine === 'elastic'
+                          ? 'bg-amber-500 text-white shadow-sm font-bold'
+                          : 'text-on-surface-variant hover:text-amber-600'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">bolt</span>
+                      Elasticsearch
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSearchEngine('solr')}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${
+                        searchEngine === 'solr'
+                          ? 'bg-orange-600 text-white shadow-sm font-bold'
+                          : 'text-on-surface-variant hover:text-orange-600'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">flare</span>
+                      Apache Solr
+                    </button>
+                  </div>
+                </div>
+
+                {searchMeta && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-mono bg-surface-container-low px-2.5 py-1 rounded border border-surface-container">
+                    <span className="font-semibold text-primary">{searchMeta.engine}</span>
+                    <span className="text-outline">•</span>
+                    <span className="text-on-surface-variant">Khớp: <strong className="text-on-surface">{searchMeta.total}</strong> món</span>
+                    <span className="text-outline">•</span>
+                    <span className="text-emerald-600 font-bold">⚡ {searchMeta.qTimeMs}ms</span>
+                    {searchMeta.semanticExpansions && searchMeta.semanticExpansions.length > 1 && (
+                      <span className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded text-[11px] font-sans" title={searchMeta.semanticExpansions.join(', ')}>
+                        ✨ Gợi ý ngữ nghĩa: {searchMeta.semanticExpansions.slice(1, 4).join(', ')}...
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               {/*  Catalog Data Table  */}
               <div className="overflow-x-auto">
@@ -381,7 +517,8 @@ const MenuManagement = () => {
                           </td>
                           <td className="py-3 px-3">
                             <span className="inline-flex items-center gap-1 font-label-sm text-label-sm bg-surface-container text-on-surface px-2 py-0.5 rounded">
-                              <span className="w-1.5 h-1.5 rounded-full bg-tertiary"></span> {item.MenuCategory ? item.MenuCategory.CategoryName : 'Chưa phân loại'}
+                              <span className="w-1.5 h-1.5 rounded-full bg-tertiary"></span> 
+                              {(item.MenuCategory && item.MenuCategory.CategoryName) || item.CategoryName || 'Bếp Nóng'}
                             </span>
                           </td>
                           <td className="py-3 px-3 text-right font-mono font-bold text-on-surface">
@@ -496,6 +633,7 @@ const MenuManagement = () => {
                   isEditing={!!editingItem}
                   formData={formData}
                   setFormData={setFormData}
+                  categoriesList={categoriesList}
                   handleSave={handleSave}
                   onCancel={() => { setIsModalOpen(false); setActiveRow(null); }}
                   onDelete={() => setConfirmModal({ isOpen: true, itemId: editingItem?.MenuItemId })}
@@ -541,15 +679,17 @@ const MenuManagement = () => {
         </div>
       )}
 
-      {/* MESSAGE MODAL (SUCCESS/ERROR) */}
+      {/* MESSAGE MODAL (SUCCESS/ERROR/CONFLICT) */}
       {messageModal.isOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-md">
           <div className="bg-surface-container-lowest w-full max-w-lg p-space-xl rounded-3xl shadow-2xl flex flex-col items-center text-center relative border border-surface-container-highest">
 
             {/* Floating Icon */}
-            <div className={`absolute -top-8 w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-4 border-surface-container-lowest ${messageModal.type === 'success' ? 'bg-[#10B981]' : 'bg-[#EF4444]'}`}>
+            <div className={`absolute -top-8 w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-4 border-surface-container-lowest ${
+              messageModal.isConflict ? 'bg-amber-500' : (messageModal.type === 'success' ? 'bg-[#10B981]' : 'bg-[#EF4444]')
+            }`}>
               <span className="material-symbols-outlined text-white text-[32px] font-bold">
-                {messageModal.type === 'success' ? 'check' : 'close'}
+                {messageModal.isConflict ? 'lock_reset' : (messageModal.type === 'success' ? 'check' : 'close')}
               </span>
             </div>
 
@@ -563,14 +703,40 @@ const MenuManagement = () => {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setMessageModal({ isOpen: false, type: 'success', title: '', message: '' })}
-              className={`mt-8 w-full py-4 rounded-xl font-bold uppercase tracking-wider text-white shadow-md hover:brightness-110 transition-all flex items-center justify-center gap-2 ${messageModal.type === 'success' ? 'bg-[#10B981]' : 'bg-[#EF4444]'}`}
-            >
-              [ Đóng / Quay về danh sách ]
-              <span className="material-symbols-outlined">arrow_forward</span>
-            </button>
+            <div className="mt-8 flex gap-3 w-full">
+              {messageModal.isConflict ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessageModal({ isOpen: false, type: 'success', title: '', message: '', isConflict: false });
+                      setIsModalOpen(false);
+                      fetchMenu();
+                    }}
+                    className="flex-1 py-4 rounded-xl font-bold uppercase tracking-wider text-white shadow-md bg-admin-primary hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined">sync</span>
+                    Tải lại dữ liệu mới nhất
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMessageModal({ isOpen: false, type: 'success', title: '', message: '', isConflict: false })}
+                    className="px-6 py-4 rounded-xl font-bold uppercase tracking-wider text-on-surface bg-surface-container hover:bg-surface-container-high transition-all"
+                  >
+                    Đóng
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMessageModal({ isOpen: false, type: 'success', title: '', message: '', isConflict: false })}
+                  className={`w-full py-4 rounded-xl font-bold uppercase tracking-wider text-white shadow-md hover:brightness-110 transition-all flex items-center justify-center gap-2 ${messageModal.type === 'success' ? 'bg-[#10B981]' : 'bg-[#EF4444]'}`}
+                >
+                  [ Đóng / Quay về danh sách ]
+                  <span className="material-symbols-outlined">arrow_forward</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
