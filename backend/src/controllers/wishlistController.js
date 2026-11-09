@@ -187,17 +187,27 @@ async function getWishlist(req, res) {
         order: orderClause
       });
 
-      const items = wishlists.map(w => formatRoomTypeForCard(w.roomType, w.WishlistId, w.CreatedAt));
+      // Deduplicate theo roomTypeId để mỗi phòng chỉ hiển thị 1 thẻ card duy nhất
+      const seenIds = new Set();
+      const uniqueItems = [];
+      for (const w of wishlists) {
+        if (!w.roomType) continue;
+        const rId = w.roomType.RoomTypeId;
+        if (!seenIds.has(rId)) {
+          seenIds.add(rId);
+          uniqueItems.push(formatRoomTypeForCard(w.roomType, w.WishlistId, w.CreatedAt));
+        }
+      }
 
       return res.status(200).json({
         success: true,
         code: SPEC_CODES.WISHLIST_UPDATED,
         message: SPEC_MESSAGES.WISHLIST_UPDATED,
         data: {
-          total: items.length,
+          total: uniqueItems.length,
           sortOption,
-          items,
-          roomTypeIds: items.map(i => i.roomTypeId)
+          items: uniqueItems,
+          roomTypeIds: uniqueItems.map(i => i.roomTypeId)
         }
       });
     }

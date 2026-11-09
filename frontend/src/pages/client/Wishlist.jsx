@@ -103,11 +103,49 @@ export default function Wishlist() {
           if (res.success && res.data && Array.isArray(res.data.items) && res.data.items.length > 0) {
             setRoomItems(res.data.items);
           } else {
-            setRoomItems([]);
+            // Cứu hộ tự động: nếu API wishlist chưa có dữ liệu, nạp trực tiếp danh sách loại phòng chuẩn
+            try {
+              const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+              let fbRes = await fetch(`${API_BASE}/loai-phong`);
+              if (!fbRes.ok) fbRes = await fetch(`${API_BASE}/v1/rooms/types`);
+              const fbJson = await fbRes.json();
+              const allTypes = Array.isArray(fbJson) ? fbJson : (fbJson.data || []);
+              const currentWishlistIds = wishlist.map(id => Number(id));
+
+              const matched = allTypes
+                .filter(rt => currentWishlistIds.includes(Number(rt.RoomTypeId || rt.MaLoaiPhong || rt.id)))
+                .map(rt => {
+                  let img = rt.ImageUrl || rt.HinhAnh || '';
+                  try {
+                    const parsed = JSON.parse(img);
+                    if (Array.isArray(parsed) && parsed.length > 0) img = parsed[0];
+                  } catch (_) {}
+                  return {
+                    wishlistId: null,
+                    roomTypeId: Number(rt.RoomTypeId || rt.MaLoaiPhong || rt.id),
+                    typeName: rt.TypeName || rt.TenLoaiPhong || 'Hạng Phòng Nghỉ Dưỡng',
+                    description: rt.Description || rt.MoTa || 'Không gian nghỉ dưỡng sang trọng chuẩn 5 sao với đầy đủ tiện nghi đẳng cấp.',
+                    basePrice: Number(rt.BasePrice || rt.GiaCoBan) || 0,
+                    adultCapacity: rt.AdultCapacity || 2,
+                    imageUrl: img || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80',
+                    amenities: []
+                  };
+                });
+
+              if (matched.length > 0) {
+                setRoomItems(matched);
+              } else {
+                setRoomItems([]);
+              }
+            } catch (fbErr) {
+              console.warn('Lỗi cứu hộ danh sách phòng:', fbErr);
+              setRoomItems([]);
+            }
           }
         }
       } catch (err) {
         console.error('Lỗi khi tải chi tiết wishlist:', err);
+        setRoomItems([]);
       } finally {
         if (isMounted) setIsLoading(false);
       }

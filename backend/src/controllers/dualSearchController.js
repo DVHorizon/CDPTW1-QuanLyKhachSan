@@ -33,16 +33,31 @@ function containsFullWidth(str) {
  */
 async function unifiedSearchRooms(req, res) {
   const startTime = Date.now();
-  const { keyword, engine, maxPrice, adults, capacity } = req.query;
-
-  // 1. Tự động nhận diện và chuẩn hóa Full-width (全角) -> Half-width (半角)
-  const isFullWidthInput = containsFullWidth(keyword);
-  const cleanKeyword = normalizeFullHalfWidth(keyword);
-
-  // 2. Xác định engine được chọn (mặc định là 'elasticsearch' hoặc 'solr')
-  const selectedEngine = (engine || 'elasticsearch').toLowerCase().trim();
+  let selectedEngine = 'elasticsearch';
+  let cleanKeyword = '';
+  let keyword = '';
+  let maxPrice = null;
+  let adults = null;
+  let capacity = null;
+  let isFullWidthInput = false;
 
   try {
+    const q = req.query || {};
+    keyword = typeof q.keyword === 'string' ? q.keyword : '';
+    maxPrice = q.maxPrice;
+    adults = q.adults;
+    capacity = q.capacity;
+
+    // 1. Tự động nhận diện và chuẩn hóa Full-width (全角) -> Half-width (半角)
+    isFullWidthInput = containsFullWidth(keyword);
+    cleanKeyword = normalizeFullHalfWidth(keyword);
+
+    // 2. Xác định engine được chọn an toàn (không bao giờ crash kể cả khi engine là array hoặc object)
+    const rawEngine = typeof q.engine === 'string' 
+      ? q.engine 
+      : (Array.isArray(q.engine) && typeof q.engine[0] === 'string' ? q.engine[0] : '');
+    selectedEngine = (rawEngine || 'elasticsearch').toLowerCase().trim();
+
     // ------------------------------------------------------------------
     // NHÁNH 0: CHẾ ĐỘ THƯỜNG (MYSQL DATABASE)
     // ------------------------------------------------------------------
@@ -219,12 +234,67 @@ async function unifiedSearchRooms(req, res) {
         });
       }
     } catch (fallbackErr) {
-      console.error('[DualSearch] Cả hai engines đều gặp lỗi:', fallbackErr);
-      return res.status(500).json({
-        success: false,
-        message: 'Lỗi tìm kiếm Dual Engine',
-        error: error.message
-      });
+      console.warn('[DualSearch] Cả hai engines đều gặp lỗi. Kích hoạt Fallback an toàn về MySQL Database:', fallbackErr.message);
+      try {
+        const whereClause = { IsDeleted: false };
+        if (cleanKeyword) {
+          whereClause[Op.or] = [
+            { TypeName: { [Op.like]: `%${cleanKeyword}%` } },
+            { Description: { [Op.like]: `%${cleanKeyword}%` } }
+          ];
+        }
+        if (maxPrice) {
+          whereClause.BasePrice = { [Op.lte]: Number(maxPrice) };
+        }
+        const cap = capacity || adults;
+        if (cap) {
+          whereClause.AdultCapacity = { [Op.gte]: Number(cap) };
+        }
+
+        const roomTypes = await RoomType.findAll({
+          where: whereClause,
+          include: [
+            {
+              model: Amenity,
+              as: 'amenityList',
+              through: { attributes: [] },
+              required: false
+            }
+          ],
+          limit: 20
+        });
+
+        const executionTimeMs = Date.now() - startTime;
+        const formattedData = roomTypes.map(r => ({
+          RoomTypeId: r.RoomTypeId,
+          TypeName: r.TypeName,
+          Description: r.Description,
+          BasePrice: Number(r.BasePrice) || 0,
+          AdultCapacity: r.AdultCapacity,
+          ImageUrl: r.ImageUrl,
+          Amenities: Array.isArray(r.amenityList) ? r.amenityList.map(a => a.Name || a.AmenityName).join(', ') : ''
+        }));
+
+        return res.status(200).json({
+          success: true,
+          engine: 'MySQL Database (Resilient Fallback)',
+          activeEngine: 'standard',
+          fallbackNotice: 'Elasticsearch & Solr hiện không khả dụng, hệ thống tự động phục vụ bằng CSDL MySQL an toàn',
+          originalKeyword: keyword || '',
+          normalizedKeyword: cleanKeyword,
+          isFullWidthInput,
+          executionTimeMs,
+          total: formattedData.length,
+          data: formattedData
+        });
+      } catch (dbErr) {
+        console.error('[DualSearch] Lỗi nghiêm trọng tại DB fallback:', dbErr);
+        return res.status(500).json({
+          success: false,
+          message: 'Lỗi tìm kiếm phòng',
+          error: dbErr.message
+        });
+      }
     }
   }
 }
