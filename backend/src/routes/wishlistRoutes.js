@@ -47,3 +47,4 @@ router.delete('/:roomTypeId', wishlistController.removeFromWishlist);
 router.delete('/', wishlistController.clearWishlist);
 
 module.exports = router;
+

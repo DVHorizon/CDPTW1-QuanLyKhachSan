@@ -170,3 +170,4 @@ export const syncWishlistApi = async (roomTypeIds = [], token = null) => {
     };
   }
 };
+

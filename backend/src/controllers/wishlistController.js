@@ -138,6 +138,24 @@ async function getWishlist(req, res) {
 
     // Trường hợp 1: Khách thành viên đã đăng nhập -> truy vấn DB
     if (userId) {
+      // Tự động đồng bộ các phòng từ localStorage/query (nếu có) vào DB cho thành viên
+      const rawIds = req.query.roomTypeIds || req.query.ids;
+      if (rawIds) {
+        const idArray = String(rawIds)
+          .split(',')
+          .map(id => Number(id.trim()))
+          .filter(id => !isNaN(id) && id > 0);
+        for (const rId of idArray) {
+          const roomExists = await RoomType.count({ where: { RoomTypeId: rId, IsDeleted: false } });
+          if (roomExists) {
+            await Wishlist.findOrCreate({
+              where: { UserId: userId, RoomTypeId: rId },
+              defaults: { UserId: userId, RoomTypeId: rId, CreatedAt: new Date() }
+            });
+          }
+        }
+      }
+
       // Xác định thứ tự sắp xếp
       let orderClause = [['CreatedAt', 'DESC'], ['WishlistId', 'DESC']];
       if (sortOption === 'DATE_ADDED_OLDEST') {

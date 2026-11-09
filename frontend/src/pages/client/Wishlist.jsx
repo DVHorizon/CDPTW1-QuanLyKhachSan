@@ -100,13 +100,10 @@ export default function Wishlist() {
         const res = await getWishlistApi(params, token);
 
         if (isMounted) {
-          if (res.success && res.data && Array.isArray(res.data.items)) {
-            // Giữ lại các item mà ID vẫn còn trong wishlist
-            const validItems = res.data.items.filter(item => wishlist.includes(item.roomTypeId));
-            setRoomItems(validItems);
+          if (res.success && res.data && Array.isArray(res.data.items) && res.data.items.length > 0) {
+            setRoomItems(res.data.items);
           } else {
-            // Nếu API không trả về hoặc lỗi, hiển thị dựa trên mảng IDs
-            setRoomItems(prev => prev.filter(item => wishlist.includes(item.roomTypeId)));
+            setRoomItems([]);
           }
         }
       } catch (err) {

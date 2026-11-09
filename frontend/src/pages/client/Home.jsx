@@ -473,7 +473,7 @@ function Home() {
             {/* Room Cards Grid (6 items) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
               {filteredRooms.map((rt) => {
-                const isWishlisted = wishlist.includes(rt.RoomTypeId);
+                const isSaved = isWishlisted(rt.RoomTypeId);
                 return (
                   <div
                     key={rt.RoomTypeId}
@@ -502,7 +502,7 @@ function Home() {
                         type="button"
                         aria-label="Yêu thích phòng"
                       >
-                        <span className={`material-symbols-outlined text-[20px] transition-colors ${isWishlisted ? 'text-rose-500 font-bold fill-current' : 'text-[#8a8782]'}`}>
+                        <span className={`material-symbols-outlined text-[20px] transition-colors ${isSaved ? 'text-rose-500 font-bold fill-current' : 'text-[#8a8782]'}`}>
                           favorite
                         </span>
                       </button>

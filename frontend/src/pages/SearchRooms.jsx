@@ -1095,7 +1095,7 @@ export default function SearchRooms() {
               {/* Danh sách phòng dạng thẻ ngang (Horizontal Cards) */}
               <div className="flex flex-col gap-space-lg">
                 {rooms.map((room) => {
-                  const isSaved = wishlist.includes(room.RoomTypeId);
+                  const isSaved = isWishlisted(room.RoomTypeId);
                   return (
                     <article
                       key={room.RoomTypeId}
