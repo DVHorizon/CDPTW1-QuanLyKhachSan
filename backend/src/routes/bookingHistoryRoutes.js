@@ -22,4 +22,7 @@ router.get('/bookings', verifyToken, bookingHistoryController.getMyBookings);
 router.get('/bookings/:bookingId', verifyToken, bookingHistoryController.getMyBookingDetail);
 router.patch('/bookings/:bookingId/cancel', verifyToken, bookingHistoryController.cancelMyBooking);
 
+// FEAT-GUEST-13C: Wishlist sub-route
+router.use('/wishlist', require('./wishlistRoutes'));
+
 module.exports = router;

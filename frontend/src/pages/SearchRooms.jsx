@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import RoomDetailModal from '../components/modals/RoomDetailModal';
 import QuickBookingModal from '../components/modals/QuickBookingModal';
+import { useWishlist } from '../context/WishlistContext';
 import { searchRoomsApi, getBranchesApi, suggestRoomsApi } from '../api/roomApi';
 
 // Helper format VND
@@ -143,7 +144,7 @@ export default function SearchRooms() {
     setEngineDropdownOpen(false);
     executeSearch({ engine: engineId });
   };
-  const [wishlist, setWishlist] = useState([]);
+  const { wishlist, wishlistCount, toggleWishlist, isWishlisted } = useWishlist();
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
@@ -323,13 +324,6 @@ export default function SearchRooms() {
     executeSearch();
   }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, priceMax, selectedEngine]);
 
-  // Xử lý Wishlist
-  const toggleWishlist = (roomId) => {
-    setWishlist(prev =>
-      prev.includes(roomId) ? prev.filter(id => id !== roomId) : [...prev, roomId]
-    );
-  };
-
   // Reset toàn bộ bộ lọc
   const handleResetFilters = () => {
     setPriceMax(25000000);
@@ -358,10 +352,8 @@ export default function SearchRooms() {
 
   return (
     <MainLayout
-      wishlistCount={wishlist.length}
-      onWishlistClick={() => {
-        window.scrollTo({ top: 300, behavior: 'smooth' });
-      }}
+      wishlistCount={wishlistCount}
+      onWishlistClick={() => navigate('/wishlist')}
     >
       <div className="flex flex-col w-full">
 

@@ -50,6 +50,7 @@ const defineLostAndFoundItem = require('./LostAndFoundItem');
 const defineSmartLockKey = require('./SmartLockKey');
 const defineMinibarUsage = require('./MinibarUsage');
 const definePricingRule = require('./PricingRule');
+const defineWishlist = require('./Wishlist');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -101,6 +102,7 @@ const LostAndFoundItem = defineLostAndFoundItem(sequelize);
 const SmartLockKey = defineSmartLockKey(sequelize);
 const MinibarUsage = defineMinibarUsage(sequelize);
 const PricingRule = definePricingRule(sequelize);
+const Wishlist = defineWishlist(sequelize);
 
 
 // PricingRule Relationships (FEAT-GUEST-12)
@@ -259,10 +261,17 @@ Payment.belongsTo(Invoice, { foreignKey: 'InvoiceId', as: 'invoice' });
 Stay.hasMany(MinibarUsage, { foreignKey: 'StayId', as: 'minibarUsages' });
 MinibarUsage.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
 
+// 20. Wishlist Associations (FEAT-GUEST-13C / A13)
+User.hasMany(Wishlist, { foreignKey: 'UserId', as: 'wishlists' });
+Wishlist.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+RoomType.hasMany(Wishlist, { foreignKey: 'RoomTypeId', as: 'wishlists' });
+Wishlist.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
+
 module.exports = {
   sequelize,
   Branch,
   RoomType,
+  Wishlist,
   PricingRule,
   Room,
   RoomSearchIndex,
@@ -291,6 +300,7 @@ module.exports = {
   LateFeePolicy,
   RoomInspectionReport,
   DamageItem,
+  Voucher,
   RoomStatusHistory,
   // Operations & Smart Lock models (tuyen/7)
   AuditLog,

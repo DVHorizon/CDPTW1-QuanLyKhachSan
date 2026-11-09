@@ -556,3 +556,13 @@ export const getRoomReviewsApi = async (roomId, params = {}) => {
   }
 };
 
+// FEAT-GUEST-13C: Re-export Wishlist API
+export {
+  getWishlistApi,
+  addToWishlistApi,
+  removeFromWishlistApi,
+  clearWishlistApi,
+  syncWishlistApi
+} from './wishlistApi';
+
+

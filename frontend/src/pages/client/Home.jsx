@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import RoomDetailModal from '../../components/modals/RoomDetailModal';
 import QuickBookingModal from '../../components/modals/QuickBookingModal';
+import { useWishlist } from '../../context/WishlistContext';
 import { fetchHomeData } from '../../api/hotelApi';
 import {
   mockBranches,
@@ -70,7 +71,7 @@ function Home() {
   const [guestOption, setGuestOption] = useState('2-0-1');
   const [searchNotification, setSearchNotification] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [wishlist, setWishlist] = useState([]);
+  const { wishlist, wishlistCount, toggleWishlist, isWishlisted } = useWishlist();
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [openFaqId, setOpenFaqId] = useState(1);
@@ -173,13 +174,6 @@ function Home() {
     navigate(`/rooms?branchId=${selectedBranch}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}&totalGuests=${guests}`);
   };
 
-  // Toggle Wishlist
-  const toggleWishlist = (roomId) => {
-    setWishlist(prev =>
-      prev.includes(roomId) ? prev.filter(id => id !== roomId) : [...prev, roomId]
-    );
-  };
-
   // Chuyển hướng trực tiếp tới màn hình Đặt Phòng (Booking Engine)
   const handleBookNow = (rt) => {
     const guests = guestOption ? guestOption.split('-') : ['2', '0', '1'];
@@ -208,11 +202,8 @@ function Home() {
 
   return (
     <MainLayout
-      wishlistCount={wishlist.length}
-      onWishlistClick={() => {
-        const el = document.getElementById('room-collection');
-        if (el) el.scrollIntoView({ behavior: 'smooth' });
-      }}
+      wishlistCount={wishlistCount}
+      onWishlistClick={() => navigate('/wishlist')}
     >
       <div className="flex flex-col w-full">
 

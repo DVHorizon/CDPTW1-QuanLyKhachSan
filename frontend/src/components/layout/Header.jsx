@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useWishlist } from '../../context/WishlistContext';
 
 /**
  * Từ điển ngôn ngữ cho thanh Header
@@ -63,7 +64,17 @@ const FlagEN = ({ className = "w-4 h-2.5" }) => (
  * Tích hợp Language Switcher (VN / ENG), hiệu ứng cuộn trang thông minh,
  * Wishlist counter, User profile và Mobile Drawer.
  */
-const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguageChange }) => {
+const Header = ({ wishlistCount: propWishlistCount, onWishlistClick, lang: propLang, onLanguageChange }) => {
+  const navigate = useNavigate();
+  let ctxWishlistCount = 0;
+  try {
+    const wl = useWishlist();
+    if (wl) ctxWishlistCount = wl.wishlistCount;
+  } catch {
+    // Không nằm trong provider
+  }
+  const wishlistCount = propWishlistCount !== undefined ? propWishlistCount : ctxWishlistCount;
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [isTop, setIsTop] = useState(true);
@@ -188,10 +199,15 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
           </a>
 
           {/* Wishlist Button with Counter */}
-          <a
-            href="#room-collection"
-            onClick={onWishlistClick}
-            className="relative w-8.5 h-8.5 rounded-lg bg-white border border-[#dedad0] hover:border-[#b9a277] text-[#203044] hover:text-rose-500 flex items-center justify-center transition-all shadow-xs shrink-0"
+          <Link
+            to="/wishlist"
+            onClick={(e) => {
+              if (onWishlistClick) {
+                e.preventDefault();
+                onWishlistClick(e);
+              }
+            }}
+            className="relative w-8.5 h-8.5 rounded-lg bg-white border border-[#dedad0] hover:border-[#b9a277] text-[#203044] hover:text-rose-500 flex items-center justify-center transition-all shadow-xs shrink-0 cursor-pointer"
             title={t.wishlistTitle}
           >
             <span className={`material-symbols-outlined text-[18px] ${wishlistCount > 0 ? 'text-rose-500 fill-current' : ''}`}>
@@ -202,7 +218,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                 {wishlistCount}
               </span>
             )}
-          </a>
+          </Link>
 
           {/* Language Selector (VN / ENG) */}
           <div className="relative shrink-0" ref={langDropdownRef}>
@@ -319,6 +335,22 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                   >
                     <span className="material-symbols-outlined text-base text-[#b9a277]">receipt_long</span>
                     <span>Lịch Sử Gọi Món</span>
+                  </Link>
+
+                  <Link
+                    to="/wishlist"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-base text-rose-500">bookmark_heart</span>
+                      <span>Danh Sách Yêu Thích</span>
+                    </div>
+                    {wishlistCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-bold">
+                        {wishlistCount}
+                      </span>
+                    )}
                   </Link>
 
                   <Link
@@ -484,6 +516,15 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                 >
                   <span className="material-symbols-outlined text-[18px] text-[#b9a277]">calendar_month</span>
                   <span>Lịch Sử Đặt Phòng</span>
+                </Link>
+
+                <Link
+                  to="/wishlist"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full py-2 px-3 rounded-lg bg-white border border-[#dedad0] text-[#203044] text-xs font-bold text-center flex items-center justify-center gap-2 mt-1"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-rose-500">bookmark_heart</span>
+                  <span>Danh Sách Yêu Thích {wishlistCount > 0 ? `(${wishlistCount})` : ''}</span>
                 </Link>
 
                 {([1, 2, 3, 4].includes(user.roleId) || ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'].includes(user.roleName)) && (
