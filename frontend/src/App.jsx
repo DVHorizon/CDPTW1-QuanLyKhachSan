@@ -51,6 +51,7 @@ import MaintenanceTicketCreate from './pages/admin/engineering/MaintenanceTicket
 import AuditLogs from './pages/AuditLogs';
 import RosterShifts from './pages/RosterShifts';
 import AirportTransferManagement from './pages/admin/transportation/AirportTransferManagement';
+import NightAuditManagement from './pages/admin/finance/NightAuditManagement';
 
 function App() {
   return (
@@ -176,6 +177,9 @@ function App() {
             <Route path="/admin/shuttle" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
             <Route path="/admin/doi-xe" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
             <Route path="/admin/don-tien-san-bay" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
+            <Route path="/admin/night-audit" element={<ProtectedRoute><NightAuditManagement /></ProtectedRoute>} />
+            <Route path="/admin/kiem-toan-dem" element={<ProtectedRoute><NightAuditManagement /></ProtectedRoute>} />
+            <Route path="/admin/tai-chinh" element={<ProtectedRoute><NightAuditManagement /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

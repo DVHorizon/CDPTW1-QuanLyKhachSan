@@ -13,6 +13,8 @@ const router = express.Router();
 // router.use('/audit-logs',    require('./routes/auditRoutes'));
 // router.use('/ota-channels',  require('./routes/otaRoutes'));
 // router.use('/roster',        require('./routes/rosterRoutes'));
+router.use('/night-audit',   require('../../routes/nightAuditRoutes'));
+router.use('/transportation', require('../../routes/transportationRoutes'));
 // Dùng lại auditLog route hiện có
 router.use('/audit-logs', require('../../routes/auditLogRoutes'));
 router.get('/ping', (req, res) => res.json({ module: 'operations', owner: 'Tuyền', status: 'ready' }));
