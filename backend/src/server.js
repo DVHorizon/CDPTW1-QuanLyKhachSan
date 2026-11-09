@@ -120,6 +120,10 @@ app.use('/api/smart-lock', require('./routes/smartLockRoutes'));
 app.use('/api/transportation', require('./routes/transportationRoutes'));
 app.use('/api/v1/transportation', require('./routes/transportationRoutes'));
 
+// Route Quy trình Kiểm toán đêm tự động & Đóng sổ tài chính (Automated Night Audit - Module 49)
+app.use('/api/night-audit', require('./routes/nightAuditRoutes'));
+app.use('/api/v1/night-audit', require('./routes/nightAuditRoutes'));
+
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
 app.use('/api/v1/guest',      require('./modules/guest'));

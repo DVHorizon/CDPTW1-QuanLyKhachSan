@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { icon: 'directions_car',      label: 'Đón Tiễn Sân Bay & Đội Xe',   to: '/admin/transportation' },
   { icon: 'spa',                 label: 'Dịch Vụ & Spa',               to: '/admin/dich-vu-spa' },
   { icon: 'restaurant',          label: 'Ẩm Thực F&B & Bếp',          to: '/admin' },
+  { icon: 'dark_mode',           label: 'Kiểm Toán Đêm Tự Động',       to: '/admin/night-audit' },
   { icon: 'account_balance',     label: 'Tài Chính & Sổ Cái',          to: '/admin/tai-chinh' },
   { icon: 'neurology',           label: 'AI Concierge & Chatbot',      to: '/admin/ai-concierge' },
   { icon: 'admin_panel_settings',label: 'Quản Trị Hệ Thống',          to: '/admin/quan-tri' },

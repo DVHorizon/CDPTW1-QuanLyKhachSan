@@ -84,6 +84,12 @@ const NAV_GROUPS = [
         allowedRoles: ["Admin", "Receptionist"],
       },
       {
+        icon: "dark_mode",
+        label: "Kiểm Toán Đêm Tự Động",
+        to: "/admin/night-audit",
+        allowedRoles: ["Admin", "Receptionist"],
+      },
+      {
         icon: "account_balance",
         label: "Tài Chính & Sổ Cái",
         to: "/admin/tai-chinh",
