@@ -53,6 +53,7 @@ import RosterShifts from './pages/RosterShifts';
 import AirportTransferManagement from './pages/admin/transportation/AirportTransferManagement';
 import NightAuditManagement from './pages/admin/finance/NightAuditManagement';
 import PoliceDeclarationExport from './pages/admin/security/PoliceDeclarationExport';
+import ChannelManagerSync from './pages/admin/operations/ChannelManagerSync';
 
 function App() {
   return (
@@ -184,6 +185,9 @@ function App() {
             <Route path="/admin/police-declaration" element={<ProtectedRoute><PoliceDeclarationExport /></ProtectedRoute>} />
             <Route path="/admin/khai-bao-tam-tru" element={<ProtectedRoute><PoliceDeclarationExport /></ProtectedRoute>} />
             <Route path="/admin/xuat-nhap-canh" element={<ProtectedRoute><PoliceDeclarationExport /></ProtectedRoute>} />
+            <Route path="/admin/channel-manager" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
+            <Route path="/admin/ota-sync" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
+            <Route path="/admin/kenh-ban-phong" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

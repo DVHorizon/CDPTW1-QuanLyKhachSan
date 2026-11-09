@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { icon: 'cleaning_services',   label: 'Buồng Phòng & Kỹ Thuật',     to: '/admin/buong-phong' },
   { icon: 'directions_car',      label: 'Đón Tiễn Sân Bay & Đội Xe',   to: '/admin/transportation' },
   { icon: 'local_police',        label: 'Khai Báo Tạm Trú Công An',    to: '/admin/police-declaration' },
+  { icon: 'sync_alt',            label: 'Đồng Bộ Kênh Bán Phòng OTA',  to: '/admin/channel-manager' },
   { icon: 'spa',                 label: 'Dịch Vụ & Spa',               to: '/admin/dich-vu-spa' },
   { icon: 'restaurant',          label: 'Ẩm Thực F&B & Bếp',          to: '/admin' },
   { icon: 'dark_mode',           label: 'Kiểm Toán Đêm Tự Động',       to: '/admin/night-audit' },

@@ -16,6 +16,7 @@ const router = express.Router();
 router.use('/night-audit',   require('../../routes/nightAuditRoutes'));
 router.use('/transportation', require('../../routes/transportationRoutes'));
 router.use('/police-declaration', require('../../routes/policeDeclarationRoutes'));
+router.use('/channel-manager', require('../../routes/channelManagerRoutes'));
 // Dùng lại auditLog route hiện có
 router.use('/audit-logs', require('../../routes/auditLogRoutes'));
 router.get('/ping', (req, res) => res.json({ module: 'operations', owner: 'Tuyền', status: 'ready' }));

@@ -128,6 +128,10 @@ app.use('/api/v1/night-audit', require('./routes/nightAuditRoutes'));
 app.use('/api/police-declaration', require('./routes/policeDeclarationRoutes'));
 app.use('/api/v1/police-declaration', require('./routes/policeDeclarationRoutes'));
 
+// Route Đồng bộ Kênh bán phòng trực tuyến OTA 2 chiều (Channel Manager Two-Way Sync - Module 52)
+app.use('/api/channel-manager', require('./routes/channelManagerRoutes'));
+app.use('/api/v1/channel-manager', require('./routes/channelManagerRoutes'));
+
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
 app.use('/api/v1/guest',      require('./modules/guest'));

@@ -242,6 +242,12 @@ const NAV_GROUPS = [
         to: "/admin/police-declaration",
         allowedRoles: ["Admin", "Receptionist"],
       },
+      {
+        icon: "sync_alt",
+        label: "Đồng Bộ Kênh Bán Phòng OTA",
+        to: "/admin/channel-manager",
+        allowedRoles: ["Admin", "Receptionist"],
+      },
     ],
   },
   {
