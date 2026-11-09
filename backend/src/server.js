@@ -116,6 +116,10 @@ app.use('/api/housekeeping/lost-and-found', require('./routes/lostAndFoundRoutes
 // Route Khóa Cửa Điện Tử Thông Minh IoT (E-Key & Smart Lock Management)
 app.use('/api/smart-lock', require('./routes/smartLockRoutes'));
 
+// Route Quản lý Đón tiễn sân bay & Lịch trình xe đưa đón (Airport Transfer & Shuttle Fleet - Module 50)
+app.use('/api/transportation', require('./routes/transportationRoutes'));
+app.use('/api/v1/transportation', require('./routes/transportationRoutes'));
+
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
 app.use('/api/v1/guest',      require('./modules/guest'));

@@ -50,6 +50,7 @@ import MaintenanceDashboard from './pages/admin/engineering/MaintenanceDashboard
 import MaintenanceTicketCreate from './pages/admin/engineering/MaintenanceTicketCreate';
 import AuditLogs from './pages/AuditLogs';
 import RosterShifts from './pages/RosterShifts';
+import AirportTransferManagement from './pages/admin/transportation/AirportTransferManagement';
 
 function App() {
   return (
@@ -170,6 +171,11 @@ function App() {
             <Route path="/admin/roster" element={<ProtectedRoute><RosterShifts /></ProtectedRoute>} />
             <Route path="/admin/shifts" element={<ProtectedRoute><RosterShifts /></ProtectedRoute>} />
             <Route path="/admin/dieu-do-ca" element={<ProtectedRoute><RosterShifts /></ProtectedRoute>} />
+            <Route path="/admin/transportation" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
+            <Route path="/admin/airport-transfer" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
+            <Route path="/admin/shuttle" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
+            <Route path="/admin/doi-xe" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
+            <Route path="/admin/don-tien-san-bay" element={<ProtectedRoute><AirportTransferManagement /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

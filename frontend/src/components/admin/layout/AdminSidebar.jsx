@@ -26,6 +26,7 @@ const ALL_NAV_ITEMS = [
   { icon: "key", label: "Khóa Thông Minh & E-Key", to: "/admin/security/smart-lock", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "security", label: "Kiểm Soát Nội Bộ & Nhật Ký", to: "/admin/audit-logs", allowedRoles: ['Admin'] },
   { icon: "event_available", label: "Điều Độ Lịch Trực Ca", to: "/admin/roster", allowedRoles: ['Admin', 'Receptionist'] },
+  { icon: "directions_car", label: "Đón Tiễn Sân Bay & Đội Xe", to: "/admin/transportation", allowedRoles: ['Admin', 'Receptionist'] },
   { icon: "campaign", label: "Tiếp Thị & CSKH (Marketing)", to: "/admin/marketing", allowedRoles: ['Admin', 'Receptionist'] },
 
   { icon: "spa", label: "Danh Mục Dịch Vụ", to: "/admin/services", allowedRoles: ['Admin', 'Receptionist'] },
