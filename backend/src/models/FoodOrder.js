@@ -28,7 +28,7 @@ module.exports = (sequelize) => {
       defaultValue: 'RoomService'
     },
     Status: {
-      type: DataTypes.ENUM('Pending', 'Preparing', 'Ready', 'Delivered', 'Cancelled'),
+      type: DataTypes.ENUM('Pending', 'Confirmed', 'Preparing', 'Ready', 'Delivering', 'Served', 'Delivered', 'Cancelled'),
       defaultValue: 'Pending'
     },
     TotalAmount: {
