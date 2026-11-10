@@ -80,6 +80,14 @@ exports.getMyActiveTableReservation = async (req, res) => {
 
 exports.getActiveStays = async (req, res) => {
   try {
+    const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId || req.query.userId;
+    const userOnly = req.query.userOnly === 'true' || (req.user && req.user.role !== 'Admin' && req.user.role !== 'Employee' && req.user.role !== 'Staff');
+
+    const bookingWhere = {};
+    if (userOnly && currentUserId) {
+      bookingWhere.UserId = currentUserId;
+    }
+
     const stays = await Stay.findAll({
       where: { 
         Status: { [require('sequelize').Op.in]: ['CheckedIn', 'Active'] } 
@@ -88,10 +96,12 @@ exports.getActiveStays = async (req, res) => {
         { model: Room },
         { 
           model: Booking, 
+          where: Object.keys(bookingWhere).length > 0 ? bookingWhere : undefined,
+          required: Object.keys(bookingWhere).length > 0,
           include: [{ model: User, as: 'user', attributes: ['UserId', 'FullName', 'Email', 'Phone'] }] 
         }
       ],
-      order: [['StayId', 'ASC']]
+      order: [['StayId', 'DESC']]
     });
     return res.status(200).json({
       success: true,

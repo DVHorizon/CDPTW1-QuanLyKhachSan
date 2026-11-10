@@ -100,21 +100,36 @@ const RoomService = () => {
   useEffect(() => {
     const fetchActiveStays = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/v1/fnb-orders/active-stays');
+        const token = localStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const uid = user?.id || user?.UserId || user?.userId;
+        const queryParam = uid ? `?userId=${uid}&userOnly=true` : '';
+        const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/active-stays${queryParam}`, { headers });
         const json = await res.json();
-        if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setActiveStays(json.data);
-          
-          // Ưu tiên chọn phòng gắn với User đang đăng nhập nếu có
-          const uid = user?.id || user?.UserId || user?.userId;
-          let matched = null;
+        if (json && json.success && Array.isArray(json.data)) {
+          // Lọc danh sách phòng nếu là khách hàng cá nhân
+          let staysList = json.data;
           if (uid) {
-            matched = json.data.find(s => String(s.userId) === String(uid));
+            const userStays = json.data.filter(s => String(s.userId) === String(uid));
+            if (userStays.length > 0) {
+              staysList = userStays;
+            }
           }
-          const defaultStay = matched || json.data[0];
-          setSelectedStay(defaultStay);
-          setStayId(defaultStay.stayId);
-          setRoomId(defaultStay.roomId);
+          setActiveStays(staysList);
+          
+          if (staysList.length > 0) {
+            const matched = uid ? staysList.find(s => String(s.userId) === String(uid)) : null;
+            const defaultStay = matched || staysList[0];
+            setSelectedStay(defaultStay);
+            setStayId(defaultStay.stayId);
+            setRoomId(defaultStay.roomId);
+          } else {
+            setSelectedStay(null);
+            setStayId(null);
+            setRoomId(null);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch active stays:', err);
@@ -144,7 +159,7 @@ const RoomService = () => {
     const fetchMenuItems = async () => {
       setIsLoadingMenu(true);
       try {
-        let url = 'http://localhost:5000/api/v1/menu-items?limit=100';
+        let url = 'http://localhost:5000/api/v1/menu-items?limit=100&availableOnly=true';
         if (selectedCategoryId && selectedCategoryId !== 'ALL') {
           url += `&category=${selectedCategoryId}`;
         }
@@ -154,9 +169,11 @@ const RoomService = () => {
         const res = await fetch(url);
         const data = await res.json();
         if (data && data.success && Array.isArray(data.data)) {
-          setMenuItems(data.data);
-          if (!selectedMenuItem && data.data.length > 0) {
-            setSelectedMenuItem(data.data[0]);
+          // Lọc chắc chắn chỉ hiển thị món Available, không bị xóa và còn đủ nguyên liệu
+          const activeOnly = data.data.filter(item => item.Status === 'Available' && !item.IsDeleted);
+          setMenuItems(activeOnly);
+          if (!selectedMenuItem && activeOnly.length > 0) {
+            setSelectedMenuItem(activeOnly[0]);
           }
         } else if (res.status === 404) {
           setMenuItems([]);
@@ -445,30 +462,37 @@ const RoomService = () => {
                 <div className="flex items-center gap-2 bg-emerald-50/80 border border-emerald-200/80 px-3 py-1.5 rounded-xl shadow-sm">
                   <span className="material-symbols-outlined text-emerald-700 text-[18px]">meeting_room</span>
                   <span className="text-xs font-bold text-slate-700">Phòng:</span>
-                  <select
-                    value={stayId || ''}
-                    onChange={(e) => {
-                      const sId = Number(e.target.value);
-                      const found = activeStays.find(s => s.stayId === sId);
-                      if (found) {
-                        setSelectedStay(found);
-                        setStayId(found.stayId);
-                        setRoomId(found.roomId);
-                        setErrorMessage('');
-                      }
-                    }}
-                    className="bg-white border border-emerald-300 rounded-lg px-2.5 py-1 font-bold text-emerald-800 text-xs shadow-sm focus:outline-none cursor-pointer"
-                  >
-                    {activeStays.length === 0 ? (
-                      <option value="">Đang tải phòng lưu trú...</option>
-                    ) : (
-                      activeStays.map(s => (
-                        <option key={s.stayId} value={s.stayId}>
-                          Phòng #{s.roomNumber} - {s.guestName}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                  {activeStays.length === 1 ? (
+                    <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-xs px-2.5 py-1 rounded-lg shadow-inner">
+                      <span>Phòng #{activeStays[0].roomNumber}</span>
+                      <span className="text-[11px] font-semibold text-emerald-700">({activeStays[0].guestName})</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={stayId || ''}
+                      onChange={(e) => {
+                        const sId = Number(e.target.value);
+                        const found = activeStays.find(s => s.stayId === sId);
+                        if (found) {
+                          setSelectedStay(found);
+                          setStayId(found.stayId);
+                          setRoomId(found.roomId);
+                          setErrorMessage('');
+                        }
+                      }}
+                      className="bg-white border border-emerald-300 rounded-lg px-2.5 py-1 font-bold text-emerald-800 text-xs shadow-sm focus:outline-none cursor-pointer"
+                    >
+                      {activeStays.length === 0 ? (
+                        <option value="">Chưa có phòng lưu trú</option>
+                      ) : (
+                        activeStays.map(s => (
+                          <option key={s.stayId} value={s.stayId}>
+                            Phòng #{s.roomNumber} - {s.guestName}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl shadow-sm">

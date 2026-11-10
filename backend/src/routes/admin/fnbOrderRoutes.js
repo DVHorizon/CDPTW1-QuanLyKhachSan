@@ -4,7 +4,7 @@ const fnbOrderController = require('../../controllers/admin/fnbOrderController')
 const { verifyToken, optionalVerifyToken } = require('../../middlewares/authMiddleware');
 
 // Lấy danh sách phòng đang lưu trú phục vụ Room Service
-router.get('/active-stays', fnbOrderController.getActiveStays);
+router.get('/active-stays', optionalVerifyToken, fnbOrderController.getActiveStays);
 router.get('/my-table-reservation', optionalVerifyToken, fnbOrderController.getMyActiveTableReservation);
 
 // Đặt món Room Service online (FEAT-FNB-04: A4.4)
