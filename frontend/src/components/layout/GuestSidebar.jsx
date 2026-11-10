@@ -1,10 +1,32 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 export default function GuestSidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [stayInfo, setStayInfo] = useState(null);
+
+  useEffect(() => {
+    const fetchGuestStay = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const uid = user?.id || user?.UserId || user?.userId;
+        const queryParam = uid ? `?userId=${uid}&userOnly=true` : '';
+        const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/active-stays${queryParam}`, { headers });
+        const json = await res.json();
+        if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const matched = uid ? json.data.find(s => String(s.userId) === String(uid)) : null;
+          setStayInfo(matched || json.data[0]);
+        }
+      } catch (err) {
+        console.error('Failed to load guest stay info for sidebar:', err);
+      }
+    };
+    fetchGuestStay();
+  }, [user]);
 
   const handleLogout = () => {
     if (logout) logout();
@@ -38,12 +60,15 @@ export default function GuestSidebar() {
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-emerald-800 uppercase tracking-wider font-bold">Kỳ Nghỉ Của Quý Khách</span>
               <span className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Đang Lưu Trú
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                {stayInfo ? "Đang Lưu Trú" : "Đặt Phòng Trực Tuyến"}
               </span>
             </div>
-            <div className="text-sm font-bold text-slate-800 truncate">Phòng Deluxe Ban Công #804</div>
+            <div className="text-sm font-bold text-slate-800 truncate">
+              {stayInfo ? `Phòng #${stayInfo.roomNumber}` : "Standard Garden Villa"}
+            </div>
             <div className="text-xs text-slate-500 flex items-center justify-between">
-              <span>Nhận: 28/11 • Trả: 02/12</span>
+              <span>{stayInfo ? `Tầng ${stayInfo.floor || 5}` : "Khu Nghỉ Dưỡng"}</span>
               <span className="font-bold text-emerald-700">Tháp B</span>
             </div>
           </div>
