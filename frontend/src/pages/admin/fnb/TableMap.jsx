@@ -281,10 +281,10 @@ export default function TableMap() {
     }
   }, [selectedTableId, fetchTableDetail]);
 
-  // WebSocket Subscription for Realtime Table Status
+  // WebSocket Subscription for Realtime Table Status & Order Status
   useEffect(() => {
     if (!subscribe) return;
-    const unsub = subscribe('TABLE_STATUS_CHANGED', (data) => {
+    const unsubTable = subscribe('TABLE_STATUS_CHANGED', (data) => {
       console.log('⚡ [TableMap Realtime] Nhận sự kiện TABLE_STATUS_CHANGED:', data);
       fetchTableMap(false);
       if (selectedTableId && data?.tableId === selectedTableId) {
@@ -292,8 +292,17 @@ export default function TableMap() {
       }
     });
 
+    const unsubOrder = subscribe('ORDER_STATUS_CHANGED', (data) => {
+      console.log('⚡ [TableMap Realtime] Nhận sự kiện ORDER_STATUS_CHANGED:', data);
+      fetchTableMap(false);
+      if (selectedTableId) {
+        fetchTableDetail(selectedTableId);
+      }
+    });
+
     return () => {
-      if (unsub) unsub();
+      if (unsubTable) unsubTable();
+      if (unsubOrder) unsubOrder();
     };
   }, [subscribe, fetchTableMap, fetchTableDetail, selectedTableId]);
 
@@ -742,8 +751,16 @@ export default function TableMap() {
                                 </div>
 
                                 {/* Status Badge */}
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${theme.chipBg}`}>
-                                  {tbl.status === 'Occupied' ? (tbl.currentOrder ? 'Đang Ăn' : 'Có Khách') : theme.shortLabel}
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                  tbl.status === 'Occupied'
+                                    ? (tbl.currentOrder?.status === 'Served' || tbl.currentOrder?.status === 'Delivered'
+                                        ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300'
+                                        : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300')
+                                    : (tbl.currentOrder ? 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300' : theme.chipBg)
+                                }`}>
+                                  {tbl.status === 'Occupied'
+                                    ? (tbl.currentOrder?.status === 'Served' || tbl.currentOrder?.status === 'Delivered' ? 'Đang Ăn' : 'Có Khách')
+                                    : (tbl.currentOrder ? 'Chờ Phục Vụ' : theme.shortLabel)}
                                 </span>
                               </div>
                             );
@@ -893,7 +910,13 @@ export default function TableMap() {
                       </span>
                       <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium mt-0.5">
                         {tableDetail?.activeOrder?.status 
-                          ? (tableDetail.activeOrder.status === 'Served' ? 'Đang thưởng thức' : `Trạng thái: ${tableDetail.activeOrder.status}`)
+                          ? (['Served', 'Delivered'].includes(tableDetail.activeOrder.status)
+                              ? 'Đang ăn (Đã phục vụ món)'
+                              : tableDetail.activeOrder.status === 'Ready'
+                                ? 'Món đã nấu xong • Chờ ra bàn'
+                                : tableDetail.activeOrder.status === 'Preparing'
+                                  ? 'Bếp đang nấu món'
+                                  : 'Chờ bếp nhận nấu')
                           : (activeTable.status === 'Occupied' ? 'Đang phục vụ' : (activeTable.status === 'Reserved' ? 'Đang chờ khách' : 'Chưa có khách'))}
                       </span>
                     </div>
@@ -961,9 +984,35 @@ export default function TableMap() {
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center justify-between">
                       <span>Chi Tiết Gọi Món (Order KDS)</span>
                       {tableDetail?.activeOrder?.orderId && (
-                        <span className="text-[11px] font-mono text-emerald-700 font-semibold">
-                          Đơn #{tableDetail.activeOrder.orderId}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {tableDetail?.activeOrder?.orderCount > 1 && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                              {tableDetail.activeOrder.orderCount} Đợt gọi món
+                            </span>
+                          )}
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                            ['Served', 'Delivered'].includes(tableDetail.activeOrder.status)
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : tableDetail.activeOrder.status === 'Ready'
+                                ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300'
+                                : tableDetail.activeOrder.status === 'Preparing'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}>
+                            {['Served', 'Delivered'].includes(tableDetail.activeOrder.status)
+                              ? '✓ Đang phục vụ'
+                              : tableDetail.activeOrder.status === 'Ready'
+                                ? 'Món đã sẵn sàng'
+                                : tableDetail.activeOrder.status === 'Preparing'
+                                  ? 'Đang chế biến'
+                                  : 'Chờ nấu'}
+                          </span>
+                          <span className="text-[11px] font-mono text-emerald-700 font-semibold">
+                            {tableDetail?.activeOrder?.orderIds?.length > 1 
+                              ? `#${tableDetail.activeOrder.orderIds.join(', #')}` 
+                              : `Đơn #${tableDetail.activeOrder.orderId}`}
+                          </span>
+                        </div>
                       )}
                     </span>
                     <div className="space-y-1.5 max-h-52 overflow-y-auto">
@@ -978,11 +1027,25 @@ export default function TableMap() {
                                 <span className="font-medium text-slate-700 dark:text-slate-200 truncate">
                                   {item.name}
                                 </span>
-                                {item.note && (
-                                  <span className="text-[10px] text-slate-400 italic truncate">
-                                    {item.note}
-                                  </span>
-                                )}
+                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                                  {item.orderId && (
+                                    <span className="font-mono text-slate-500">Đơn #{item.orderId}</span>
+                                  )}
+                                  {item.orderStatus && (
+                                    <span className={`px-1 py-0.2 rounded font-semibold ${
+                                      ['Served', 'Delivered'].includes(item.orderStatus)
+                                        ? 'text-emerald-700 bg-emerald-50'
+                                        : item.orderStatus === 'Ready'
+                                          ? 'text-indigo-700 bg-indigo-50'
+                                          : 'text-amber-700 bg-amber-50'
+                                    }`}>
+                                      {item.orderStatus === 'Served' ? 'Đã ra món' : item.orderStatus}
+                                    </span>
+                                  )}
+                                  {item.note && (
+                                    <span className="italic truncate">• {item.note}</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <span className="font-bold font-mono text-slate-800 dark:text-slate-100 shrink-0 ml-2">

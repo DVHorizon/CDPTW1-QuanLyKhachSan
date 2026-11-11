@@ -14,6 +14,7 @@ const RoomService = () => {
   const initialTarget = (searchParams.get('target') === 'Table' || location.state?.target === 'Table') ? 'Table' : 'Room';
   const [orderTarget, setOrderTarget] = useState(initialTarget);
   const [tableReservation, setTableReservation] = useState(null);
+  const [tableReservations, setTableReservations] = useState([]);
   const [checkingTableRes, setCheckingTableRes] = useState(false);
   const [tableResChecked, setTableResChecked] = useState(false);
 
@@ -35,13 +36,22 @@ const RoomService = () => {
 
       const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/my-table-reservation?${params.toString()}`);
       const json = await res.json();
-      if (json && json.success && json.hasReservation && json.data) {
-        setTableReservation(json.data);
+      if (json && json.success && json.hasReservation) {
+        const list = json.reservations && json.reservations.length > 0 ? json.reservations : [json.data];
+        setTableReservations(list);
+        setTableReservation((prev) => {
+          if (prev && list.some(r => r.tableId === prev.tableId)) {
+            return list.find(r => r.tableId === prev.tableId);
+          }
+          return list[0];
+        });
       } else {
+        setTableReservations([]);
         setTableReservation(null);
       }
     } catch (err) {
       console.warn('Lỗi kiểm tra lượt đặt bàn:', err);
+      setTableReservations([]);
       setTableReservation(null);
     } finally {
       setCheckingTableRes(false);
@@ -500,12 +510,31 @@ const RoomService = () => {
                   <span className="text-xs font-bold text-amber-900">Bàn Ăn:</span>
                   {checkingTableRes ? (
                     <span className="text-xs text-slate-500 italic">Đang kiểm tra bàn đã đặt...</span>
-                  ) : tableReservation ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-xs text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300">
-                        {tableReservation.tableNumber} ({tableReservation.location})
-                      </span>
-                      <span className="text-[11px] text-emerald-700 font-medium">✓ Đã đặt trước</span>
+                  ) : tableReservations && tableReservations.length > 0 ? (
+                    <div className="flex items-center gap-2">
+                      {tableReservations.length === 1 ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-xs text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300">
+                            {tableReservations[0].tableNumber} ({tableReservations[0].location})
+                          </span>
+                          <span className="text-[11px] text-emerald-700 font-medium">✓ Đã đặt trước</span>
+                        </div>
+                      ) : (
+                        <select
+                          value={tableReservation?.tableId || tableReservations[0]?.tableId}
+                          onChange={(e) => {
+                            const found = tableReservations.find(r => String(r.tableId) === String(e.target.value));
+                            if (found) setTableReservation(found);
+                          }}
+                          className="text-xs font-bold text-emerald-800 bg-white border border-emerald-300 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer shadow-xs"
+                        >
+                          {tableReservations.map((r) => (
+                            <option key={r.reservationId} value={r.tableId}>
+                              {r.tableNumber} - {r.location} ({r.guestCount} khách)
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
@@ -539,27 +568,55 @@ const RoomService = () => {
                   <>
                     <div className="flex items-center justify-between">
                       <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Thông Tin Bàn Ăn</span>
-                      <span className={`px-space-xs py-0.5 rounded font-label-sm text-label-sm font-bold ${tableReservation ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                        {tableReservation ? "ĐÃ ĐẶT BÀN" : "CHƯA ĐẶT BÀN"}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {tableReservations.length > 1 && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-label-sm text-label-sm font-bold">
+                            {tableReservations.length} BÀN ĐÃ ĐẶT
+                          </span>
+                        )}
+                        <span className={`px-space-xs py-0.5 rounded font-label-sm text-label-sm font-bold ${tableReservation ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                          {tableReservation ? "ĐÃ ĐẶT BÀN" : "CHƯA ĐẶT BÀN"}
+                        </span>
+                      </div>
                     </div>
                     {tableReservation ? (
-                      <div className="flex items-start gap-space-md pt-space-xs">
-                        <div className="min-w-[48px] px-2.5 py-2 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 flex-shrink-0 shadow-inner">
-                          <span className="material-symbols-outlined text-[24px]">restaurant</span>
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-headline-lg text-headline-sm text-on-surface font-bold truncate text-emerald-900">
-                            {tableReservation.tableNumber}
-                          </span>
-                          <div className="flex items-center gap-space-xs mt-0.5 text-xs text-slate-500">
-                            <span>{tableReservation.location}</span>
-                            <span>•</span>
-                            <span>{tableReservation.guestCount} Khách</span>
+                      <div className="space-y-2 pt-space-xs">
+                        {tableReservations.length > 1 && (
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase">Chọn bàn bạn muốn phục vụ món:</label>
+                            <select
+                              value={tableReservation.tableId}
+                              onChange={(e) => {
+                                const found = tableReservations.find(r => String(r.tableId) === String(e.target.value));
+                                if (found) setTableReservation(found);
+                              }}
+                              className="w-full text-xs font-bold text-emerald-900 bg-emerald-50/60 border border-emerald-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                            >
+                              {tableReservations.map((r) => (
+                                <option key={r.reservationId} value={r.tableId}>
+                                  {r.tableNumber} - {r.location} (Lượt #{r.reservationId})
+                                </option>
+                              ))}
+                            </select>
                           </div>
-                          <span className="text-[11px] text-emerald-700 font-medium mt-1">
-                            Lượt #{tableReservation.reservationId} • {tableReservation.customerName}
-                          </span>
+                        )}
+                        <div className="flex items-start gap-space-md pt-1">
+                          <div className="min-w-[48px] px-2.5 py-2 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 flex-shrink-0 shadow-inner">
+                            <span className="material-symbols-outlined text-[24px]">restaurant</span>
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-headline-lg text-headline-sm text-on-surface font-bold truncate text-emerald-900">
+                              {tableReservation.tableNumber}
+                            </span>
+                            <div className="flex items-center gap-space-xs mt-0.5 text-xs text-slate-500">
+                              <span>{tableReservation.location}</span>
+                              <span>•</span>
+                              <span>{tableReservation.guestCount} Khách</span>
+                            </div>
+                            <span className="text-[11px] text-emerald-700 font-medium mt-1">
+                              Lượt #{tableReservation.reservationId} • {tableReservation.customerName}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     ) : (
