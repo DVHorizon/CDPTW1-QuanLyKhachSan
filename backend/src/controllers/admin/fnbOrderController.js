@@ -36,7 +36,7 @@ exports.getMyActiveTableReservation = async (req, res) => {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
 
-    const reservation = await TableReservation.findOne({
+    const reservations = await TableReservation.findAll({
       where: {
         [Op.or]: userCondition,
         Status: { [Op.in]: ['Confirmed', 'Pending'] },
@@ -49,28 +49,32 @@ exports.getMyActiveTableReservation = async (req, res) => {
       order: [['ReservationTime', 'ASC']]
     });
 
-    if (!reservation) {
+    if (!reservations || reservations.length === 0) {
       return res.status(200).json({
         success: true,
         hasReservation: false,
         message: 'Quý khách chưa có lượt đặt bàn nào còn hiệu lực trong ngày hôm nay.',
-        data: null
+        data: null,
+        reservations: []
       });
     }
+
+    const mappedReservations = reservations.map(r => ({
+      reservationId: r.TableReservationId,
+      tableId: r.TableId,
+      tableNumber: r.table?.TableNumber || ('Bàn #' + r.TableId),
+      location: r.table?.Location || 'Khu vực chung',
+      guestCount: r.GuestCount,
+      reservationTime: r.ReservationTime,
+      status: r.Status,
+      customerName: r.user?.FullName || 'Quý Khách'
+    }));
 
     return res.status(200).json({
       success: true,
       hasReservation: true,
-      data: {
-        reservationId: reservation.TableReservationId,
-        tableId: reservation.TableId,
-        tableNumber: reservation.table?.TableNumber || ('Bàn #' + reservation.TableId),
-        location: reservation.table?.Location || 'Khu vực chung',
-        guestCount: reservation.GuestCount,
-        reservationTime: reservation.ReservationTime,
-        status: reservation.Status,
-        customerName: reservation.user?.FullName || 'Quý Khách'
-      }
+      data: mappedReservations[0], // Lượt đặt đầu tiên làm mặc định
+      reservations: mappedReservations // Danh sách toàn bộ các bàn khách đã đặt
     });
   } catch (error) {
     console.error('Error fetching active table reservation:', error);
@@ -282,9 +286,12 @@ exports.createRoomServiceOrder = async (req, res) => {
       await FoodOrderDetail.create(detail, { transaction });
     }
 
-    // Nếu là đơn Bàn, cập nhật trạng thái bàn sang Occupied
+    // Nếu là đơn Bàn: Khi khách vừa đặt món, bàn vẫn ở trạng thái Đã Đặt Trước (Reserved) chờ nấu & phục vụ.
+    // Chỉ khi món nấu xong và trạng thái chuyển sang 'Served' (Đang phục vụ), bàn mới chuyển sang 'Occupied' (Đang ăn).
     if (assignedTable) {
-      await assignedTable.update({ Status: 'Occupied' }, { transaction });
+      if (assignedTable.Status === 'Available') {
+        await assignedTable.update({ Status: 'Reserved' }, { transaction });
+      }
     }
 
     // Gộp hóa đơn phòng nếu chọn RoomInvoice
@@ -342,20 +349,12 @@ exports.createRoomServiceOrder = async (req, res) => {
       note: d.Note
     }));
 
-    // 6. Gửi WebSocket thông báo Bếp (KDS) và Sơ đồ bàn (TableMap)
+    // 6. Gửi WebSocket thông báo Điều phối (Dispatch Hub) và Sơ đồ bàn (TableMap)
+    // Đơn mới ở trạng thái 'Pending' sẽ chờ nhân viên/quản lý xác nhận nấu món
     try {
-      broadcastNewKitchenOrder({
-        foodOrderId: order.FoodOrderId,
-        orderType: order.OrderType,
-        location: locationLabel,
-        orderTime: order.createdAt || new Date().toISOString(),
-        totalAmount: order.TotalAmount,
-        note: req.body?.note || '',
-        items: itemsList
-      });
-
       broadcastOrderStatus({
         orderId: order.FoodOrderId,
+        foodOrderId: order.FoodOrderId,
         status: 'Pending',
         orderType: order.OrderType,
         paymentMode: order.PaymentMode,
@@ -363,6 +362,7 @@ exports.createRoomServiceOrder = async (req, res) => {
         roomNumber: stay?.Room?.RoomNumber || null,
         tableId: resolvedTableId,
         tableNumber: assignedTable?.TableNumber || null,
+        items: itemsList,
         updatedAt: new Date().toISOString()
       });
 
@@ -373,7 +373,7 @@ exports.createRoomServiceOrder = async (req, res) => {
           broadcastTableUpdate({
             tableId: resolvedTableId,
             tableNumber: assignedTable?.TableNumber || ('Bàn #' + resolvedTableId),
-            status: 'Occupied',
+            status: 'Reserved',
             action: 'OrderDishes',
             orderId: order.FoodOrderId,
             timestamp: new Date().toISOString()
@@ -574,8 +574,9 @@ exports.getOrderHistory = async (req, res) => {
 
 exports.getKitchenOrders = async (req, res) => {
   try {
+    // Theo đúng Spec nghiệp vụ: Chỉ hiển thị trên Màn hình Bếp (KDS) khi đơn đã được Bếp/Quản lý xác nhận nấu món ('Preparing')
     const orders = await FoodOrder.findAll({
-      where: { Status: ['Pending', 'Preparing'] },
+      where: { Status: 'Preparing' },
       include: [
         { 
           model: FoodOrderDetail, 
@@ -608,15 +609,21 @@ exports.getKitchenOrders = async (req, res) => {
         createdAt: order.OrderTime,
         isOverSLA: isOverSLA,
         roomNumber: order.Stay?.Room?.RoomNumber || 'Khách Vãng Lai',
-        items: order.details.map(d => ({
-          orderDetailId: d.FoodOrderDetailId,
-          menuItemId: d.MenuItemId,
-          itemName: d.MenuItem?.ItemName || 'N/A',
-          quantity: d.Quantity,
-          isCompleted: false,
-          note: d.Note,
-          kitchenStation: d.MenuItem?.KitchenStation || 'hot'
-        }))
+        items: order.details.map(d => {
+          const rawNote = d.Note || '';
+          const isDone = rawNote.includes('__COOKED__');
+          const cleanNote = rawNote.replace(/__COOKED__/g, '').trim();
+
+          return {
+            orderDetailId: d.FoodOrderDetailId,
+            menuItemId: d.MenuItemId,
+            itemName: d.MenuItem?.ItemName || 'N/A',
+            quantity: d.Quantity,
+            isCompleted: isDone,
+            note: cleanNote,
+            kitchenStation: d.MenuItem?.KitchenStation || 'hot'
+          };
+        })
       });
     }
     
@@ -636,7 +643,14 @@ exports.updateItemCompletion = async (req, res) => {
       return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn trong đơn.' });
     }
     
-    // detail.IsCompleted = isCompleted;
+    let currentNote = detail.Note || '';
+    if (isCompleted) {
+      if (!currentNote.includes('__COOKED__')) {
+        detail.Note = `${currentNote} __COOKED__`.trim();
+      }
+    } else {
+      detail.Note = currentNote.replace(/__COOKED__/g, '').trim();
+    }
     await detail.save();
     
     // Update order status to Preparing if it was Pending
@@ -649,7 +663,11 @@ exports.updateItemCompletion = async (req, res) => {
       broadcastOrderStatus(order);
     }
     
-    res.json({ success: true, message: 'Cập nhật món thành công.' });
+    res.json({ 
+      success: true, 
+      isCompleted: !!isCompleted,
+      message: isCompleted ? 'Đã hoàn thành món!' : 'Đã bỏ đánh dấu món.' 
+    });
   } catch (error) {
     res.status(500).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Lỗi cập nhật món.' });
   }
@@ -668,9 +686,9 @@ exports.markOrderReady = async (req, res) => {
     }
     
     // Check if all items are completed
-    const uncompletedItems = [];
+    const uncompletedItems = (order.details || []).filter(d => !(d.Note || '').includes('__COOKED__'));
     if (uncompletedItems.length > 0) {
-      return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Còn món chưa hoàn thành.' });
+      return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Còn món chưa hoàn thành trong đơn này.' });
     }
     
     order.Status = 'Ready';
@@ -715,15 +733,18 @@ exports.getOrderStatus = async (req, res) => {
         note: order.Note,
         roomNumber: order.Stay?.Room?.RoomNumber || 'N/A',
         roomType: order.Stay?.Room?.RoomType?.Name || 'Deluxe Suite',
-        items: (order.details || []).map(d => ({
-          orderDetailId: d.FoodOrderDetailId,
-          itemName: d.MenuItem?.ItemName || 'Món ăn',
-          price: d.UnitPrice,
-          quantity: d.Quantity,
-          totalPrice: d.TotalPrice,
-          isCompleted: false,
-          note: d.Note
-        }))
+        items: (order.details || []).map(d => {
+          const rawNote = d.Note || '';
+          return {
+            orderDetailId: d.FoodOrderDetailId,
+            itemName: d.MenuItem?.ItemName || 'Món ăn',
+            price: d.UnitPrice,
+            quantity: d.Quantity,
+            totalPrice: d.TotalPrice,
+            isCompleted: rawNote.includes('__COOKED__'),
+            note: rawNote.replace(/__COOKED__/g, '').trim()
+          };
+        })
       }
     });
   } catch (error) {
@@ -756,13 +777,17 @@ exports.getAllOrdersForHub = async (req, res) => {
       totalAmount: order.TotalAmount,
       roomNumber: order.Stay?.Room?.RoomNumber || (order.TableId ? `Bàn ${order.TableId}` : 'Khách Vãng Lai'),
       note: order.Note,
-      items: (order.details || []).map(d => ({
-        orderDetailId: d.FoodOrderDetailId,
-        itemName: d.MenuItem?.ItemName || 'Món ăn',
-        quantity: d.Quantity,
-        isCompleted: false,
-        kitchenStation: d.MenuItem?.KitchenStation || 'Hot'
-      }))
+      items: (order.details || []).map(d => {
+        const rawNote = d.Note || '';
+        return {
+          orderDetailId: d.FoodOrderDetailId,
+          itemName: d.MenuItem?.ItemName || 'Món ăn',
+          quantity: d.Quantity,
+          isCompleted: rawNote.includes('__COOKED__'),
+          note: rawNote.replace(/__COOKED__/g, '').trim(),
+          kitchenStation: d.MenuItem?.KitchenStation || 'Hot'
+        };
+      })
     }));
 
     res.json({
@@ -866,7 +891,8 @@ exports.getExpediterAndStationMetrics = async (req, res) => {
 
     activeOrders.forEach(order => {
       (order.details || []).forEach(d => {
-        if (false) {
+        const isCooked = (d.Note || '').includes('__COOKED__');
+        if (!isCooked) {
           totalItems += d.Quantity || 1;
           const station = (d.MenuItem?.KitchenStation || '').toLowerCase();
           const catName = (d.MenuItem?.ItemName || '').toLowerCase();
@@ -1243,25 +1269,86 @@ exports.updateOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const { orderId } = req.params;
-    const { paymentMode, status } = req.body;
+    const { paymentMode, status, note } = req.body;
     
-    const order = await FoodOrder.findOne({ where: { FoodOrderId: orderId, IsDeleted: false }, transaction });
+    const order = await FoodOrder.findOne({ 
+      where: { FoodOrderId: orderId, IsDeleted: false }, 
+      include: [
+        { model: FoodOrderDetail, as: 'details', include: [{ model: MenuItem }] },
+        { model: Stay, include: [{ model: Room }] }
+      ],
+      transaction 
+    });
     if (!order) {
       await transaction.rollback();
       return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy đơn.' });
     }
 
+    const previousStatus = order.Status;
+
     if (paymentMode) order.PaymentMode = paymentMode;
     if (status) order.Status = status;
+    if (note !== undefined) order.Note = note;
 
     await order.save({ transaction });
     await transaction.commit();
 
-    const fullOrder = await FoodOrder.findByPk(orderId, {
-      include: [{ model: Stay, include: [{ model: Room }] }]
-    });
-    if (fullOrder) {
-      broadcastOrderStatus(fullOrder);
+    // 1. Phát WebSocket đồng bộ trạng thái đơn
+    broadcastOrderStatus(order);
+
+    // 2. KHI ĐƠN CHUYỂN SANG 'Preparing' (Bếp xác nhận nấu món):
+    // Phát thông báo chuông và popup order sang Màn hình Bếp (KDS)
+    if (status === 'Preparing' && previousStatus !== 'Preparing') {
+      try {
+        const locationLabel = order.Stay?.Room?.RoomNumber 
+          ? `Phòng #${order.Stay.Room.RoomNumber}` 
+          : (order.TableId ? `Bàn #${order.TableId}` : 'Phòng VIP');
+
+        const itemsList = (order.details || []).map(d => ({
+          orderDetailId: d.FoodOrderDetailId,
+          menuItemId: d.MenuItemId,
+          itemName: d.MenuItem?.ItemName || 'Món ăn',
+          quantity: d.Quantity,
+          note: (d.Note || '').replace(/__COOKED__/g, '').trim()
+        }));
+
+        broadcastNewKitchenOrder({
+          foodOrderId: order.FoodOrderId,
+          orderType: order.OrderType,
+          location: locationLabel,
+          roomNumber: order.Stay?.Room?.RoomNumber || (order.TableId ? `Bàn ${order.TableId}` : 'N/A'),
+          orderTime: order.OrderTime || order.createdAt || new Date().toISOString(),
+          totalAmount: order.TotalAmount,
+          note: order.Note || '',
+          items: itemsList
+        });
+      } catch (kdsErr) {
+        console.warn('Lỗi broadcast sang Bếp khi xác nhận nấu:', kdsErr.message);
+      }
+    }
+
+    // KHI ĐƠN CHUYỂN SANG 'Served' HOẶC 'Delivered' (Món đã nấu xong và được phục vụ tới bàn):
+    // Cập nhật trạng thái bàn sang 'Occupied' (Đang ăn / Có khách)
+    if ((status === 'Served' || status === 'Delivered') && order.TableId) {
+      try {
+        const tableToUpdate = await RestaurantTable.findByPk(order.TableId);
+        if (tableToUpdate && tableToUpdate.Status !== 'Cleaning') {
+          await tableToUpdate.update({ Status: 'Occupied' });
+          const { broadcastTableUpdate } = require('../../services/websocketService');
+          if (broadcastTableUpdate) {
+            broadcastTableUpdate({
+              tableId: tableToUpdate.TableId,
+              tableNumber: tableToUpdate.TableNumber,
+              status: 'Occupied',
+              action: 'DishesServed',
+              orderId: order.FoodOrderId,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+      } catch (tblErr) {
+        console.warn('Lỗi cập nhật bàn sang Occupied khi món Served:', tblErr.message);
+      }
     }
 
     res.json({ success: true, message: 'Cập nhật thành công', data: order });
@@ -1590,6 +1677,8 @@ exports.updateOrder = async (req, res) => {
       });
     }
 
+    const previousStatus = order.Status;
+
     if (status) {
       order.Status = status;
     }
@@ -1602,8 +1691,63 @@ exports.updateOrder = async (req, res) => {
 
     await order.save();
 
-    // Phát WebSocket real-time cho các màn hình theo dõi
+    // Phát WebSocket real-time cho các màn hình theo dõi (OrderDispatchHub, v.v.)
     broadcastOrderStatus(order);
+
+    // KHI ĐƠN CHUYỂN SANG 'Preparing' (Bếp xác nhận nấu món):
+    // Phát thông báo chuông và popup order sang Màn hình Bếp (KDS)
+    if (status === 'Preparing' && previousStatus !== 'Preparing') {
+      try {
+        const locationLabel = order.Stay?.Room?.RoomNumber 
+          ? `Phòng #${order.Stay.Room.RoomNumber}` 
+          : (order.TableId ? `Bàn #${order.TableId}` : 'Phòng VIP');
+
+        const itemsList = (order.details || []).map(d => ({
+          orderDetailId: d.FoodOrderDetailId,
+          menuItemId: d.MenuItemId,
+          itemName: d.MenuItem?.ItemName || 'Món ăn',
+          quantity: d.Quantity,
+          note: (d.Note || '').replace(/__COOKED__/g, '').trim()
+        }));
+
+        broadcastNewKitchenOrder({
+          foodOrderId: order.FoodOrderId,
+          orderType: order.OrderType,
+          location: locationLabel,
+          roomNumber: order.Stay?.Room?.RoomNumber || (order.TableId ? `Bàn ${order.TableId}` : 'N/A'),
+          orderTime: order.OrderTime || order.createdAt || new Date().toISOString(),
+          totalAmount: order.TotalAmount,
+          note: order.Note || '',
+          items: itemsList
+        });
+      } catch (kdsErr) {
+        console.warn('Lỗi broadcast sang Bếp khi xác nhận nấu:', kdsErr.message);
+      }
+    }
+
+    // KHI ĐƠN CHUYỂN SANG 'Served' HOẶC 'Delivered' (Món đã nấu xong và được phục vụ tới bàn):
+    // Cập nhật trạng thái bàn sang 'Occupied' (Đang ăn / Có khách)
+    if ((status === 'Served' || status === 'Delivered') && order.TableId) {
+      try {
+        const tableToUpdate = await RestaurantTable.findByPk(order.TableId);
+        if (tableToUpdate && tableToUpdate.Status !== 'Cleaning') {
+          await tableToUpdate.update({ Status: 'Occupied' });
+          const { broadcastTableUpdate } = require('../../services/websocketService');
+          if (broadcastTableUpdate) {
+            broadcastTableUpdate({
+              tableId: tableToUpdate.TableId,
+              tableNumber: tableToUpdate.TableNumber,
+              status: 'Occupied',
+              action: 'DishesServed',
+              orderId: order.FoodOrderId,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+      } catch (tblErr) {
+        console.warn('Lỗi cập nhật bàn sang Occupied khi món Served:', tblErr.message);
+      }
+    }
 
     return res.status(200).json({
       success: true,

@@ -614,6 +614,7 @@ exports.getTableMapOverview = async (req, res) => {
     // Lấy các đơn món chưa hoàn tất của bàn (kể cả đang chuẩn bị, sẵn sàng hoặc đang dùng món)
     const activeOrders = await FoodOrder.findAll({
       where: {
+        TableId: { [Op.ne]: null },
         OrderType: 'Restaurant',
         Status: { [Op.notIn]: ['Cancelled', 'Completed', 'Paid'] }
       },
@@ -624,14 +625,17 @@ exports.getTableMapOverview = async (req, res) => {
           as: 'details',
           include: [{ model: MenuItem, attributes: ['MenuItemId', 'ItemName', 'Price'] }]
         }
-      ]
+      ],
+      order: [['OrderTime', 'ASC']]
     });
 
+    // Gom TẤT CẢ các đơn món còn hiệu lực theo từng bàn
     const orderMap = new Map();
     activeOrders.forEach(o => {
-      if (o.TableId) {
-        orderMap.set(o.TableId, o);
+      if (!orderMap.has(o.TableId)) {
+        orderMap.set(o.TableId, []);
       }
+      orderMap.get(o.TableId).push(o);
     });
 
     let totalSeats = 0;
@@ -643,13 +647,30 @@ exports.getTableMapOverview = async (req, res) => {
 
     const tableList = tables.map(t => {
       const activeRes = reservationMap.get(t.TableId);
-      const activeOrd = orderMap.get(t.TableId);
+      const ordersForTable = orderMap.get(t.TableId) || [];
+      const hasActiveOrders = ordersForTable.length > 0;
+      const latestOrder = hasActiveOrders ? ordersForTable[ordersForTable.length - 1] : null;
+
+      // Kiểm tra xem có bất kỳ món nào đã được Served / Delivered hay chưa
+      const anyOrderServed = ordersForTable.some(o => ['Served', 'Delivered'].includes(o.Status));
 
       let effectiveStatus = t.Status || 'Available';
-      if (activeOrd && effectiveStatus !== 'Cleaning') {
-        effectiveStatus = 'Occupied';
-      } else if (activeRes && effectiveStatus === 'Available') {
-        effectiveStatus = 'Reserved';
+      // Quy tắc phân định:
+      // 1. Nếu bàn đã được Check-in (t.Status === 'Occupied') hoặc khách vãng lai nhận bàn:
+      //    - Bàn ở trạng thái Occupied (Có Khách / Đang Ăn).
+      // 2. Nếu bàn có các đơn món:
+      //    - Khi có đơn món đã được bưng ra phục vụ (Served / Delivered): Bàn là Occupied (Đang Ăn).
+      //    - Khi các đơn món chưa phục vụ xong (Pending, Preparing, Ready): Nếu bàn chưa check-in thì là Reserved (Đã Đặt / Chờ Phục Vụ).
+      // 3. Nếu có lượt đặt bàn (activeRes) và bàn đang Available:
+      //    - Bàn là Reserved (Đã Đặt Trước).
+      if (effectiveStatus !== 'Cleaning') {
+        if (t.Status === 'Occupied') {
+          effectiveStatus = 'Occupied';
+        } else if (anyOrderServed) {
+          effectiveStatus = 'Occupied';
+        } else if ((hasActiveOrders || activeRes) && effectiveStatus === 'Available') {
+          effectiveStatus = 'Reserved';
+        }
       }
 
       totalSeats += (t.Capacity || 4);
@@ -663,6 +684,24 @@ exports.getTableMapOverview = async (req, res) => {
       } else if (effectiveStatus === 'Available') {
         availableCount++;
       }
+
+      // Gom toàn bộ món ăn từ TẤT CẢ các đơn gọi món của bàn
+      const allItems = [];
+      let totalOrderAmount = 0;
+      ordersForTable.forEach(ord => {
+        totalOrderAmount += parseFloat(ord.TotalAmount || 0);
+        (ord.details || []).forEach(d => {
+          allItems.push({
+            orderId: ord.FoodOrderId,
+            orderStatus: ord.Status,
+            name: d.MenuItem?.ItemName || 'Món ăn',
+            quantity: d.Quantity,
+            price: d.UnitPrice,
+            total: d.TotalPrice,
+            note: d.Note
+          });
+        });
+      });
 
       return {
         tableId: t.TableId,
@@ -679,19 +718,15 @@ exports.getTableMapOverview = async (req, res) => {
           time: activeRes.ReservationTime,
           note: activeRes.Note
         } : null,
-        currentOrder: activeOrd ? {
-          orderId: activeOrd.FoodOrderId,
-          status: activeOrd.Status,
-          totalAmount: activeOrd.TotalAmount,
-          orderTime: activeOrd.OrderTime,
-          guestName: activeOrd.User?.FullName || 'Khách tại bàn',
-          itemCount: activeOrd.details?.length || 0,
-          items: activeOrd.details?.map(d => ({
-            name: d.MenuItem?.ItemName || 'Món ăn',
-            quantity: d.Quantity,
-            price: d.UnitPrice,
-            total: d.TotalPrice
-          })) || []
+        currentOrder: hasActiveOrders ? {
+          orderId: latestOrder ? latestOrder.FoodOrderId : null,
+          orderCount: ordersForTable.length,
+          status: anyOrderServed ? 'Served' : (latestOrder ? latestOrder.Status : 'Pending'),
+          totalAmount: totalOrderAmount,
+          orderTime: latestOrder ? latestOrder.OrderTime : null,
+          guestName: latestOrder?.User?.FullName || 'Khách tại bàn',
+          itemCount: allItems.length,
+          items: allItems
         } : null
       };
     });
@@ -788,8 +823,8 @@ exports.getTableDetail = async (req, res) => {
       });
     }
 
-    // Lấy thông tin đơn món đang hoạt động (gồm cả món đang làm, sẵn sàng, hoặc đang phục vụ ăn uống)
-    const activeOrder = await FoodOrder.findOne({
+    // Lấy thông tin TẤT CẢ các đơn món đang hoạt động của bàn (gồm cả các đợt gọi món trước và gọi tiếp)
+    const activeOrders = await FoodOrder.findAll({
       where: {
         TableId: tableId,
         OrderType: 'Restaurant',
@@ -807,10 +842,33 @@ exports.getTableDetail = async (req, res) => {
           include: [{ model: MenuItem, attributes: ['MenuItemId', 'ItemName', 'Price'] }]
         }
       ],
-      order: [['OrderTime', 'DESC']]
+      order: [['OrderTime', 'ASC']]
     });
 
-    const roomNumber = activeOrder?.Stay?.Room?.RoomNumber || null;
+    const hasActiveOrders = activeOrders.length > 0;
+    const latestOrder = hasActiveOrders ? activeOrders[activeOrders.length - 1] : null;
+    const anyOrderServed = activeOrders.some(o => ['Served', 'Delivered'].includes(o.Status));
+
+    // Gom toàn bộ món ăn từ TẤT CẢ các đơn món của bàn
+    const combinedItems = [];
+    let combinedTotalAmount = 0;
+    activeOrders.forEach(ord => {
+      combinedTotalAmount += parseFloat(ord.TotalAmount || 0);
+      (ord.details || []).forEach(d => {
+        combinedItems.push({
+          detailId: d.FoodOrderDetailId,
+          orderId: ord.FoodOrderId,
+          orderStatus: ord.Status,
+          name: d.MenuItem?.ItemName || 'Món ăn',
+          quantity: d.Quantity,
+          unitPrice: d.UnitPrice,
+          totalPrice: d.TotalPrice,
+          note: d.Note
+        });
+      });
+    });
+
+    const roomNumber = latestOrder?.Stay?.Room?.RoomNumber || null;
 
     return res.status(200).json({
       success: true,
@@ -819,7 +877,9 @@ exports.getTableDetail = async (req, res) => {
         tableNumber: table.TableNumber,
         location: table.Location,
         capacity: table.Capacity,
-        status: activeOrder ? 'Occupied' : table.Status,
+        status: table.Status === 'Occupied' 
+          ? 'Occupied' 
+          : (anyOrderServed ? 'Occupied' : (hasActiveOrders ? 'Reserved' : table.Status)),
         reservation: reservation ? {
           reservationId: reservation.TableReservationId,
           guestName: reservation.user?.FullName || 'Khách đặt trước',
@@ -829,23 +889,18 @@ exports.getTableDetail = async (req, res) => {
           time: reservation.ReservationTime,
           note: reservation.Note
         } : null,
-        activeOrder: activeOrder ? {
-          orderId: activeOrder.FoodOrderId,
-          status: activeOrder.Status,
-          totalAmount: activeOrder.TotalAmount,
-          orderTime: activeOrder.OrderTime,
-          guestName: activeOrder.user?.FullName || reservation?.user?.FullName || 'Khách tại bàn',
-          phone: activeOrder.user?.Phone || reservation?.user?.Phone || '',
+        activeOrder: hasActiveOrders ? {
+          orderId: latestOrder.FoodOrderId,
+          orderIds: activeOrders.map(o => o.FoodOrderId),
+          orderCount: activeOrders.length,
+          status: anyOrderServed ? 'Served' : latestOrder.Status,
+          totalAmount: combinedTotalAmount,
+          orderTime: latestOrder.OrderTime,
+          guestName: latestOrder.user?.FullName || reservation?.user?.FullName || 'Khách tại bàn',
+          phone: latestOrder.user?.Phone || reservation?.user?.Phone || '',
           roomNumber: roomNumber,
-          note: activeOrder.Note || reservation?.Note || '',
-          items: activeOrder.details?.map(d => ({
-            detailId: d.FoodOrderDetailId,
-            name: d.MenuItem?.ItemName || 'Món ăn',
-            quantity: d.Quantity,
-            unitPrice: d.UnitPrice,
-            totalPrice: d.TotalPrice,
-            note: d.Note
-          })) || []
+          note: activeOrders.map(o => o.Note).filter(Boolean).join(' | ') || reservation?.Note || '',
+          items: combinedItems
         } : null
       }
     });
