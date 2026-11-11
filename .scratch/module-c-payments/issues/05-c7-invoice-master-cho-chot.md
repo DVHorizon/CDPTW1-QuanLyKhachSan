@@ -1,3 +1,4 @@
+
 # 05 — C7, C8, C9: Master Invoice, Xuất PDF VAT & Quyết toán Đa phương thức (VietQR)
 
 Status: done
@@ -5,6 +6,7 @@ Type: task
 Blocked by: 04
 
 ## Nội dung đã hoàn thiện & chuẩn hoá
+
 1. **C7 — Tạo Hoá Đơn Tổng Hợp (`POST /api/v1/invoices/master` — `masterInvoiceController.js`):**
    - Mở DB Transaction với `lock: t.LOCK.UPDATE` trên `Booking`, `Invoice`, `Payments` để chống Race Condition.
    - Chặn tạo trùng hoá đơn (`409 ERROR_0017_ALREADY_EXISTS`).
@@ -17,4 +19,5 @@ Blocked by: 04
    - Hỗ trợ ghép 1–3 phương thức thanh toán (`Cash`, `Card`, `BankTransfer`, `VietQR`, `VNPay`, `MoMo`), tính tiền thối (`changeDue`), tạo mã QR VietQR động (`img.vietqr.io`) và kết nối cổng giả lập `/mock-payment/:transactionCode`.
 
 ## Comments
-- 2026-11-11 (Hà): Đã hoàn thiện, chuẩn hoá spec và pass 100% bộ kiểm thử tích hợp `test_feat_invoice_c6_c7_c8.js` cùng 40/40 test cases E2E Tier 1 & Tier 2 cho C5, C6, C7, C8, C9.
+
+- Đã hoàn thiện, chuẩn hoá spec và pass 100% bộ kiểm thử tích hợp `test_feat_invoice_c6_c7_c8.js` cùng 40/40 test cases E2E Tier 1 & Tier 2 cho C5, C6, C7, C8, C9.
