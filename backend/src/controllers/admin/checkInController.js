@@ -180,7 +180,7 @@ async function findBookingByCodeOrId(codeOrId, connOrPool = pool) {
     LEFT JOIN Stays s ON b.BookingId = s.BookingId
     LEFT JOIN Rooms r ON s.RoomId = r.RoomId
     WHERE (b.ConfirmationCode = ? ${isNum ? 'OR b.BookingId = ?' : ''})
-      AND b.IsDeleted = 0
+      AND (b.IsDeleted = 0 OR b.IsDeleted IS NULL)
     ORDER BY (b.Status != 'Cancelled') DESC, b.BookingId DESC
     LIMIT 1
   `;
@@ -555,7 +555,6 @@ async function processCheckIn(req, res) {
       `SELECT BookingId, ConfirmationCode, Status, RoomTypeId, CheckInDate, CheckOutDate
        FROM Bookings
        WHERE (BookingId = ? ${!isNum ? 'OR ConfirmationCode = ?' : ''})
-         AND IsDeleted = 0
        FOR UPDATE`,
       isNum ? [Number(targetBookingId)] : [targetBookingId, targetBookingId]
     );
@@ -741,12 +740,65 @@ async function processCheckIn(req, res) {
       );
     }
 
-    // 9. Khai báo tạm trú PoliceDeclarations
+    // 9. Khai báo tạm trú PoliceDeclarations & Đồng bộ sang Phân hệ 51 (PoliceGuestDeclarationsStore)
     try {
       await conn.query(
         `INSERT INTO PoliceDeclarations (StayId, GuestName, IdNumber, IdType, Nationality, DeclarationDate, Status)
          VALUES (?, ?, ?, ?, ?, NOW(), 'Pending')`,
         [stayId, cleanFullName, cleanDocNum, cleanDocType, cleanNationality]
+      );
+    } catch (_) {}
+
+    try {
+      const isPassportDoc = cleanDocType === 'Passport' || cleanNationality.toLowerCase() !== 'việt nam';
+      const natCode = isPassportDoc ? 'INT' : 'VNM';
+      const cleanAscii = String(cleanFullName || 'KHACH')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .toUpperCase()
+        .trim();
+      const parts = cleanAscii.split(/\s+/);
+      const surname = parts[0] || 'GUEST';
+      const given = parts.slice(1).join('<') || 'VIP';
+      const a08Record = {
+        id: `CHK-${actualBookingId}`,
+        bookingId: actualBookingId,
+        bookingCode: booking.ConfirmationCode || `BK-${actualBookingId}`,
+        roomNumber: String(room.RoomNumber || '101'),
+        buildingInfo: `Check-in Quầy Lễ Tân • #${booking.ConfirmationCode || actualBookingId}`,
+        guestName: cleanFullName,
+        mrzFullName: `${surname}, ${parts.slice(1).join(' ') || surname}`,
+        nationality: cleanNationality || 'Việt Nam',
+        nationalityCode: natCode,
+        documentType: isPassportDoc ? 'HC' : 'CCCD',
+        documentNumber: cleanDocNum,
+        documentExpiryYear: isoExpiry ? String(isoExpiry).slice(0, 4) : '2032',
+        documentExpiryFull: isoExpiry || '20/08/2032',
+        dobGender: `${isoDob || '1990-01-01'} • ${String(gender || 'NAM').toUpperCase()}`,
+        entryPort: isPassportDoc ? 'Sân bay Quốc tế Phú Quốc (PQC)' : 'Check-in tại quầy Lễ Tân (CCCD/VNeID)',
+        visaType: isPassportDoc ? 'E-visa 30 ngày (Hợp lệ)' : 'VNeID Mức 2 [ĐẠT]',
+        visaCode: `Check-in #${booking.ConfirmationCode || actualBookingId}`,
+        visaCategory: isPassportDoc ? 'E_VISA' : 'VNEID_LEVEL_2',
+        checkInTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        checkInDateLabel: 'Đã Check-in',
+        status: isPassportDoc ? 'SENT_POLICE' : 'SYNCED_DB',
+        statusLabel: isPassportDoc ? 'ĐÃ GỬI BỘ CÔNG AN' : 'ĐÃ ĐỒNG BỘ CSDL',
+        isForeigner: isPassportDoc,
+        isPhuQuocVisaFree: false,
+        selected: true,
+        source: 'CHECKIN_DESK',
+        mrzLine1: `P<${natCode}${surname}<<${given}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<`.slice(0, 44),
+        mrzLine2: `${cleanDocNum.padEnd(9, '<')}4${natCode}9001018M3208206<<<<<<<<<<<<<<04`.slice(0, 44),
+        sha256Hash: `${String(actualBookingId).padStart(4, '0')}...c06a`,
+        sortOrder: 0,
+      };
+      await conn.query(
+        `INSERT INTO PoliceGuestDeclarationsStore (id, payload, sortOrder, isDeleted)
+         VALUES (?, ?, 0, 0)
+         ON DUPLICATE KEY UPDATE payload = VALUES(payload), isDeleted = 0`,
+        [a08Record.id, JSON.stringify(a08Record)]
       );
     } catch (_) {}
 

@@ -247,11 +247,12 @@ const buildBookingFilter = async (queryObj) => {
   const hasDateTo = dateTo !== undefined && dateTo !== null && String(dateTo).trim() !== '';
 
   if (!hasDateFrom && !hasDateTo) {
-    // Mặc định: 30 ngày gần nhất (hôm nay - 29 ngày đến hôm nay)
-    finalDateFrom = addDaysUtc7(today, -29);
-    finalDateTo = addDaysUtc7(today, 30);
+    if (!cleanKeyword) {
+      // Mặc định: 30 ngày gần nhất và 30 ngày sắp tới khi KHÔNG nhập từ khóa
+      finalDateFrom = addDaysUtc7(today, -29);
+      finalDateTo = addDaysUtc7(today, 30);
+    }
   } else if (!hasDateFrom || !hasDateTo) {
-    // Chỉ có 1 trong 2 mốc
     errors.push({
       field: 'dateRange',
       code: 'ERROR_0022_INVALID_DATE_RANGE',
@@ -390,31 +391,34 @@ const buildBookingFilter = async (queryObj) => {
   const whereClauses = ['b.IsDeleted = 0'];
   const params = [];
 
-  // Từ khóa tìm kiếm: Tìm trên Mã booking, Họ tên khách, SĐT (Mục 3.2 & Test Case 5-9)
+  // Từ khóa tìm kiếm: Tìm trên Mã booking, Mã giao dịch, Họ tên khách, SĐT (Mục 3.2 & Test Case 5-9)
   if (cleanKeyword) {
     const escaped = `%${escapeSqlLike(cleanKeyword)}%`;
     whereClauses.push(`(
       b.ConfirmationCode LIKE ? OR
+      EXISTS (SELECT 1 FROM Payments p WHERE p.BookingId = b.BookingId AND p.TransactionCode LIKE ?) OR
       COALESCE(bg.FullName, u.FullName) LIKE ? OR
       COALESCE(bg.Phone, u.Phone) LIKE ?
     )`);
-    params.push(escaped, escaped, escaped);
+    params.push(escaped, escaped, escaped, escaped);
   }
-
   // Khoảng ngày (Mục 3.3)
-  if (cleanDateType === 'BOOKING_DATE') {
-    whereClauses.push('DATE(CONVERT_TZ(b.CreatedAt, "+00:00", "+07:00")) BETWEEN ? AND ?');
-    params.push(finalDateFrom, finalDateTo);
-  } else if (cleanDateType === 'CHECKOUT_DATE') {
-    whereClauses.push('DATE(b.CheckOutDate) BETWEEN ? AND ?');
-    params.push(finalDateFrom, finalDateTo);
-  } else {
-    // CHECKIN_DATE (mặc định)
-    whereClauses.push('DATE(b.CheckInDate) BETWEEN ? AND ?');
-    params.push(finalDateFrom, finalDateTo);
+  // Khoảng ngày (Mục 3.3): Nếu CÓ nhập từ khóa tìm kiếm (cleanKeyword),
+  // ưu tiên tìm theo từ khóa và bỏ qua giới hạn ngày để đơn tương lai/quá khứ hiển thị ngay (Phương án 1)
+  // Áp dụng khoảng ngày nếu người dùng chọn ngày (hoặc ngày mặc định khi không tìm keyword):
+  if (finalDateFrom && finalDateTo) {
+    if (cleanDateType === 'BOOKING_DATE') {
+      whereClauses.push('DATE(CONVERT_TZ(b.CreatedAt, "+00:00", "+07:00")) BETWEEN ? AND ?');
+      params.push(finalDateFrom, finalDateTo);
+    } else if (cleanDateType === 'CHECKOUT_DATE') {
+      whereClauses.push('DATE(b.CheckOutDate) BETWEEN ? AND ?');
+      params.push(finalDateFrom, finalDateTo);
+    } else {
+      // CHECKIN_DATE (mặc định)
+      whereClauses.push('DATE(b.CheckInDate) BETWEEN ? AND ?');
+      params.push(finalDateFrom, finalDateTo);
+    }
   }
-
-  // Trạng thái (Mục 3.4)
   if (cleanStatuses.length < 6) {
     const dbStatuses = [];
     cleanStatuses.forEach((st) => {
@@ -1308,9 +1312,10 @@ router.get('/', async (req, res) => {
         COALESCE(bg.Phone, u.Phone) LIKE ? OR
         COALESCE(bg.IdNumber, u.IdNumber) LIKE ? OR
         COALESCE(bg.Email, u.Email) LIKE ? OR
-        r.RoomNumber LIKE ?
+        r.RoomNumber LIKE ? OR
+        p.TransactionCode LIKE ?
       )`);
-      baseParams.push(q, q, q, q, q, q);
+      baseParams.push(q, q, q, q, q, q, q);
     }
 
     if (date && String(date).trim() && date !== 'all') {
@@ -1372,6 +1377,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE ${whereSql}
     `;
     const [[{ total }]] = await pool.query(countQuery, params);
@@ -1412,6 +1418,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE ${whereSql}
       ORDER BY b.CheckInDate ASC, b.BookingId DESC
       LIMIT ? OFFSET ?
@@ -1437,6 +1444,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE ${baseWhereSql}
       `,
       [todayStr, todayStr, ...baseParams]
@@ -1524,6 +1532,7 @@ router.get('/:id', async (req, res) => {
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
+      LEFT JOIN Payments p ON b.BookingId = p.BookingId
       WHERE b.BookingId = ?
       ORDER BY s.StayId DESC
       LIMIT 1
@@ -1573,4 +1582,13 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+
+// ─── TÍNH NĂNG 10: TẠO MÃ QR BOOKING & GỬI EMAIL XÁC NHẬN (FEAT-GUEST-10 / A10) ───
+const bookingQrNotificationController = require('../controllers/bookingQrNotificationController');
+router.get('/:bookingId/qr-code', bookingQrNotificationController.getBookingQRCode);
+
+// ─── FEAT-INVOICE-01 (C6): Tự động gom chi phí lưu trú (Booking Charges Aggregation) ───
+const bookingChargesCtrl = require('../modules/services/controllers/bookingChargesController');
+const { verifyToken } = require('../middlewares/authMiddleware');
+router.get('/:bookingId/charges', verifyToken, bookingChargesCtrl.getBookingCharges);
 module.exports = router;

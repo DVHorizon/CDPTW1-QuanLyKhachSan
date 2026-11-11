@@ -4,17 +4,21 @@
  * modules/services/controllers/bookingChargesController.js
  * 👤 OWNER: Hà — FEAT-INVOICE-01 (C6): Tự động gom chi phí lưu trú (Booking Charges Aggregation)
  * Endpoint: GET /api/v1/bookings/:bookingId/charges (alias: GET /bookings/:bookingId/charges)
- * Quyết định liên quan: D6, D12, D13, D14, D15, D16
  */
 
 const {
   Booking,
   Stay,
   Room,
+  RoomType,
+  User,
   ServiceOrder,
   FoodOrder,
+  FoodOrderDetail,
+  MenuItem,
   MinibarUsage,
   Payment,
+  sequelize,
 } = require('../../../models');
 const { Op } = require('sequelize');
 const pool = require('../../../config/db');
@@ -60,10 +64,15 @@ async function calculateBookingChargesData(bookingId, options = {}) {
   const { transaction = null, lock = null } = options;
   const numBookingId = Number(bookingId);
 
-  // 1. Kiểm tra tồn tại Booking
+  // 1. Kiểm tra tồn tại Booking kèm Khách hàng và Hạng phòng
+  const includeModels = [
+    { model: User, as: 'user', attributes: ['UserId', 'FullName', 'Email', 'Phone'] },
+    { model: RoomType, as: 'roomType', attributes: ['RoomTypeId', 'TypeName', 'BasePrice'] },
+  ];
+
   const booking = !Number.isNaN(numBookingId)
-    ? await Booking.findByPk(numBookingId, { transaction, lock })
-    : await Booking.findOne({ where: { ConfirmationCode: String(bookingId).trim() }, transaction, lock });
+    ? await Booking.findByPk(numBookingId, { include: includeModels, transaction, lock })
+    : await Booking.findOne({ where: { ConfirmationCode: String(bookingId).trim() }, include: includeModels, transaction, lock });
 
   if (!booking) {
     return null;
@@ -88,10 +97,15 @@ async function calculateBookingChargesData(bookingId, options = {}) {
   const surchargeAmount = Number(booking.SurchargeAmount || 0);
   const discountAmount = Number(booking.DiscountAmount || 0);
 
-  // 3. Lấy danh sách Stays thuộc booking
+  // 3. Lấy danh sách Stays thuộc booking kèm Room và RoomType
   const stays = await Stay.findAll({
     where: { BookingId: booking.BookingId },
-    include: [{ model: Room }],
+    include: [
+      {
+        model: Room,
+        include: [{ model: RoomType, as: 'roomType', attributes: ['TypeName', 'BasePrice'] }],
+      },
+    ],
     transaction,
     lock,
     order: [['StayId', 'ASC']],
@@ -108,6 +122,10 @@ async function calculateBookingChargesData(bookingId, options = {}) {
     ? Number(booking.RoomSubtotal)
     : (fallbackRoomSubtotal > 0 ? fallbackRoomSubtotal : Number(booking.TotalAmount || 0));
 
+  const guestName = booking.user?.FullName || 'Khách đặt phòng';
+  const checkInDate = booking.CheckInDate;
+  const checkOutDate = booking.CheckOutDate;
+
   // 4. Booking chưa có Stay nào (chưa check-in) -> Tạm tính theo kế hoạch
   if (!stays || stays.length === 0) {
     const grandTotal = Number(booking.TotalAmount) > 0
@@ -115,12 +133,32 @@ async function calculateBookingChargesData(bookingId, options = {}) {
       : Math.max(0, effectiveRoomSubtotal + surchargeAmount - discountAmount);
     const remainingBalance = Math.max(0, grandTotal - effectivePaid);
 
+    const summary = {
+      roomSubtotal: effectiveRoomSubtotal,
+      minibarSubtotal: 0,
+      serviceSubtotal: 0,
+      foodSubtotal: 0,
+      surcharge: surchargeAmount,
+      discount: discountAmount,
+      grandTotal,
+      totalPaid: effectivePaid,
+      remainingBalance,
+    };
+
     return {
       booking,
+      guestName,
+      roomNumber: 'Chưa gán phòng (Dự tính)',
+      checkInDate,
+      checkOutDate,
       estimated: true,
       hasPendingServices: false,
       stays: [],
       rawStays: [],
+      minibar: [],
+      services: [],
+      foodAndBeverage: [],
+      summary,
       surchargeAmount,
       discountAmount,
       grandTotal,
@@ -133,18 +171,32 @@ async function calculateBookingChargesData(bookingId, options = {}) {
   // 5. Tính chi tiết từng Stay
   const roomQuantity = Math.max(1, Number(booking.RoomQuantity || 1));
   const contractNights = calculateStayNights(null, booking);
-  const unitNight = effectiveRoomSubtotal / (roomQuantity * contractNights);
+  const unitNight = effectiveRoomSubtotal > 0
+    ? effectiveRoomSubtotal / (roomQuantity * contractNights)
+    : Number(booking.roomType?.BasePrice || 0);
 
   let hasPendingServices = false;
   let totalStaysSubtotal = 0;
+  let totalRoomSubtotal = 0;
+  let totalMinibarSubtotal = 0;
+  let totalServiceSubtotal = 0;
+  let totalFoodSubtotal = 0;
   let totalExtensionsAmount = 0;
   let totalDamagesAmount = 0;
   const staysDetail = [];
+  const flatMinibar = [];
+  const flatServices = [];
+  const flatFood = [];
 
   for (const stay of stays) {
+    const roomNum = stay.Room?.RoomNumber || `P.${stay.RoomId}`;
+    const roomTypeName = stay.Room?.roomType?.TypeName || booking.roomType?.TypeName || 'Tiêu chuẩn';
+
     // 5.1. Tiền phòng cơ sở
     const nights = calculateStayNights(stay, booking);
-    const roomSubtotal = unitNight * nights;
+    const stayPricePerNight = unitNight || Number(stay.Room?.roomType?.BasePrice || 0);
+    const roomSubtotal = stayPricePerNight * nights;
+    totalRoomSubtotal += roomSubtotal;
 
     // 5.2. Dịch vụ ServiceOrders
     const serviceOrders = await ServiceOrder.findAll({
@@ -153,21 +205,48 @@ async function calculateBookingChargesData(bookingId, options = {}) {
       lock,
     });
 
+    let serviceNameMap = {};
+    if (serviceOrders.length > 0) {
+      const sIds = [...new Set(serviceOrders.map(s => s.ServiceId).filter(Boolean))];
+      if (sIds.length > 0) {
+        try {
+          const [sRows] = await pool.query(
+            `SELECT ServiceId, ServiceName, Description FROM Services WHERE ServiceId IN (?)`,
+            [sIds]
+          );
+          (sRows || []).forEach(r => { serviceNameMap[r.ServiceId] = r; });
+        } catch (_) {}
+      }
+    }
+
     const completedServices = [];
     let servicesSubtotal = 0;
 
     for (const order of serviceOrders) {
       if (order.Status === 'Completed') {
-        const itemTotal = Number(order.TotalPrice || 0);
+        const itemTotal = Number(order.TotalPrice || (Number(order.Quantity || 1) * Number(order.UnitPrice || 0)));
         servicesSubtotal += itemTotal;
-        completedServices.push({
+        totalServiceSubtotal += itemTotal;
+        const svInfo = serviceNameMap[order.ServiceId];
+        const svName = svInfo?.ServiceName || `Dịch vụ #${order.ServiceId}`;
+        const svObj = {
           orderId: order.OrderId,
           serviceId: order.ServiceId,
-          quantity: Number(order.Quantity),
-          unitPrice: Number(order.UnitPrice),
+          stayId: stay.StayId,
+          roomNumber: roomNum,
+          service: svName,
+          type: svInfo?.Description || 'Dịch vụ phòng',
+          quantity: Number(order.Quantity || 1),
+          unitPrice: Number(order.UnitPrice || 0),
+          price: Number(order.UnitPrice || 0),
           subtotal: itemTotal,
+          total: itemTotal,
+          status: 'Hoàn thành',
           orderDate: order.OrderDate,
-        });
+          orderedAt: order.OrderDate,
+        };
+        completedServices.push(svObj);
+        flatServices.push(svObj);
       } else if (['Received', 'InProgress', 'Processing'].includes(order.Status)) {
         hasPendingServices = true;
       }
@@ -180,21 +259,45 @@ async function calculateBookingChargesData(bookingId, options = {}) {
       lock,
     });
 
+    let minibarItemNameMap = {};
+    if (minibarUsages && minibarUsages.length > 0) {
+      const itemIds = [...new Set(minibarUsages.map(m => m.ItemId).filter(Boolean))];
+      if (itemIds.length > 0) {
+        try {
+          const [invRows] = await pool.query(
+            `SELECT ItemId, ItemName FROM InventoryItems WHERE ItemId IN (?)`,
+            [itemIds]
+          );
+          (invRows || []).forEach(r => { minibarItemNameMap[r.ItemId] = r.ItemName; });
+        } catch (_) {}
+      }
+    }
+
     let minibarSubtotal = 0;
     const minibarList = [];
 
     if (minibarUsages && minibarUsages.length > 0) {
       for (const m of minibarUsages) {
-        const itemTotal = Number(m.TotalAmount || 0);
+        const itemTotal = Number(m.TotalAmount || (Number(m.Quantity || 1) * Number(m.UnitPrice || 0)));
         minibarSubtotal += itemTotal;
-        minibarList.push({
+        totalMinibarSubtotal += itemTotal;
+        const itemName = minibarItemNameMap[m.ItemId] || `Món Minibar #${m.ItemId}`;
+        const mbObj = {
           usageId: m.UsageId,
           itemId: m.ItemId,
-          quantity: Number(m.Quantity),
-          unitPrice: Number(m.UnitPrice),
+          stayId: stay.StayId,
+          roomNumber: roomNum,
+          item: itemName,
+          quantity: Number(m.Quantity || 1),
+          unitPrice: Number(m.UnitPrice || 0),
+          price: Number(m.UnitPrice || 0),
           subtotal: itemTotal,
+          total: itemTotal,
           usageDate: m.UsageDate,
-        });
+          consumedAt: m.UsageDate,
+        };
+        minibarList.push(mbObj);
+        flatMinibar.push(mbObj);
       }
     } else {
       try {
@@ -208,15 +311,23 @@ async function calculateBookingChargesData(bookingId, options = {}) {
         for (const l of lines || []) {
           const itemTotal = Number(l.LineAmount || 0);
           minibarSubtotal += itemTotal;
-          minibarList.push({
+          totalMinibarSubtotal += itemTotal;
+          const mbObj = {
             usageId: l.LineId,
             itemId: l.LineId,
+            stayId: stay.StayId,
+            roomNumber: roomNum,
             item: l.ProductName,
-            quantity: Number(l.BillableQty),
-            unitPrice: Number(l.UnitPrice),
+            quantity: Number(l.BillableQty || 1),
+            unitPrice: Number(l.UnitPrice || 0),
+            price: Number(l.UnitPrice || 0),
             subtotal: itemTotal,
+            total: itemTotal,
             usageDate: l.CreatedAt,
-          });
+            consumedAt: l.CreatedAt,
+          };
+          minibarList.push(mbObj);
+          flatMinibar.push(mbObj);
         }
       } catch (_) {}
     }
@@ -228,6 +339,13 @@ async function calculateBookingChargesData(bookingId, options = {}) {
         PaymentMode: 'RoomInvoice',
         Status: { [Op.in]: ['Served', 'Delivered'] },
       },
+      include: [
+        {
+          model: FoodOrderDetail,
+          as: 'details',
+          include: [{ model: MenuItem, attributes: ['ItemName', 'Price'] }],
+        },
+      ],
       transaction,
       lock,
     });
@@ -236,13 +354,27 @@ async function calculateBookingChargesData(bookingId, options = {}) {
     const foodList = foodOrders.map((f) => {
       const itemTotal = Number(f.TotalAmount || 0);
       foodSubtotal += itemTotal;
-      return {
+      totalFoodSubtotal += itemTotal;
+      const itemsText = (f.details && f.details.length > 0)
+        ? f.details.map(d => `${d.MenuItem?.ItemName || 'Món ăn'} (x${d.Quantity})`).join(', ')
+        : `Đơn F&B #${f.FoodOrderId}`;
+      const foObj = {
         foodOrderId: f.FoodOrderId,
+        stayId: stay.StayId,
+        roomNumber: roomNum,
         orderType: f.OrderType,
         status: f.Status,
+        item: itemsText,
+        quantity: 1,
+        price: itemTotal,
         subtotal: itemTotal,
+        total: itemTotal,
+        orderCode: `FNB-${f.FoodOrderId}`,
         orderTime: f.OrderTime,
+        orderedAt: f.OrderTime,
       };
+      flatFood.push(foObj);
+      return foObj;
     });
 
     // 5.5. Phí gia hạn lưu trú (StayExtensions)
@@ -330,10 +462,18 @@ async function calculateBookingChargesData(bookingId, options = {}) {
     staysDetail.push({
       stayId: stay.StayId,
       roomId: stay.RoomId,
-      roomNumber: stay.Room?.RoomNumber || `P.${stay.RoomId}`,
+      roomNumber: roomNum,
+      roomTypeName,
+      checkIn: stay.ActualCheckIn || checkInDate,
+      checkOut: stay.ActualCheckOut || stay.ExpectedCheckOut || checkOutDate,
+      nights,
+      pricePerNight: stayPricePerNight,
+      earlyCheckInFee: 0,
+      lateCheckOutFee: 0,
+      roomTotal: roomSubtotal,
       room: {
         nights,
-        unitPrice: unitNight,
+        unitPrice: stayPricePerNight,
         subtotal: roomSubtotal,
       },
       services: completedServices,
@@ -351,12 +491,32 @@ async function calculateBookingChargesData(bookingId, options = {}) {
   const grandTotal = totalStaysSubtotal + netSurcharge - discountAmount;
   const remainingBalance = Math.max(0, grandTotal - effectivePaid);
 
+  const summary = {
+    roomSubtotal: totalRoomSubtotal,
+    minibarSubtotal: totalMinibarSubtotal,
+    serviceSubtotal: totalServiceSubtotal,
+    foodSubtotal: totalFoodSubtotal,
+    surcharge: netSurcharge,
+    discount: discountAmount,
+    grandTotal,
+    totalPaid: effectivePaid,
+    remainingBalance,
+  };
+
   return {
     booking,
+    guestName,
+    roomNumber: staysDetail[0]?.roomNumber || '—',
+    checkInDate,
+    checkOutDate,
     estimated: false,
     hasPendingServices,
     stays: staysDetail,
     rawStays: stays,
+    minibar: flatMinibar,
+    services: flatServices,
+    foodAndBeverage: flatFood,
+    summary,
     surchargeAmount: netSurcharge,
     discountAmount,
     grandTotal,
@@ -368,7 +528,7 @@ async function calculateBookingChargesData(bookingId, options = {}) {
 
 /**
  * GET /api/v1/bookings/:bookingId/charges
- * Tính và trả về bản tổng hợp TẠM TÍNH toàn bộ chi phí phát sinh của 1 booking
+ * Tính và trả về bản tổng hợp toàn bộ chi phí thực tế và tạm tính của 1 booking
  */
 async function getBookingCharges(req, res) {
   try {
@@ -401,9 +561,17 @@ async function getBookingCharges(req, res) {
       success: true,
       data: {
         bookingId: calcResult.booking.BookingId,
+        guestName: calcResult.guestName,
+        roomNumber: calcResult.roomNumber,
+        checkInDate: calcResult.checkInDate,
+        checkOutDate: calcResult.checkOutDate,
         estimated: calcResult.estimated,
         hasPendingServices: calcResult.hasPendingServices,
         stays: calcResult.stays,
+        minibar: calcResult.minibar,
+        services: calcResult.services,
+        foodAndBeverage: calcResult.foodAndBeverage,
+        summary: calcResult.summary,
         surchargeAmount: calcResult.surchargeAmount,
         discountAmount: calcResult.discountAmount,
         grandTotal: calcResult.grandTotal,

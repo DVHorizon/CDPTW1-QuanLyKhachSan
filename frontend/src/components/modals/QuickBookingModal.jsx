@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 
 const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, checkOut, checkOutDate, isOpen = true, onClose, onSuccess }) => {
   if (!isOpen || !room) return null;
@@ -24,6 +24,8 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
   const [specialRequest, setSpecialRequest] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [bookingRef, setBookingRef] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Tính số đêm
   const d1 = new Date(bookingIn);
@@ -32,11 +34,49 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
   const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   const totalAmount = nights * (room.BasePrice || 1850000);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const refCode = 'GH-' + Math.floor(100000 + Math.random() * 900000);
-    setBookingRef(refCode);
-    setIsSuccess(true);
+    setErrorMessage('');
+    setIsSubmitting(true);
+
+    try {
+      const token = localStorage.getItem('hotel_token');
+      const response = await fetch('http://localhost:5000/api/v1/rooms/book', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          roomTypeId: room.RoomTypeId,
+          checkInDate: bookingIn,
+          checkOutDate: bookingOut,
+          guestName,
+          guestPhone,
+          guestEmail,
+          specialRequest,
+          adults: room.AdultCapacity || 2,
+          children: room.ChildCapacity || 0,
+          roomQuantity: 1,
+          isPolicyAccepted: true
+        })
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        setErrorMessage(resData.message || 'Không thể tạo đơn đặt phòng.');
+      } else {
+        const refCode = resData.data?.confirmationCode || ('GH-' + Math.floor(100000 + Math.random() * 900000));
+        setBookingRef(refCode);
+        setIsSuccess(true);
+        if (onSuccess) onSuccess(resData.data);
+      }
+    } catch (err) {
+      console.error('Booking submission error:', err);
+      setErrorMessage('Không thể kết nối tới máy chủ đặt phòng. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {
@@ -133,6 +173,13 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
         ) : (
           /* FORM STATE */
           <form onSubmit={handleSubmit} className="p-5 sm:p-7 flex flex-col gap-5">
+            {errorMessage && (
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">error</span>
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
             {/* Room Brief Card */}
             <div className="flex items-center gap-4 p-3.5 bg-[#fbf8f2] rounded-xl border border-[#dedad0]">
               <img 
@@ -287,9 +334,10 @@ const QuickBookingModal = ({ room, branch, branchName, checkIn, checkInDate, che
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[13px] font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5"
+                disabled={isSubmitting}
+                className="px-6 py-2.5 rounded-xl bg-[#b9a277] hover:bg-[#a68e64] text-white text-[13px] font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
               >
-                <span>Xác Nhận Đặt Phòng</span>
+                <span>{isSubmitting ? 'Đang Xử Lý...' : 'Xác Nhận Đặt Phòng'}</span>
                 <span className="material-symbols-outlined text-[18px]">done</span>
               </button>
             </div>

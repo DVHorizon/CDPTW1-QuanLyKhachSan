@@ -2,10 +2,10 @@
 
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const cors = require('cors');
 require('dotenv').config();
 
-const path = require('path');
 const { initSocket } = require('./sockets/socketHandler');
 
 const app = express();
@@ -48,8 +48,8 @@ app.use(
 );
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-// Phục vụ tệp tĩnh ảnh CCCD, thẻ khách và chữ ký số
+// Phục vụ tệp tĩnh ảnh phòng, CCCD, thẻ khách và chữ ký số
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // ─── Health check ──────────────────────────────────────────────────────────
@@ -87,6 +87,7 @@ app.use('/api/v1', require('./routes/admin/menuRoutes'));
 
 // Route F&B Orders (Room Service, KDS, History)
 app.use('/api/v1/fnb-orders', require('./routes/admin/fnbOrderRoutes'));
+app.use('/api/v1/kitchen-inventory', require('./routes/admin/kitchenInventoryRoutes'));
 
 // Route Quản lý tình trạng phòng trống (Room Availability)
 app.use('/api/admin/room-availability', require('./routes/admin/roomAvailability'));
@@ -176,6 +177,22 @@ app.use('/api/housekeeping/lost-and-found', require('./routes/lostAndFoundRoutes
 // Route Khóa Cửa Điện Tử Thông Minh IoT (E-Key & Smart Lock Management)
 app.use('/api/smart-lock', require('./routes/smartLockRoutes'));
 
+// Route Quản lý Đón tiễn sân bay & Lịch trình xe đưa đón (Airport Transfer & Shuttle Fleet - Module 50)
+app.use('/api/transportation', require('./routes/transportationRoutes'));
+app.use('/api/v1/transportation', require('./routes/transportationRoutes'));
+
+// Route Quy trình Kiểm toán đêm tự động & Đóng sổ tài chính (Automated Night Audit - Module 49)
+app.use('/api/night-audit', require('./routes/nightAuditRoutes'));
+app.use('/api/v1/night-audit', require('./routes/nightAuditRoutes'));
+
+// Route Tự động kết xuất dữ liệu Khai báo tạm trú Công an (Police Guest Declaration Export - Module 51)
+app.use('/api/police-declaration', require('./routes/policeDeclarationRoutes'));
+app.use('/api/v1/police-declaration', require('./routes/policeDeclarationRoutes'));
+
+// Route Đồng bộ Kênh bán phòng trực tuyến OTA 2 chiều (Channel Manager Two-Way Sync - Module 52)
+app.use('/api/channel-manager', require('./routes/channelManagerRoutes'));
+app.use('/api/v1/channel-manager', require('./routes/channelManagerRoutes'));
+
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
 app.use('/api/v1/guest',      require('./modules/guest'));
@@ -224,6 +241,8 @@ app.use('/api/v1/fnb-orders',         require('./routes/admin/fnbOrderRoutes'));
 app.use('/api/fnb-orders',            require('./routes/admin/fnbOrderRoutes'));
 app.use('/api/v1/table-reservations', require('./routes/admin/tableReservationRoutes'));
 app.use('/api/table-reservations',    require('./routes/admin/tableReservationRoutes'));
+app.get('/api/v1/statistics/fnb',     require('./controllers/admin/fnbOrderController').getFnbStatistics);
+app.post('/api/v1/ai/combo-suggestion', require('./controllers/admin/fnbOrderController').getAiComboSuggestion);
 
 // 👤 Tuyền — Back-office Operations
 app.use('/api/v1/operations', require('./modules/operations'));
@@ -251,12 +270,19 @@ app.get('/bookings/:id', require('./controllers/onlineDepositPaymentController')
 app.post('/bookings/:bookingId/deposit', require('./controllers/onlineDepositPaymentController').processDepositPayment);
 
 // FEAT-INVOICE-01: Booking Charges Aggregation (C6)
+app.get('/api/v1/bookings/:bookingId/charges', require('./middlewares/authMiddleware').verifyToken, require('./modules/services/controllers/bookingChargesController').getBookingCharges);
+app.get('/api/bookings/:bookingId/charges', require('./middlewares/authMiddleware').verifyToken, require('./modules/services/controllers/bookingChargesController').getBookingCharges);
 app.get('/bookings/:bookingId/charges', require('./middlewares/authMiddleware').verifyToken, require('./modules/services/controllers/bookingChargesController').getBookingCharges);
 
 // FEAT-GUEST-09: Xem lịch sử đặt phòng & Hủy phòng (Mã truy vết: A9)
 app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));
 app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
 app.use('/me',        require('./routes/bookingHistoryRoutes'));
+
+// FEAT-GUEST-10: Cổng gửi Email xác nhận & Thông báo
+const bookingQrNotificationController = require('./controllers/bookingQrNotificationController');
+app.post('/api/v1/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
+app.post('/api/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
 
 // ─── Catch-all 404 Handler for API Routes (Guarantees JSON) ────────────────
 app.all(['/api', '/api/*'], (req, res) => {
@@ -295,6 +321,15 @@ try {
 }
 
 const { AuditLog } = require('./models');
+
+// ─── Global Unhandled Error Prevention (Ngăn chặn tiến trình Node.js bị crash) ───
+process.on('uncaughtException', (err) => {
+  console.error('🔥 [CRITICAL] Uncaught Exception:', err.message, err.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 [CRITICAL] Unhandled Rejection:', reason);
+});
 
 // ─── Start server ──────────────────────────────────────────────────────────
 server.listen(PORT, async () => {

@@ -4,7 +4,8 @@ const fnbOrderController = require('../../controllers/admin/fnbOrderController')
 const { verifyToken, optionalVerifyToken } = require('../../middlewares/authMiddleware');
 
 // Lấy danh sách phòng đang lưu trú phục vụ Room Service
-router.get('/active-stays', fnbOrderController.getActiveStays);
+router.get('/active-stays', optionalVerifyToken, fnbOrderController.getActiveStays);
+router.get('/my-table-reservation', optionalVerifyToken, fnbOrderController.getMyActiveTableReservation);
 
 // Đặt món Room Service online (FEAT-FNB-04: A4.4)
 router.post('/', verifyToken, fnbOrderController.createRoomServiceOrder);
@@ -38,6 +39,12 @@ router.get('/:orderId/reviews', fnbOrderController.getOrderReview);
 
 // FEAT-FNB-11 (Mã truy vết: A4.11): In phiếu order chuyển bếp và hóa đơn tạm tính
 router.get('/:orderId/print', optionalVerifyToken, fnbOrderController.printOrderDocument);
+
+// Dashboard F&B (Doanh thu & top món bán chạy/tồn chậm)
+router.get('/statistics', fnbOrderController.getFnbStatistics);
+
+// AI gợi ý combo món
+router.post('/ai/combo-suggestion', fnbOrderController.getAiComboSuggestion);
 
 
 

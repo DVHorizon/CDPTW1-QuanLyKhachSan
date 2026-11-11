@@ -16,6 +16,8 @@
     "seed:legacy": "node src/seeders/seedAll.js",
     "seed:stays": "node src/seeders/seedInHouseStays.js",
     "verify:db": "node src/seeders/verifyTables.js",
+    "sync:rooms": "node src/seeders/syncBothEngines.js",
+    "sync:menu": "node src/seeders/syncMenuBoth.js",
     "test:pricing": "node tests/test_feat_guest_06_pricing_calculation.js",
     "test:voucher": "node tests/test_feat_guest_07_voucher_redemption.js",
     "test:booking": "node tests/test_feat_guest_05_booking_engine.js",
@@ -29,6 +31,7 @@
     "test:all": "node tests/test_feat_guest_06_pricing_calculation.js && node tests/test_feat_guest_07_voucher_redemption.js && node tests/test_feat_guest_05_booking_engine.js && node tests/test_feat_guest_08_deposit_payment.js"
   },
   "dependencies": {
+    "@elastic/elasticsearch": "^8.13.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^18.0.3",
@@ -37,7 +40,7 @@
     "fuse.js": "^7.5.0",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.9.0",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.3.1",
     "pdfkit": "^0.20.2",
     "qrcode": "^1.5.4",
     "sequelize": "^6.37.0",

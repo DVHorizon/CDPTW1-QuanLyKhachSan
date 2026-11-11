@@ -52,6 +52,7 @@ const defineMaintenanceTicket = require('./MaintenanceTicket');
 const defineLostAndFoundItem = require('./LostAndFoundItem');
 const defineSmartLockKey = require('./SmartLockKey');
 const defineMinibarUsage = require('./MinibarUsage');
+const definePricingRule = require('./PricingRule');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -105,6 +106,12 @@ const MaintenanceTicket = defineMaintenanceTicket(sequelize);
 const LostAndFoundItem = defineLostAndFoundItem(sequelize);
 const SmartLockKey = defineSmartLockKey(sequelize);
 const MinibarUsage = defineMinibarUsage(sequelize);
+const PricingRule = definePricingRule(sequelize);
+
+
+// PricingRule Relationships (FEAT-GUEST-12)
+RoomType.hasMany(PricingRule, { foreignKey: 'RoomTypeId', as: 'pricingRules' });
+PricingRule.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
 
 // Inventory Relationships
 InventoryItem.hasMany(InventoryBatch, { foreignKey: 'ItemId', as: 'batches' });
@@ -155,6 +162,10 @@ Review.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
 Review.hasMany(ReviewPhoto, { foreignKey: 'ReviewId', as: 'photos' });
 ReviewPhoto.belongsTo(Review, { foreignKey: 'ReviewId', as: 'review' });
 
+// 7c. Stay & Review (FEAT-GUEST-11)
+Stay.hasOne(Review, { foreignKey: 'StayId', as: 'review' });
+Review.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
+
 // 8. MenuCategory & MenuItem
 MenuCategory.hasMany(MenuItem, { foreignKey: 'CategoryId' });
 MenuItem.belongsTo(MenuCategory, { foreignKey: 'CategoryId' });
@@ -202,6 +213,11 @@ FoodOrderDetail.belongsTo(MenuItem, { foreignKey: 'MenuItemId' });
 FoodOrder.hasOne(Review, { foreignKey: 'FoodOrderId', as: 'review' });
 Review.belongsTo(FoodOrder, { foreignKey: 'FoodOrderId', as: 'foodOrder' });
 
+// 14c. User & FoodOrder
+User.hasMany(FoodOrder, { foreignKey: 'UserId', as: 'foodOrders' });
+FoodOrder.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+FoodOrder.belongsTo(User, { foreignKey: 'UserId' });
+
 // 15. RestaurantTable & TableReservation
 const defineRestaurantTable = require('./RestaurantTable');
 const defineTableReservation = require('./TableReservation');
@@ -210,6 +226,9 @@ const TableReservation = defineTableReservation(sequelize);
 
 RestaurantTable.hasMany(TableReservation, { foreignKey: 'TableId', as: 'reservations' });
 TableReservation.belongsTo(RestaurantTable, { foreignKey: 'TableId', as: 'table' });
+
+RestaurantTable.hasMany(FoodOrder, { foreignKey: 'TableId', as: 'orders' });
+FoodOrder.belongsTo(RestaurantTable, { foreignKey: 'TableId', as: 'table' });
 
 User.hasMany(TableReservation, { foreignKey: 'UserId', as: 'tableReservations' });
 TableReservation.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
@@ -263,6 +282,7 @@ module.exports = {
   sequelize,
   Branch,
   RoomType,
+  PricingRule,
   Room,
   RoomSearchIndex,
   Amenity,

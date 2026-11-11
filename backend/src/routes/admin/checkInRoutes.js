@@ -160,7 +160,7 @@ router.get('/lookup', async (req, res) => {
          OR b.BookingId = ?
          OR bg.Phone = ?
          OR bg.IdNumber = ?)
-        AND b.Status != 'Cancelled'
+      ORDER BY (b.Status != 'Cancelled') DESC, b.BookingId DESC
       LIMIT 1
     `;
 

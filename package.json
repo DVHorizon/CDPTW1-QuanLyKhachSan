@@ -8,6 +8,7 @@
     "test:security": "node scripts/test_xss_defense.js"
   },
   "dependencies": {
+    "@elastic/elasticsearch": "^9.5.1",
     "bcryptjs": "^3.0.3",
     "sequelize-cli": "^6.6.5"
   }

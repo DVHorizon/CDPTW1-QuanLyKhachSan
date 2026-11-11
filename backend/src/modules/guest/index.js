@@ -45,4 +45,9 @@ router.get('/rooms/suggest',         roomSearchController.suggestRooms);
 router.get('/rooms/:id',             roomSearchController.getRoomDetail);
 router.get('/branches',              roomSearchController.getBranches);
 
+
+// ─── TÍNH NĂNG 10: TẠO MÃ QR BOOKING & GỬI EMAIL XÁC NHẬN (FEAT-GUEST-10 / A10) ───
+const bookingQrNotificationController = require('../../controllers/bookingQrNotificationController');
+router.get('/bookings/:bookingId/qr-code', bookingQrNotificationController.getBookingQRCode);
+router.post('/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
 module.exports = router;

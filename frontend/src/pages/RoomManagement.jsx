@@ -485,6 +485,10 @@ const RoomManagement = () => {
           setFormErrors((prev) => ({ ...prev, [data.field]: data.message }));
         }
         showToast(data.message || 'Lỗi khi lưu phòng vật lý', 'error', data.code);
+        if (data.isRecordDeleted || res.status === 404) {
+          setIsModalOpen(false);
+          fetchAllData();
+        }
         return;
       }
 
@@ -532,6 +536,9 @@ const RoomManagement = () => {
 
       if (!res.ok || !data.success) {
         showToast(data.message || 'Không thể xóa phòng', 'error', data.code);
+        if (data.isRecordDeleted || res.status === 404) {
+          fetchAllData();
+        }
         setIsDeleting(false);
         setDeleteTarget(null);
         return;

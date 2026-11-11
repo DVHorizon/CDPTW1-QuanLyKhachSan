@@ -76,6 +76,73 @@ export default function SearchRooms() {
   const [errorMessage, setErrorMessage] = useState('');
   const [validationError, setValidationError] = useState('');
   const [searchEngineMeta, setSearchEngineMeta] = useState(null);
+  const [selectedEngine, setSelectedEngine] = useState(searchParams.get('engine') || 'solr');
+  const [engineDropdownOpen, setEngineDropdownOpen] = useState(false);
+  const engineDropdownRef = useRef(null);
+
+  // Danh mục cấu hình các chế độ tìm kiếm (Search Modes / Engines)
+  const SEARCH_MODES = [
+    {
+      id: 'solr',
+      name: 'Apache Solr 10.1',
+      shortName: 'Solr',
+      tag: 'BM25',
+      icon: 'light_mode',
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-50/70',
+      borderColor: 'border-amber-300',
+      badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
+      iconBg: 'bg-amber-500 text-white',
+      description: 'Khớp cụm chính xác, phản hồi tức thì.'
+    },
+    {
+      id: 'elasticsearch',
+      name: 'Elasticsearch 9.5',
+      shortName: 'Elasticsearch',
+      tag: 'Fuzzy Match',
+      icon: 'bolt',
+      color: 'text-emerald-500',
+      bgColor: 'bg-emerald-50/70',
+      borderColor: 'border-emerald-300',
+      badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      iconBg: 'bg-emerald-600 text-white',
+      description: 'Tìm kiếm toàn văn, tự sửa lỗi chính tả.'
+    },
+    {
+      id: 'dual',
+      name: 'Dual Engine (Tự động)',
+      shortName: 'Dual Engine',
+      tag: 'Failover',
+      icon: 'swap_horiz',
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-50/70',
+      borderColor: 'border-blue-300',
+      badgeBg: 'bg-blue-100 text-blue-800 border-blue-200',
+      iconBg: 'bg-blue-600 text-white',
+      description: 'Chế độ kép kết hợp & tự động dự phòng lỗi.'
+    },
+    {
+      id: 'standard',
+      name: 'Chế độ thường (SQL)',
+      shortName: 'Chế độ thường',
+      tag: 'Database',
+      icon: 'database',
+      color: 'text-slate-600',
+      bgColor: 'bg-slate-50/70',
+      borderColor: 'border-slate-300',
+      badgeBg: 'bg-slate-100 text-slate-800 border-slate-200',
+      iconBg: 'bg-slate-700 text-white',
+      description: 'Tìm kiếm cơ sở dữ liệu MySQL tiêu chuẩn.'
+    }
+  ];
+
+  const currentMode = SEARCH_MODES.find(m => m.id === selectedEngine) || SEARCH_MODES[0];
+
+  const handleSelectEngine = (engineId) => {
+    setSelectedEngine(engineId);
+    setEngineDropdownOpen(false);
+    executeSearch({ engine: engineId });
+  };
   const [wishlist, setWishlist] = useState([]);
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
@@ -117,6 +184,9 @@ export default function SearchRooms() {
     const handleClickOutside = (e) => {
       if (searchInputContainerRef.current && !searchInputContainerRef.current.contains(e.target)) {
         setShowSuggestions(false);
+      }
+      if (engineDropdownRef.current && !engineDropdownRef.current.contains(e.target)) {
+        setEngineDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -210,7 +280,8 @@ export default function SearchRooms() {
       view: selectedView,
       amenities: selectedAmenities,
       rating: selectedRating === '4.5' ? '4.5' : selectedRating === '4.0' ? '4.0' : undefined,
-      sortBy
+      sortBy,
+      engine: overrideParams.engine || selectedEngine
     };
 
     // Cập nhật search params trên URL
@@ -220,6 +291,7 @@ export default function SearchRooms() {
     newParams.set('checkOutDate', queryParams.checkOutDate);
     newParams.set('totalGuests', queryParams.totalGuests);
     if (queryParams.keyword) newParams.set('keyword', queryParams.keyword);
+    if (queryParams.engine) newParams.set('engine', queryParams.engine);
     setSearchParams(newParams, { replace: true });
 
     const result = await searchRoomsApi(queryParams);
@@ -241,13 +313,15 @@ export default function SearchRooms() {
 
     if (result.searchEngine) {
       setSearchEngineMeta(result.searchEngine);
+    } else if (result.engine) {
+      setSearchEngineMeta({ engine: result.engine, executionTimeMs: result.executionTimeMs, query: result.originalKeyword, normalizedQuery: result.normalizedKeyword, isFullWidthInput: result.isFullWidthInput });
     }
   };
 
   // Tự động tìm kiếm lần đầu khi mount
   useEffect(() => {
     executeSearch();
-  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, priceMax]);
+  }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, priceMax, selectedEngine]);
 
   // Xử lý Wishlist
   const toggleWishlist = (roomId) => {
@@ -294,14 +368,14 @@ export default function SearchRooms() {
         {/* ══════════════════════════════════════════════════════════════
             DYNAMIC SEARCH STRIP (STICKY TOP-20)
         ══════════════════════════════════════════════════════════════ */}
-        <section className="sticky top-20 z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-md py-space-md px-margin border-b border-[#dedad0]/50">
+        <section className="w-full bg-surface-container-lowest py-space-md px-margin border-b border-[#dedad0]/50 shadow-sm">
           <div className="max-w-[1440px] mx-auto flex flex-col gap-space-sm">
             
             {/* Thanh tìm kiếm chính */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-md items-center">
               
               {/* 1. Destination / Khu nghỉ dưỡng */}
-              <div className="lg:col-span-3 flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-low rounded-xl border border-transparent hover:border-secondary/30 transition-colors">
+              <div className="lg:col-span-4 flex items-center gap-space-sm px-space-md py-space-sm bg-surface-container-low rounded-xl border border-transparent hover:border-secondary/30 transition-colors">
                 <span className="material-symbols-outlined text-secondary text-[24px]">location_on</span>
                 <div className="flex flex-col min-w-0 w-full">
                   <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Khu nghỉ dưỡng</span>
@@ -329,7 +403,7 @@ export default function SearchRooms() {
               </div>
 
               {/* 2. Date Interval Selector */}
-              <div className="lg:col-span-4 flex items-center justify-between px-space-md py-space-sm bg-surface-container-low rounded-xl hover:bg-surface-container transition-colors border border-transparent hover:border-secondary/30">
+              <div className="lg:col-span-5 flex items-center justify-between px-space-md py-space-sm bg-surface-container-low rounded-xl hover:bg-surface-container transition-colors border border-transparent hover:border-secondary/30">
                 <div className="flex items-center gap-space-sm flex-1">
                   <span className="material-symbols-outlined text-secondary text-[24px]">calendar_today</span>
                   <div className="flex flex-col flex-1">
@@ -446,21 +520,6 @@ export default function SearchRooms() {
                   </div>
                 )}
               </div>
-
-              {/* 4. Action Button */}
-              <div className="lg:col-span-2">
-                <button
-                  type="button"
-                  onClick={() => executeSearch()}
-                  disabled={loading}
-                  className="w-full h-12 flex items-center justify-center gap-space-xs bg-primary text-on-primary rounded-xl font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm active:scale-98 disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-[20px]">
-                    {loading ? 'sync' : 'search'}
-                  </span>
-                  <span>{loading ? 'Đang quét...' : 'Cập Nhật'}</span>
-                </button>
-              </div>
             </div>
 
             {/* Keyword Input & Search Engine indicator strip */}
@@ -469,8 +528,8 @@ export default function SearchRooms() {
                 ref={searchInputContainerRef}
                 className="relative w-full sm:w-auto flex-1"
               >
-                <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-lg border border-transparent focus-within:border-secondary/40">
-                  <span className="material-symbols-outlined text-[18px] text-secondary">manage_search</span>
+                <div className="flex items-center gap-3 bg-surface-container-low px-4 py-2.5 rounded-xl border border-[#dedad0]/60 focus-within:border-secondary/60 focus-within:bg-white transition-all shadow-sm">
+                  <span className="material-symbols-outlined text-[22px] text-secondary">manage_search</span>
                   <input
                     type="text"
                     placeholder="Tìm theo từ khóa (Deluxe, Villa, Hồ bơi, Bãi biển, Jacuzzi, Buffet...)"
@@ -487,7 +546,7 @@ export default function SearchRooms() {
                         setShowSuggestions(false);
                       }
                     }}
-                    className="bg-transparent text-xs w-full text-on-surface focus:outline-none placeholder:text-outline"
+                    className="bg-transparent text-sm w-full text-on-surface focus:outline-none placeholder:text-outline font-medium"
                   />
                   {keyword && (
                     <button
@@ -611,22 +670,125 @@ export default function SearchRooms() {
                 )}
               </div>
 
-              {/* Search Engine Badge */}
-              {searchEngineMeta && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 text-[11px] text-on-tertiary-container font-semibold bg-[#e8f7f0] px-3 py-1 rounded-full shrink-0 border border-[#b7eb8f]/40">
-                    <span className="material-symbols-outlined text-[15px]">neurology</span>
-                    <span>Search Engine: {searchEngineMeta.engine} ({searchEngineMeta.executionTimeMs}ms)</span>
-                  </div>
-                  {searchEngineMeta.isFullWidthInput && (
-                    <div className="flex items-center gap-1 text-[11px] text-[#d48806] font-semibold bg-[#fffbe6] border border-[#ffe58f] px-2.5 py-1 rounded-full shrink-0 animate-fade-in">
-                      <span className="material-symbols-outlined text-[14px]">translate</span>
-                      <span>Full-width (全角): "{searchEngineMeta.query}" ➔ Half-width: "{searchEngineMeta.normalizedQuery}"</span>
+              {/* Action Buttons: Nút Chọn Chế Độ Search & Nút Tìm kiếm */}
+              <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto justify-end">
+                {/* NÚT LỰA CHỌN CHẾ ĐỘ SEARCH - HIỂN THỊ TÊN CHẾ ĐỘ VÀ MŨI TÊN NHƯ BẢN VẼ */}
+                <div ref={engineDropdownRef} className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setEngineDropdownOpen(prev => !prev)}
+                    className="h-11 px-4 min-w-[140px] sm:min-w-[160px] flex items-center justify-between gap-2.5 bg-surface-container-low hover:bg-white rounded-xl border border-[#dedad0] hover:border-secondary/60 text-on-surface font-semibold text-sm transition-all shadow-sm active:scale-98 cursor-pointer select-none"
+                    title="Lựa chọn chế độ tìm kiếm"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${currentMode.iconBg}`}>
+                        <span className="material-symbols-outlined text-[15px]">{currentMode.icon}</span>
+                      </div>
+                      <span className="font-bold text-sm text-[#0b1c30] truncate">
+                        {currentMode.shortName}
+                      </span>
+                    </div>
+                    <span
+                      className="material-symbols-outlined text-[20px] text-outline shrink-0 transition-transform duration-200"
+                      style={{ transform: engineDropdownOpen ? 'rotate(180deg)' : 'none' }}
+                    >
+                      expand_more
+                    </span>
+                  </button>
+
+                  {/* Popover Menu Lựa Chọn Chế Độ Search */}
+                  {engineDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-xl border border-[#dedad0] z-50 p-2.5 animate-fade-in">
+                      <div className="px-2 pb-1.5 mb-1.5 border-b border-[#dedad0]/60 flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[15px] text-secondary">tune</span>
+                          Chế Độ Tìm Kiếm
+                        </span>
+                        <span className="text-[10px] text-secondary font-bold bg-secondary/10 px-2 py-0.5 rounded-full border border-secondary/20">
+                          Dual Engine
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        {SEARCH_MODES.map((mode) => {
+                          const isSelected = selectedEngine === mode.id;
+                          return (
+                            <button
+                              key={mode.id}
+                              type="button"
+                              onClick={() => handleSelectEngine(mode.id)}
+                              className={`w-full text-left p-2 rounded-xl transition-all border flex items-center gap-2.5 cursor-pointer ${
+                                isSelected
+                                  ? `${mode.bgColor} ${mode.borderColor} shadow-xs ring-1 ring-secondary/20`
+                                  : 'border-transparent hover:bg-surface-container-low'
+                              }`}
+                            >
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                isSelected ? mode.iconBg : 'bg-surface-container text-outline'
+                              }`}>
+                                <span className="material-symbols-outlined text-[16px]">{mode.icon}</span>
+                              </div>
+                              <div className="flex flex-col flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className={`text-xs font-bold ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
+                                    {mode.name}
+                                  </span>
+                                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${mode.badgeBg}`}>
+                                    {mode.tag}
+                                  </span>
+                                </div>
+                                <p className="text-[10.5px] text-outline truncate">
+                                  {mode.description}
+                                </p>
+                              </div>
+                              {isSelected && (
+                                <span className="material-symbols-outlined text-secondary text-[16px] shrink-0">
+                                  check_circle
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
-              )}
+
+                {/* NÚT TÌM KIẾM */}
+                <button
+                  type="button"
+                  onClick={() => executeSearch()}
+                  disabled={loading}
+                  className="h-11 px-6 sm:px-7 flex items-center justify-center gap-2 bg-primary text-on-primary rounded-xl font-bold text-sm hover:bg-secondary transition-all shadow-md active:scale-98 disabled:opacity-50 shrink-0 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">
+                    {loading ? 'sync' : 'search'}
+                  </span>
+                  <span>{loading ? 'Đang tìm...' : 'Tìm kiếm'}</span>
+                </button>
+              </div>
             </div>
+
+            {/* Trạng thái công cụ tìm kiếm đang kích hoạt & chuẩn hóa CJK */}
+            {searchEngineMeta && (
+              <div className="flex items-center gap-2 flex-wrap pt-0.5 animate-fade-in">
+                <div className="flex items-center gap-1.5 text-[11px] text-on-tertiary-container font-semibold bg-[#e8f7f0] px-3 py-1 rounded-full shrink-0 border border-[#b7eb8f]/50">
+                  <span className="material-symbols-outlined text-[14px] text-emerald-700">neurology</span>
+                  <span>
+                    Chế độ: <strong className="text-emerald-900">{searchEngineMeta.engine}</strong>
+                    {searchEngineMeta.executionTimeMs !== undefined && (
+                      <span className="text-emerald-700 font-normal"> • {searchEngineMeta.executionTimeMs}ms</span>
+                    )}
+                  </span>
+                </div>
+                {searchEngineMeta.isFullWidthInput && (
+                  <div className="flex items-center gap-1 text-[11px] text-[#d48806] font-semibold bg-[#fffbe6] border border-[#ffe58f] px-2.5 py-1 rounded-full shrink-0 animate-fade-in">
+                    <span className="material-symbols-outlined text-[13px]">translate</span>
+                    <span>Chuẩn hóa Full-width (全角): "{searchEngineMeta.query}" ➔ "{searchEngineMeta.normalizedQuery}"</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Thông báo lỗi validation nguyên văn */}
             {validationError && (
