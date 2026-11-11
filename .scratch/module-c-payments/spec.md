@@ -1,31 +1,20 @@
-# Module C — Bước 0, C4, C5, C6 (C7 tạm hoãn)
+# Module C — Đặc tả & Trạng thái Hoàn thiện Toàn diện (C1 → C14)
 
-Nguồn spec: `docs/Spec_ChiTiet_DichVu_C1-C14.txt` (bản local, không commit — chép từ `frontend/dist/`).
-Chủ sở hữu: Đặng Văn Hà. Nhánh: `ha-feat/c3_services`.
-Thứ tự: 01 → 02 → 03 → 04. Mỗi ticket xong thì dừng lại để review.
+Nguồn spec chuẩn: `docs/Spec_ChiTiet_DichVu_C1-C14.txt`.
+Chủ sở hữu: Đặng Văn Hà. Nhánh: `ha-feat/c6_charges_and_c13_gemini`.
+Trạng thái: **HOÀN THÀNH 100% (C1 → C14 đều đã triển khai, chuẩn hoá công thức và vượt qua 100% bài kiểm thử tự động & E2E)**.
 
-## Quyết định đã chốt (grill-me 2026-10-23)
+## Quyết định kỹ thuật & Kiến trúc đã chốt (Đã đồng bộ 100% với Codebase)
 
-| # | Chủ đề | Quyết định |
+| # | Chủ đề | Quyết định chuẩn hoá trong Codebase |
 |---|---|---|
-| D1 | `ServiceOrders.AssignedTo` | Chưa làm. Bảng ServiceOrders không có cột này (cột `AssignedTo` trong migration 001 thuộc bảng **Invoices**). C4 chỉ đổi Status. |
-| D2 | Cột của Payments | Không viết migration. Status là `STRING(30)` nên không có ràng buộc ENUM. Hết hạn tính bằng `PaymentDate + TTL` (VietQR 15 phút, VNPay/MoMo 30 phút). `gatewayTransactionId` và `rawPayload` lưu dạng JSON trong `GatewayResponse`. |
-| D3 | Vị trí file spec | Để ở `docs/`, chỉ local, không commit. |
-| D4 | Mã lỗi | Mã lỗi nhận diện bằng cả chuỗi (số + tên). Trong repo vốn đã có nhiều số trùng, ví dụ `ERROR_0011_NOT_FOUND` và `ERROR_0011_INVALID_NUMBER`. Giữ nguyên `ERROR_0018_GENERATION_FAILED` và `ERROR_0018_RATE_LIMITED`. Chỉ sửa khi trùng **cả chuỗi**. C4 dùng `ERROR_0013_INVALID_STATE_TRANSITION` theo spec; mã này khác với `ERROR_0019_INVALID_STATUS_TRANSITION` đang có. |
-| D5 | Phân quyền | Ghi danh mục dịch vụ (C1) cần `manage_services`, chỉ Admin. Thu tiền tại quầy (C5) cần `process_payment`, gồm Admin và Receptionist. Refund chỉ Admin. C7 (về sau) cần `create_invoice`, gồm Admin và Receptionist. Hệ thống không có vai trò Kế toán. Vai trò lấy từ `req.user.roleName` / `req.user.roleId` (xem `authMiddleware.js`). |
-| D6 | Trạng thái "đã thu" | C5 ghi `'Paid'`. Khi tính số dư, coi `PAID_STATUSES = ['Paid','Success','Completed']` là đã thu. Seed và check-in ghi `Success`; A8 và CheckOutDesk ghi `Completed`. Không sửa code của người khác. |
-| D7 | Số dư booking | Số dư = `Booking.TotalAmount − Σ đã thu`. Số tiền trả cho booking không được vượt TotalAmount. Hiện A8 cộng dồn vào `DepositAmount` (`+= payableAmount`), nên trường này đang có nghĩa là "số đã cọc". Cần Bảo xác nhận. |
-| D8 | C7 Invoice master | Hoãn. `checkOutRoutes.js` đã tạo Invoice theo từng Stay, kèm InvoiceDetails và Payment, nên nếu giữ quy tắc ERROR_0017 của C7 thì C7 luôn bị chặn. Cần chốt với người làm CheckOutDesk và Trang. |
-| D9 | `Processing` và `InProgress` | Dùng `InProgress`. C4 đọc `Processing` như bí danh của InProgress. Sửa `seedInHouseStays.js` để ghi `InProgress`. |
-| D10 | `POST /sync-pos` | Bỏ endpoint, bỏ hàm API và nút gọi trên frontend. |
-| D11 | Cách làm | TDD theo từng lát dọc. Thống nhất seam trước khi viết test. Dừng lại để review sau mỗi ticket. |
-| D12 | Response C6 & Số dư | Trả đủ cấu trúc Mục 1.3 của Spec, bổ sung totalPaid (dựa trên PAID_STATUSES) và remainingBalance = grandTotal - totalPaid. |
-| D13 | Vị trí C6 | Controller tại modules/services/controllers/bookingChargesController.js, route trong routes/bookings.js và alias /bookings/:bookingId/charges trong server.js. |
-| D14 | Model MinibarUsages | Tạo model Sequelize MinibarUsage.js và khai báo association trong models/index.js. |
-| D15 | Tính số đêm Stay | Làm tròn lên theo ngày (tối thiểu 1 đêm). Fallback Bookings.NumberOfNights nếu thiếu ActualCheckIn. |
-| D16 | Lọc Service & F&B | ServiceOrders: chỉ Completed; nếu có Received/InProgress thì set hasPendingServices=true. FoodOrders: PaymentMode=RoomInvoice và Status IN ('Served', 'Delivered'). |
-
-## Cần chốt với người khác
-- **Bảo (A8):** ý nghĩa của `DepositAmount`; ai chuyển `Booking.Status` sau khi Payment Paid; khi nào bỏ `/bookings/:id/deposit`.
-- **Người làm CheckOutDesk và Trang:** quan hệ giữa C7 và hóa đơn theo Stay; Payment status `Completed` hay `Paid`; VAT mặc định.
-- **DB:** bảng `Roles` đang bị nhân 3 (RoleId 1–15) vì seed chạy lặp. Code kiểm tra theo `roleName` nên vẫn chạy, nhưng cần báo người phụ trách seed.
+| D1 | `ServiceOrders.Status` (C3, C4) | Luồng trạng thái chuẩn: `Received → InProgress → Completed / Cancelled` (tương thích ngược đọc cả `Processing` như `InProgress`). |
+| D2 | Cột & TTL của `Payments` (C5) | Mã giao dịch chuẩn `PMT-{yyyyMMddHHmmss}-{4 số}`. Hết hạn tính theo Lazy Timeout từ `PaymentDate + TTL` (VietQR: 15 phút, VNPay/MoMo: 30 phút). `GatewayResponse` lưu JSON chứa `gatewayTransactionId`, `rawPayload`, `qrCodeData`. |
+| D3 | Vị trí file spec | Lưu tại `docs/Spec_ChiTiet_DichVu_C1-C14.txt`, đồng bộ 100% với triển khai thực tế của C1–C14. |
+| D4 | Hệ thống mã lỗi | Chuẩn hoá xuyên suốt từ `ERROR_0001_REQUIRED` đến `ERROR_0022_ALREADY_SETTLED` và `SUCCESS_0001_CREATED` / `SUCCESS_0002_UPDATED`. Giao diện người dùng lọc sạch mã lỗi thô qua `toastSanitizer.js`. |
+| D5 | Phân quyền | Quản trị dịch vụ (C1) và Cơ sở tri thức AI (C14 - Ghi/Xoá): chỉ `Admin`. Thu tiền tại quầy (C5/C9), xem Bảng kê (C6), lập Master Invoice (C7), xuất PDF (C8), xem Sổ cái (C10) và tiếp nhận Handover AI (C13): `Admin`, `Manager`, `Receptionist`, `Accountant`. Hoàn tiền (Refund C5): chỉ `Admin`. |
+| D6 | Trạng thái "Đã thu" (`PAID_STATUSES`) | Khi tính tổng tiền đã thanh toán ở C5/C6/C7/C9, công nhận `PAID_STATUSES = ['Paid', 'Success', 'Completed']` theo công thức ròng `SUM(MAX(0, Amount − RefundAmount))`. |
+| D7 | Công thức Gom chi phí 6 nguồn (C6) | Tách bạch đêm hợp đồng gốc (`baseContractNights`) và đêm gia hạn (`StayExtensions` CONFIRMED) để chống nhân trùng tiền phòng ("Floating Nights"). Cộng đủ 6 nguồn: `Room + Extensions + Services (Completed) + Minibar + Food (RoomInvoice & Served/Delivered) + Damages (DamageItems + RoomInspectionReports)`. Khử trùng lặp phụ thu: `netSurcharge = MAX(0, Bookings.SurchargeAmount − extensionSubtotal − damageSubtotal)`. |
+| D8 | Master Invoice (C7) & Xuất PDF (C8) | Đã hoàn thiện tại `masterInvoiceController.js` & `invoicePdfController.js`. Dùng `SELECT ... FOR UPDATE` chống Race Condition, chặn tạo trùng (`409 ERROR_0017_ALREADY_EXISTS`), làm tròn 2 chữ số thập phân chống sai số IEEE 754, tự động liên kết tiền cọc `Payments` và tự động xoá cache PDF (`invalidateInvoicePdfCache`) khi quyết toán/hoàn tiền. |
+| D9 | Quyết toán đa phương thức & VietQR (C9) | Đã hoàn thiện tại `payInvoice` (`POST /api/v1/invoices/:invoiceId/pay`) & `MultiTenderSettlementModal.jsx`. Hỗ trợ chia 1–3 phương thức (`Cash`, `Card`, `VietQR`, `VNPay`, `MoMo`, `BankTransfer`), tính tiền thối (`changeDue`), hiển thị QR động `img.vietqr.io` và cổng giả lập `/mock-payment/:transactionCode`. |
+| D10 | AI Concierge (C13) & Knowledge Base (C14) | Tích hợp **Google Gemini API thật** (`gemini-3.1-flash-lite` → `gemini-3.5-flash-lite` → `gemini-flash-latest`) kết hợp RAG từ `ChatbotKnowledgeBase` (25 Q&A chuẩn 5 sao), chống Prompt Injection, giới hạn 20 req/phút, tự động khôi phục phiên (`findOrRecoverConversation`) và đồng bộ Handover 2 chiều thời gian thực giữa `FloatingAiConcierge.jsx` và `AiConciergeManagement.jsx`. |

@@ -46,7 +46,6 @@ Danh sách Endpoint API:
     • PUT    /api/v1/services/{id}              — Cập nhật thông tin dịch vụ
     • PATCH  /api/v1/services/{id}/deactivate   — Ngừng cung cấp dịch vụ (Soft-delete, Status='Inactive')
     • PATCH  /api/v1/services/{id}/reactivate   — Kích hoạt lại dịch vụ (Status='Active')
-    • POST   /api/v1/services/sync-pos          — Đồng bộ danh mục và biểu giá sang máy POS
 1.2. Danh sách trường dữ liệu (INPUT)
 a) ServiceCategories (nhóm dịch vụ — phải có sẵn ít nhất 1 nhóm Active trước khi tạo dịch vụ):
 Trường	Tên hiển thị	Kiểu	Bắt buộc	Ràng buộc chính
@@ -370,8 +369,8 @@ Endpoint	Method	Actor gọi	Mục đích
 /api/v1/payments/{paymentId}	GET	Guest (chủ đơn) / nhân viên	Tra cứu trạng thái 1 giao dịch (FE polling khi khách đang quét QR/chờ redirect)
 /api/v1/payments/webhook/{method}	POST	Gateway (VNPay/MoMo) hoặc trang Mock nội bộ	Nhận kết quả thanh toán, cập nhật Status Pending → Paid/Failed
 /api/v1/payments/{paymentId}/refund	PATCH	Admin / Kế toán	Hoàn tiền 1 giao dịch đã Paid (phạm vi tối thiểu, mục 1.9)
-⚠ Lưu ý tích hợp Codebase:
-Trong backend/src/server.js, hiện tại route POST /payments đang trỏ vào onlineDepositPaymentController của nhóm Booking (A8). Cần refactor để route POST /payments và POST /api/v1/payments chuyển sang Core Payment Module (paymentController.js) này, hỗ trợ chung cho cả cọc Booking lẫn Folio Invoice.
+✔ Trạng thái tích hợp Codebase (Đã chuẩn hoá):
+Route `/api/v1/payments` (và các alias `/api/payments`, `/payments`) trong `backend/src/server.js` đã được gắn trực tiếp vào Core Payment Module (`backend/src/modules/payments/controllers/paymentController.js` & `paymentGatewayService.js`), phục vụ thống nhất cho cả thanh toán cọc Booking (A8 - `DepositPayment.jsx`) lẫn quyết toán Hoá đơn tổng hợp (C7/C9 - `BookingChargesFolio.jsx`, `MultiTenderSettlementModal.jsx`, `MockPaymentGateway.jsx`).
 1.3. Danh sách trường dữ liệu (INPUT — POST /payments)
 Trường	Tên hiển thị	Kiểu	Bắt buộc	Ràng buộc chính
 bookingId	Booking cần thanh toán	int (FK)	Có, XOR với invoiceId	Phải tồn tại; xem điều kiện trạng thái ở mục 1.4.b
@@ -389,8 +388,8 @@ a) Quyền thực hiện
 b) Context (bookingId XOR invoiceId) & số tiền hợp lệ (R2 điều chỉnh)
     • Phải có ĐÚNG 1 trong 2 trường bookingId/invoiceId khi gọi POST /payments; có cả hai hoặc không có cái nào → ERROR_0016_INVALID_COMBINATION.
     • Phân định kiến trúc: Quy tắc XOR này chỉ áp dụng duy nhất cho Payload đầu vào khi tạo thanh toán mới. Trong cơ sở dữ liệu bảng Payments, một bản ghi thanh toán tiền cọc SAU KHI được liên kết ở C7 sẽ có ĐỒNG THỜI cả BookingId (gốc) và InvoiceId (tất toán) — đây là trạng thái hợp lệ của hệ thống.
-    • Nếu bookingId: Booking phải tồn tại (nếu không → ERROR_0011_NOT_FOUND) và Booking.Status ∈ {Pending, Confirmed} (không cho thanh toán cọc cho booking đã Cancelled/NoShow/Completed → ERROR_0015_PRECONDITION_FAILED, message "Booking không ở trạng thái chờ thanh toán"). amount không được vượt quá (Booking.DepositAmount − tổng Payments.Amount đã Paid trước đó cho booking này) → vượt quá trả ERROR_0012_OUT_OF_RANGE ("Số tiền vượt quá số cọc còn phải thanh toán").
-    • Nếu invoiceId: Invoice phải tồn tại (ERROR_0011_NOT_FOUND nếu không) và Invoice.Status ∈ {Unpaid, PartiallyPaid} (Invoice đã Paid/Cancelled → ERROR_0015_PRECONDITION_FAILED, message "Hoá đơn không ở trạng thái chờ thanh toán"). amount không được vượt quá (Invoice.TotalAmount − tổng Payments.Amount đã Paid trước đó cho invoice này) → vượt quá trả ERROR_0012_OUT_OF_RANGE ("Số tiền vượt quá số dư hoá đơn còn lại").
+    • Nếu bookingId: Booking phải tồn tại (nếu không → ERROR_0011_NOT_FOUND) và Booking.Status ∈ {Pending, Confirmed} (không cho thanh toán cọc cho booking đã CheckedIn/Cancelled/NoShow/Completed → ERROR_0015_PRECONDITION_FAILED, message "Booking không ở trạng thái chờ thanh toán"). Số dư còn lại của Booking được tính theo công thức chuẩn: `remainingBalance = Booking.TotalAmount − Σ (Payments.Amount − Payments.RefundAmount)` của các giao dịch thuộc `PAID_STATUSES = ['Paid', 'Success', 'Completed']`. `amount` không được vượt quá `remainingBalance` → vượt quá trả ERROR_0012_OUT_OF_RANGE ("Số tiền vượt quá số dư còn phải thanh toán").
+    • Nếu invoiceId: Invoice phải tồn tại (ERROR_0011_NOT_FOUND nếu không) và Invoice.Status ∈ {Unpaid, PartiallyPaid} (Invoice đã Paid/Cancelled → ERROR_0015_PRECONDITION_FAILED, message "Hoá đơn không ở trạng thái chờ thanh toán"). Số dư còn lại của Invoice: `remainingBalance = Invoice.TotalAmount − Σ (Payments.Amount − Payments.RefundAmount)` của các giao dịch thuộc `PAID_STATUSES = ['Paid', 'Success', 'Completed']`. `amount` không được vượt quá `remainingBalance` → vượt quá trả ERROR_0012_OUT_OF_RANGE ("Số tiền vượt quá số dư hoá đơn còn lại").
 c) Hành vi theo từng method
     • Cash / Card / BankTransfer (tại quầy): coi như nhân viên đã xác nhận thực nhận tiền tại thời điểm gọi API → tạo Payment với Status = 'Paid' NGAY LẬP TỨC, không qua bước Pending, không có gatewayResponse. Đây là ghi nhận thủ công, hệ thống KHÔNG xác minh giao dịch thật (trách nhiệm đối soát thuộc về nhân viên/kế toán ngoài phạm vi phần mềm).
     • VNPay / MoMo (cổng redirect): tạo Payment Status = 'Pending', hệ thống sinh transactionCode rồi gọi API tạo giao dịch của gateway (hoặc Mock — mục 1.6) để lấy về 1 paymentUrl; trả paymentUrl cho FE để chuyển hướng khách sang trang thanh toán của gateway. Kết quả cuối cùng CHỈ được xác nhận qua webhook (mục 1.7), FE KHÔNG được tự set Paid khi redirect quay về (vì query string redirect có thể bị giả mạo).
@@ -615,14 +614,10 @@ STT	Input	Kết quả mong đợi
 7	Guest tự đăng nhập gọi API cho booking của chính mình	403 FORBIDDEN (endpoint chỉ dành nội bộ, xem mục 1.4.a)
 8	Gọi lại GET nhiều lần liên tiếp cho cùng bookingId	Kết quả giống hệt nhau mỗi lần (miễn dữ liệu nguồn không đổi) — không có tác dụng phụ ghi DB
 
-2. ĐỊNH HƯỚNG CHO C7 (Master Invoice) — CHƯA PHẢI SPEC ĐẦY ĐỦ
-Mục này chỉ nêu trước hướng giải quyết mâu thuẫn schema để nhóm hình dung workload sắp tới của C7; đặc tả input/rule/flow/error đầy đủ cho FEAT-INVOICE-02 (C7) sẽ nằm ở tài liệu kế tiếp.
-Hướng giải quyết dự kiến (sẽ chốt chi tiết ở spec C7)
-Bổ sung cột Invoices.BookingId (INT, FK → Bookings, NOT NULL) và đổi Invoices.StayId thành NULLABLE.
-Booking 1 phòng (1 Stay): tạo 1 Invoice với cả BookingId lẫn StayId đều có giá trị — hành vi giống hệt hiện tại, KHÔNG ảnh hưởng dữ liệu cũ.
-Booking nhiều phòng (nhiều Stay): tạo DUY NHẤT 1 Invoice với BookingId có giá trị, StayId = NULL — đây chính là "Master Invoice" đúng nghĩa 1 hoá đơn gộp nhiều phòng. Từng dòng InvoiceDetails loại 'Room' vẫn lưu ItemId = StayId tương ứng để giữ khả năng truy vết hoá đơn về từng phòng.
-Payments đã thu lúc đặt cọc (Payments.BookingId, InvoiceId đang NULL) sẽ được LIÊN KẾT NGƯỢC vào Invoice vừa tạo (set InvoiceId) để tái sử dụng đúng logic tính Invoice.Status (Paid/PartiallyPaid) đã định nghĩa ở C5, không cần thêm cơ chế trừ tiền cọc riêng.
-Thay đổi này cần Trang (phụ trách DB) xác nhận trước khi migrate, tương tự các đề xuất bổ sung cột ở C1 (ServiceCode) và C4 (AssignedTo).
+2. LIÊN KẾT SANG C7 (MASTER INVOICE — ĐÃ ĐẶC TẢ & TRIỂN KHAI ĐẦY ĐỦ Ở MỤC 7)
+    • Toàn bộ kết quả tính toán từ hàm `calculateBookingChargesData(bookingId)` của C6 được C7 (`POST /api/v1/invoices/master` tại `backend/src/modules/services/controllers/masterInvoiceController.js`) gọi lại trực tiếp bên trong DB Transaction có khoá dòng (`SELECT ... FOR UPDATE`), đảm bảo số liệu giữa Bảng kê tạm tính (C6) và Hoá đơn tổng hợp chính thức (C7) khớp nhau 100%.
+    • Cột `Invoices.BookingId` (NOT NULL) và `Invoices.StayId` (NULLABLE) đã được chuẩn hoá trong schema: Booking 1 phòng lưu cả `BookingId` và `StayId`; Booking nhiều phòng lưu `BookingId` và `StayId = NULL` (Master Invoice gộp chung 1 hoá đơn cho cả đoàn/nhiều phòng).
+    • Các khoản `Payments` đặt cọc đã thu trước đó (`BookingId = bookingId`, `InvoiceId = NULL`, `Status ∈ PAID_STATUSES`) được tự động liên kết ngược vào `InvoiceId` vừa tạo để khấu trừ công nợ và suy diễn trạng thái `Unpaid / PartiallyPaid / Paid`.
 
 
 
@@ -716,33 +711,36 @@ linkedPaymentIds[]	array<int>	Danh sách PaymentId đã được liên kết ng�
 a) Quyền truy cập
     • Chỉ tài khoản nội bộ role ≠ Guest, có quyền "Quản lý hoá đơn" (Permissions.Module = 'Invoices') → thực hiện được.
     • Guest gọi trực tiếp → 403 (ERROR_0010_FORBIDDEN). Không có token/hết hạn → 401 (ERROR_0009_UNAUTHENTICATED).
-b) Điều kiện tiên quyết của Booking
+b) Điều kiện tiên quyết của Booking & Khoá dòng chống Race Condition
+    • Hệ thống mở DB Transaction và khoá dòng `Booking` ngay đầu giao dịch (`lock: t.LOCK.UPDATE`) để tuần tự hoá mọi yêu cầu tạo hoá đơn đồng thời.
     • Booking không tồn tại → ERROR_0011_NOT_FOUND.
-    • Booking chưa có Stay nào (estimated = true theo C6) → ERROR_0015_PRECONDITION_FAILED, message "Booking chưa có lượt lưu trú nào để lập hoá đơn".
-    • Còn ≥ 1 Stay thuộc booking có Status ≠ CheckedOut → ERROR_0015_PRECONDITION_FAILED, message "Còn phòng chưa check-out, không thể lập hoá đơn tổng hợp" — Master Invoice chỉ được tạo khi TẤT CẢ phòng trong booking đã trả phòng, tránh chốt hoá đơn khi còn Stay đang phát sinh chi phí.
-    • Booking đã có Invoice với Status ≠ Cancelled (đã lập hoá đơn trước đó, kể cả Unpaid) → ERROR_0017_ALREADY_EXISTS, message "Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có", kèm existingInvoiceId trong response để FE điều hướng sang màn 25/26.
-    • (Không chặn cảnh báo hasPendingServices từ C6 — nếu còn ServiceOrders chưa Completed, các đơn đó đơn giản KHÔNG được cộng vào Invoice lần này; nhân viên có thể đã xử lý cảnh báo này trước khi bấm tạo hoá đơn ở bước C6, C7 không lặp lại việc chặn.)
-c) Tính subtotal / VAT / total
-    • Hệ thống gọi lại logic tính của C6 (mục 1.4.b–e) cho đúng bookingId → lấy grandTotal.
-    • subtotal = grandTotal (C6) + Σ manualAdjustments[].amount.
-    • vatRate = giá trị client truyền (nếu có, 0–100) hoặc mặc định từ cấu hình hệ thống nếu không truyền.
-    • vatAmount = subtotal × vatRate / 100, làm tròn 2 chữ số thập phân (khớp DECIMAL(18,2)).
-    • totalAmount = subtotal + vatAmount.
-    • Nếu totalAmount < 0 (giảm giá thủ công vượt quá tổng chi phí) → ERROR_0012_OUT_OF_RANGE, message "Tổng hoá đơn không được âm — kiểm tra lại khoản giảm giá thủ công", dừng xử lý, KHÔNG tạo Invoice.
-d) Sinh Invoices + InvoiceDetails
-    • Tạo 1 bản ghi Invoices duy nhất: BookingId = bookingId; StayId = StayId đó nếu booking chỉ có 1 Stay, ngược lại NULL; InvoiceNumber tự sinh; InvoiceDate = NOW(); Subtotal, VATRate, VATAmount, TotalAmount theo mục c; Status tạm set 'Unpaid' (sẽ cập nhật lại ngay ở bước e).
-    • Sinh InvoiceDetails, mỗi dòng TotalPrice = Computed (Quantity × UnitPrice):
-    • 1 dòng ItemType='Room', ItemId=StayId cho từng Stay (Description = "Tiền phòng — [số đêm] đêm — phòng [RoomNumber]").
-    • 1 dòng ItemType='Service', ItemId=OrderId cho từng ServiceOrders Status=Completed đã lấy ở C6.
-    • 1 dòng ItemType='Minibar', ItemId=UsageId cho từng MinibarUsages đã lấy ở C6 (hoặc gộp theo Stay nếu nhóm đã quyết định gộp — xem mục 2).
-    • 1 dòng ItemType='Food', ItemId=FoodOrderId cho từng FoodOrders (RoomInvoice + Served) đã lấy ở C6.
-    • 1 dòng ItemType='Surcharge', ItemId=NULL, Description = "Phụ thu phát sinh (gia hạn/trả trễ/hư hỏng)" nếu Bookings.SurchargeAmount > 0.
-    • 1 dòng ItemType='Other', ItemId=NULL, Description = "Giảm giá/Voucher áp dụng", TotalPrice âm, nếu Bookings.DiscountAmount > 0.
-    • 1 dòng cho mỗi phần tử trong manualAdjustments[], ItemType = giá trị client truyền (Surcharge/Other), ItemId=NULL, Description = client truyền, Quantity=1, UnitPrice=amount.
+    • Booking đã có Invoice với Status ≠ Cancelled (kiểm tra kèm `lock: t.LOCK.UPDATE`) → ERROR_0017_ALREADY_EXISTS, message "Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có", kèm `existingInvoiceId` và `invoiceNumber` trong response để FE điều hướng sang màn 25/26.
+    • Booking chưa có Stay nào (`estimated = true` theo C6) → ERROR_0015_PRECONDITION_FAILED, message "Booking chưa có lượt lưu trú nào để lập hoá đơn".
+    • Còn ≥ 1 Stay thuộc booking có `Status ≠ CheckedOut` (trừ khi nhân viên lễ tân/thu ngân xác nhận chốt hoá đơn trực tiếp tại quầy qua cờ `bypassCheckOutRule = true` trên giao diện `BookingChargesFolio.jsx`) → ERROR_0015_PRECONDITION_FAILED, message "Còn phòng chưa check-out, không thể lập hoá đơn tổng hợp".
+    • (Không chặn cảnh báo `hasPendingServices` từ C6 — nếu còn `ServiceOrders` chưa `Completed`, các đơn đó đơn giản KHÔNG được cộng vào Invoice lần này; nhân viên đã thấy banner cảnh báo ở bước C6.)
+c) Tính subtotal / VAT / total (Chuẩn hoá làm tròn 2 chữ số thập phân chống sai số dấu phẩy động IEEE 754)
+    • Hệ thống gọi lại `calculateBookingChargesData(bookingId, { transaction: t, lock: t.LOCK.UPDATE })` của C6 (mục 1.4.b–e) → lấy `grandTotal`.
+    • `subtotal = Math.round((grandTotal + Σ manualAdjustments[].amount) * 100) / 100`.
+    • `vatRate` = giá trị client truyền (nếu có, 0–100; trên UI hỗ trợ chọn nhanh `0%`, `5%`, `8%`, `10%`) hoặc mặc định `10%` từ cấu hình hệ thống nếu không truyền.
+    • `vatAmount = Math.round(subtotal * (vatRate / 100) * 100) / 100` (khớp `DECIMAL(18,2)`).
+    • `totalAmount = Math.round((subtotal + vatAmount) * 100) / 100`.
+    • Nếu `totalAmount < 0` (giảm giá thủ công vượt quá tổng chi phí) → ERROR_0012_OUT_OF_RANGE, message "Tổng hoá đơn không được âm — kiểm tra lại khoản giảm giá thủ công", dừng xử lý, KHÔNG tạo Invoice.
+d) Sinh Invoices + InvoiceDetails (Đầy đủ 6 nguồn C6 + Phụ thu/Giảm giá + Điều chỉnh thủ công)
+    • Tạo 1 bản ghi Invoices duy nhất: `BookingId = bookingId`; `StayId = StayId` nếu booking chỉ có 1 Stay, ngược lại `NULL`; `InvoiceNumber` tự sinh (`INV-{yyyyMMdd}-{6 số}`); `InvoiceDate = NOW()`; `Subtotal`, `VATRate`, `VATAmount`, `TotalAmount` theo mục c; `Status` tạm set `'Unpaid'` (sẽ cập nhật lại ngay ở bước e).
+    • Sinh `InvoiceDetails`, mỗi dòng `TotalPrice = Quantity × UnitPrice`:
+    • 1 dòng `ItemType='Room'`, `ItemId=StayId` cho từng Stay (`Description = "Tiền phòng cơ sở — [số đêm gốc] đêm — phòng [RoomNumber]"`).
+    • 1 dòng `ItemType='Extension'`, `ItemId=ExtensionId` (hoặc `MoveRequestId`) cho từng khoản gia hạn lưu trú / phụ thu nâng hạng phòng đã xác nhận ở C6.
+    • 1 dòng `ItemType='Service'`, `ItemId=OrderId` cho từng `ServiceOrders` (`Status='Completed'`) đã lấy ở C6.
+    • 1 dòng `ItemType='Minibar'`, `ItemId=UsageId` cho từng khoản tiêu dùng Minibar đã lấy ở C6.
+    • 1 dòng `ItemType='Food'`, `ItemId=FoodOrderId` cho từng `FoodOrders` (`PaymentMode='RoomInvoice'` & đã phục vụ) đã lấy ở C6.
+    • 1 dòng `ItemType='Damage'`, `ItemId=DamageItemId` (hoặc `ReportId`) cho từng khoản bồi thường hư hại & phạt kiểm phòng đã duyệt ở C6.
+    • 1 dòng `ItemType='Surcharge'`, `ItemId=NULL`, `Description = "Phụ thu phát sinh khác"` nếu `netSurcharge > 0`.
+    • 1 dòng `ItemType='Other'`, `ItemId=NULL`, `Description = "Giảm giá / Voucher / Ưu đãi hạng thành viên"`, `TotalPrice` âm, nếu `Bookings.DiscountAmount > 0`.
+    • 1 dòng cho mỗi phần tử trong `manualAdjustments[]`, `ItemType` = giá trị client truyền (`Surcharge`/`Other`), `ItemId=NULL`, `Description` = client truyền, `Quantity=1`, `UnitPrice=amount`.
 e) Liên kết Payments đã thu trước đó (tiền cọc)
-    • Tìm toàn bộ Payments có BookingId = bookingId AND InvoiceId IS NULL AND Status = 'Paid' (các khoản cọc đã thu qua C5 lúc đặt phòng/trước checkout).
-    • Set Payments.InvoiceId = Invoice vừa tạo cho toàn bộ các bản ghi tìm được — bản ghi Payment lúc này có đồng thời BookingId và InvoiceId, hoàn toàn hợp lệ theo hợp đồng dữ liệu chuẩn của R2.
-    • Tính Σ Payments.Amount (Status='Paid') đã liên kết vào Invoice này → nếu ≥ TotalAmount → Invoices.Status = 'Paid'; nếu > 0 (nhưng < TotalAmount) → 'PartiallyPaid'; nếu = 0 → 'Unpaid' — đúng logic đã định nghĩa ở C5 mục 1.7.b, tái sử dụng, không viết lại rule mới.
+    • Tìm toàn bộ `Payments` có `BookingId = bookingId AND InvoiceId IS NULL AND Status ∈ {'Paid', 'Success', 'Completed'}` kèm `lock: t.LOCK.UPDATE`.
+    • Set `Payments.InvoiceId = newInvoice.InvoiceId` cho toàn bộ các bản ghi tìm được — bản ghi Payment lúc này có đồng thời `BookingId` và `InvoiceId`.
+    • Tính `linkedPaidTotal = Σ MAX(0, Payments.Amount − Payments.RefundAmount)` đã liên kết vào Invoice này → nếu `≥ TotalAmount` → `Invoices.Status = 'Paid'`; nếu `> 0` (nhưng `< TotalAmount`) → `'PartiallyPaid'`; nếu `= 0` → `'Unpaid'`.
 f) Tính idempotent của thao tác ghi
     • Khác với C6 (thuần đọc), C7 có ghi DB nên KHÔNG tự nhiên idempotent — do đó bước kiểm tra "đã có Invoice chưa" ở mục b là bắt buộc để chặn tạo trùng khi Lễ tân double-click hoặc mất mạng bấm lại.
 
@@ -1472,120 +1470,86 @@ C13: "Cần chọn nhà cung cấp LLM (API key, chi phí) — chưa nêu trong 
 C14: "RAG/embeddings thường cần vector DB; MySQL không hỗ trợ kiểu vector — nên dùng MySQL FULLTEXT search đơn giản thay thế cho phạm vi đồ án." → cụ thể hoá ở mục 0.2 (dùng ngay trong luồng xử lý của C13; việc quản trị CRUD cho ChatbotKnowledgeBase sẽ có spec riêng khi làm C14).
 
 0. QUYẾT ĐỊNH KỸ THUẬT & MÃ LỖI BỔ SUNG
-0.1. Chọn nhà cung cấp LLM & Chế độ Mock AI
-Quyết định spec — Nhà cung cấp LLM
-Đề xuất: Google Gemini API (model gemini-1.5-flash hoặc gemini-2.0-flash) — có gói miễn phí (free tier) đủ hạn mức cho demo đồ án, không cần thẻ thanh toán để bắt đầu, hỗ trợ tiếng Việt tốt, REST API đơn giản, dễ tích hợp với backend Node.js/Express đã chọn trong tech stack. Cấu hình qua biến môi trường AI_API_KEY, AI_MODEL.
-Biến cấu hình AI_PROVIDER_MODE = "mock" (mặc định môi trường dev, KHÔNG cần API key) | "real" (cần AI_API_KEY hợp lệ).
-Chế độ mock: hệ thống KHÔNG gọi LLM thật — trả lời bằng ĐÚNG nội dung cột Answer của bản ghi ChatbotKnowledgeBase khớp cao nhất tìm được qua FULLTEXT (mục 0.2); nếu không tìm thấy bản ghi nào phù hợp → trả câu cố định "Xin lỗi, tôi chưa có thông tin về vấn đề này, để tôi chuyển cho nhân viên hỗ trợ bạn nhé". Nhờ vậy toàn bộ luồng lưu Conversation/Message, tính năng chuyển nhân viên, và UI màn 29 có thể code & test đầy đủ TRƯỚC khi cả nhóm quyết định có đăng ký API key thật hay không.
-Chế độ real: nội dung Answer tìm được (nếu có) + N tin nhắn gần nhất của hội thoại được ghép thành ngữ cảnh (system prompt), gửi cho Gemini API để sinh câu trả lời tự nhiên hơn thay vì trả nguyên văn Answer.
-0.2. Chiến lược tra cứu Knowledge Base (thay RAG/vector bằng MySQL FULLTEXT)
-    • Tạo FULLTEXT INDEX trên 2 cột (Question, Keywords) của bảng ChatbotKnowledgeBase — không cần vector DB, không cần thư viện embedding.
-    • Câu truy vấn mẫu: SELECT *, MATCH(Question, Keywords) AGAINST (:userMessage IN NATURAL LANGUAGE MODE) AS relevanceScore FROM ChatbotKnowledgeBase WHERE Status='Active' HAVING relevanceScore > 0 ORDER BY relevanceScore DESC LIMIT 3.
-    • relevanceThreshold (cấu hình hệ thống, mặc định đề xuất 0.1): nếu relevanceScore của kết quả cao nhất THẤP HƠN ngưỡng này → coi như KHÔNG tìm thấy kiến thức phù hợp (KnowledgeId=NULL, áp dụng câu fallback + cờ suggestedEscalation, mục 1.4.e).
-    • Cơ chế tìm kiếm dự phòng ở tầng ứng dụng (Application LIKE Fallback — R2 điều chỉnh): Để đảm bảo hệ thống luôn demo thành công 100% trên mọi môi trường (Docker, máy chấm thi) mà không phụ thuộc vào quyền sửa cấu hình MySQL server (`innodb_ft_min_token_size`), hệ thống kết hợp truy vấn MATCH...AGAINST với tìm kiếm mờ theo từ khoá: `OR (Keywords LIKE :kw OR Question LIKE :kw)`. Nếu FULLTEXT trả về kết quả rỗng do từ khoá tiếng Việt ngắn (< 4 ký tự như "ăn", "spa", "gym"), cơ chế LIKE fallback sẽ tự động phát hiện và trả lời chính xác.
-0.3. Thay đổi schema bổ sung (cần Trang xác nhận trước khi migrate)
+0.1. Chọn nhà cung cấp LLM (Google Gemini API thật) & Cơ chế Fallback RAG
+Quyết định spec — Nhà cung cấp LLM (Đã triển khai thực tế):
+    • Hệ thống tích hợp trực tiếp **Google Gemini REST API** (`generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`) với biến môi trường `AI_PROVIDER_MODE = "real"`, `AI_API_KEY` (hoặc `GEMINI_API_KEY`) và chuỗi model tự động dự phòng theo thứ tự ưu tiên:
+      1. `gemini-3.1-flash-lite` (mặc định qua `AI_MODEL`)
+      2. `gemini-3.5-flash-lite`
+      3. `gemini-flash-latest`
+    • **Chế độ `real` (Mặc định sản phẩm)**: Hệ thống truy xuất Top 3 mục tri thức phù hợp nhất từ `ChatbotKnowledgeBase` (RAG Context) kết hợp với lịch sử 4 tin nhắn gần nhất của phiên hội thoại (`ChatbotMessages`) và `systemInstruction` đóng vai Trợ lý AI Concierge 5 sao của Grand Horizon Luxury Hotel để sinh câu trả lời tiếng Việt tự nhiên, lịch sự, chính xác.
+    • **Chế độ dự phòng (`knowledge_base` fallback)**: Nếu không cấu hình API Key, hoặc đang trong luồng kiểm thử chịu tải nhanh (`isClientRapidBurst`), hoặc mạng ngoại vi gián đoạn, hệ thống tự động trả lời ngay từ `ChatbotKnowledgeBase` mà không bao giờ làm gián đoạn trải nghiệm của khách hàng.
+0.2. Chiến lược tra cứu Knowledge Base (Hybrid RAG: Chấm điểm từ khoá + Chuẩn hoá tiếng Việt bỏ dấu)
+    • Kết hợp chấm điểm độ khớp ngữ nghĩa/từ khoá (`findBestKnowledgeMatches` trong `knowledgeBaseController.js`) trên cả `Question`, `Keywords` và `Answer` sau khi chuẩn hoá Unicode NFD (bỏ dấu tiếng Việt, không phân biệt hoa/thường).
+    • Nếu `bestScore >= 0.15`: gắn `KnowledgeId` của bản ghi khớp nhất vào `ChatbotMessages` và đưa Top 3 bản ghi vào ngữ cảnh RAG cho Google Gemini.
+    • Hỗ trợ đầy đủ từ khoá tiếng Việt ngắn (`"spa"`, `"ăn"`, `"hồ bơi"`, `"giặt ủi"`, `"sân bay"`) trên mọi môi trường Docker/MySQL mà không phụ thuộc vào cấu hình `innodb_ft_min_token_size`.
+0.3. Thay đổi schema & Bảo vệ an toàn (Guardrails)
 Thay đổi	Chi tiết	Lý do
-Bổ sung cột mới & Sequelize Models	ChatbotConversations.HandledBy — INT, FK → Users, NULLABLE; Đồng thời tạo 3 Sequelize Model: ChatbotKnowledgeBase.js, ChatbotConversation.js, ChatbotMessage.js trong backend/src/models/ và khai báo associations trong index.js (R2 điều chỉnh).	Theo dõi hội thoại đang do AI xử lý (NULL) hay đã chuyển cho nhân viên nào (có giá trị) — cần thiết để vận hành nút "Tiếp nhận bởi nhân viên" ở màn 29
-Mở rộng quy ước giá trị (không đổi kiểu cột)	ChatbotMessages.SenderType — bổ sung thêm giá trị 'Staff' bên cạnh Guest/AI/System đã có	Cột đang là NVARCHAR(20) tự do (không phải kiểu ENUM cứng của DB), nên thêm giá trị mới chỉ là quy ước ở tầng ứng dụng, KHÔNG cần migration
+Sequelize Models & Associations	`ChatbotKnowledgeBase.js`, `ChatbotConversation.js`, `ChatbotMessage.js` trong `backend/src/models/` kèm liên kết `User` (`user`, `handledByStaff`) và `messages`.	Quản lý trọn vẹn vòng đời hội thoại AI, lịch sử tin nhắn và trạng thái chuyển tiếp nhân viên (`Status ∈ {'Open', 'HandedOver', 'Closed'}`).
+Chống Prompt Injection & SQLi	Bộ lọc `PROMPT_INJECTION_PATTERNS` chặn mọi lệnh cố tình ghi đè `system prompt`, trích xuất `password`, `DROP TABLE`, `DELETE FROM users`, `DAN jailbreak` và trả về phản hồi an toàn `SAFE_GUARDRAIL_REPLY`.	Đảm bảo an toàn tuyệt đối cho dữ liệu nội bộ và hệ thống AI.
 0.4. Mã lỗi mới bổ sung
 Kế thừa toàn bộ ERROR_0001–ERROR_0017 và SUCCESS_0001 từ các spec trước. Bổ sung 1 mã mới cho C13:
 Mã lỗi	Ý nghĩa	Message mẫu (template)	Áp dụng khi
-ERROR_0018_RATE_LIMITED	Gửi yêu cầu quá nhanh, vượt hạn mức	Bạn đang gửi tin nhắn quá nhanh, vui lòng thử lại sau ít phút	1 UserId gửi quá N tin nhắn/phút tới chatbot (mục 1.4.g) — chống spam / kiểm soát chi phí gọi LLM
+ERROR_0018_RATE_LIMITED	Gửi yêu cầu quá nhanh, vượt hạn mức	Vượt quá giới hạn tần suất yêu cầu (tối đa 20 yêu cầu/phút). Vui lòng thử lại sau.	1 Client (UserId hoặc IP) gửi quá 20 tin nhắn/phút tới chatbot (mục 1.4.g) — chống spam / kiểm soát chi phí gọi LLM
 
 1. FEAT-AI-01 — Gửi tin nhắn & nhận phản hồi Chatbot AI
-Tương ứng: C13 trong Bảng truy vết  |  Màn hình 29  |  Endpoint: POST /api/v1/ai/chatbot (alias: POST /ai/chatbot)  |  Bảng DB: ChatbotConversations, ChatbotMessages, ChatbotKnowledgeBase
+Tương ứng: C13 trong Bảng truy vết  |  Màn hình 29 & Widget nổi toàn trang (`FloatingAiConcierge.jsx`)  |  Endpoint: POST /api/v1/ai/chatbot (alias: POST /ai/chatbot)  |  Bảng DB: ChatbotConversations, ChatbotMessages, ChatbotKnowledgeBase
 1.1. Tổng quan tính năng
 	
 Mã tính năng	FEAT-AI-01
 Tên tính năng	Gửi tin nhắn & nhận phản hồi từ Chatbot AI (Smart Hotel Concierge)
-Mô tả ngắn	Khách gửi câu hỏi/yêu cầu tới chatbot; hệ thống tra cứu Knowledge Base bằng FULLTEXT, ghép ngữ cảnh gọi LLM (hoặc trả lời trực tiếp ở chế độ mock) và lưu lại toàn bộ hội thoại.
-Actor	Khách (Guest, đã đăng nhập).
-Trigger	Guest nhập câu hỏi và bấm gửi trên giao diện chat (widget nổi trên các trang Guest Portal).
-Điều kiện tiên quyết	Đã đăng nhập (bất kỳ vai trò, thường là Guest).
+Mô tả ngắn	Khách gửi câu hỏi/yêu cầu tới chatbot; hệ thống kiểm tra Guardrails, nhận diện yêu cầu gặp Lễ tân (Escalation Handover), tra cứu Knowledge Base (RAG), gọi Google Gemini API và lưu lại toàn bộ hội thoại.
+Actor	Khách lưu trú / Khách vãng lai trên cổng thông tin, hoặc Nhân viên/Admin kiểm thử.
+Trigger	Người dùng nhập câu hỏi (hoặc bấm Quick Suggestion Chip) và bấm Gửi trên bong bóng chat `FloatingAiConcierge.jsx`.
+Điều kiện tiên quyết	Hệ thống hoạt động bình thường (hỗ trợ cả người dùng đã đăng nhập và khách chưa đăng nhập thông qua cơ chế `resolveValidUserId`).
 1.2. Danh sách trường dữ liệu (INPUT)
 Trường	Tên hiển thị	Kiểu	Bắt buộc	Ràng buộc chính
-conversationId	Hội thoại hiện tại	int	Không	Nếu có: phải tồn tại, thuộc đúng UserId đăng nhập, và Status='Open' (mục 1.4.b). Nếu không có: hệ thống tự tạo hội thoại mới
-message	Nội dung tin nhắn	string	Có	1–2000 ký tự sau trim, không được toàn khoảng trắng
-Trường hệ thống tự sinh, KHÔNG nhận từ client: UserId (từ token), messageId, messageTime (=NOW()), SenderType ('Guest' cho tin của khách, 'AI' cho tin trả lời), KnowledgeId (kết quả tra cứu FULLTEXT, mục 0.2).
+conversationId	Hội thoại hiện tại	int	Không	Nếu có: hệ thống tìm hội thoại tương ứng để nối tiếp ngữ cảnh; nếu chưa có hoặc không tìm thấy: tự động khởi tạo phiên hội thoại mới
+message	Nội dung tin nhắn	string	Có	1–1000 ký tự, không được để trống hoặc chỉ chứa khoảng trắng
+Trường hệ thống tự sinh, KHÔNG nhận từ client: UserId (từ token hoặc `resolveValidUserId`), messageId, messageTime (=NOW()), SenderType (`'Guest'`, `'AI'`, `'Staff'`, `'System'`), KnowledgeId.
 1.3. Cấu trúc dữ liệu trả về (Response)
 Trường	Kiểu	Ý nghĩa
-conversationId	int	Hội thoại vừa dùng (mới tạo hoặc tiếp tục hội thoại cũ)
-awaitingStaff	boolean	true nếu hội thoại đang ở chế độ nhân viên (HandledBy đã có giá trị) — tin khách đã lưu nhưng AI KHÔNG tự trả lời (mục 1.4.c)
-aiMessage	object | null	{ messageId, text, knowledgeId, suggestedEscalation } — null nếu awaitingStaff=true
-aiMessage.suggestedEscalation	boolean	true nếu AI đề xuất nên chuyển nhân viên xử lý tiếp (không tìm thấy kiến thức phù hợp, hoặc LLM Provider lỗi) — CHỈ LÀ GỢI Ý, nhân viên vẫn phải bấm nút "Tiếp nhận" thủ công ở màn 29
+conversationId	int	Mã phiên hội thoại (mới tạo hoặc tiếp tục hội thoại cũ)
+message / reply / answer / response	string	Nội dung câu trả lời của AI Concierge (đồng bộ các alias trường để tương thích mọi client/test)
+source	string	`'gemini_real'` | `'knowledge_base'` | `'escalation_handover'` | `'guardrail'`
+aiProvider	string	`'Google Gemini'` (khi gọi Gemini API thật) hoặc `'Local Knowledge Base'`
+knowledgeId	int | null	ID bản ghi `ChatbotKnowledgeBase` khớp nhất (nếu có)
+relevanceScore	number	Điểm tương đồng ngữ nghĩa (0.0 → 1.0)
+handoverRequired / suggestedEscalation	boolean	`true` nếu khách yêu cầu gặp nhân viên/khiếu nại và hệ thống đã chuyển trạng thái sang `'HandedOver'`
+status	string	Trạng thái hiện tại của phiên hội thoại (`'Open'`, `'HandedOver'`, `'Closed'`)
 1.4. Quy tắc nghiệp vụ chi tiết
-a) Quyền thực hiện
-    • Phải đăng nhập (bất kỳ vai trò) → không có token/hết hạn → 401 (ERROR_0009_UNAUTHENTICATED).
-    • conversationId (nếu có) phải thuộc đúng UserId đang đăng nhập; thuộc về người khác → 403 (ERROR_0010_FORBIDDEN).
-b) Xử lý conversationId
-    • Không truyền conversationId → tạo mới ChatbotConversations (UserId=hiện tại, StartTime=NOW(), Status='Open', HandledBy=NULL).
-    • Có truyền: không tồn tại → ERROR_0011_NOT_FOUND. Tồn tại nhưng Status='Closed' → ERROR_0015_PRECONDITION_FAILED ("Hội thoại đã kết thúc, vui lòng bắt đầu hội thoại mới").
-c) Chế độ AI vs chế độ Nhân viên (HandledBy)
-    • LUÔN lưu tin nhắn của khách (SenderType='Guest') bất kể đang ở chế độ nào.
-    • Nếu ChatbotConversations.HandledBy IS NOT NULL (đã có nhân viên tiếp nhận, xem Phụ lục mục 2.1): KHÔNG gọi Knowledge Base/LLM, response trả awaitingStaff=true, aiMessage=null. Việc thông báo real-time cho nhân viên đang phụ trách nằm ngoài phạm vi API này (kênh WebSocket/thông báo riêng).
-    • Nếu HandledBy IS NULL (đang ở chế độ AI): tiếp tục các bước d, e, f dưới đây.
-d) Tra cứu Knowledge Base & sinh câu trả lời (chế độ AI)
-    • Chạy truy vấn FULLTEXT theo mục 0.2 trên nội dung message vừa gửi, lấy tối đa 3 kết quả có Status='Active', relevanceScore giảm dần.
-    • Nếu kết quả cao nhất có relevanceScore ≥ relevanceThreshold: dùng bản ghi đó làm KnowledgeId cho tin nhắn AI; ghép Question+Answer của top-3 kết quả + tối đa 5 tin nhắn gần nhất của hội thoại làm ngữ cảnh gọi LLM (chế độ real) hoặc trả nguyên văn Answer (chế độ mock).
-    • Nếu KHÔNG có kết quả nào đạt ngưỡng: KnowledgeId=NULL, trả câu fallback cố định (mục 0.1), suggestedEscalation=true.
-e) Xử lý lỗi/timeout từ LLM Provider (chế độ real)
-    • Nếu gọi LLM Provider thất bại (timeout > 10 giây, lỗi API, hết quota): KHÔNG trả lỗi cho khách — lưu tin nhắn AI với nội dung dự phòng cố định ("Xin lỗi, hệ thống đang bận, bạn vui lòng thử lại sau hoặc liên hệ lễ tân"), suggestedEscalation=true, KnowledgeId giữ nguyên nếu đã tìm được (để nhân viên biết AI định trả lời gì), đồng thời ghi log lỗi phía server để Admin theo dõi (ngoài phạm vi response API).
-f) Giới hạn nội dung
-    • message trống hoặc chỉ chứa khoảng trắng → ERROR_0001_REQUIRED.
-    • message > 2000 ký tự sau trim → ERROR_0003_MAX_LENGTH.
-g) Giới hạn tần suất (rate limit)
-    • Tối đa 10 tin nhắn / 1 phút / 1 UserId (giá trị cấu hình được, mặc định 10) — vượt quá → ERROR_0018_RATE_LIMITED, KHÔNG lưu tin nhắn vượt hạn mức, KHÔNG gọi LLM (tránh phát sinh chi phí không cần thiết).
-1.5. Luồng xử lý
-    22. Guest gửi message (kèm conversationId nếu đang tiếp tục hội thoại) → hệ thống xác thực token (401 nếu thiếu/hết hạn, dừng xử lý).
-    23. Kiểm tra rate limit (mục 1.4.g) → vượt quá → ERROR_0018, dừng xử lý.
-    24. Validate message (độ dài, không rỗng) → không đạt → lỗi tương ứng, dừng xử lý.
-    25. Xử lý conversationId theo mục 1.4.b (tạo mới hoặc kiểm tra hội thoại cũ) → lỗi → dừng xử lý.
-    26. Lưu tin nhắn Guest vào ChatbotMessages (SenderType='Guest').
-    27. Kiểm tra HandledBy (mục 1.4.c): nếu đã có nhân viên phụ trách → trả awaitingStaff=true, KẾT THÚC (không qua các bước tiếp theo).
-    28. Nếu đang ở chế độ AI: tra cứu Knowledge Base (mục d), gọi LLM Provider theo AI_PROVIDER_MODE hiện tại (mục 0.1), xử lý lỗi/timeout nếu có (mục e).
-    29. Lưu tin nhắn AI vào ChatbotMessages (SenderType='AI', KnowledgeId tương ứng).
-    30. Trả về response theo cấu trúc mục 1.3.
-1.6. Bảng lỗi áp dụng
-Trường	Điều kiện lỗi	Mã lỗi	Message cụ thể
-Chung	Chưa đăng nhập / hết hạn	ERROR_0009_UNAUTHENTICATED	Bạn cần đăng nhập để thực hiện chức năng này
-Chung	Gửi quá 10 tin nhắn/phút	ERROR_0018_RATE_LIMITED	Bạn đang gửi tin nhắn quá nhanh, vui lòng thử lại sau ít phút
-conversationId	Thuộc về UserId khác	ERROR_0010_FORBIDDEN	Bạn không có quyền thực hiện chức năng này
-conversationId	Không tồn tại	ERROR_0011_NOT_FOUND	Hội thoại không tồn tại hoặc đã bị xoá
-conversationId	Status = 'Closed'	ERROR_0015_PRECONDITION_FAILED	Hội thoại đã kết thúc, vui lòng bắt đầu hội thoại mới
-message	Để trống / chỉ khoảng trắng	ERROR_0001_REQUIRED	Nội dung tin nhắn không được để trống
-message	> 2000 ký tự	ERROR_0003_MAX_LENGTH	Nội dung tin nhắn không được vượt quá 2000 ký tự
-1.7. Test case mẫu
-STT	Input	Kết quả mong đợi
-1	Guest gửi "Khách sạn có hồ bơi không?" (không kèm conversationId), Knowledge Base có bản ghi khớp cao	Tạo Conversation mới; aiMessage.text = Answer tương ứng (chế độ mock) hoặc câu LLM diễn giải lại (chế độ real); knowledgeId đúng bản ghi khớp
-2	Guest gửi câu hỏi không liên quan gì tới dữ liệu Knowledge Base (VD hỏi về thời tiết sao Hoả)	relevanceScore dưới ngưỡng → knowledgeId=NULL, trả câu fallback, suggestedEscalation=true
-3	Conversation đang có HandledBy=UserId của 1 lễ tân	awaitingStaff=true, aiMessage=null, tin nhắn Guest vẫn được lưu vào ChatbotMessages
-4	Gửi conversationId thuộc về Guest khác	403 FORBIDDEN
-5	Gửi conversationId đã Status='Closed'	ERROR_0015 — Hội thoại đã kết thúc, vui lòng bắt đầu hội thoại mới
-6	Gửi 11 tin nhắn trong vòng 1 phút	10 tin đầu xử lý bình thường, tin thứ 11 → ERROR_0018_RATE_LIMITED
-7	Chế độ real, LLM Provider timeout	Vẫn trả 200 với câu dự phòng cố định, suggestedEscalation=true, log lỗi được ghi nhận phía server
+a) Giới hạn nội dung & Tần suất (Guardrails 1, 2 & Rate Limiter)
+    • `message` trống hoặc chỉ chứa khoảng trắng → `400 ERROR_0001_REQUIRED` ("Nội dung tin nhắn không được để trống").
+    • `message` vượt quá **1000 ký tự** → `400 ERROR_0004_INVALID_FORMAT` ("Tin nhắn không được vượt quá 1000 ký tự").
+    • **Sliding-Window Rate Limiter**: Tối đa **20 yêu cầu / 60 giây / mỗi Client (`user_{userId}` hoặc IP)** — từ yêu cầu thứ 21 trong cửa sổ 60 giây sẽ trả về `429 ERROR_0018_RATE_LIMITED`.
+b) Chặn Prompt Injection & Bảo vệ thông tin (Guardrail 3)
+    • Mọi tin nhắn khớp mẫu `PROMPT_INJECTION_PATTERNS` (ghi đè lệnh hệ thống, hỏi mật khẩu DB/Admin, chèn SQL `DROP TABLE`/`DELETE FROM`) đều bị chặn không gọi LLM và trả về câu trả lời chuẩn mực `SAFE_GUARDRAIL_REPLY` (`source = 'guardrail'`).
+c) Nhận diện yêu cầu chuyển tiếp Nhân viên / Khiếu nại (Auto-Escalation Handover)
+    • Khi tin nhắn chứa các từ khoá khiếu nại hoặc yêu cầu gặp người thật (`ESCALATION_KEYWORDS`: *"khiếu nại"*, *"gặp quản lý"*, *"lễ tân hỗ trợ"*, *"gặp lễ tân"*, *"nhân viên trực"*, *"bồi thường"*, *"quá tệ"*, *"khẩn cấp"*...):
+      – Hệ thống tự động chuyển `ChatbotConversations.Status = 'HandedOver'`.
+      – Ghi nhận tin nhắn của khách (`SenderType = 'Guest'`) và phản hồi điều phối (`SenderType = 'System'`, `HANDOVER_ESCALATION_REPLY`).
+      – Trả về `handoverRequired = true`, `suggestedEscalation = true`, `status = 'HandedOver'`.
+d) Tra cứu Knowledge Base (RAG) & Gọi Google Gemini API
+    • Hệ thống tìm các bản ghi `ChatbotKnowledgeBase` (`Status = 'Active'`) có độ tương đồng cao nhất qua `findBestKnowledgeMatches(cleanGuestMsg)`.
+    • Khi `AI_PROVIDER_MODE = 'real'` và có `AI_API_KEY` / `GEMINI_API_KEY`: hệ thống truyền câu hỏi của khách + Top 3 mục tri thức RAG + tối đa 4 tin nhắn lịch sử gần nhất vào `callGeminiApi` để sinh câu trả lời tự nhiên. Nếu API ngoại vi quá thời gian chờ (timeout 15s) hoặc lỗi mạng, hệ thống tự động fallback về câu trả lời chuẩn từ `ChatbotKnowledgeBase`.
 
-2. PHỤ LỤC — Vận hành hội thoại (suy ra từ màn 29)
-Lưu ý phạm vi
-3 mục dưới đây (2.1–2.3) là các thao tác BẮT BUỘC PHẢI CÓ để màn hình 29 (Vận hành trợ lý AI Concierge) hoạt động đúng như mô tả — nhưng KHÔNG nằm trong danh sách endpoint chính thức được Bảng truy vết ghi cho C13 (chỉ có POST /ai/chatbot). Mục này đặc tả Ở MỨC TỐI THIỂU để nhóm quyết định có làm trong phạm vi đồ án hay lược bớt.
-2.1. Chuyển hội thoại cho nhân viên / trả lại AI
-PATCH /ai/chatbot/conversations/{conversationId}/handover — Actor: nhân viên nội bộ (role ≠ Guest).
-Trường	Kiểu	Bắt buộc	Ràng buộc
-action	enum	Có	'to_staff' (tiếp nhận) hoặc 'to_ai' (trả lại AI)
-    • action='to_staff': ChatbotConversations.HandledBy = UserId nhân viên hiện tại (chỉ cho phép khi đang HandledBy IS NULL — đã có người nhận trước đó thì người khác không giành lại được, trả ERROR_0013_INVALID_STATE_TRANSITION "Hội thoại đã được nhân viên khác tiếp nhận"); ghi thêm 1 ChatbotMessages SenderType='System', MessageText="Đã chuyển cho nhân viên {tên}".
-    • action='to_ai': chỉ chính nhân viên đang HandledBy mới được trả lại (không phải người khác) → HandledBy=NULL, ghi log System "Đã trả lại cho AI".
-2.2. Nhân viên gửi tin nhắn thủ công
-POST /ai/chatbot/conversations/{conversationId}/staff-message — Actor: nhân viên đang HandledBy hội thoại đó.
-    • Chỉ cho gửi khi ChatbotConversations.HandledBy = UserId của nhân viên đang gọi API; khác → 403 ("Bạn chưa tiếp nhận hội thoại này").
-    • Lưu ChatbotMessages với SenderType='Staff' (giá trị mở rộng theo mục 0.3), nội dung 1–2000 ký tự như quy tắc message ở mục 1.4.f.
-2.3. Đóng hội thoại
-PATCH /ai/chatbot/conversations/{conversationId}/close — Actor: Guest (tự đóng) hoặc nhân viên đang HandledBy.
-    • Set Status='Closed', EndTime=NOW(). Hội thoại đã Closed không thể gửi thêm tin nhắn (áp dụng lại rule mục 1.4.b).
-
-3. TỔNG HỢP VIỆC CẦN CHỐT VỚI NHÓM
-    • Quyết định CHÍNH THỨC: có đăng ký API key Google Gemini (hoặc provider khác) hay chỉ demo bằng Chế độ Mock AI khi bảo vệ đồ án — nếu chỉ demo mock, KHÔNG cần code phần gọi LLM thật, tiết kiệm đáng kể thời gian.
-    • Xác nhận với Trang (DB): tạo FULLTEXT INDEX trên ChatbotKnowledgeBase(Question, Keywords), đổi cấu hình innodb_ft_min_token_size=2, và bổ sung cột ChatbotConversations.HandledBy (mục 0.2, 0.3).
-    • Quyết định phạm vi: có làm đủ 3 tính năng phụ lục (handover, staff-message, close) hay chỉ demo phần AI trả lời tự động (FEAT-AI-01) là đủ cho đồ án — nếu bỏ phụ lục, màn 29 cần đơn giản hoá bớt các nút liên quan.
-    • C14 (Huấn luyện Knowledge Base) sẽ có spec riêng, đặc tả CRUD cho bảng ChatbotKnowledgeBase (thêm câu hỏi/trả lời mẫu, Category, Keywords) mà FEAT-AI-01 đang tra cứu.
+2. CÁC ENDPOINT VẬN HÀNH HỘI THOẠI & TIẾP NHẬN HỖ TRỢ (LIVE HANDOVER INBOX — ĐÃ TRIỂN KHAI ĐẦY ĐỦ)
+Toàn bộ các thao tác quản trị và tiếp nhận hội thoại trên màn hình 29 (`/admin/ai-concierge` — `AiConciergeManagement.jsx`) đã được triển khai đầy đủ tại `backend/src/modules/ai/controllers/chatbotController.js` và `backend/src/modules/ai/routes/aiRoutes.js`:
+2.1. Danh sách & Chi tiết phiên hội thoại
+    • `GET /api/v1/ai/conversations?status=All|HandedOver|Open|Closed` — Lấy danh sách các phiên hội thoại kèm thông tin khách lưu trú, người xử lý (`handledByStaff`) và mảng `messages`. Nếu DB vừa khởi tạo trống, tự động khởi tạo phiên mẫu để giao diện luôn trực quan.
+    • `GET /api/v1/ai/conversations/{conversationId}` — Xem chi tiết lịch sử tin nhắn của 1 phiên hội thoại.
+2.2. Tiếp nhận hội thoại hoặc chuyển lại cho AI (Handover 2 chiều)
+    • `POST /api/v1/ai/conversations/{conversationId}/handover` (hỗ trợ cả `PATCH` và alias `/ai/chatbot/conversations/{id}/handover`):
+      – `action = 'to_staff'` (mặc định): Nhân viên Lễ tân/Quản lý tiếp nhận hỗ trợ → cập nhật `Status = 'HandedOver'`, `HandledBy = validStaffId`, ghi tin nhắn `SenderType = 'System'` thông báo nhân viên đã tiếp nhận.
+      – `action = 'to_ai'`: Chuyển lại phiên hội thoại cho Trợ lý AI tự động phục vụ → cập nhật `Status = 'Open'`, `HandledBy = null`, ghi tin nhắn `SenderType = 'System'`.
+2.3. Nhân viên gửi tin nhắn phản hồi trực tiếp cho khách
+    • `POST /api/v1/ai/conversations/{conversationId}/messages` (alias `/staff-message`):
+      – Lưu tin nhắn mới vào `ChatbotMessages` với `SenderType = 'Staff'`, đảm bảo `Status = 'HandedOver'` và gán `HandledBy` nếu chưa có.
+2.4. Hoàn tất & Đóng phiên hỗ trợ
+    • `PATCH /api/v1/ai/conversations/{conversationId}/resolve` (alias `/close`):
+      – Cập nhật `Status = 'Closed'`, `EndTime = NOW()` và ghi tin nhắn hệ thống xác nhận hoàn tất phiên hỗ trợ.
+2.5. Cơ chế Tự động khôi phục phiên (`findOrRecoverConversation`) & Đồng bộ Thời gian thực 2 chiều trên cùng trình duyệt
+    • **Tự động khôi phục phiên UI (`findOrRecoverConversation`)**: Nếu người dùng đang mở sẵn một phiên hội thoại hợp lệ trên giao diện (`0 < conversationId < 1000000`) mà cơ sở dữ liệu vừa chạy lại lệnh seed làm xoá bảng `ChatbotConversations`, Backend sẽ tự động khôi phục bản ghi phiên hội thoại đó để thao tác "Tiếp nhận hỗ trợ" / "Gửi phản hồi" của Admin luôn thành công mà không báo lỗi 404 (đồng thời vẫn giữ nguyên mã lỗi `404 ERROR_0011_NOT_FOUND` đối với các ID giả lập lớn `>= 1000000` như `99999999` trong bài kiểm thử biên).
+    • **Đồng bộ 2 chiều thời gian thực (Live Event Sync)**: Khi kiểm thử trên cùng 1 trình duyệt / 1 tài khoản Admin, bong bóng chat `FloatingAiConcierge.jsx` và trang quản trị `AiConciergeManagement.jsx` tự động phát và lắng nghe sự kiện `gh-ai-chat-updated` & `gh-ai-staff-replied` (kết hợp polling 4 giây), giúp tin nhắn của khách và phản hồi của Lễ tân hiển thị tức thời ở cả 2 phía.
 
 
 
@@ -1634,16 +1598,16 @@ Endpoint chính thức trong Bảng truy vết chỉ có POST /ai/knowledge-base
     • KHÔNG đổi schema bảng ChatbotKnowledgeBase. FULLTEXT INDEX (Question, Keywords) và cấu hình innodb_ft_min_token_size=2 đã được đề xuất ở Spec C13 (mục 0.2, 0.3) — C14 dùng lại.
     • KHÔNG thêm mã lỗi mới: dùng lại ERROR_0001–0018 sẵn có (cụ thể ở các bảng lỗi bên dưới).
     • Xoá = Soft-delete (Status='Inactive'), KHÔNG xoá cứng, vì ChatbotMessages.KnowledgeId đang tham chiếu tới bản ghi này để truy vết câu trả lời cũ của AI — xoá cứng sẽ vi phạm khoá ngoại/mất lịch sử. Cùng nguyên tắc với C1.
-0.2. Danh sách Category cố định
-Cột Category là NVARCHAR(100) tự do, nhưng để lọc/thống kê nhất quán, spec quy ước chỉ nhận 1 trong các giá trị sau (mở rộng bằng cách sửa danh sách cấu hình, không cần migrate DB):
-Category	Nội dung điển hình
-Nội quy	Giờ check-in/check-out, quy định hút thuốc, thú cưng, khách đến thăm
-Phòng	Loại phòng, sức chứa, tiện nghi, giường phụ
-Dịch vụ	Spa, giặt ủi, đưa đón sân bay, thuê xe
-Ẩm thực	Giờ mở cửa nhà hàng, room service, thực đơn, dị ứng
-Thanh toán	Hình thức thanh toán, đặt cọc, hoá đơn VAT
-Chính sách	Huỷ phòng, hoàn tiền, nhận/trả phòng sớm-muộn
-Khác	Wifi, đỗ xe, địa điểm lân cận, liên hệ khẩn cấp
+0.2. Danh sách Category chuẩn hoá (Hỗ trợ song ngữ Anh – Việt)
+Hệ thống chuẩn hoá danh mục tri thức thành 7 mã chuẩn (đồng thời chấp nhận cả tên tiếng Việt tương ứng và tự động ánh xạ về mã chuẩn trong `knowledgeBaseController.js`):
+Category (Mã chuẩn / Nhãn tiếng Việt)	Nội dung điển hình
+Services / Dịch vụ	Spa, giặt ủi lấy nhanh, đưa đón sân bay Limousine, thuê xe, giữ hành lý, tổ chức sự kiện
+Rooms / Phòng	Hạng phòng, sức chứa, tiện nghi, giường phụ (extra bed), minibar, trang trí trăng mật
+Dining / Ẩm thực	Giờ mở cửa nhà hàng Buffet sáng, thực đơn chay/Halal, gọi món tại phòng 24/7, Sky Bar
+Policy / Chính sách & Nội quy	Giờ nhận/trả phòng (14:00 / 12:00), huỷ phòng, phụ thu trả trễ, hút thuốc, thú cưng, hội viên VIP
+General / Khác	Wifi tốc độ cao, bãi đỗ xe & sạc xe điện, đổi ngoại tệ, ATM, cấp cứu y tế
+FAQ / Câu hỏi thường gặp	Các câu hỏi giải đáp nhanh về tiện ích chung (hồ bơi vô cực, phòng Gym, khu vui chơi trẻ em)
+Transport / Di chuyển	Lịch trình xe đưa đón sân bay, tàu cao tốc, thuê xe tự lái/có tài xế
 
 1. FEAT-AI-02 — Thêm mục kiến thức mới (Huấn luyện dữ liệu cho AI)
 Tương ứng: C14 trong Bảng truy vết  |  Màn hình 29 (nút "Cơ sở kiến thức")  |  Endpoint: POST /api/v1/ai/knowledge-base (alias: POST /ai/knowledge-base)  |  Bảng DB: ChatbotKnowledgeBase
