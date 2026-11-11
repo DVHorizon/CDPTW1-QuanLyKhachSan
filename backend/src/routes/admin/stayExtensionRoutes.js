@@ -849,20 +849,44 @@ router.post(['/:stayId/extensions/confirm', '/:stayId/extensions'], optionalVeri
       console.warn('Lỗi cập nhật Housekeeping:', hkErr.message);
     }
 
-    // 7. Cập nhật bản ghi StayExtensions
-    if (idempotencyKey) {
-      try {
+    // 7. Cập nhật hoặc tạo mới bản ghi StayExtensions ở trạng thái CONFIRMED để đồng bộ C6 Folio
+    try {
+      const [updExt] = await conn.query(
+        `UPDATE StayExtensions SET
+           ExtensionStatus = 'CONFIRMED',
+           IdempotencyKey = COALESCE(?, IdempotencyKey),
+           AdditionalNights = ?,
+           TotalAmount = ?,
+           RequestedCheckoutAt = ?,
+           UpdatedAt = NOW()
+         WHERE StayId = ? AND ExtensionStatus IN ('QUOTED', 'PENDING_APPROVAL')
+         ORDER BY ExtensionId DESC LIMIT 1`,
+        [idempotencyKey || null, addNights, addAmount, `${newCheckout} 12:00:00`, stay.StayId]
+      );
+      if (!updExt || updExt.affectedRows === 0) {
         await conn.query(
-          `UPDATE StayExtensions SET
-             ExtensionStatus = 'CONFIRMED',
-             IdempotencyKey = ?,
-             UpdatedAt = NOW()
-           WHERE StayId = ? AND ExtensionStatus IN ('QUOTED', 'PENDING_APPROVAL')
-           ORDER BY ExtensionId DESC LIMIT 1`,
-          [idempotencyKey, stay.StayId]
+          `INSERT INTO StayExtensions
+             (StayId, BookingId, RoomId, CurrentCheckoutAt, RequestedCheckoutAt, AdditionalNights,
+              BaseAmount, TaxRate, TaxAmount, TotalAmount, ApprovalStatus, ExtensionStatus,
+              IdempotencyKey, Version, Note, CreatedAt, UpdatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 12.0, ?, ?, 'APPROVED', 'CONFIRMED', ?, ?, ?, NOW(), NOW())`,
+          [
+            stay.StayId,
+            stay.BookingId,
+            stay.RoomId,
+            `${curCheckout} 12:00:00`,
+            `${newCheckout} 12:00:00`,
+            addNights,
+            subtotalPart,
+            vatPart,
+            addAmount,
+            idempotencyKey || null,
+            newVersion,
+            memo || `Gia hạn lưu trú +${addNights} đêm đến ${newCheckout}`,
+          ]
         );
-      } catch (_) {}
-    }
+      }
+    } catch (_) {}
 
     // 8. Ghi nhật ký AuditLogs
     try {

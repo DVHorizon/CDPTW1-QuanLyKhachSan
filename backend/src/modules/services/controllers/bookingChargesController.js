@@ -135,9 +135,11 @@ async function calculateBookingChargesData(bookingId, options = {}) {
 
     const summary = {
       roomSubtotal: effectiveRoomSubtotal,
+      extensionSubtotal: 0,
       minibarSubtotal: 0,
       serviceSubtotal: 0,
       foodSubtotal: 0,
+      damageSubtotal: 0,
       surcharge: surchargeAmount,
       discount: discountAmount,
       grandTotal,
@@ -155,9 +157,11 @@ async function calculateBookingChargesData(bookingId, options = {}) {
       hasPendingServices: false,
       stays: [],
       rawStays: [],
+      extensions: [],
       minibar: [],
       services: [],
       foodAndBeverage: [],
+      damages: [],
       summary,
       surchargeAmount,
       discountAmount,
@@ -168,11 +172,41 @@ async function calculateBookingChargesData(bookingId, options = {}) {
     };
   }
 
-  // 5. Tính chi tiết từng Stay
+  // 5. Tiền xử lý Gia hạn lưu trú (StayExtensions) để tách bạch đêm hợp đồng gốc và đêm gia hạn
+  const stayIds = stays.map(s => s.StayId);
+  const extensionsByStay = {};
+  const extendedNightsByStay = {};
+  let totalExtendedNights = 0;
+
+  if (stayIds.length > 0) {
+    try {
+      const [allExtRows] = await pool.query(
+        `SELECT ExtensionId, StayId, AdditionalNights, TotalAmount, BaseAmount, CreatedAt
+         FROM StayExtensions
+         WHERE StayId IN (?) AND UPPER(ExtensionStatus) = 'CONFIRMED'
+         ORDER BY ExtensionId ASC`,
+        [stayIds]
+      );
+      for (const ext of allExtRows || []) {
+        const sid = ext.StayId;
+        if (!extensionsByStay[sid]) extensionsByStay[sid] = [];
+        extensionsByStay[sid].push(ext);
+        const addN = Math.max(0, Number(ext.AdditionalNights || 0));
+        extendedNightsByStay[sid] = (extendedNightsByStay[sid] || 0) + addN;
+        totalExtendedNights += addN;
+      }
+    } catch (_) {}
+  }
+
+  // Tính chi tiết từng Stay
   const roomQuantity = Math.max(1, Number(booking.RoomQuantity || 1));
-  const contractNights = calculateStayNights(null, booking);
+  const rawContractNights = calculateStayNights(null, booking);
+  // Khi gia hạn phòng, stayExtensionRoutes cộng thêm AdditionalNights vào Bookings.NumberOfNights
+  // nhưng giữ nguyên Bookings.RoomSubtotal (phần tiền gia hạn đẩy vào SurchargeAmount/StayExtensions).
+  // Do đó số đêm hợp đồng gốc = rawContractNights - totalExtendedNights.
+  const baseContractNights = Math.max(1, rawContractNights - totalExtendedNights);
   const unitNight = effectiveRoomSubtotal > 0
-    ? effectiveRoomSubtotal / (roomQuantity * contractNights)
+    ? effectiveRoomSubtotal / (roomQuantity * baseContractNights)
     : Number(booking.roomType?.BasePrice || 0);
 
   let hasPendingServices = false;
@@ -184,21 +218,25 @@ async function calculateBookingChargesData(bookingId, options = {}) {
   let totalExtensionsAmount = 0;
   let totalDamagesAmount = 0;
   const staysDetail = [];
+  const flatExtensions = [];
   const flatMinibar = [];
   const flatServices = [];
   const flatFood = [];
+  const flatDamages = [];
 
   for (const stay of stays) {
     const roomNum = stay.Room?.RoomNumber || `P.${stay.RoomId}`;
     const roomTypeName = stay.Room?.roomType?.TypeName || booking.roomType?.TypeName || 'Tiêu chuẩn';
 
-    // 5.1. Tiền phòng cơ sở
-    const nights = calculateStayNights(stay, booking);
+    // 5.1. Tiền phòng cơ sở (trừ số đêm đã tách riêng ở bảng Gia hạn lưu trú để không nhân đôi)
+    const rawStayNights = calculateStayNights(stay, booking);
+    const stayExtNights = extendedNightsByStay[stay.StayId] || 0;
+    const nights = Math.max(1, rawStayNights - stayExtNights);
     const stayPricePerNight = unitNight || Number(stay.Room?.roomType?.BasePrice || 0);
     const roomSubtotal = stayPricePerNight * nights;
     totalRoomSubtotal += roomSubtotal;
 
-    // 5.2. Dịch vụ ServiceOrders
+    // 5.2. Dịch vụ ServiceOrders (kèm tên danh mục từ ServiceCategories)
     const serviceOrders = await ServiceOrder.findAll({
       where: { StayId: stay.StayId },
       transaction,
@@ -211,11 +249,22 @@ async function calculateBookingChargesData(bookingId, options = {}) {
       if (sIds.length > 0) {
         try {
           const [sRows] = await pool.query(
-            `SELECT ServiceId, ServiceName, Description FROM Services WHERE ServiceId IN (?)`,
+            `SELECT s.ServiceId, s.ServiceName, s.Description, sc.CategoryName
+             FROM Services s
+             LEFT JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
+             WHERE s.ServiceId IN (?)`,
             [sIds]
           );
           (sRows || []).forEach(r => { serviceNameMap[r.ServiceId] = r; });
-        } catch (_) {}
+        } catch (_) {
+          try {
+            const [sRowsFallback] = await pool.query(
+              `SELECT ServiceId, ServiceName, Description FROM Services WHERE ServiceId IN (?)`,
+              [sIds]
+            );
+            (sRowsFallback || []).forEach(r => { serviceNameMap[r.ServiceId] = r; });
+          } catch (__) {}
+        }
       }
     }
 
@@ -235,7 +284,7 @@ async function calculateBookingChargesData(bookingId, options = {}) {
           stayId: stay.StayId,
           roomNumber: roomNum,
           service: svName,
-          type: svInfo?.Description || 'Dịch vụ phòng',
+          type: svInfo?.CategoryName || svInfo?.Description || 'Dịch vụ phòng',
           quantity: Number(order.Quantity || 1),
           unitPrice: Number(order.UnitPrice || 0),
           price: Number(order.UnitPrice || 0),
@@ -247,12 +296,12 @@ async function calculateBookingChargesData(bookingId, options = {}) {
         };
         completedServices.push(svObj);
         flatServices.push(svObj);
-      } else if (['Received', 'InProgress', 'Processing'].includes(order.Status)) {
+      } else if (['Received', 'InProgress', 'Processing', 'Pending', 'Confirmed'].includes(order.Status)) {
         hasPendingServices = true;
       }
     }
 
-    // 5.3. Tiêu thụ Minibar (ưu tiên MinibarUsages, dự phòng MinibarInspectionLines)
+    // 5.3. Tiêu thụ Minibar (ưu tiên MinibarUsages, tra tên từ cả InventoryItems và MinibarProducts; dự phòng MinibarInspectionLines)
     const minibarUsages = await MinibarUsage.findAll({
       where: { StayId: stay.StayId },
       transaction,
@@ -269,6 +318,17 @@ async function calculateBookingChargesData(bookingId, options = {}) {
             [itemIds]
           );
           (invRows || []).forEach(r => { minibarItemNameMap[r.ItemId] = r.ItemName; });
+        } catch (_) {}
+        try {
+          const [prodRows] = await pool.query(
+            `SELECT ProductId, ProductName FROM MinibarProducts WHERE ProductId IN (?)`,
+            [itemIds]
+          );
+          (prodRows || []).forEach(r => {
+            if (!minibarItemNameMap[r.ProductId]) {
+              minibarItemNameMap[r.ProductId] = r.ProductName;
+            }
+          });
         } catch (_) {}
       }
     }
@@ -332,12 +392,11 @@ async function calculateBookingChargesData(bookingId, options = {}) {
       } catch (_) {}
     }
 
-    // 5.4. F&B Orders (Chỉ lấy RoomInvoice, bỏ PayNow)
-    const foodOrders = await FoodOrder.findAll({
+    // 5.4. F&B Orders (Chỉ lấy RoomInvoice, bỏ PayNow; cảnh báo nếu còn đơn RoomInvoice đang chế biến)
+    const allRoomInvoiceFoodOrders = await FoodOrder.findAll({
       where: {
         StayId: stay.StayId,
         PaymentMode: 'RoomInvoice',
-        Status: { [Op.in]: ['Served', 'Delivered'] },
       },
       include: [
         {
@@ -351,76 +410,115 @@ async function calculateBookingChargesData(bookingId, options = {}) {
     });
 
     let foodSubtotal = 0;
-    const foodList = foodOrders.map((f) => {
-      const itemTotal = Number(f.TotalAmount || 0);
-      foodSubtotal += itemTotal;
-      totalFoodSubtotal += itemTotal;
-      const itemsText = (f.details && f.details.length > 0)
-        ? f.details.map(d => `${d.MenuItem?.ItemName || 'Món ăn'} (x${d.Quantity})`).join(', ')
-        : `Đơn F&B #${f.FoodOrderId}`;
-      const foObj = {
-        foodOrderId: f.FoodOrderId,
-        stayId: stay.StayId,
-        roomNumber: roomNum,
-        orderType: f.OrderType,
-        status: f.Status,
-        item: itemsText,
-        quantity: 1,
-        price: itemTotal,
-        subtotal: itemTotal,
-        total: itemTotal,
-        orderCode: `FNB-${f.FoodOrderId}`,
-        orderTime: f.OrderTime,
-        orderedAt: f.OrderTime,
-      };
-      flatFood.push(foObj);
-      return foObj;
-    });
+    const foodList = [];
+    for (const f of allRoomInvoiceFoodOrders) {
+      if (['Served', 'Delivered', 'Completed'].includes(f.Status)) {
+        const itemTotal = Number(f.TotalAmount || 0);
+        foodSubtotal += itemTotal;
+        totalFoodSubtotal += itemTotal;
+        const itemsText = (f.details && f.details.length > 0)
+          ? f.details.map(d => `${d.MenuItem?.ItemName || 'Món ăn'} (x${d.Quantity})`).join(', ')
+          : `Đơn F&B #${f.FoodOrderId}`;
+        const foObj = {
+          foodOrderId: f.FoodOrderId,
+          stayId: stay.StayId,
+          roomNumber: roomNum,
+          orderType: f.OrderType,
+          status: f.Status,
+          item: itemsText,
+          quantity: 1,
+          price: itemTotal,
+          subtotal: itemTotal,
+          total: itemTotal,
+          orderCode: `FNB-${f.FoodOrderId}`,
+          orderTime: f.OrderTime,
+          orderedAt: f.OrderTime,
+        };
+        foodList.push(foObj);
+        flatFood.push(foObj);
+      } else if (['Pending', 'Confirmed', 'Preparing', 'Cooking', 'Ready'].includes(f.Status)) {
+        hasPendingServices = true;
+      }
+    }
 
-    // 5.5. Phí gia hạn lưu trú (StayExtensions)
+    // 5.5. Phí gia hạn lưu trú (StayExtensions) & phụ thu nâng hạng đổi phòng (RoomMoveRequests)
     let extensionSubtotal = 0;
     const extensionList = [];
+    const stayExts = extensionsByStay[stay.StayId] || [];
+    for (const ext of stayExts) {
+      const extAmount = Number(ext.TotalAmount || ext.BaseAmount || 0);
+      extensionSubtotal += extAmount;
+      const extObj = {
+        extensionId: ext.ExtensionId,
+        stayId: stay.StayId,
+        roomNumber: roomNum,
+        nights: Number(ext.AdditionalNights || 1),
+        total: extAmount,
+        createdAt: ext.CreatedAt,
+      };
+      extensionList.push(extObj);
+      flatExtensions.push(extObj);
+    }
+
     try {
-      const [extensions] = await pool.query(
-        `SELECT ExtensionId, AdditionalNights, TotalAmount, BaseAmount, CreatedAt
-         FROM StayExtensions
-         WHERE StayId = ? AND ExtensionStatus = 'CONFIRMED'`,
+      const [roomMoves] = await pool.query(
+        `SELECT MoveRequestId, RateDifference, RateAdjustment, CompletedAt, CreatedAt
+         FROM RoomMoveRequests
+         WHERE StayId = ? AND UPPER(MoveStatus) = 'COMPLETED'
+           AND UPPER(RateAdjustment) IN ('REPRICE_REMAINDER', 'APPLY_NEW_RATE', 'UPGRADE_SURCHARGE')
+           AND RateDifference > 0`,
         [stay.StayId]
       );
-      for (const ext of extensions || []) {
-        const extAmount = Number(ext.TotalAmount || ext.BaseAmount || 0);
-        extensionSubtotal += extAmount;
-        extensionList.push({
-          extensionId: ext.ExtensionId,
-          nights: Number(ext.AdditionalNights || 1),
-          total: extAmount,
-          createdAt: ext.CreatedAt,
-        });
+      for (const mv of roomMoves || []) {
+        const moveFee = Number(mv.RateDifference || 0);
+        if (moveFee > 0) {
+          extensionSubtotal += moveFee;
+          const mvObj = {
+            extensionId: `MOVE-${mv.MoveRequestId}`,
+            stayId: stay.StayId,
+            roomNumber: roomNum,
+            nights: 1,
+            total: moveFee,
+            createdAt: mv.CompletedAt || mv.CreatedAt,
+          };
+          extensionList.push(mvObj);
+          flatExtensions.push(mvObj);
+        }
       }
     } catch (_) {}
+
     totalExtensionsAmount += extensionSubtotal;
 
-    // 5.6. Phí bồi thường thiệt hại buồng phòng & phạt (DamageItems & Inspections)
+    // 5.6. Phí bồi thường thiệt hại buồng phòng & phạt (DamageItems & RoomInspectionReports)
     let damageSubtotal = 0;
     const damageList = [];
     try {
       const [damages] = await pool.query(
-        `SELECT DamageItemId, ItemName, ApprovedCharge, ReasonCode, CreatedAt
+        `SELECT DamageItemId, ItemName, ApprovedCharge, ProposedCharge, ReasonCode, DamageDescription, Status, CreatedAt
          FROM DamageItems
-         WHERE StayId = ? AND UPPER(Status) IN ('APPROVED', 'CONFIRMED', 'CHARGED')`,
+         WHERE StayId = ?`,
         [stay.StayId]
       );
       for (const dam of damages || []) {
-        const charge = Number(dam.ApprovedCharge || 0);
-        if (charge > 0) {
-          damageSubtotal += charge;
-          damageList.push({
-            damageId: dam.DamageItemId,
-            item: dam.ItemName || 'Bồi thường tài sản phòng',
-            total: charge,
-            reason: dam.ReasonCode || '',
-            createdAt: dam.CreatedAt,
-          });
+        const upStatus = String(dam.Status || '').toUpperCase();
+        if (['APPROVED', 'CONFIRMED', 'CHARGED'].includes(upStatus)) {
+          const charge = Number(dam.ApprovedCharge || dam.ProposedCharge || 0);
+          if (charge > 0) {
+            damageSubtotal += charge;
+            const damObj = {
+              damageId: dam.DamageItemId,
+              stayId: stay.StayId,
+              roomNumber: roomNum,
+              item: dam.ItemName || 'Bồi thường tài sản phòng',
+              total: charge,
+              reason: dam.ReasonCode || dam.DamageDescription || 'Biên bản kiểm phòng',
+              createdAt: dam.CreatedAt,
+            };
+            damageList.push(damObj);
+            flatDamages.push(damObj);
+          }
+        } else if (['SUBMITTED', 'DISPUTED', 'PENDING'].includes(upStatus)) {
+          hasPendingServices = true;
         }
       }
 
@@ -435,21 +533,31 @@ async function calculateBookingChargesData(bookingId, options = {}) {
         const keycardFee = Number(ins.KeycardLossPenalty || 0);
         if (linenFee > 0) {
           damageSubtotal += linenFee;
-          damageList.push({
+          const linenObj = {
             damageId: `LINEN-${ins.InspectionId}`,
+            stayId: stay.StayId,
+            roomNumber: roomNum,
             item: 'Bồi thường đồ vải / nệm bẩn',
+            reason: 'Biên bản kiểm phòng trả phòng',
             total: linenFee,
             createdAt: ins.CreatedAt,
-          });
+          };
+          damageList.push(linenObj);
+          flatDamages.push(linenObj);
         }
         if (keycardFee > 0) {
           damageSubtotal += keycardFee;
-          damageList.push({
+          const keycardObj = {
             damageId: `KEYCARD-${ins.InspectionId}`,
+            stayId: stay.StayId,
+            roomNumber: roomNum,
             item: 'Phí làm mất thẻ từ phòng',
+            reason: 'Biên bản kiểm phòng trả phòng',
             total: keycardFee,
             createdAt: ins.CreatedAt,
-          });
+          };
+          damageList.push(keycardObj);
+          flatDamages.push(keycardObj);
         }
       }
     } catch (_) {}
@@ -493,9 +601,11 @@ async function calculateBookingChargesData(bookingId, options = {}) {
 
   const summary = {
     roomSubtotal: totalRoomSubtotal,
+    extensionSubtotal: totalExtensionsAmount,
     minibarSubtotal: totalMinibarSubtotal,
     serviceSubtotal: totalServiceSubtotal,
     foodSubtotal: totalFoodSubtotal,
+    damageSubtotal: totalDamagesAmount,
     surcharge: netSurcharge,
     discount: discountAmount,
     grandTotal,
@@ -513,9 +623,11 @@ async function calculateBookingChargesData(bookingId, options = {}) {
     hasPendingServices,
     stays: staysDetail,
     rawStays: stays,
+    extensions: flatExtensions,
     minibar: flatMinibar,
     services: flatServices,
     foodAndBeverage: flatFood,
+    damages: flatDamages,
     summary,
     surchargeAmount: netSurcharge,
     discountAmount,
@@ -561,6 +673,7 @@ async function getBookingCharges(req, res) {
       success: true,
       data: {
         bookingId: calcResult.booking.BookingId,
+        confirmationCode: calcResult.booking.ConfirmationCode,
         guestName: calcResult.guestName,
         roomNumber: calcResult.roomNumber,
         checkInDate: calcResult.checkInDate,
@@ -568,9 +681,11 @@ async function getBookingCharges(req, res) {
         estimated: calcResult.estimated,
         hasPendingServices: calcResult.hasPendingServices,
         stays: calcResult.stays,
+        extensions: calcResult.extensions,
         minibar: calcResult.minibar,
         services: calcResult.services,
         foodAndBeverage: calcResult.foodAndBeverage,
+        damages: calcResult.damages,
         summary: calcResult.summary,
         surchargeAmount: calcResult.surchargeAmount,
         discountAmount: calcResult.discountAmount,
