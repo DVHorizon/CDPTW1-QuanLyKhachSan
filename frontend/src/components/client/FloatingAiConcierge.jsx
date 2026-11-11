@@ -1,5 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { sendChatMessageApi } from '../../api/aiApi';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  sendChatMessageApi,
+  fetchConversationDetailApi,
+} from '../../api/aiApi';
 import {
   cleanMessage,
   extractErrorCode,
@@ -114,6 +117,70 @@ const FloatingAiConcierge = () => {
     }
   }, [messages, isOpen, loading]);
 
+  // Đồng bộ lịch sử tin nhắn thực tế từ Server (bao gồm tin nhắn của Lễ tân khi test trên cùng 1 tài khoản/trình duyệt)
+  const syncConversationFromServer = useCallback(
+    async (targetConvId = null) => {
+      const activeId = targetConvId || conversationId;
+      if (!activeId) return;
+      try {
+        const res = await fetchConversationDetailApi(activeId);
+        const detail = res?.data;
+        if (!detail) return;
+
+        setHandoverActive(detail.status === 'HandedOver');
+
+        if (Array.isArray(detail.messages) && detail.messages.length > 0) {
+          const mapped = detail.messages.map((m, idx) => ({
+            id: m.messageId ? `srv-${m.messageId}` : `srv-idx-${idx}`,
+            senderType: m.senderType || 'AI',
+            text: cleanMessage(m.messageText) || m.messageText,
+            time: m.messageTime
+              ? new Date(m.messageTime).toLocaleTimeString('vi-VN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : new Date().toLocaleTimeString('vi-VN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+          }));
+          setMessages([INITIAL_WELCOME_MESSAGE, ...mapped]);
+        }
+      } catch (_) {
+        // Bỏ qua lỗi ngầm định khi polling
+      }
+    },
+    [conversationId]
+  );
+
+  useEffect(() => {
+    const handleStaffReplied = (event) => {
+      const targetId = event?.detail?.conversationId || conversationId;
+      if (targetId && (!conversationId || Number(targetId) === Number(conversationId))) {
+        if (!conversationId) {
+          setConversationId(Number(targetId));
+          sessionStorage.setItem('gh_ai_conversation_id', String(targetId));
+        }
+        syncConversationFromServer(targetId);
+      }
+    };
+
+    window.addEventListener('gh-ai-staff-replied', handleStaffReplied);
+
+    let pollTimer = null;
+    if (isOpen && conversationId) {
+      syncConversationFromServer(conversationId);
+      pollTimer = setInterval(() => {
+        syncConversationFromServer(conversationId);
+      }, 4000);
+    }
+
+    return () => {
+      window.removeEventListener('gh-ai-staff-replied', handleStaffReplied);
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }, [isOpen, conversationId, syncConversationFromServer]);
+
   const handleSendMessage = async (customText = null) => {
     const rawMsg = customText !== null ? customText : inputText;
     const trimmed = String(rawMsg || '').trim();
@@ -151,10 +218,17 @@ const FloatingAiConcierge = () => {
       if (payload.conversationId) {
         setConversationId(payload.conversationId);
         sessionStorage.setItem('gh_ai_conversation_id', String(payload.conversationId));
+        window.dispatchEvent(
+          new CustomEvent('gh-ai-chat-updated', {
+            detail: { conversationId: payload.conversationId },
+          })
+        );
       }
 
       if (payload.handoverRequired || payload.suggestedEscalation || payload.status === 'HandedOver') {
         setHandoverActive(true);
+      } else if (payload.status === 'Open') {
+        setHandoverActive(false);
       }
 
       const replyText =
@@ -290,6 +364,7 @@ const FloatingAiConcierge = () => {
             {messages.map((msg) => {
               const isGuest = msg.senderType === 'Guest';
               const isSystem = msg.senderType === 'System';
+              const isStaff = msg.senderType === 'Staff';
               return (
                 <div
                   key={msg.id}
@@ -301,15 +376,25 @@ const FloatingAiConcierge = () => {
                     className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
                       isGuest
                         ? 'bg-[#1c1917] text-white rounded-br-xs'
+                        : isStaff
+                        ? 'bg-amber-700 text-white rounded-bl-xs'
                         : isSystem
                         ? 'bg-amber-50 text-amber-950 border border-amber-300 rounded-bl-xs'
                         : 'bg-white text-stone-800 border border-[#e6e0d4] rounded-bl-xs'
                     }`}
                   >
                     {!isGuest && (
-                      <div className="text-[11px] font-semibold text-[#9a8052] mb-1 flex items-center justify-between gap-2">
+                      <div
+                        className={`text-[11px] font-semibold mb-1 flex items-center justify-between gap-2 ${
+                          isStaff ? 'text-amber-100' : 'text-[#9a8052]'
+                        }`}
+                      >
                         <span>
-                          {isSystem ? 'Điều phối Lễ tân' : 'Grand Horizon Concierge'}
+                          {isStaff
+                            ? 'Chuyên viên Lễ tân'
+                            : isSystem
+                            ? 'Điều phối Lễ tân'
+                            : 'Grand Horizon Concierge'}
                         </span>
                       </div>
                     )}

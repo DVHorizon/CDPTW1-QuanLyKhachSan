@@ -149,12 +149,13 @@ export const fetchConversationDetailApi = async (conversationId) => {
 };
 
 /**
- * 10. Nhân viên Lễ tân tiếp nhận xử lý hội thoại (Handover - C13)
+ * 10. Nhân viên Lễ tân tiếp nhận xử lý hội thoại hoặc chuyển lại cho AI (Handover - C13)
  */
-export const claimHandoverApi = async (conversationId) => {
+export const claimHandoverApi = async (conversationId, action = 'to_staff') => {
   const res = await fetch(`${BASE_URL}/conversations/${conversationId}/handover`, {
     method: 'POST',
     headers: getAuthHeaders(),
+    body: JSON.stringify({ action }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw data;

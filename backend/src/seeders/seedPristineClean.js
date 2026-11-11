@@ -907,6 +907,21 @@ async function seedPristineClean() {
       `);
     }
 
+    console.log('💬 18.1 Seeding Phiên hội thoại mẫu AI Concierge & Handover (ChatbotConversations)...');
+    await sequelize.query(`
+      INSERT INTO ChatbotConversations (ConversationId, UserId, StartTime, EndTime, Status, HandledBy) VALUES
+      (1, 6, DATE_SUB(NOW(), INTERVAL 15 MINUTE), NULL, 'HandedOver', NULL),
+      (2, 7, DATE_SUB(NOW(), INTERVAL 30 MINUTE), NULL, 'Open', NULL);
+    `);
+
+    await sequelize.query(`
+      INSERT INTO ChatbotMessages (MessageId, ConversationId, KnowledgeId, SenderType, MessageText, MessageTime) VALUES
+      (1, 1, NULL, 'Guest', 'Tôi muốn đặt xe Limousine đón sân bay lúc 18h tối nay và yêu cầu gặp lễ tân hỗ trợ gấp.', DATE_SUB(NOW(), INTERVAL 14 MINUTE)),
+      (2, 1, NULL, 'System', 'Dạ chúng tôi rất tiếc về sự bất tiện của quý khách. Yêu cầu của quý khách đã được chuyển ngay tới Quản lý ca trực và bộ phận Lễ tân để hỗ trợ trực tiếp trong giây lát ạ.', DATE_SUB(NOW(), INTERVAL 13 MINUTE)),
+      (3, 2, NULL, 'Guest', 'Hồ bơi vô cực trên tầng thượng mở cửa từ mấy giờ đến mấy giờ?', DATE_SUB(NOW(), INTERVAL 29 MINUTE)),
+      (4, 2, 1, 'AI', 'Dạ, Hồ bơi vô cực tầng thượng (Infinity Pool) tại Tầng 25 mở cửa phục vụ miễn phí cho khách lưu trú từ 06:00 sáng đến 22:00 tối hàng ngày, có khu vực bể sục Jacuzzi nước ấm và quầy Horizon Sky Bar phục vụ khăn tắm, cocktail tại chỗ.', DATE_SUB(NOW(), INTERVAL 28 MINUTE));
+    `);
+
     // =========================================================================
     // 15. HOUSEKEEPING, REVIEWS, MAINTENANCE & POLICIES
     // =========================================================================
