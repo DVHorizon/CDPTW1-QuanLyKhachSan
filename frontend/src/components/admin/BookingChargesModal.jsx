@@ -82,12 +82,26 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
       }
 
       const staysList = data?.stays || [];
+      const extensionsList = data?.extensions || [];
       const minibarList = data?.minibar || [];
       const servicesList = data?.services || [];
       const fnbList = data?.foodAndBeverage || [];
+      const damagesList = data?.damages || [];
       const sum = data?.summary || {};
 
-      // 1. Tiền phòng
+      // 1. Tiền phòng & gia hạn
+      const extensionRowsHtml = extensionsList.map(ext => `
+          <tr style="background-color: #f0f9ff;">
+            <td style="font-weight: 700; color: #0284c7;">${ext.roomNumber || '—'}</td>
+            <td style="font-weight: 600; color: #0369a1;">Gia hạn lưu trú (+${ext.nights} đêm)</td>
+            <td style="font-size: 9.5px; color: #475569;">Lập lúc: ${fmtDateTime(ext.createdAt)}</td>
+            <td style="text-align: center; font-weight: 700; color: #0284c7;">+${ext.nights}</td>
+            <td style="text-align: right; color: #64748b;">—</td>
+            <td style="text-align: right; color: #64748b;">0 ₫</td>
+            <td style="text-align: right; font-weight: 700; color: #0369a1;">+${fmtMoney(ext.total)}</td>
+          </tr>
+      `).join('');
+
       const staysRows = staysList.length === 0
         ? `<tr><td colspan="7" style="text-align: center; color: #64748b; font-style: italic; padding: 8px;">Chưa có thông tin nhận phòng (Stay). Tiền phòng được dự tính dựa trên đặt phòng: ${fmtMoney(sum.roomSubtotal)}</td></tr>`
         : staysList.map(s => `
@@ -100,7 +114,39 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
             <td style="text-align: right; color: #64748b; font-size: 9.5px;">${s.earlyCheckInFee || s.lateCheckOutFee ? '+' + fmtMoney((s.earlyCheckInFee || 0) + (s.lateCheckOutFee || 0)) : '0 ₫'}</td>
             <td style="text-align: right; font-weight: 700; color: #0f172a;">${fmtMoney(s.roomTotal)}</td>
           </tr>
-        `).join('');
+        `).join('') + extensionRowsHtml;
+
+      // 5. Bồi thường thiệt hại buồng phòng & phạt
+      const damagesSectionHtml = damagesList.length === 0 ? '' : `
+              <div class="section-box">
+                <div class="section-header" style="background-color: #fef2f2; border-color: #fecaca;">
+                  <span style="color: #991b1b;">5. Bồi Thường Thiệt Hại Buồng Phòng & Phạt (${damagesList.length} khoản)</span>
+                  <span class="subtotal" style="color: #7f1d1d;">${fmtMoney(sum.damageSubtotal)}</span>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width: 12%;">Phòng</th>
+                      <th style="width: 36%;">Nội dung bồi thường / Phạt</th>
+                      <th style="width: 24%;">Lý do</th>
+                      <th style="text-align: right; width: 14%;">Số tiền</th>
+                      <th style="text-align: right; width: 14%;">Thời điểm ghi nhận</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${damagesList.map(d => `
+                      <tr>
+                        <td style="font-weight: 700; color: #dc2626;">${d.roomNumber || '—'}</td>
+                        <td style="font-weight: 600;">${d.item}</td>
+                        <td style="color: #475569; font-size: 9.5px;">${d.reason || 'Kiểm phòng phát hiện'}</td>
+                        <td style="text-align: right; font-weight: 700; color: #dc2626;">${fmtMoney(d.total)}</td>
+                        <td style="text-align: right; color: #64748b; font-size: 9.5px;">${fmtDateTime(d.createdAt)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+      `;
 
       // 2. Tiêu dùng Minibar (Luôn in đầy đủ bảng)
       const minibarRows = minibarList.length === 0
@@ -428,8 +474,8 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
               <!-- 1. TIỀN PHÒNG & LƯU TRÚ -->
               <div class="section-box">
                 <div class="section-header" style="background-color: #eff6ff; border-color: #bfdbfe;">
-                  <span style="color: #1e40af;">1. Tiền Phòng & Lưu Trú (${staysList.length} lượt ở)</span>
-                  <span class="subtotal" style="color: #1e3a8a;">${fmtMoney(sum.roomSubtotal)}</span>
+                  <span style="color: #1e40af;">1. Tiền Phòng & Lưu Trú (${staysList.length} lượt ở${extensionsList.length > 0 ? ` • ${extensionsList.length} gia hạn` : ''})</span>
+                  <span class="subtotal" style="color: #1e3a8a;">${fmtMoney((sum.roomSubtotal || 0) + (sum.extensionSubtotal || 0))}</span>
                 </div>
                 <table>
                   <thead>
@@ -518,6 +564,8 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
                 </table>
               </div>
 
+              ${damagesSectionHtml}
+
               <!-- KHỐI TỔNG KẾT TÀI CHÍNH & QUYẾT TOÁN -->
               <div class="finance-box">
                 <div class="finance-grid">
@@ -526,9 +574,11 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
                       Chi tiết cộng dồn các khoản phí:
                     </div>
                     <div class="row"><span>Tiền phòng & phụ thu:</span><strong style="font-family: monospace;">${fmtMoney(sum.roomSubtotal)}</strong></div>
+                    ${sum.extensionSubtotal > 0 ? `<div class="row" style="color: #0369a1;"><span>Phí gia hạn lưu trú:</span><strong style="font-family: monospace;">+${fmtMoney(sum.extensionSubtotal)}</strong></div>` : ''}
                     <div class="row"><span>Tiêu dùng Minibar:</span><strong style="font-family: monospace;">${fmtMoney(sum.minibarSubtotal)}</strong></div>
                     <div class="row"><span>Dịch vụ phát sinh (Laundry/Spa...):</span><strong style="font-family: monospace;">${fmtMoney(sum.serviceSubtotal)}</strong></div>
                     <div class="row"><span>Ẩm thực F&B ghi nợ phòng:</span><strong style="font-family: monospace;">${fmtMoney(sum.foodSubtotal)}</strong></div>
+                    ${sum.damageSubtotal > 0 ? `<div class="row" style="color: #dc2626;"><span>Bồi thường & phạt kiểm phòng:</span><strong style="font-family: monospace;">+${fmtMoney(sum.damageSubtotal)}</strong></div>` : ''}
                     ${sum.surcharge > 0 ? `<div class="row" style="color: #b45309;"><span>Phụ phí khác:</span><strong style="font-family: monospace;">+${fmtMoney(sum.surcharge)}</strong></div>` : ''}
                     ${sum.discount > 0 ? `<div class="row" style="color: #dc2626;"><span>Giảm giá / Ưu đãi:</span><strong style="font-family: monospace;">-${fmtMoney(sum.discount)}</strong></div>` : ''}
                   </div>

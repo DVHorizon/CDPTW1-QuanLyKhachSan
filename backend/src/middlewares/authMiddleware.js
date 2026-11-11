@@ -200,8 +200,8 @@ const requireInternalStaff = (req, res, next) => {
     });
   }
 
-  const internalRoleIds = [1, 2, 3, 4];
-  const internalRoleNames = ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'];
+  const internalRoleIds = [1, 2, 3, 4, 6, 7];
+  const internalRoleNames = ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping', 'Manager', 'Staff'];
 
   if (!internalRoleIds.includes(req.user.roleId) && !internalRoleNames.includes(req.user.roleName)) {
     return res.status(403).json({

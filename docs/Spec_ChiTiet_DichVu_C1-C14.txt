@@ -354,7 +354,7 @@ ERROR_0016_INVALID_COMBINATION	Tổ hợp trường không hợp lệ (loại tr
     • PaymentDate được set NGAY khi tạo bản ghi (= thời điểm khởi tạo giao dịch, không phải thời điểm hoàn tất) — vì cột này NOT NULL trong khi thanh toán online có thể ở trạng thái Pending một khoảng thời gian trước khi có kết quả. Thời điểm hoàn tất thực tế (nếu cần đối soát chi tiết) được đọc từ GatewayResponse (JSON gateway trả về có timestamp riêng).
     • 6 giá trị PaymentMethod chia 3 nhóm hành vi khác nhau (mục 1.4.c): Cash / Card / BankTransfer = xử lý tại quầy (staff-only, Paid ngay); VNPay / MoMo = cổng redirect (Pending → chờ callback); VietQR = mã QR động (Pending → chờ callback hoặc xác nhận thủ công).
 
-1. FEAT-PAYMENT-01 — Core Payment Module
+5. FEAT-PAYMENT-01 — Core Payment Module
 Tương ứng: C5 trong Bảng truy vết  |  Màn hình 7 (Thanh toán tiền cọc), 26 (Thanh toán hoá đơn & Mã QR)  |  Bảng DB: Payments
 1.1. Tổng quan tính năng
 	
@@ -522,7 +522,7 @@ Ghi nhận gốc: "Invoices gắn theo StayId — 1 booking nhiều phòng sẽ 
 CÁCH C6 TRÁNH XUNG ĐỘT NÀY: C6 (GET /bookings/{bookingId}/charges) KHÔNG đọc và KHÔNG ghi bảng Invoices/InvoiceDetails. Nó tính trực tiếp từ dữ liệu vận hành gốc (Bookings, Stays, ServiceOrders, MinibarUsages, FoodOrders) theo PHẠM VI BOOKING (gộp tất cả Stay/phòng thuộc booking đó trong 1 lần gọi) — nhờ vậy không bị giới hạn bởi quan hệ 1 Invoice : 1 Stay hiện có trong DB.
 Việc GHI dữ liệu này thành 1 bản ghi Invoices chính thức (và quyết định schema Invoices.BookingId/StayId cần đổi thế nào để hết mâu thuẫn khi PERSIST) thuộc phạm vi FEAT-INVOICE-02 (C7 — POST /invoices/master), sẽ đặc tả trong tài liệu kế tiếp. Mục 4 của tài liệu này nêu trước hướng giải quyết để nhóm hình dung, nhưng chưa phải spec đầy đủ cho C7.
 
-1. FEAT-INVOICE-01 — Tự động gom chi phí lưu trú (Booking Charges Aggregation)
+6. FEAT-INVOICE-01 — Tự động gom chi phí lưu trú (Booking Charges Aggregation)
 Tương ứng: C6 trong Bảng truy vết  |  Màn hình 20 (Check-out), 25 (Hoá đơn tổng hợp)  |  Endpoint: GET /api/v1/bookings/{bookingId}/charges (alias: GET /bookings/{bookingId}/charges)
 1.1. Tổng quan tính năng
 	
@@ -537,48 +537,68 @@ Tham số	Kiểu	Bắt buộc	Mô tả / Ràng buộc
 bookingId	int (path param)	Có	Phải tồn tại trong bảng Bookings; không tồn tại → ERROR_0011_NOT_FOUND
 1.3. Cấu trúc dữ liệu trả về (Response)
 Trường	Kiểu	Ý nghĩa
-bookingId	int	Booking đang được tổng hợp
+bookingId	int	Booking đang được tổng hợp (hỗ trợ truyền cả BookingId số hoặc ConfirmationCode)
+confirmationCode	string	Mã xác nhận đặt phòng
+guestName	string	Họ tên khách đại diện của Booking
+roomNumber	string	Danh sách số phòng lưu trú thực tế (hoặc "Chưa gán phòng (Dự tính)")
+checkInDate, checkOutDate	date	Ngày nhận/trả phòng dự kiến của Booking
 estimated	boolean	true nếu booking CHƯA có Stay nào (chưa check-in) — số liệu chỉ là ước tính theo kế hoạch đặt phòng, xem mục 1.4.d
-hasPendingServices	boolean	true nếu còn ≥1 ServiceOrders chưa Completed thuộc booking này — cảnh báo nhân viên, KHÔNG chặn API (mục 1.4.c)
+hasPendingServices	boolean	true nếu còn ≥1 ServiceOrders, FoodOrders (RoomInvoice) hoặc biên bản DamageItems chưa hoàn tất/chờ duyệt thuộc booking này — cảnh báo nhân viên, KHÔNG chặn API (mục 1.4.c)
 stays[]	array	1 phần tử cho mỗi phòng/lượt lưu trú thuộc booking (rỗng nếu estimated=true)
-stays[].stayId, roomId, roomNumber	int/string	Định danh lượt lưu trú và phòng thực tế
-stays[].room	object	{ nights, unitPrice, subtotal } — chi tiết tiền phòng của riêng Stay này (mục 1.4.b)
-stays[].services[]	array	Danh sách ServiceOrders Status=Completed của Stay này, kèm subtotal
-stays[].minibar[]	array	Danh sách MinibarUsages của Stay này, kèm subtotal
-stays[].food[]	array	Danh sách FoodOrders PaymentMode=RoomInvoice & Status=Served của Stay này, kèm subtotal
-stays[].staySubtotal	decimal	= room.subtotal + services subtotal + minibar subtotal + food subtotal
-surchargeAmount	decimal	= Bookings.SurchargeAmount hiện tại (lấy nguyên, không tính lại — mục 1.4.e)
+stays[].stayId, roomId, roomNumber, roomTypeName	int/string	Định danh lượt lưu trú, phòng thực tế và tên hạng phòng
+stays[].room	object	{ nights, unitPrice, subtotal } — chi tiết tiền phòng cơ sở của riêng Stay này (mục 1.4.b)
+stays[].extensions[]	array	Danh sách phí gia hạn lưu trú (StayExtensions CONFIRMED) & phụ thu đổi/nâng hạng phòng (RoomMoveRequests COMPLETED) của Stay này
+stays[].services[]	array	Danh sách ServiceOrders Status=Completed của Stay này (kèm tên dịch vụ và phân loại ServiceCategories), kèm subtotal
+stays[].minibar[]	array	Danh sách MinibarUsages (tra tên từ InventoryItems & MinibarProducts; fallback MinibarInspectionLines CONFIRMED) của Stay này, kèm subtotal
+stays[].food[]	array	Danh sách FoodOrders PaymentMode=RoomInvoice & Status ∈ {Served, Delivered, Completed} của Stay này, kèm subtotal
+stays[].damages[]	array	Danh sách bồi thường hư hỏng & phạt (DamageItems APPROVED/CONFIRMED/CHARGED + RoomInspectionReports LinenDamageFee/KeycardLossPenalty) của Stay này
+stays[].staySubtotal	decimal	= room.subtotal + services subtotal + minibar subtotal + food subtotal + extensions subtotal + damages subtotal
+extensions[]	array	Mảng phẳng gộp toàn bộ khoản gia hạn lưu trú & phụ thu nâng hạng phòng của mọi Stay để hiển thị trực tiếp trên Bảng 1 (Master Folio)
+minibar[]	array	Mảng phẳng gộp toàn bộ tiêu dùng Minibar của mọi Stay để hiển thị trên Bảng 2 (Master Folio)
+services[]	array	Mảng phẳng gộp toàn bộ dịch vụ khách sạn (Giặt ủi, Spa, Tour...) đã hoàn thành để hiển thị trên Bảng 3 (Master Folio)
+foodAndBeverage[]	array	Mảng phẳng gộp toàn bộ đơn F&B ghi nợ phòng (RoomInvoice) để hiển thị trên Bảng 4 (Master Folio)
+damages[]	array	Mảng phẳng gộp toàn bộ khoản bồi thường thiệt hại buồng phòng & phạt kiểm phòng để hiển thị trên Bảng 5 (Master Folio)
+summary	object	{ roomSubtotal, extensionSubtotal, minibarSubtotal, serviceSubtotal, foodSubtotal, damageSubtotal, surcharge, discount, grandTotal, totalPaid, remainingBalance } — khối tổng hợp tài chính hiển thị trên Bảng Kê
+surchargeAmount	decimal	= MAX(0, Bookings.SurchargeAmount − extensionSubtotal − damageSubtotal) để tránh tính trùng các khoản gia hạn/đền bù đã bóc tách riêng (mục 1.4.e)
 discountAmount	decimal	= Bookings.DiscountAmount hiện tại (lấy nguyên, không tính lại — mục 1.4.e)
 grandTotal	decimal	= tổng staySubtotal của mọi Stay + surchargeAmount − discountAmount
+totalPaid	decimal	= MAX(tổng Payments hợp lệ thuộc PAID_STATUSES trừ RefundAmount, Bookings.DepositAmount)
+remainingBalance	decimal	= MAX(0, grandTotal − totalPaid) — số tiền còn phải thu tại quầy
 1.4. Quy tắc nghiệp vụ chi tiết
 a) Quyền truy cập
-    • Chỉ tài khoản nội bộ (role ≠ Guest: Lễ tân, Thu ngân, Admin...) được gọi endpoint này → Guest gọi trực tiếp → 403 (ERROR_0010_FORBIDDEN). Guest chỉ xem được hoá đơn CHÍNH THỨC sau khi đã phát hành (thuộc tính năng khác, C10).
+    • Chỉ tài khoản nội bộ (role ≠ Guest: Lễ tân, Thu ngân, Admin, Manager, Accountant...) được gọi endpoint này → Guest gọi trực tiếp → 403 (ERROR_0010_FORBIDDEN). Guest chỉ xem được hoá đơn CHÍNH THỨC sau khi đã phát hành (thuộc tính năng khác, C10).
     • Không có token / hết hạn → 401 (ERROR_0009_UNAUTHENTICATED).
-b) Tính tiền phòng (room) — theo TỪNG Stay
-    • unitNight (đơn giá phòng/đêm) = Bookings.RoomSubtotal ÷ Bookings.RoomQuantity ÷ Bookings.NumberOfNights — vì 1 Booking chỉ đặt 1 RoomTypeId duy nhất nên mọi phòng trong cùng booking có đơn giá/đêm bằng nhau theo hợp đồng ban đầu.
-    • Số đêm tính cho 1 Stay: nếu Stay.Status = 'CheckedOut' → dùng đúng (ActualCheckOut − ActualCheckIn), làm tròn LÊN theo ngày, tối thiểu 1 đêm. Nếu Stay đang CheckedIn/Extended (chưa trả phòng) → dùng (NOW() − ActualCheckIn) làm tròn lên, để nhân viên xem tạm tính nếu khách hỏi trước khi checkout.
-    • room.subtotal = unitNight × số đêm tính được ở trên.
-    • Hợp đồng dữ liệu gia hạn lưu trú (R2 điều chỉnh): Khi gia hạn phòng, số đêm gia hạn được cộng thẳng vào `Bookings.NumberOfNights` và tiền phòng gia hạn cộng vào `Bookings.RoomSubtotal`. Cột `Bookings.SurchargeAmount` TUYỆT ĐỐI CHỈ CHỨA các phụ thu ngoài tiền phòng (trả phòng trễ, thêm người, bồi thường hư hỏng). Quy ước này đảm bảo C6 nhân số đêm thực tế với unitNight KHÔNG bị tính trùng chi phí phòng 2 lần.
-c) Dịch vụ (ServiceOrders)
-    • Chỉ cộng các ServiceOrders có Status = 'Completed' của đúng StayId đang xét; ServiceOrders Status = 'Cancelled' KHÔNG được cộng (chi phí phát sinh đền bù huỷ ngang nếu có sẽ do lễ tân ghi nhận qua Phụ thu tại bước C7 — R2 điều chỉnh).
-    • Nếu Stay còn ServiceOrders ở Status ∈ {Received, InProgress}: KHÔNG chặn API, nhưng response set hasPendingServices = true ở cấp booking để FE hiển thị cảnh báo (VD: "Còn 2 dịch vụ chưa hoàn tất — kiểm tra trước khi Check-out").
+b) Tính tiền phòng cơ sở (room) & tách bạch Gia hạn lưu trú (extensions) — theo TỪNG Stay
+    • Khi luồng Gia hạn lưu trú (`stayExtensionRoutes.js`) xác nhận gia hạn, hệ thống cộng thêm `AdditionalNights` vào `Bookings.NumberOfNights` nhưng giữ nguyên `Bookings.RoomSubtotal` (phần tiền gia hạn được ghi vào `StayExtensions` và cộng vào `Bookings.SurchargeAmount`).
+    • Do đó, C6 truy vấn trước các bản ghi `StayExtensions` (`ExtensionStatus = 'CONFIRMED'`) để xác định `totalExtendedNights`. Số đêm hợp đồng gốc trước gia hạn là `baseContractNights = MAX(1, Bookings.NumberOfNights − totalExtendedNights)`.
+    • `unitNight` (đơn giá phòng hợp đồng/đêm) = `Bookings.RoomSubtotal ÷ (Bookings.RoomQuantity × baseContractNights)`.
+    • Tiền phòng cơ sở của mỗi Stay tính theo số đêm gốc (`nights = MAX(1, stayNights − stayExtendedNights)`), nhân với `unitNight`.
+    • Các đêm gia hạn (`StayExtensions` có `ExtensionStatus = 'CONFIRMED'`) và phụ thu nâng hạng đổi phòng (`RoomMoveRequests` có `MoveStatus = 'COMPLETED'`, `RateDifference > 0`) được tách thành mảng `extensions[]` hiển thị riêng dòng "Gia hạn lưu trú (+X đêm)" ngay trong Bảng 1 để minh bạch cho khách và thu ngân, tuyệt đối không nhân trùng hay làm loãng đơn giá đêm gốc.
+c) Dịch vụ khách sạn (ServiceOrders), Minibar, Ẩm thực F&B (FoodOrders) và Bồi thường kiểm phòng (Damages)
+    • Dịch vụ (`ServiceOrders`): Chỉ cộng các đơn có `Status = 'Completed'` của đúng `StayId` đang xét (kèm tên dịch vụ từ `Services` và phân loại từ `ServiceCategories`). Nếu còn đơn ở `Status ∈ {Received, InProgress, Processing, Pending, Confirmed}` → bật `hasPendingServices = true`.
+    • Minibar (`MinibarUsages` & `MinibarInspectionLines`): Ưu tiên lấy từ `MinibarUsages` của `StayId` (tra cứu tên sản phẩm từ cả `InventoryItems` và `MinibarProducts`). Nếu chưa có bản ghi trong `MinibarUsages`, fallback sang biên bản kiểm phòng `MinibarInspectionLines` (`MinibarInspections.Status = 'CONFIRMED'` và `BillableQty > 0`).
+    • Ẩm thực F&B (`FoodOrders`): Chỉ cộng các đơn có `PaymentMode = 'RoomInvoice'` và `Status ∈ {Served, Delivered, Completed}` (bỏ qua đơn `PayNow` đã thu tiền trực tiếp tại nhà hàng). Nếu còn đơn `RoomInvoice` ở `Status ∈ {Pending, Confirmed, Preparing, Cooking, Ready}` → bật `hasPendingServices = true`.
+    • Bồi thường & Phạt kiểm phòng (`DamageItems` & `RoomInspectionReports`): Cộng các khoản hư hỏng tài sản phòng trong `DamageItems` có `Status ∈ {APPROVED, CONFIRMED, CHARGED}` và các khoản phạt đồ vải bẩn (`LinenDamageFee > 0`), mất thẻ từ (`KeycardLossPenalty > 0`) trong `RoomInspectionReports` (`Status ∉ {REJECTED, WAIVED}`). Nếu còn khoản `DamageItems` đang ở `Status ∈ {SUBMITTED, DISPUTED, PENDING}` → bật `hasPendingServices = true`.
 d) Booking chưa check-in (chưa có Stay)
-    • Nếu Stays.BookingId không có bản ghi nào (booking đang Pending/Confirmed, khách chưa tới): trả estimated = true, stays = [] (mảng rỗng), và tính riêng 1 khối ước tính dựa trên Bookings.RoomSubtotal/SurchargeAmount/DiscountAmount hiện có — KHÔNG có services/minibar/food vì chưa phát sinh (không có Stay để gắn vào).
-    • grandTotal trong trường hợp này = Bookings.RoomSubtotal + SurchargeAmount − DiscountAmount (đúng bằng Bookings.TotalAmount đã lưu sẵn lúc đặt phòng).
-e) Phụ thu / giảm giá cấp Booking
-    • surchargeAmount và discountAmount lấy TRỰC TIẾP từ Bookings.SurchargeAmount / Bookings.DiscountAmount tại thời điểm gọi API — đây là 2 khoản được các tính năng khác (Gia hạn lưu trú, Áp voucher, Check-out ghi phụ thu hư hỏng...) MAINTAIN sẵn ở cấp Booking, C6 không tính lại và không tách theo từng Stay (do dữ liệu gốc không lưu chi tiết theo từng phòng).
-    • Nếu Booking có nhiều Stay: surchargeAmount/discountAmount chỉ xuất hiện 1 LẦN DUY NHẤT ở cấp response (ngoài mảng stays[]), không cộng lặp vào từng staySubtotal.
+    • Nếu `Stays.BookingId` không có bản ghi nào (booking đang Pending/Confirmed, khách chưa tới): trả `estimated = true`, `stays = []` (mảng rỗng), và tính riêng 1 khối ước tính dựa trên `Bookings.RoomSubtotal / SurchargeAmount / DiscountAmount` hiện có — các mảng `extensions`, `minibar`, `services`, `foodAndBeverage`, `damages` đều là `[]`.
+    • `grandTotal` trong trường hợp này = `Bookings.TotalAmount` (hoặc `Bookings.RoomSubtotal + SurchargeAmount − DiscountAmount`), đồng thời khấu trừ tiền cọc đã đóng (`totalPaid`) để trả về `remainingBalance`.
+e) Phụ thu / giảm giá cấp Booking & Khấu trừ tiền đã thanh toán (C5 Payments)
+    • `netSurcharge = MAX(0, Bookings.SurchargeAmount − extensionSubtotal − damageSubtotal)`: loại trừ phần tiền gia hạn lưu trú và bồi thường kiểm phòng nếu các luồng vận hành đã cộng dồn vào `Bookings.SurchargeAmount`, đảm bảo KHÔNG BAO GIỜ tính trùng 2 lần vào `grandTotal`.
+    • `discountAmount` lấy trực tiếp từ `Bookings.DiscountAmount`.
+    • `totalPaid`: tổng hợp từ bảng `Payments` (Module C5) của Booking với `Status ∈ {'Paid', 'Success', 'Completed'}` theo công thức `SUM(MAX(0, Amount − RefundAmount))`, đối chiếu với `Bookings.DepositAmount` (`effectivePaid = MAX(totalPaid, DepositAmount)`).
+    • `remainingBalance = MAX(0, grandTotal − totalPaid)`.
 f) Đây là số liệu tạm tính — không ghi DB
-    • GET /bookings/{bookingId}/charges là thao tác THUẦN ĐỌC (read-only): không tạo, không sửa bất kỳ bản ghi nào trong Invoices/InvoiceDetails hay bảng khác. Gọi lại nhiều lần cho cùng bookingId luôn an toàn (idempotent tự nhiên vì không ghi gì).
-    • Số liệu chính thức (có InvoiceNumber, VAT, PDF...) chỉ được CHỐT khi gọi FEAT-INVOICE-02 (C7 — POST /invoices/master, đặc tả riêng).
+    • `GET /bookings/{bookingId}/charges` là thao tác THUẦN ĐỌC (read-only): không tạo, không sửa bất kỳ bản ghi nào trong `Invoices/InvoiceDetails` hay bảng khác. Gọi lại nhiều lần cho cùng `bookingId` luôn an toàn (idempotent tự nhiên).
+    • Số liệu chính thức (có `InvoiceNumber`, `VAT`, `PDF`...) chỉ được CHỐT khi gọi FEAT-INVOICE-02 (C7 — `POST /invoices/master`).
 1.5. Luồng xử lý
-    1. Nhân viên mở màn 20/25 cho 1 booking → FE gọi GET /bookings/{bookingId}/charges; hệ thống xác thực token & quyền (401/403 nếu không đạt, dừng xử lý — mục 1.4.a).
-    2. Hệ thống tải Booking theo bookingId; không tồn tại → ERROR_0011_NOT_FOUND, dừng xử lý.
-    3. Hệ thống tải toàn bộ Stays có BookingId tương ứng. Nếu rỗng → trả ngay kết quả ước tính (mục 1.4.d), KẾT THÚC.
-    4. Với MỖI Stay tìm được: tính room (mục b), tải & lọc services Completed (mục c), tải toàn bộ minibar, tải & lọc food RoomInvoice+Served, tính staySubtotal.
-    5. Trong lúc duyệt qua các Stay, nếu phát hiện bất kỳ ServiceOrders nào Status ∈ {Received, InProgress} → đánh dấu hasPendingServices = true cho cả response.
-    6. Cộng surchargeAmount/discountAmount cấp Booking (mục e), tính grandTotal.
-    7. Trả về JSON tổng hợp theo cấu trúc mục 1.3 — HTTP 200, không có trường hợp "không tìm thấy chi phí" nào bị coi là lỗi (booking mới tạo, chưa phát sinh gì vẫn trả 200 với các subtotal = 0).
+    1. Nhân viên mở màn 20 (Check-out), popup Chi phí trong Quản lý đặt phòng, hoặc màn 25 (`/admin/charges`) → FE gọi `GET /api/v1/bookings/{bookingId}/charges`; hệ thống xác thực token & quyền (401/403 nếu không đạt — mục 1.4.a).
+    2. Hệ thống tải `Booking` theo `bookingId` (hoặc `ConfirmationCode`) kèm `User`, `RoomType` và danh sách `Payments` đã thu; không tồn tại → `ERROR_0011_NOT_FOUND`.
+    3. Hệ thống tải toàn bộ `Stays` có `BookingId` tương ứng. Nếu rỗng → trả ngay kết quả ước tính (`estimated = true`, mục 1.4.d), KẾT THÚC.
+    4. Tiền xử lý `StayExtensions` (`CONFIRMED`) để xác định số đêm gia hạn và số đêm hợp đồng gốc của từng Stay.
+    5. Với MỖI `Stay` tìm được: tính tiền phòng cơ sở (`room`), tải & lọc `ServiceOrders` (`services`), tải `MinibarUsages` / `MinibarInspectionLines` (`minibar`), tải & lọc `FoodOrders` ghi nợ phòng (`food`), tải `StayExtensions` + `RoomMoveRequests` (`extensions`), tải `DamageItems` + `RoomInspectionReports` (`damages`), tính `staySubtotal` và gom vào các mảng phẳng cấp Booking.
+    6. Trong lúc duyệt qua các Stay, nếu phát hiện bất kỳ `ServiceOrders`, `FoodOrders (RoomInvoice)` hoặc `DamageItems` nào đang dở dang/chờ duyệt → đánh dấu `hasPendingServices = true`.
+    7. Tính `netSurcharge`, `discountAmount`, `grandTotal`, `totalPaid`, `remainingBalance` và đối tượng `summary` (mục 1.4.e).
+    8. Trả về JSON tổng hợp theo cấu trúc mục 1.3 — HTTP 200.
 1.6. Bảng lỗi áp dụng
 Trường	Điều kiện lỗi	Mã lỗi	Message cụ thể
 Chung	Chưa đăng nhập / hết hạn	ERROR_0009_UNAUTHENTICATED	Bạn cần đăng nhập để thực hiện chức năng này

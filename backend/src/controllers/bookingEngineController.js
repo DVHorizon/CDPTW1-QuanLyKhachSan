@@ -547,18 +547,20 @@ exports.calculatePricing = async (req, res) => {
     // FEAT-GUEST-12 (A12): Tích hợp Dynamic Pricing Engine cho ngày cuối tuần, lễ, và mùa cao điểm
     let dynamicPricingResult = null;
     let roomSubtotal = Math.round((numberOfNights * effectiveRate * numRooms) * 100) / 100;
-    try {
-      dynamicPricingResult = await dynamicPricingService.calculateDynamicPricing({
-        roomId: roomTypeId || 1,
-        checkInDate,
-        checkOutDate
-      });
-      if (dynamicPricingResult && dynamicPricingResult.totalRoomPrice) {
-        // Áp dụng giá động cho số lượng phòng
-        roomSubtotal = Math.round((dynamicPricingResult.totalRoomPrice * numRooms) * 100) / 100;
+    if (roomTypeId && !baseRate) {
+      try {
+        dynamicPricingResult = await dynamicPricingService.calculateDynamicPricing({
+          roomId: roomTypeId,
+          checkInDate,
+          checkOutDate
+        });
+        if (dynamicPricingResult && dynamicPricingResult.totalRoomPrice) {
+          // Áp dụng giá động cho số lượng phòng
+          roomSubtotal = Math.round((dynamicPricingResult.totalRoomPrice * numRooms) * 100) / 100;
+        }
+      } catch (dpErr) {
+        console.warn('Fallback standard calculation:', dpErr.message);
       }
-    } catch (dpErr) {
-      console.warn('Fallback standard calculation:', dpErr.message);
     }
 
     // 3. Phụ thu thêm người lớn / trẻ em vượt chuẩn phòng

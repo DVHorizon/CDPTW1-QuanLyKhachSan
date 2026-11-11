@@ -38,6 +38,8 @@ export default function BookingChargesFolio() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [recentBookings, setRecentBookings] = useState([]);
+  const [loadingBookingsList, setLoadingBookingsList] = useState(false);
 
   // State Hóa đơn Master & Xuất PDF
   const [invoice, setInvoice] = useState(null);
@@ -147,6 +149,12 @@ export default function BookingChargesFolio() {
     } else {
       setData(null);
       setInvoice(null);
+      setLoadingBookingsList(true);
+      bookingApi
+        .getRecentBookings(25)
+        .then((list) => setRecentBookings(Array.isArray(list) ? list : []))
+        .catch(() => setRecentBookings([]))
+        .finally(() => setLoadingBookingsList(false));
     }
   }, [activeBookingId, fetchCharges]);
 
@@ -364,26 +372,94 @@ export default function BookingChargesFolio() {
           </form>
         </div>
 
-        {/* Chưa chọn Booking */}
+        {/* Chưa chọn Booking -> Hiển thị danh sách đặt phòng để chọn nhanh */}
         {!activeBookingId ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center space-y-4 shadow-sm">
-            <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto border border-blue-100 shadow-inner">
-              <span className="material-symbols-outlined text-3xl">receipt_long</span>
-            </div>
-            <div className="max-w-md mx-auto space-y-1">
-              <h3 className="text-base font-bold text-slate-800">Chưa chọn mã đặt phòng</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Vui lòng nhập mã đặt phòng (Booking ID) vào ô tìm kiếm ở trên hoặc truy cập từ danh sách đặt phòng để xem bảng kê chi phí tổng hợp.
-              </p>
-            </div>
-            <div className="pt-2">
-              <Link
-                to="/admin/bookings"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-sm">arrow_back</span>
-                <span>Đến Danh Sách Đặt Phòng</span>
-              </Link>
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-blue-600 text-lg">list_alt</span>
+                  <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                    Danh Sách Đặt Phòng Gần Đây — Chọn Để Xem Bảng Kê Chi Phí (Master Folio)
+                  </h2>
+                </div>
+                <Link
+                  to="/admin/dat-phong"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">open_in_new</span>
+                  <span>Quản Lý Đặt Phòng</span>
+                </Link>
+              </div>
+
+              {loadingBookingsList ? (
+                <div className="p-12 text-center space-y-3">
+                  <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+                  <p className="text-xs text-slate-500">Đang tải danh sách đặt phòng...</p>
+                </div>
+              ) : recentBookings.length === 0 ? (
+                <div className="p-12 text-center space-y-3">
+                  <p className="text-xs text-slate-500">
+                    Vui lòng nhập mã đặt phòng (Booking ID hoặc Mã xác nhận) vào ô tìm kiếm phía trên để xem bảng kê chi phí tổng hợp.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100">
+                      <tr>
+                        <th className="px-5 py-3">Booking ID</th>
+                        <th className="px-4 py-3">Mã Xác Nhận</th>
+                        <th className="px-4 py-3">Khách Hàng</th>
+                        <th className="px-4 py-3">Hạng Phòng</th>
+                        <th className="px-4 py-3">Lưu Trú</th>
+                        <th className="px-4 py-3 text-center">Trạng Thái</th>
+                        <th className="px-4 py-3 text-right">Tổng Tạm Tính</th>
+                        <th className="px-5 py-3 text-right">Thao Tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {recentBookings.map((b) => {
+                        const bId = b.bookingId || b.BookingId;
+                        const code = b.confirmationCode || b.ConfirmationCode || `#${bId}`;
+                        const guest = b.guestName || b.primaryGuest?.FullName || b.user?.FullName || b.User?.FullName || `Khách #${bId}`;
+                        const rType = b.roomTypeName || b.roomType?.TypeName || b.RoomType?.TypeName || 'Tiêu chuẩn';
+                        const status = b.status || b.Status || 'Pending';
+                        const totalAmt = b.totalAmount ?? b.TotalAmount ?? b.payment?.totalAmount ?? 0;
+                        return (
+                          <tr key={bId} className="hover:bg-blue-50/40 transition-colors">
+                            <td className="px-5 py-3 font-mono font-bold text-slate-800">#{bId}</td>
+                            <td className="px-4 py-3 font-mono text-blue-700 font-semibold">{code}</td>
+                            <td className="px-4 py-3 font-medium text-slate-900">{guest}</td>
+                            <td className="px-4 py-3 text-slate-600">{rType}</td>
+                            <td className="px-4 py-3 text-slate-500">
+                              {fmtDate(b.checkInDate || b.CheckInDate)} → {fmtDate(b.checkOutDate || b.CheckOutDate)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                {status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                              {fmtMoney(totalAmt)}
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/admin/charges/${bId}`)}
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer inline-flex items-center gap-1"
+                              >
+                                <span className="material-symbols-outlined text-sm">receipt_long</span>
+                                <span>Xem Bảng Kê</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         ) : loading ? (
@@ -443,10 +519,16 @@ export default function BookingChargesFolio() {
                   <span>In Bảng Kê</span>
                 </button>
                 <Link
-                  to="/admin/bookings"
+                  to="/admin/charges"
                   className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer border border-slate-700 ml-1"
                 >
-                  Quay lại
+                  Danh sách Folio
+                </Link>
+                <Link
+                  to="/admin/dat-phong"
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer border border-slate-700"
+                >
+                  Quản lý Đặt phòng
                 </Link>
               </div>
             </div>

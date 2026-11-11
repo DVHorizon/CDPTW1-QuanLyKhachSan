@@ -47,13 +47,13 @@ async function runTests() {
 
   // 2. Tạo một đơn Booking mới ở trạng thái Pending để dùng cho kiểm thử
   console.log('👉 [2] Tạo đơn đặt phòng mới (Pending) để kiểm thử thanh toán cọc...');
-  const createBookingRes = await request('http://localhost:5000/bookings', {
+  const createBookingRes = await request('/guest/bookings', {
     method: 'POST',
     headers: { Authorization: `Bearer ${guestToken}` },
     body: JSON.stringify({
       roomTypeId: 1,
-      checkInDate: '2026-11-10',
-      checkOutDate: '2026-11-12',
+      checkInDate: '2026-11-20',
+      checkOutDate: '2026-11-22',
       firstName: 'Dang',
       lastName: 'Ha Test',
       email: 'guest@hoteldomain.vn',

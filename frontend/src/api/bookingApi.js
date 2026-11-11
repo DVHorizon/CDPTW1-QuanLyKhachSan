@@ -252,6 +252,16 @@ export const bookingApi = {
   getBookingDetail: async (bookingId) => {
     return await safeFetchJson(`/${bookingId}`);
   },
+
+  // Lấy danh sách booking gần đây để chọn nhanh trên trang Master Folio
+  getRecentBookings: async (limit = 20) => {
+    const res = await safeFetchJson(`?limit=${limit}`);
+    if (Array.isArray(res?.data?.items)) return res.data.items;
+    if (Array.isArray(res?.data?.bookings)) return res.data.bookings;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res)) return res;
+    return [];
+  },
 };
 
 export default bookingApi;

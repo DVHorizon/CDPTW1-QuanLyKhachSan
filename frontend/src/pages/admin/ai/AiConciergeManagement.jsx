@@ -157,19 +157,33 @@ const AiConciergeManagement = () => {
   };
 
   // Tải danh sách hội thoại khách hàng (Handover Inbox)
-  const loadConversations = async () => {
-    setConvLoading(true);
+  const loadConversations = async (preferredConvId = null, silent = false) => {
+    if (!silent) setConvLoading(true);
     try {
       const res = await fetchConversationsApi({ status: convFilterStatus });
       const list = Array.isArray(res?.data) ? res.data : [];
       setConversations(list);
-      if (list.length > 0 && !selectedConvId) {
-        setSelectedConvId(list[0].conversationId);
+      if (list.length > 0) {
+        if (
+          preferredConvId &&
+          list.some((c) => Number(c.conversationId) === Number(preferredConvId))
+        ) {
+          setSelectedConvId(Number(preferredConvId));
+        } else if (
+          !selectedConvId ||
+          !list.some((c) => Number(c.conversationId) === Number(selectedConvId))
+        ) {
+          setSelectedConvId(list[0].conversationId);
+        }
+      } else {
+        setSelectedConvId(null);
       }
+      return list;
     } catch (error) {
-      showSanitizedToast(error, 'error');
+      if (!silent) showSanitizedToast(error, 'error');
+      return [];
     } finally {
-      setConvLoading(false);
+      if (!silent) setConvLoading(false);
     }
   };
 
@@ -182,6 +196,27 @@ const AiConciergeManagement = () => {
       loadConversations();
     }
   }, [activeTab, convFilterStatus]);
+
+  // Đồng bộ thời gian thực khi người dùng chat ở FloatingAiConcierge ngay trên cùng trình duyệt
+  useEffect(() => {
+    const handleChatUpdated = (event) => {
+      const incomingConvId = event?.detail?.conversationId || null;
+      loadConversations(incomingConvId, true);
+    };
+    window.addEventListener('gh-ai-chat-updated', handleChatUpdated);
+
+    let intervalId = null;
+    if (activeTab === 'inbox') {
+      intervalId = setInterval(() => {
+        loadConversations(null, true);
+      }, 4000);
+    }
+
+    return () => {
+      window.removeEventListener('gh-ai-chat-updated', handleChatUpdated);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [activeTab, convFilterStatus, selectedConvId]);
 
   const filteredKbItems = useMemo(() => {
     if (!searchKeyword.trim()) return kbItems;
@@ -298,12 +333,24 @@ const AiConciergeManagement = () => {
     }
   };
 
-  // Tiếp nhận Handover
-  const handleClaimHandover = async (conversationId) => {
+  // Tiếp nhận Handover hoặc trả về cho AI
+  const handleClaimHandover = async (conversationId, action = 'to_staff') => {
     try {
-      const res = await claimHandoverApi(conversationId);
-      showSanitizedToast(res?.message || 'Đã tiếp nhận phiên hội thoại thành công.', 'success');
-      await loadConversations();
+      const res = await claimHandoverApi(conversationId, action);
+      const updatedId = res?.data?.conversationId || conversationId;
+      showSanitizedToast(
+        res?.message ||
+          (action === 'to_ai'
+            ? 'Đã chuyển lại hội thoại cho Trợ lý AI.'
+            : 'Đã tiếp nhận phiên hội thoại thành công.'),
+        'success'
+      );
+      await loadConversations(updatedId);
+      window.dispatchEvent(
+        new CustomEvent('gh-ai-staff-replied', {
+          detail: { conversationId: updatedId, action },
+        })
+      );
     } catch (error) {
       showSanitizedToast(error, 'error');
     }
@@ -318,14 +365,21 @@ const AiConciergeManagement = () => {
       return;
     }
 
+    const replyMessage = staffReplyText.trim();
     try {
       const res = await sendStaffReplyApi(
         selectedConversation.conversationId,
-        staffReplyText.trim()
+        replyMessage
       );
+      const updatedId = res?.data?.conversationId || selectedConversation.conversationId;
       setStaffReplyText('');
       showSanitizedToast(res?.message || 'Đã gửi phản hồi tới khách hàng.', 'success');
-      await loadConversations();
+      await loadConversations(updatedId);
+      window.dispatchEvent(
+        new CustomEvent('gh-ai-staff-replied', {
+          detail: { conversationId: updatedId },
+        })
+      );
     } catch (error) {
       showSanitizedToast(error, 'error');
     }
@@ -335,8 +389,14 @@ const AiConciergeManagement = () => {
   const handleResolveConversation = async (conversationId) => {
     try {
       const res = await resolveConversationApi(conversationId);
+      const updatedId = res?.data?.conversationId || conversationId;
       showSanitizedToast(res?.message || 'Đã hoàn tất và đóng phiên hỗ trợ.', 'success');
-      await loadConversations();
+      await loadConversations(updatedId);
+      window.dispatchEvent(
+        new CustomEvent('gh-ai-staff-replied', {
+          detail: { conversationId: updatedId, action: 'resolved' },
+        })
+      );
     } catch (error) {
       showSanitizedToast(error, 'error');
     }
@@ -696,20 +756,30 @@ const AiConciergeManagement = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Danh sách phiên hội thoại */}
             <div className="bg-white rounded-2xl border border-stone-200 shadow-xs p-4 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <h2 className="text-base font-bold text-stone-900">
                   Phiên Hội Thoại Khách Hàng
                 </h2>
-                <select
-                  value={convFilterStatus}
-                  onChange={(e) => setConvFilterStatus(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg border border-stone-300 text-xs"
-                >
-                  <option value="All">Tất cả</option>
-                  <option value="HandedOver">Cần hỗ trợ (HandedOver)</option>
-                  <option value="Open">AI đang trả lời (Open)</option>
-                  <option value="Closed">Đã đóng (Closed)</option>
-                </select>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => loadConversations(selectedConvId)}
+                    className="px-2.5 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-100 text-stone-700 text-xs font-medium transition"
+                    title="Làm mới danh sách hội thoại"
+                  >
+                    Làm mới
+                  </button>
+                  <select
+                    value={convFilterStatus}
+                    onChange={(e) => setConvFilterStatus(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-lg border border-stone-300 text-xs"
+                  >
+                    <option value="All">Tất cả</option>
+                    <option value="HandedOver">Cần hỗ trợ (HandedOver)</option>
+                    <option value="Open">AI đang trả lời (Open)</option>
+                    <option value="Closed">Đã đóng (Closed)</option>
+                  </select>
+                </div>
               </div>
 
               {convLoading ? (
@@ -794,16 +864,27 @@ const AiConciergeManagement = () => {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {selectedConversation.status !== 'Closed' && (
                         <button
                           type="button"
                           onClick={() =>
-                            handleClaimHandover(selectedConversation.conversationId)
+                            handleClaimHandover(selectedConversation.conversationId, 'to_staff')
                           }
                           className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition"
                         >
                           Tiếp nhận hỗ trợ
+                        </button>
+                      )}
+                      {selectedConversation.status === 'HandedOver' && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleClaimHandover(selectedConversation.conversationId, 'to_ai')
+                          }
+                          className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition"
+                        >
+                          Chuyển lại cho AI
                         </button>
                       )}
                       {selectedConversation.status !== 'Closed' && (
