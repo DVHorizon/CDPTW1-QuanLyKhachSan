@@ -139,7 +139,14 @@ const RoomManagement = () => {
 
   const showToast = (message, type = 'success', code = null) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    setToast({ message, type, code });
+    if (code) {
+      if (type === 'error') {
+        console.error('[Mã lỗi hệ thống]: ' + code, { message });
+      } else {
+        console.log('[Mã phản hồi]: ' + code, { message });
+      }
+    }
+    setToast({ message, type });
     toastTimeoutRef.current = setTimeout(() => {
       setToast(null);
     }, 4500);
@@ -663,11 +670,7 @@ const RoomManagement = () => {
               {toast.type === 'error' ? 'error' : toast.type === 'info' ? 'info' : 'check_circle'}
             </span>
             <div className="flex-1 text-sm">
-              {toast.code && (
-                <span className="block text-[11px] font-mono uppercase tracking-wider opacity-90 mb-0.5">
-                  [{toast.code}]
-                </span>
-              )}
+              
               {toast.message}
             </div>
             <button

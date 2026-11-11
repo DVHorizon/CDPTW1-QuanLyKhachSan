@@ -413,6 +413,7 @@ export default function RoomAvailability() {
 
   // ─── Kiểm tra phân quyền truy cập URL màn hình (Test Case 1 & 2) ───────────
   if (!token) {
+    console.warn('[RoomAvailability] ERROR_0009_UNAUTHENTICATED');
     return (
       <AdminLayout>
         <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
@@ -421,7 +422,7 @@ export default function RoomAvailability() {
           </div>
           <h2 className="text-xl font-bold text-slate-800 mb-2">Chưa xác thực danh tính</h2>
           <p className="text-slate-600 mb-6 max-w-md">
-            Bạn cần đăng nhập để thực hiện chức năng này (ERROR_0009_UNAUTHENTICATED)
+            Bạn cần đăng nhập để thực hiện chức năng này.
           </p>
           <button
             onClick={() => navigate('/login')}
@@ -435,6 +436,7 @@ export default function RoomAvailability() {
   }
 
   if (!canView) {
+    console.warn('[RoomAvailability] ERROR_0010_FORBIDDEN');
     return (
       <AdminLayout>
         <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
@@ -443,7 +445,7 @@ export default function RoomAvailability() {
           </div>
           <h2 className="text-xl font-bold text-slate-800 mb-2">Truy Cập Bị Từ Chối (403)</h2>
           <p className="text-slate-600 mb-6 max-w-md">
-            Bạn không có quyền thực hiện chức năng này (ERROR_0010_FORBIDDEN)
+            Bạn không có quyền thực hiện chức năng này.
           </p>
           <button
             onClick={() => navigate('/admin/ban-lam-viec')}

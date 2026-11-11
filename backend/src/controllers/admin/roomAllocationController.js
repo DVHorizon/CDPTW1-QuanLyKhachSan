@@ -258,8 +258,6 @@ const getAvailableRooms = async (req, res) => {
       `;
       params.push(checkOutDate, checkInDate);
       if (bookingId) params.push(Number(bookingId));
-      params.push(checkOutDate, checkInDate);
-      if (bookingId) params.push(Number(bookingId));
     }
 
     sql += ' ORDER BY r.Floor DESC, r.RoomNumber ASC LIMIT 100';

@@ -7,7 +7,9 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "migrate": "sequelize-cli db:migrate",
-    "seed": "node src/seeders/seedRunner.js",
+    "seed": "node src/seeders/seedPristineClean.js",
+    "seed:clean": "node src/seeders/seedPristineClean.js",
+    "seed:synthetic": "node src/seeders/seedRunner.js",
     "seed:fast": "node src/seeders/seedRunner.js --count=1000",
     "seed:dev": "node src/seeders/seedRunner.js --count=10000",
     "seed:full": "node src/seeders/seedRunner.js --count=100000",
@@ -22,6 +24,8 @@
     "test:service-status": "node tests/test_feat_service_04_status.js",
     "test:payment-c5": "node tests/test_feat_payment_01_c5.js",
     "test:charges-c6": "node tests/test_feat_invoice_01_c6.js",
+    "test:invoice-c6-c7-c8": "node tests/test_feat_invoice_c6_c7_c8.js",
+    "test:manual": "node ../scripts/test_manual.js",
     "test:all": "node tests/test_feat_guest_06_pricing_calculation.js && node tests/test_feat_guest_07_voucher_redemption.js && node tests/test_feat_guest_05_booking_engine.js && node tests/test_feat_guest_08_deposit_payment.js"
   },
   "dependencies": {
@@ -34,6 +38,7 @@
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.9.0",
     "nodemailer": "^9.1.1",
+    "pdfkit": "^0.20.2",
     "qrcode": "^1.5.4",
     "sequelize": "^6.37.0",
     "sqlite3": "^6.0.1",

@@ -36,6 +36,11 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import ExtendStayAndMove from './pages/admin/ExtendStayAndMove';
 import MinibarManagement from './pages/admin/MinibarManagement';
 import BookingChargesFolio from './pages/admin/BookingChargesFolio';
+import InvoiceLedger from './pages/admin/finance/InvoiceLedger';
+import MasterRevenueDashboard from './pages/admin/statistics/MasterRevenueDashboard';
+import AiConciergeManagement from './pages/admin/ai/AiConciergeManagement';
+import FloatingAiConcierge from './components/client/FloatingAiConcierge';
+import ClientConcierge from './pages/client/ClientConcierge';
 
 // tuyen/7 imports:
 import MarketingDashboard from './pages/admin/marketing/MarketingDashboard';
@@ -57,6 +62,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/rooms" element={<SearchRooms />} />
+            <Route path="/services" element={<ServiceManagement />} />
             <Route path="/rooms/search" element={<SearchRooms />} />
             <Route path="/tim-kiem" element={<SearchRooms />} />
             <Route path="/rooms/:id" element={<RoomDetail />} />
@@ -81,6 +87,8 @@ function App() {
             <Route path="/my-bookings" element={<MyBookings />} />
             <Route path="/me/bookings" element={<MyBookings />} />
             <Route path="/lich-su-dat-phong" element={<MyBookings />} />
+            <Route path="/client/concierge" element={<ClientConcierge />} />
+            <Route path="/concierge" element={<ClientConcierge />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/login" element={<Auth />} />
             <Route path="/register" element={<Auth />} />
@@ -112,20 +120,51 @@ function App() {
 
             {/* Phân hệ Check-out & Kiểm phòng (FEAT-CHECKOUT-INSPECT-01 / Spec 11) */}
             <Route path="/admin/check-out" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
+            <Route path="/admin/checkout" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
+            <Route path="/admin/checkout/:stayId" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
             <Route path="/admin/check-out/:stayId" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
             <Route path="/admin/guest-check-out" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
             <Route path="/admin/kiem-phong" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
             <Route path="/admin/tra-phong" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
+            <Route path="/admin/finance/checkout" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
+            <Route path="/admin/finance/checkout/:stayId" element={<ProtectedRoute><CheckOutDesk /></ProtectedRoute>} />
 
             {/* Phân hệ Tổng hợp chi phí lưu trú / Master Folio (FEAT-INVOICE-01 / C6) */}
             <Route path="/admin/charges" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
             <Route path="/admin/charges/:bookingId" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+            <Route path="/admin/bookings/charges" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+            <Route path="/admin/bookings/charges/:bookingId" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+            <Route path="/admin/booking/charges" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
             <Route path="/admin/bang-ke-chi-phi" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
             <Route path="/admin/bang-ke-chi-phi/:bookingId" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
             <Route path="/admin/folio" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
             <Route path="/admin/folio/:bookingId" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
             <Route path="/admin/invoices/master" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
             <Route path="/admin/invoices/master/:bookingId" element={<ProtectedRoute><BookingChargesFolio /></ProtectedRoute>} />
+
+            {/* Phân hệ Sổ cái hoá đơn & Quản trị tài chính (FEAT-INVOICE-05 / C10 Màn 27) */}
+            <Route path="/admin/tai-chinh" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><InvoiceLedger /></ProtectedRoute>} />
+            <Route path="/admin/invoices" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><InvoiceLedger /></ProtectedRoute>} />
+            <Route path="/admin/finance" element={<Navigate to="/admin/finance/ledger" replace />} />
+            <Route path="/admin/finance/ledger" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><InvoiceLedger /></ProtectedRoute>} />
+            <Route path="/admin/finance/settlement" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><InvoiceLedger /></ProtectedRoute>} />
+            <Route path="/admin/finance/settlement/:invoiceId" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><InvoiceLedger /></ProtectedRoute>} />
+            <Route path="/admin/so-cai" element={<ProtectedRoute requiredPermission="BOOKING_VIEW"><InvoiceLedger /></ProtectedRoute>} />
+
+            {/* Phân hệ Báo cáo Doanh thu & Công suất phòng Thời gian thực (FEAT-REPORT-01 & FEAT-REPORT-02 / C11 & C12) */}
+            <Route path="/admin/ban-lam-viec" element={<ProtectedRoute><MasterRevenueDashboard /></ProtectedRoute>} />
+            <Route path="/admin/statistics" element={<ProtectedRoute><MasterRevenueDashboard /></ProtectedRoute>} />
+            <Route path="/admin/statistics/revenue" element={<ProtectedRoute><MasterRevenueDashboard /></ProtectedRoute>} />
+            <Route path="/admin/statistics/occupancy" element={<ProtectedRoute><MasterRevenueDashboard /></ProtectedRoute>} />
+            <Route path="/admin/bao-cao" element={<ProtectedRoute><MasterRevenueDashboard /></ProtectedRoute>} />
+            <Route path="/admin/dashboard" element={<ProtectedRoute><MasterRevenueDashboard /></ProtectedRoute>} />
+
+            {/* Phân hệ Trợ lý ảo AI Concierge & Quản trị Cơ sở Tri thức (FEAT-AI-01 & FEAT-AI-02 / C13 & C14) */}
+            <Route path="/admin/ai-concierge" element={<ProtectedRoute><AiConciergeManagement /></ProtectedRoute>} />
+            <Route path="/admin/knowledge-base" element={<ProtectedRoute><AiConciergeManagement /></ProtectedRoute>} />
+            <Route path="/admin/ai/knowledge" element={<ProtectedRoute><AiConciergeManagement /></ProtectedRoute>} />
+            <Route path="/admin/ai/knowledge-base" element={<ProtectedRoute><AiConciergeManagement /></ProtectedRoute>} />
+            <Route path="/admin/ai" element={<ProtectedRoute><AiConciergeManagement /></ProtectedRoute>} />
 
             {/* Phân hệ Quản lý Minibar phòng (FEAT-MINIBAR-01 / Spec 12) */}
             <Route path="/admin/minibar" element={<ProtectedRoute><MinibarManagement /></ProtectedRoute>} />
@@ -149,6 +188,7 @@ function App() {
             <Route path="/admin/fnb/room-service" element={<ProtectedRoute><RoomService /></ProtectedRoute>} />
             <Route path="/admin/fnb/history" element={<ProtectedRoute><FnbOrderHistory /></ProtectedRoute>} />
             <Route path="/admin/services" element={<ProtectedRoute><ServiceManagement /></ProtectedRoute>} />
+            <Route path="/admin/services/management" element={<ProtectedRoute><ServiceManagement /></ProtectedRoute>} />
             <Route path="/admin/services/dispatch" element={<ProtectedRoute><ServiceDispatchTerminal /></ProtectedRoute>} />
             <Route path="/admin/services/orders" element={<ProtectedRoute><ServiceOrdersKanban /></ProtectedRoute>} />
             <Route path="/admin/services/kanban" element={<ProtectedRoute><ServiceOrdersKanban /></ProtectedRoute>} />
@@ -174,6 +214,7 @@ function App() {
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
+          <FloatingAiConcierge />
         </Router>
       </SocketProvider>
     </AuthProvider>

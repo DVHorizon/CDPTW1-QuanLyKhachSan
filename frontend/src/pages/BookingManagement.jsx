@@ -114,7 +114,7 @@ export default function BookingManagement() {
   // ─── Giá trị mặc định theo Spec 6 ──────────────────────────────────────────
   const today = getTodayUtc7();
   const defaultDateFrom = addDaysUtc7(today, -29);
-  const defaultDateTo = today;
+  const defaultDateTo = addDaysUtc7(today, 30);
 
   // ─── Khởi tạo state từ URL Query String ─────────────────────────────────────
   const initialKeyword = searchParams.get('keyword') || '';
@@ -1007,20 +1007,41 @@ export default function BookingManagement() {
                         </td>
 
                         {/* Tổng tiền (Căn phải, phân cách hàng nghìn) (Mục 3.9) */}
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
-                          {fmtCurrency(b.totalAmount)}
+                        <td
+                          className="py-3.5 px-4 text-right font-mono font-bold text-slate-900"
+                          title="Tiền phòng theo hợp đồng đặt phòng. Bấm icon bảng kê để xem tổng phát sinh thực tế (Master Folio)."
+                        >
+                          <div>{fmtCurrency(b.totalAmount)}</div>
+                          {['CheckedIn', 'CheckedOut'].includes(b.status) && (
+                            <span className="text-[10px] text-slate-400 font-normal block">
+                              (Hợp đồng)
+                            </span>
+                          )}
                         </td>
 
                         {/* Cột Thao tác: Xem Bảng Kê Chi Phí C6 (Màn 25) */}
                         <td className="py-3.5 px-3 text-center">
-                          <Link
-                            to={`/admin/charges/${b.bookingId}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-100/60 transition-colors inline-flex items-center justify-center border border-transparent hover:border-blue-200"
-                            title="Mở màn hình Bảng kê chi phí lưu trú (Màn 25)"
-                          >
-                            <span className="material-symbols-outlined text-lg block">receipt_long</span>
-                          </Link>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setChargesModalBookingId(b.bookingId);
+                              }}
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-100/60 transition-colors inline-flex items-center justify-center border border-transparent hover:border-blue-200 cursor-pointer"
+                              title="Xem nhanh Popup Bảng kê chi phí"
+                            >
+                              <span className="material-symbols-outlined text-lg block">receipt_long</span>
+                            </button>
+                            <Link
+                              to={`/admin/charges/${b.bookingId}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors inline-flex items-center justify-center border border-transparent hover:border-indigo-200"
+                              title="Mở trang Bảng kê chi phí riêng (Màn 25)"
+                            >
+                              <span className="material-symbols-outlined text-base block">open_in_new</span>
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1439,7 +1460,7 @@ export default function BookingManagement() {
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                       <div>
-                        <span className="text-xs text-slate-500 block">Tổng tiền booking:</span>
+                        <span className="text-xs text-slate-500 block">Tổng tiền theo hợp đồng:</span>
                         <strong className="text-base font-mono font-bold text-blue-800">
                           {fmtCurrency(detailData.payment?.totalAmount)}
                         </strong>
@@ -1451,7 +1472,7 @@ export default function BookingManagement() {
                         </strong>
                       </div>
                       <div>
-                        <span className="text-xs text-slate-500 block">Còn lại phải thu:</span>
+                        <span className="text-xs text-slate-500 block">Còn lại (theo hợp đồng):</span>
                         <strong className="text-base font-mono font-bold text-rose-700">
                           {fmtCurrency(detailData.payment?.remainingAmount)}
                         </strong>
@@ -1460,15 +1481,17 @@ export default function BookingManagement() {
 
                     {/* Nút Xem Bảng Kê Chi Phí Lưu Trú C6 */}
                     <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs text-slate-500">Xem chi tiết các khoản phát sinh:</span>
+                      <span className="text-xs text-slate-500">
+                        Chi phí phát sinh thực tế (Master Folio):
+                      </span>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => setChargesModalBookingId(selectedBookingId)}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-300"
+                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-blue-200"
                         >
-                          <span className="material-symbols-outlined text-sm">open_in_new</span>
-                          <span>Xem Popup</span>
+                          <span className="material-symbols-outlined text-sm">receipt_long</span>
+                          <span>Bảng Kê Chi Phí</span>
                         </button>
                         <Link
                           to={`/admin/charges/${selectedBookingId}`}

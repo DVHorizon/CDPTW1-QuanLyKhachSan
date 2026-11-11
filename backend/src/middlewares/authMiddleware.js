@@ -9,16 +9,20 @@ const JWT_SECRET = process.env.JWT_SECRET || 'grand_horizon_secret_key_2026_luxu
  * Giúp thu hồi quyền / khóa tài khoản tức thì mà không cần chờ JWT hết hạn.
  */
 const verifyToken = async (req, res, next) => {
+  let token = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query && req.query.token) {
+    token = req.query.token;
+  }
+  if (!token) {
     return res.status(401).json({
       success: false,
       code: 'ERROR_0009_UNAUTHENTICATED',
       message: 'Bạn cần đăng nhập để thực hiện chức năng này'
     });
   }
-
-  const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
 

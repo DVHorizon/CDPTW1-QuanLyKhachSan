@@ -50,3 +50,13 @@ Thumbs.db
 # 9. Cơ sở dữ liệu cục bộ
 *.sqlite
 database.sqlite
+
+
+# 10. Teamwork run artifacts & temporary subagent logs
+.agents/teamwork/
+.agents/scratch/
+.scratch/
+
+# 11. Tệp sinh tự động khi test (Hóa đơn PDF test, uploads tạm thời)
+backend/public/uploads/invoices/*.pdf
+backend/public/uploads/test/

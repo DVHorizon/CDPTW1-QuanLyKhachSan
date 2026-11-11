@@ -68,11 +68,8 @@ export const bookingApi = {
     // Lấy thêm thông tin khách hàng / hạng phòng / ngày lưu trú và hỗ trợ tra cứu theo cả ConfirmationCode
     let bookingMeta = null;
     try {
-      const metaRes = await fetch(`http://localhost:5000/bookings/${bookingId}`);
-      if (metaRes.ok) {
-        const metaJson = await metaRes.json();
-        bookingMeta = metaJson?.data || null;
-      }
+      const metaJson = await safeFetchJson(`/${bookingId}`).catch(() => null);
+      bookingMeta = metaJson?.data || metaJson || null;
     } catch (_) {}
 
     const resolvedId = bookingMeta?.bookingId || bookingId;
@@ -93,13 +90,16 @@ export const bookingApi = {
       roomId: st.roomId,
       roomNumber: st.roomNumber || `P.${st.roomId}`,
       roomTypeName: st.roomTypeName || defaultRoomTypeName,
+      roomType: st.roomTypeName || defaultRoomTypeName,
       checkIn: st.checkIn || st.actualCheckIn || defaultCheckIn,
       checkOut: st.checkOut || st.actualCheckOut || defaultCheckOut,
       nights: Number(st.nights ?? st.room?.nights ?? 1),
       pricePerNight: Number(st.pricePerNight ?? st.room?.unitPrice ?? 0),
+      ratePerNight: Number(st.pricePerNight ?? st.room?.unitPrice ?? 0),
       earlyCheckInFee: Number(st.earlyCheckInFee || 0),
       lateCheckOutFee: Number(st.lateCheckOutFee || 0),
       roomTotal: Number(st.roomTotal ?? st.room?.subtotal ?? 0),
+      totalRoomCost: Number(st.roomTotal ?? st.room?.subtotal ?? 0),
     }));
 
     const minibar = Array.isArray(raw.minibar)
@@ -114,7 +114,9 @@ export const bookingApi = {
             quantity: Number(mb.quantity || 1),
             price: Number(mb.price ?? mb.unitPrice ?? 0),
             total: Number(mb.total ?? mb.subtotal ?? 0),
+            roomNumber: mb.roomNumber || st.roomNumber || (st.roomId ? `P.${st.roomId}` : '—'),
             consumedAt: mb.consumedAt || mb.usageDate || null,
+            usedAt: mb.consumedAt || mb.usageDate || null,
           }))
         );
 
@@ -152,19 +154,53 @@ export const bookingApi = {
           }))
         );
 
+    // Bóc tách Phí gia hạn phòng (StayExtensions)
+    const extensions = Array.isArray(raw.extensions)
+      ? raw.extensions
+      : rawStays.flatMap((st) =>
+          (st.extensions || []).map((ext) => ({
+            extensionId: ext.extensionId,
+            stayId: st.stayId,
+            roomNumber: ext.roomNumber || st.roomNumber || (st.roomId ? `P.${st.roomId}` : '—'),
+            nights: Number(ext.nights || 1),
+            total: Number(ext.total || ext.amount || 0),
+            createdAt: ext.createdAt || null,
+          }))
+        );
+
+    // Bóc tách Bồi thường thiệt hại buồng phòng (DamageItems, Linen, Keycard)
+    const damages = Array.isArray(raw.damages)
+      ? raw.damages
+      : rawStays.flatMap((st) =>
+          (st.damages || []).map((dam) => ({
+            damageId: dam.damageId || dam.damageItemId,
+            stayId: st.stayId,
+            roomNumber: dam.roomNumber || st.roomNumber || (st.roomId ? `P.${st.roomId}` : '—'),
+            item: dam.item || dam.itemName || 'Bồi thường tài sản phòng',
+            reason: dam.reason || dam.reasonCode || '',
+            total: Number(dam.total || dam.approvedCharge || dam.proposedCharge || 0),
+            createdAt: dam.createdAt || null,
+          }))
+        );
+
     const roomSubtotalFromStays = stays.reduce((sum, st) => sum + Number(st.roomTotal || 0), 0);
+    const extensionSubtotal = extensions.reduce((sum, e) => sum + Number(e.total || 0), 0);
     const minibarSubtotal = minibar.reduce((sum, m) => sum + Number(m.total || 0), 0);
     const serviceSubtotal = services.reduce((sum, s) => sum + Number(s.total || 0), 0);
     const foodSubtotal = foodAndBeverage.reduce((sum, f) => sum + Number(f.total || 0), 0);
+    const damageSubtotal = damages.reduce((sum, d) => sum + Number(d.total || 0), 0);
     const surcharge = Number(raw.surchargeAmount ?? raw.summary?.surcharge ?? 0);
     const discount = Number(raw.discountAmount ?? raw.summary?.discount ?? 0);
-    const grandTotal = Number(raw.grandTotal ?? raw.summary?.grandTotal ?? 0);
-    const totalPaid = Number(raw.totalPaid ?? raw.summary?.totalPaid ?? 0);
-    const remainingBalance = Number(raw.remainingBalance ?? raw.summary?.remainingBalance ?? 0);
+    const metaTotal = Number(bookingMeta?.totalAmount || bookingMeta?.payment?.totalAmount || 0);
+    const metaDeposit = Number(bookingMeta?.depositAmount || bookingMeta?.payment?.depositAmount || 0);
+    const computedGrandTotal = roomSubtotalFromStays + extensionSubtotal + minibarSubtotal + serviceSubtotal + foodSubtotal + damageSubtotal + surcharge - discount;
+    const grandTotal = Number(raw.grandTotal > 0 ? raw.grandTotal : (raw.summary?.grandTotal > 0 ? raw.summary.grandTotal : (stays.length > 0 ? computedGrandTotal : metaTotal)));
+    const totalPaid = Math.max(Number(raw.totalPaid ?? raw.summary?.totalPaid ?? 0), metaDeposit);
+    const remainingBalance = Number(raw.remainingBalance >= 0 ? raw.remainingBalance : (raw.summary?.remainingBalance >= 0 ? raw.summary.remainingBalance : Math.max(0, grandTotal - totalPaid)));
     const roomSubtotal =
       stays.length > 0
         ? roomSubtotalFromStays
-        : Number(bookingMeta?.roomSubtotal || Math.max(0, grandTotal - surcharge + discount));
+        : Number(bookingMeta?.roomSubtotal || bookingMeta?.payment?.originalPrice || Math.max(0, grandTotal - surcharge + discount));
 
     const guestName =
       raw.guestName ||
@@ -188,14 +224,18 @@ export const bookingApi = {
       estimated: Boolean(raw.estimated),
       hasPendingServices: Boolean(raw.hasPendingServices),
       stays,
+      extensions,
       minibar,
       services,
       foodAndBeverage,
+      damages,
       summary: {
         roomSubtotal,
+        extensionSubtotal,
         minibarSubtotal,
         serviceSubtotal,
         foodSubtotal,
+        damageSubtotal,
         surcharge,
         discount,
         grandTotal,

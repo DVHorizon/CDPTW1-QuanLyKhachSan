@@ -71,6 +71,13 @@ app.use('/api/v1/rooms',      require('./routes/rooms'));
 app.use('/api/phong',          require('./routes/rooms'));
 app.use('/api/so-do-phong',    require('./routes/rooms'));
 app.use('/api/room-status',    require('./routes/rooms'));
+// FEAT-INVOICE-01: Booking Charges Aggregation (C6)
+const bookingChargesController = require('./modules/services/controllers/bookingChargesController');
+const { verifyToken, requirePermission } = require('./middlewares/authMiddleware');
+app.get('/api/v1/bookings/:bookingId/charges', verifyToken, bookingChargesController.getBookingCharges);
+app.get('/api/bookings/:bookingId/charges',    verifyToken, bookingChargesController.getBookingCharges);
+app.get('/bookings/:bookingId/charges',        verifyToken, bookingChargesController.getBookingCharges);
+
 // Route Quản lý danh sách booking toàn hệ thống (Master Bookings)
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/v1/bookings', require('./routes/bookings'));
@@ -94,10 +101,30 @@ app.use('/api/v1/allocation', require('./routes/admin/roomAllocationRoutes'));
 app.use('/api/allocation', require('./routes/admin/roomAllocationRoutes'));
 
 // Route Nghiệp vụ Check-in tại quầy (Front Desk Express Check-In Workflow - Spec 8)
-app.use('/api/v1/check-ins', require('./routes/admin/checkInRoutes'));
-app.use('/api/check-ins', require('./routes/admin/checkInRoutes'));
-app.use('/api/v1/check-in', require('./routes/admin/checkInRoutes'));
-app.use('/api/check-in', require('./routes/admin/checkInRoutes'));
+const checkInRoutes = require('./routes/admin/checkInRoutes');
+app.use('/api/v1/check-ins', checkInRoutes);
+app.use('/api/check-ins', checkInRoutes);
+app.use('/api/v1/check-in', checkInRoutes);
+app.use('/api/check-in', checkInRoutes);
+app.use('/api/v1/checkin', checkInRoutes);
+app.use('/api/checkin', checkInRoutes);
+
+const checkInController = require('./controllers/admin/checkInController');
+
+
+// Additional Check-In aliases for Stays and Bookings
+app.post('/api/v1/stays/check-in', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.processCheckIn);
+app.post('/api/stays/check-in',    verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.processCheckIn);
+
+// Booking param aliases: POST /api/v1/bookings/:bookingId/check-in
+const handleBookingCheckInAlias = (req, res, next) => {
+  req.body = { ...req.body, bookingId: req.params.bookingId };
+  return checkInController.processCheckIn(req, res, next);
+};
+app.post('/api/v1/bookings/:bookingId/check-in', verifyToken, requirePermission('CHECKIN_CREATE'), handleBookingCheckInAlias);
+app.post('/api/v1/bookings/:bookingId/checkin',  verifyToken, requirePermission('CHECKIN_CREATE'), handleBookingCheckInAlias);
+app.post('/api/bookings/:bookingId/check-in',    verifyToken, requirePermission('CHECKIN_CREATE'), handleBookingCheckInAlias);
+app.post('/api/bookings/:bookingId/checkin',     verifyToken, requirePermission('CHECKIN_CREATE'), handleBookingCheckInAlias);
 
 // Route Nghiệp vụ Check-out & Kiểm phòng (FEAT-CHECKOUT-INSPECT-01)
 const checkOutRoutes = require('./routes/admin/checkOutRoutes');
@@ -176,6 +203,21 @@ app.use('/api/v1/payments',       require('./modules/payments'));
 app.use('/api/payments',          require('./modules/payments'));
 app.use('/payments',              require('./modules/payments'));
 
+// FEAT-INVOICE-02 & FEAT-INVOICE-03: Master Folio Invoice (C7 & C8)
+app.use('/api/v1/invoices',       require('./modules/services/routes/invoiceRoutes'));
+app.use('/api/invoices',          require('./modules/services/routes/invoiceRoutes'));
+app.use('/invoices',              require('./modules/services/routes/invoiceRoutes'));
+
+// FEAT-REPORT-01 & FEAT-REPORT-02: Real-time Revenue & Occupancy Statistics (C11 & C12)
+app.use('/api/v1/statistics',     require('./modules/statistics'));
+app.use('/api/statistics',        require('./modules/statistics'));
+app.use('/statistics',            require('./modules/statistics'));
+
+// FEAT-AI-01 & FEAT-AI-02: AI Concierge Chatbot & Knowledge Base (C13 & C14)
+app.use('/api/v1/ai',             require('./modules/ai'));
+app.use('/api/ai',                require('./modules/ai'));
+app.use('/ai',                    require('./modules/ai'));
+
 // 👤 Trang — F&B
 app.use('/api/v1/fnb',                require('./modules/fnb'));
 app.use('/api/v1/fnb-orders',         require('./routes/admin/fnbOrderRoutes'));
@@ -215,6 +257,31 @@ app.get('/bookings/:bookingId/charges', require('./middlewares/authMiddleware').
 app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));
 app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
 app.use('/me',        require('./routes/bookingHistoryRoutes'));
+
+// ─── Catch-all 404 Handler for API Routes (Guarantees JSON) ────────────────
+app.all(['/api', '/api/*'], (req, res) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  return res.status(404).json({
+    success: false,
+    code: 'ERROR_0004_NOT_FOUND',
+    errorCode: 'ERROR_0004_NOT_FOUND',
+    message: `Đường dẫn API không tồn tại: ${req.method} ${req.originalUrl}`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Catch-all 404 for remaining non-API routes
+app.use((req, res) => {
+  if (req.accepts('html')) {
+    return res.status(404).send('<!DOCTYPE html><html><body><h1>404 Not Found</h1></body></html>');
+  }
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  return res.status(404).json({
+    success: false,
+    code: 'NOT_FOUND',
+    message: `Tài nguyên không tồn tại: ${req.method} ${req.originalUrl}`,
+  });
+});
 
 // ─── Global Error Handler (phải đặt CUỐI CÙNG) ────────────────────────────
 app.use(require('./shared/middlewares/errorHandler'));

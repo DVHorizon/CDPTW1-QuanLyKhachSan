@@ -249,7 +249,7 @@ const buildBookingFilter = async (queryObj) => {
   if (!hasDateFrom && !hasDateTo) {
     // Mặc định: 30 ngày gần nhất (hôm nay - 29 ngày đến hôm nay)
     finalDateFrom = addDaysUtc7(today, -29);
-    finalDateTo = today;
+    finalDateTo = addDaysUtc7(today, 30);
   } else if (!hasDateFrom || !hasDateTo) {
     // Chỉ có 1 trong 2 mốc
     errors.push({
@@ -577,60 +577,245 @@ router.get('/export', checkBookingPermission, async (req, res) => {
       });
     }
 
-    // Tạo file Excel với ExcelJS (Mục 3.12: 9 cột đúng thứ tự, Tên file Booking_yyyyMMdd_HHmmss.xlsx)
+    // Tạo file Excel với ExcelJS chuẩn chỉnh 5 sao (Mục 3.12: Tên file Booking_yyyyMMdd_HHmmss.xlsx)
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'Grand Horizon Hotel PMS';
+    workbook.creator = 'Grand Horizon Luxury Hotel Management System';
+    workbook.lastModifiedBy = 'PMS Reservation Engine';
     workbook.created = new Date();
+    workbook.modified = new Date();
 
-    const sheet = workbook.addWorksheet('Danh Sách Đặt Phòng');
+    const sheet = workbook.addWorksheet('Danh Sách Đặt Phòng', {
+      views: [{ showGridLines: true }],
+      properties: { defaultRowHeight: 24 },
+    });
 
-    // 9 cột theo đúng thứ tự Spec 3.12
-    sheet.columns = [
-      { header: 'Mã booking', key: 'bookingCode', width: 22 },
-      { header: 'Tên khách', key: 'customerName', width: 28 },
-      { header: 'SĐT', key: 'customerPhone', width: 16 },
-      { header: 'Phòng', key: 'rooms', width: 24 },
-      { header: 'Loại phòng', key: 'roomType', width: 28 },
-      { header: 'Ngày nhận', key: 'checkInDate', width: 16 },
-      { header: 'Ngày trả', key: 'checkOutDate', width: 16 },
-      { header: 'Trạng thái', key: 'status', width: 20 },
-      { header: 'Tổng tiền', key: 'totalAmount', width: 20 },
-    ];
-
-    // Style Header Row
-    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    sheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1F4E78' }, // Xanh chuẩn Navy PMS
+    const BORDER_THIN = {
+      top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
     };
-    sheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
-    sheet.getRow(1).height = 26;
 
-    rows.forEach((r) => {
+    const BORDER_HEADER = {
+      top: { style: 'medium', color: { argb: 'FF1E3A8A' } },
+      left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+      bottom: { style: 'medium', color: { argb: 'FF1E3A8A' } },
+      right: { style: 'thin', color: { argb: 'FF94A3B8' } },
+    };
+
+    const BORDER_SUMMARY = {
+      top: { style: 'thin', color: { argb: 'FF1E3A8A' } },
+      bottom: { style: 'double', color: { argb: 'FF1E3A8A' } },
+      left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    };
+
+    // Dòng 1: Banner tên thương hiệu
+    sheet.mergeCells('A1:I1');
+    const brandCell = sheet.getCell('A1');
+    brandCell.value = 'GRAND HORIZON LUXURY HOTEL & RESORT • PHÂN HỆ QUẢN TRỊ ĐẶT PHÒNG PMS';
+    brandCell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF1E3A8A' } };
+    brandCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(1).height = 20;
+
+    // Dòng 2: Tiêu đề báo cáo chính
+    sheet.mergeCells('A2:I2');
+    const titleCell = sheet.getCell('A2');
+    titleCell.value = 'BÁO CÁO DANH SÁCH ĐẶT PHÒNG KHÁCH SẠN (HOTEL RESERVATIONS)';
+    titleCell.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(2).height = 36;
+
+    // Dòng 3: Metadata thời gian và đơn vị tính
+    sheet.mergeCells('A3:I3');
+    const subTitleCell = sheet.getCell('A3');
+    subTitleCell.value = `Thời điểm xuất: ${new Date().toLocaleString('vi-VN')}   |   Tổng số booking: ${rows.length} bản ghi   |   Đơn vị tiền tệ: Đồng Việt Nam (VND)`;
+    subTitleCell.font = { name: 'Segoe UI', size: 9.5, italic: true, color: { argb: 'FF475569' } };
+    subTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    subTitleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(3).height = 24;
+
+    sheet.addRow([]); // Dòng 4 trống ngăn cách
+
+    // Dòng 5: Tiêu đề các cột dữ liệu (9 cột theo đúng thứ tự Spec 3.12)
+    const tableHeader = sheet.addRow([
+      'Mã booking',
+      'Tên khách',
+      'SĐT',
+      'Phòng',
+      'Loại phòng',
+      'Ngày nhận',
+      'Ngày trả',
+      'Trạng thái',
+      'Tổng tiền (VND)',
+    ]);
+    tableHeader.height = 30;
+    tableHeader.eachCell((cell) => {
+      cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = BORDER_HEADER;
+    });
+
+    const STATUS_PALETTE = {
+      Confirmed: { text: 'FF047857', bg: 'FFECFDF5' },
+      CheckedIn: { text: 'FF047857', bg: 'FFECFDF5' },
+      CheckedOut: { text: 'FF1D4ED8', bg: 'FFEFF6FF' },
+      Cancelled: { text: 'FFB91C1C', bg: 'FFFEF2F2' },
+      NoShow: { text: 'FFB91C1C', bg: 'FFFEF2F2' },
+      Pending: { text: 'FFB45309', bg: 'FFFFFBEB' },
+    };
+
+    let grandTotal = 0;
+
+    rows.forEach((r, idx) => {
       const stKey = r.Status;
       const stLabel = STATUS_LABELS[stKey] || stKey;
+      const amount = Number(r.TotalAmount) || 0;
+      grandTotal += amount;
 
-      const row = sheet.addRow({
-        bookingCode: r.ConfirmationCode || `GH-${r.BookingId}`,
-        customerName: r.CustomerName,
-        customerPhone: r.CustomerPhone,
-        rooms: r.AssignedRooms || 'Chưa gán phòng',
-        roomType: r.RoomTypeName,
-        checkInDate: fmtDisplayDate(r.CheckInDate),
-        checkOutDate: fmtDisplayDate(r.CheckOutDate),
-        status: stLabel,
-        totalAmount: Number(r.TotalAmount) || 0,
-      });
+      const row = sheet.addRow([
+        r.ConfirmationCode || `GH-${r.BookingId}`,
+        r.CustomerName || 'Khách vãng lai',
+        r.CustomerPhone || '—',
+        r.AssignedRooms || 'Chưa gán phòng',
+        r.RoomTypeName || 'Chưa phân loại',
+        fmtDisplayDate(r.CheckInDate),
+        fmtDisplayDate(r.CheckOutDate),
+        stLabel,
+        amount,
+      ]);
 
-      row.height = 22;
-      row.getCell(9).numFmt = '#,##0'; // Định dạng số #,##0 theo Mục 3.12
-      row.getCell(9).alignment = { horizontal: 'right' };
-      row.getCell(1).alignment = { horizontal: 'center' };
-      row.getCell(6).alignment = { horizontal: 'center' };
-      row.getCell(7).alignment = { horizontal: 'center' };
-      row.getCell(8).alignment = { horizontal: 'center' };
+      row.height = 24;
+      const isEven = idx % 2 === 1;
+      const bgArgb = isEven ? 'FFF8FAFC' : 'FFFFFFFF';
+
+      // Cột 1: Mã booking
+      row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(1).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1E3A8A' } };
+
+      // Cột 2: Tên khách
+      row.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' };
+      row.getCell(2).font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+
+      // Cột 3: SĐT
+      row.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(3).font = { name: 'Segoe UI', size: 9.5, color: { argb: 'FF475569' } };
+
+      // Cột 4: Phòng
+      row.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(4).font = { name: 'Segoe UI', size: 9.5, color: { argb: 'FF0F172A' } };
+
+      // Cột 5: Loại phòng
+      row.getCell(5).alignment = { vertical: 'middle', horizontal: 'left' };
+      row.getCell(5).font = { name: 'Segoe UI', size: 9.5, color: { argb: 'FF334155' } };
+
+      // Cột 6: Ngày nhận
+      row.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(6).font = { name: 'Segoe UI', size: 9.5, color: { argb: 'FF334155' } };
+
+      // Cột 7: Ngày trả
+      row.getCell(7).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(7).font = { name: 'Segoe UI', size: 9.5, color: { argb: 'FF334155' } };
+
+      // Cột 8: Trạng thái (Style dạng Badge thanh lịch)
+      const stCell = row.getCell(8);
+      const stColor = STATUS_PALETTE[stKey] || { text: 'FF475569', bg: bgArgb };
+      stCell.alignment = { vertical: 'middle', horizontal: 'center' };
+      stCell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: stColor.text } };
+
+      // Cột 9: Tổng tiền
+      const amtCell = row.getCell(9);
+      amtCell.alignment = { vertical: 'middle', horizontal: 'right' };
+      amtCell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF0F766E' } };
+      amtCell.numFmt = '#,##0 "₫"';
+
+      // Áp dụng border và background cho từng cell
+      for (let c = 1; c <= 9; c++) {
+        const cell = row.getCell(c);
+        cell.border = BORDER_THIN;
+        if (c === 8 && stColor.bg !== bgArgb) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: stColor.bg } };
+        } else {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } };
+        }
+      }
     });
+
+    // Dòng Tổng Cộng Doanh Thu (Summary Row)
+    const summaryRow = sheet.addRow([
+      `TỔNG CỘNG DOANH THU KỲ BÁO CÁO (${rows.length} ĐẶT PHÒNG):`,
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      grandTotal,
+    ]);
+    const summaryRowIdx = sheet.rowCount;
+    sheet.mergeCells(`A${summaryRowIdx}:H${summaryRowIdx}`);
+
+    summaryRow.height = 28;
+    const summaryLabel = summaryRow.getCell(1);
+    summaryLabel.alignment = { vertical: 'middle', horizontal: 'right' };
+    summaryLabel.font = { name: 'Segoe UI', size: 10.5, bold: true, color: { argb: 'FF1E293B' } };
+    summaryLabel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    summaryLabel.border = BORDER_SUMMARY;
+
+    const summaryVal = summaryRow.getCell(9);
+    summaryVal.alignment = { vertical: 'middle', horizontal: 'right' };
+    summaryVal.font = { name: 'Segoe UI', size: 11.5, bold: true, color: { argb: 'FF0F766E' } };
+    summaryVal.numFmt = '#,##0 "₫"';
+    summaryVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    summaryVal.border = BORDER_SUMMARY;
+
+    // Khu vực chữ ký xác nhận báo cáo (Signatures)
+    sheet.addRow([]);
+    sheet.addRow([]);
+    const signRow = sheet.addRow([
+      '',
+      'Người Lập Báo Cáo',
+      '',
+      '',
+      'Trưởng Bộ Phận Lễ Tân',
+      '',
+      '',
+      'Ban Giám Đốc Khách Sạn',
+      '',
+    ]);
+    signRow.height = 22;
+    signRow.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF334155' } };
+    signRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    const noteRow = sheet.addRow([
+      '',
+      '(Ký, ghi rõ họ tên)',
+      '',
+      '',
+      '(Ký, ghi rõ họ tên)',
+      '',
+      '',
+      '(Ký, đóng dấu phê duyệt)',
+      '',
+    ]);
+    noteRow.height = 20;
+    noteRow.font = { name: 'Segoe UI', size: 8.5, italic: true, color: { argb: 'FF64748B' } };
+    noteRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    sheet.columns = [
+      { width: 22 },
+      { width: 28 },
+      { width: 16 },
+      { width: 22 },
+      { width: 26 },
+      { width: 16 },
+      { width: 16 },
+      { width: 20 },
+      { width: 24 },
+    ];
 
     res.setHeader(
       'Content-Type',
@@ -881,7 +1066,7 @@ router.get('/:id', checkBookingPermission, async (req, res) => {
     }
 
     const b = bRows[0];
-    const bookingId = b.BookingId;
+    // const bookingId = b.BookingId;
 
     // 2. Tải danh sách phòng đã đặt (Khối 2: BookingRooms)
     const roomsQuery = `
@@ -929,19 +1114,26 @@ router.get('/:id', checkBookingPermission, async (req, res) => {
     const originalPrice = subtotal + (Number(b.SurchargeAmount) || 0);
 
     // 4. Lịch sử thay đổi trạng thái (Khối 5: StatusHistory)
-    const [historyRows] = await pool.query(
-      `SELECT
-         HistoryId,
-         OldStatus,
-         NewStatus,
-         ChangedAt,
-         ChangedBy,
-         Note
-       FROM BookingStatusHistory
-       WHERE BookingId = ?
-       ORDER BY ChangedAt DESC, HistoryId DESC`,
-      [bookingId]
-    );
+    let historyRows = [];
+    try {
+      const [rows] = await pool.query(
+        `SELECT
+           HistoryId,
+           OldStatus,
+           NewStatus,
+           ChangedAt,
+           ChangedBy,
+           Note
+         FROM BookingStatusHistory
+         WHERE BookingId = ?
+         ORDER BY ChangedAt DESC, HistoryId DESC`,
+        [bookingId]
+      );
+      historyRows = rows || [];
+    } catch (hErr) {
+      console.warn('[Booking Detail] Không thể truy vấn BookingStatusHistory:', hErr.message);
+      historyRows = [];
+    }
 
     const statusHistory = historyRows.map((h) => ({
       historyId: h.HistoryId,

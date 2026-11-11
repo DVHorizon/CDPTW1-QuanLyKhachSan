@@ -16,6 +16,7 @@ let wss = null;
  * 1. Sơ đồ phòng & Kiểm tra phòng trống Real-time (/ws/rooms hoặc /ws)
  * 2. Khóa phòng tạm thời & Đặt phòng trực tuyến Real-time
  * 3. Đơn món F&B Room Service Real-time (/ws/fnb-orders)
+ * 4. Master Dashboard Doanh thu Real-time (/ws/v1/dashboard)
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -34,8 +35,13 @@ function initSocket(server) {
         const urlObj = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
         const pathname = urlObj.pathname;
 
-        // Chấp nhận các path hợp lệ: /ws, /ws/rooms, /ws/fnb-orders
-        if (pathname === '/ws' || pathname === '/ws/rooms' || pathname === '/ws/fnb-orders') {
+        // Chấp nhận các path hợp lệ: /ws, /ws/rooms, /ws/fnb-orders, /ws/v1/dashboard
+        if (
+          pathname === '/ws' ||
+          pathname === '/ws/rooms' ||
+          pathname === '/ws/fnb-orders' ||
+          pathname === '/ws/v1/dashboard'
+        ) {
           wss.handleUpgrade(request, socket, head, (ws) => {
             ws.pathname = pathname;
             wss.emit('connection', ws, request);
@@ -110,7 +116,7 @@ function initSocket(server) {
       clearInterval(pingInterval);
     });
 
-    console.log('✅ WebSocket Realtime Hub đã sẵn sàng (/ws, /ws/rooms, /ws/fnb-orders)');
+    console.log('✅ WebSocket Realtime Hub đã sẵn sàng (/ws, /ws/rooms, /ws/fnb-orders, /ws/v1/dashboard)');
     return wss;
   } catch (err) {
     console.warn('⚠️ Lỗi khởi tạo WebSocket Server:', err.message);
@@ -174,6 +180,59 @@ function broadcastOrderStatus(order) {
   });
 }
 
+/**
+ * Phát sự kiện cập nhật Dashboard Doanh thu Real-time (C11)
+ * @param {Object} payload Dữ liệu cập nhật doanh thu / KPIs
+ */
+function broadcastDashboardUpdate(payload) {
+  if (!wss) return;
+
+  const message = JSON.stringify({
+    event: 'DASHBOARD_UPDATE',
+    type: 'DASHBOARD_UPDATE',
+    data: payload,
+    timestamp: new Date().toISOString()
+  });
+
+  let sentCount = 0;
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      if (!client.pathname || client.pathname === '/ws/v1/dashboard' || client.pathname === '/ws') {
+        client.send(message);
+        sentCount++;
+      }
+    }
+  });
+
+  console.log(`📢 [WebSocket] Broadcast [DASHBOARD_UPDATE] tới ${sentCount} clients.`);
+}
+
+/**
+ * Phát thông báo sự kiện nghiệp vụ tới Dashboard Real-time
+ * @param {string} action - 'PAYMENT_SUCCESS' | 'NEW_BOOKING' | 'ROOM_STATUS_CHANGED' | 'NEW_FNB_ORDER' | 'PAYMENT_REFUNDED'
+ * @param {Object} eventData - Dữ liệu sự kiện
+ */
+function notifyDashboardEvent(action, eventData = {}) {
+  if (!wss) return;
+  const payload = {
+    event: 'DASHBOARD_UPDATE',
+    type: 'DASHBOARD_UPDATE',
+    action,
+    data: eventData,
+    timestamp: new Date().toISOString()
+  };
+  let count = 0;
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1 /* OPEN */) {
+      if (!client.pathname || client.pathname === '/ws/v1/dashboard' || client.pathname === '/ws') {
+        client.send(JSON.stringify(payload));
+        count++;
+      }
+    }
+  });
+  console.log(`📢 [WebSocket] notifyDashboardEvent [${action}] sent to ${count} clients.`);
+}
+
 function getWss() {
   return wss;
 }
@@ -182,5 +241,7 @@ module.exports = {
   initSocket,
   broadcastRoomEvent,
   broadcastOrderStatus,
+  broadcastDashboardUpdate,
+  notifyDashboardEvent,
   getWss
 };

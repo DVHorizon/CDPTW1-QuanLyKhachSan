@@ -34,6 +34,9 @@ const defineMinibarProduct = require('./MinibarProduct');
 const defineMinibarInspection = require('./MinibarInspection');
 const defineMinibarInspectionLine = require('./MinibarInspectionLine');
 const defineMinibarInspectionEvent = require('./MinibarInspectionEvent');
+const defineChatbotKnowledgeBase = require('./ChatbotKnowledgeBase');
+const defineChatbotConversation = require('./ChatbotConversation');
+const defineChatbotMessage = require('./ChatbotMessage');
 
 // Operations & Smart Lock models (tuyen/7)
 const defineAuditLog = require('./AuditLog');
@@ -84,6 +87,9 @@ const MinibarProduct = defineMinibarProduct(sequelize);
 const MinibarInspection = defineMinibarInspection(sequelize);
 const MinibarInspectionLine = defineMinibarInspectionLine(sequelize);
 const MinibarInspectionEvent = defineMinibarInspectionEvent(sequelize);
+const ChatbotKnowledgeBase = defineChatbotKnowledgeBase(sequelize);
+const ChatbotConversation = defineChatbotConversation(sequelize);
+const ChatbotMessage = defineChatbotMessage(sequelize);
 
 // Initialize Operations & Smart Lock models
 const AuditLog = defineAuditLog(sequelize);
@@ -240,6 +246,19 @@ Payment.belongsTo(Invoice, { foreignKey: 'InvoiceId', as: 'invoice' });
 Stay.hasMany(MinibarUsage, { foreignKey: 'StayId', as: 'minibarUsages' });
 MinibarUsage.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
 
+// 20. Chatbot AI Associations (FEAT-AI-01 & FEAT-AI-02 - Spec C13 & C14)
+User.hasMany(ChatbotConversation, { foreignKey: 'UserId', as: 'chatbotConversations' });
+ChatbotConversation.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+
+User.hasMany(ChatbotConversation, { foreignKey: 'HandledBy', as: 'handledConversations' });
+ChatbotConversation.belongsTo(User, { foreignKey: 'HandledBy', as: 'handledByStaff' });
+
+ChatbotConversation.hasMany(ChatbotMessage, { foreignKey: 'ConversationId', as: 'messages' });
+ChatbotMessage.belongsTo(ChatbotConversation, { foreignKey: 'ConversationId', as: 'conversation' });
+
+ChatbotKnowledgeBase.hasMany(ChatbotMessage, { foreignKey: 'KnowledgeId', as: 'messages' });
+ChatbotMessage.belongsTo(ChatbotKnowledgeBase, { foreignKey: 'KnowledgeId', as: 'knowledgeBase' });
+
 module.exports = {
   sequelize,
   Branch,
@@ -253,6 +272,7 @@ module.exports = {
   User,
   Booking,
   BookingGuest,
+  Voucher,
   Review,
   ReviewPhoto,
   MenuCategory,
@@ -291,4 +311,8 @@ module.exports = {
   MinibarInspection,
   MinibarInspectionLine,
   MinibarInspectionEvent,
+  // Chatbot AI models (C13 & C14)
+  ChatbotKnowledgeBase,
+  ChatbotConversation,
+  ChatbotMessage,
 };
