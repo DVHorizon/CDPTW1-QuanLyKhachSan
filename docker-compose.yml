@@ -39,6 +39,10 @@ services:
       - DB_PASSWORD=
       - DB_NAME=hotel_management
       - PORT=5000
+      - AI_PROVIDER_MODE=${AI_PROVIDER_MODE:-real}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - AI_MODEL=${AI_MODEL:-gemini-1.5-flash}
+      - AI_API_KEY=${AI_API_KEY:-}
     volumes:
       - ./backend:/app
       - /app/node_modules
