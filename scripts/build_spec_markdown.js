@@ -138,6 +138,7 @@ mdLines.push('');
 // Now let's iterate through lines and parse
 let idx = 0;
 let currentFeature = 'C1';
+let masterErrorTableInjected = false;
 
 while (idx < lines.length) {
     const line = lines[idx];
@@ -152,10 +153,11 @@ while (idx < lines.length) {
         mdLines.push(convertTableBlock(tableRows));
         mdLines.push('');
         
-        // If this was the first error table in section 0.1, inject master error table
-        if (tableRows.some(r => r.includes('ERROR_0011_NOT_FOUND'))) {
+        // If this was the first error table in section 0.1, inject master error table once
+        if (!masterErrorTableInjected && tableRows.some(r => r.includes('ERROR_0011_NOT_FOUND'))) {
             mdLines.push(MASTER_ERROR_TABLE.trim());
             mdLines.push('');
+            masterErrorTableInjected = true;
         }
         continue;
     }
@@ -322,7 +324,7 @@ while (idx < lines.length) {
         if (/^(GET|POST|PUT|PATCH|DELETE)\s+\//.test(content)) {
             const m = content.match(/^((?:GET|POST|PUT|PATCH|DELETE)\s+[^—\s]+)\s*(?:—\s*(.*))?$/);
             if (m) {
-                const endpointPart = m[1].trim();
+                const endpointPart = m[1].replace(/\s+/g, ' ').trim();
                 const descPart = m[2] ? ` — ${m[2].trim()}` : '';
                 mdLines.push(`- \`${endpointPart}\`${descPart}`);
                 idx++;
@@ -342,6 +344,43 @@ while (idx < lines.length) {
         continue;
     }
     
+    // Standalone endpoint line with description: PATCH /payments/... — ...
+    if (/^(GET|POST|PUT|PATCH|DELETE)\s+\/[^—\s]+\s+—/.test(trimmed)) {
+        const m = trimmed.match(/^((?:GET|POST|PUT|PATCH|DELETE)\s+[^—\s]+)\s*—\s*(.*)$/);
+        if (m) {
+            mdLines.push(`- \`${m[1].replace(/\s+/g, ' ').trim()}\` — ${m[2].trim()}`);
+            idx++;
+            continue;
+        }
+    }
+
+    // Standalone endpoint heading (e.g. GET /invoices, GET /statistics/revenue)
+    if (/^(GET|POST|PUT|PATCH|DELETE)\s+\/[a-zA-Z0-9_\-\/{}\.]*$/.test(trimmed)) {
+        mdLines.push('');
+        mdLines.push(`#### \`${trimmed.replace(/\s+/g, ' ').trim()}\``);
+        mdLines.push('');
+        idx++;
+        continue;
+    }
+
+    // WebSocket payload heading
+    if (trimmed === 'WebSocket — payload tối thiểu mỗi sự kiện') {
+        mdLines.push('');
+        mdLines.push(`#### ${trimmed}`);
+        mdLines.push('');
+        idx++;
+        continue;
+    }
+
+    // Endpoint list label
+    if (trimmed === 'Danh sách Endpoint hỗ trợ:') {
+        mdLines.push('');
+        mdLines.push(`**${trimmed}**`);
+        mdLines.push('');
+        idx++;
+        continue;
+    }
+
     // Numbered process steps: 1. Actor bấm ..., 2. Hệ thống ..., etc.
     if (/^[0-9]+\.\s+/.test(trimmed)) {
         mdLines.push(trimmed);

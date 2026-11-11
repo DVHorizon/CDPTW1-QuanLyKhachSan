@@ -110,13 +110,13 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 
 
 Danh sách Endpoint API:
-- `GET    /api/v1/services/categories` — Lấy danh sách nhóm dịch vụ
-- `POST   /api/v1/services/categories` — Thêm mới nhóm dịch vụ (Category)
-- `GET    /api/v1/services` — Xem danh sách dịch vụ (kèm filter/sort theo C2)
-- `POST   /api/v1/services` — Tạo mới dịch vụ
-- `PUT    /api/v1/services/{id}` — Cập nhật thông tin dịch vụ
-- `PATCH  /api/v1/services/{id}/deactivate` — Ngừng cung cấp dịch vụ (Soft-delete, Status='Inactive')
-- `PATCH  /api/v1/services/{id}/reactivate` — Kích hoạt lại dịch vụ (Status='Active')
+- `GET /api/v1/services/categories` — Lấy danh sách nhóm dịch vụ
+- `POST /api/v1/services/categories` — Thêm mới nhóm dịch vụ (Category)
+- `GET /api/v1/services` — Xem danh sách dịch vụ (kèm filter/sort theo C2)
+- `POST /api/v1/services` — Tạo mới dịch vụ
+- `PUT /api/v1/services/{id}` — Cập nhật thông tin dịch vụ
+- `PATCH /api/v1/services/{id}/deactivate` — Ngừng cung cấp dịch vụ (Soft-delete, Status='Inactive')
+- `PATCH /api/v1/services/{id}/reactivate` — Kích hoạt lại dịch vụ (Status='Active')
 
 ### 1.2. Danh sách trường dữ liệu (INPUT)
 
@@ -201,35 +201,6 @@ Danh sách Endpoint API:
 | Chung | Không đủ quyền | ERROR_0010_FORBIDDEN | Bạn không có quyền thực hiện chức năng này |
 | Chung | Lưu thành công | SUCCESS_0001_CREATED | Thêm mới dịch vụ thành công |
 
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
-
 
 ### 1.6. Test case mẫu
 
@@ -300,11 +271,13 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 
 **Tương ứng:** C3 trong Bảng truy vết  |  **Màn hình:** 23  |  Endpoint chính: POST /api/v1/service-orders (alias: POST /service-orders)  |  **Bảng DB:** ServiceOrders
 
-Danh sách Endpoint hỗ trợ:
-- `POST   /api/v1/service-orders` — Tạo đơn đặt dịch vụ (đơn lẻ hoặc batch)
-- `GET    /api/v1/service-orders` — Lấy danh sách đơn dịch vụ (query params: stayId, status)
-- `GET    /api/v1/service-orders/active-stays` — Danh sách các phòng in-house đang lưu trú (CheckedIn/Extended) cho lễ tân tra cứu
-- `GET    /api/v1/service-orders/my-stay` — Lấy thông tin lượt lưu trú của khách đang đăng nhập
+
+**Danh sách Endpoint hỗ trợ:**
+
+- `POST /api/v1/service-orders` — Tạo đơn đặt dịch vụ (đơn lẻ hoặc batch)
+- `GET /api/v1/service-orders` — Lấy danh sách đơn dịch vụ (query params: stayId, status)
+- `GET /api/v1/service-orders/active-stays` — Danh sách các phòng in-house đang lưu trú (CheckedIn/Extended) cho lễ tân tra cứu
+- `GET /api/v1/service-orders/my-stay` — Lấy thông tin lượt lưu trú của khách đang đăng nhập
 
 ### 3.1. Tổng quan tính năng
 
@@ -388,35 +361,6 @@ Các trường hệ thống tự sinh, KHÔNG nhận từ client: unitPrice (sna
 | quantity | > 100 hoặc sai bước nhảy | ERROR_0012_OUT_OF_RANGE | Số lượng vượt quá giới hạn cho phép (tối đa 100) hoặc không đúng bước nhảy quy định |
 | note | > 500 ký tự | ERROR_0003_MAX_LENGTH | Ghi chú không được vượt quá 500 ký tự |
 | Chung | Tạo đơn thành công | SUCCESS_0001_CREATED | Thêm mới đơn dịch vụ thành công |
-
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
 
 
 ### 3.6. Test case mẫu
@@ -506,35 +450,6 @@ Mọi transition không nằm trong bảng trên → trả ERROR_0013_INVALID_ST
 | cancelReason | Độ dài > 500 ký tự | ERROR_0003_MAX_LENGTH | Lý do huỷ không được vượt quá 500 ký tự |
 | Chung | Cập nhật thành công | SUCCESS_0001_CREATED (biến thể: dùng chung template "Cập nhật {đối tượng} thành công") | Cập nhật trạng thái đơn dịch vụ thành công |
 
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
-
 
 ### 4.7. Test case mẫu
 
@@ -546,35 +461,6 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 | 4 | newStatus = Cancelled, cancelReason = "" | ERROR_0001_REQUIRED — Lý do huỷ không được để trống |
 | 5 | orderId đang Received, nhân viên chuyển thẳng sang Completed | Thành công (bỏ qua InProgress được cho phép theo mục 4.3) |
 | 6 | orderId không tồn tại (999999) | ERROR_0011_NOT_FOUND |
-
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
 
 
 
@@ -733,7 +619,7 @@ Mọi transition không nằm trong bảng trên → ERROR_0013_INVALID_STATE_TR
 
 ### 1.9. Hoàn tiền (Refund)
 
-PATCH /payments/{paymentId}/refund — chỉ Admin/Kế toán (quyền "Quản lý thanh toán"); áp dụng khi cần hoàn cọc booking bị huỷ hợp lệ hoặc điều chỉnh hoá đơn.
+- `PATCH /payments/{paymentId}/refund` — chỉ Admin/Kế toán (quyền "Quản lý thanh toán"); áp dụng khi cần hoàn cọc booking bị huỷ hợp lệ hoặc điều chỉnh hoá đơn.
 | **Trường** | **Tên hiển thị** | **Kiểu** | **Bắt buộc** | **Ràng buộc chính** |
 | :--- | :--- | :--- | :--- | :--- |
 | refundReason | Lý do hoàn tiền | string | Có | 2–500 ký tự sau trim |
@@ -761,35 +647,6 @@ PATCH /payments/{paymentId}/refund — chỉ Admin/Kế toán (quyền "Quản l
 | refund | Payment không ở trạng thái Paid | ERROR_0013_INVALID_STATE_TRANSITION | Không thể hoàn tiền — giao dịch không ở trạng thái đã thanh toán |
 | refundReason | Để trống | ERROR_0001_REQUIRED | Lý do hoàn tiền không được để trống |
 | Chung | Tạo/xử lý thành công | SUCCESS_0001_CREATED | Tạo yêu cầu thanh toán thành công |
-
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
 
 
 ### 1.11. Test case mẫu
@@ -847,35 +704,6 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 | **Tham số** | **Kiểu** | **Bắt buộc** | **Mô tả / Ràng buộc** |
 | :--- | :--- | :--- | :--- |
 | bookingId | int (path param) | Có | Phải tồn tại trong bảng Bookings; không tồn tại → ERROR_0011_NOT_FOUND |
-
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
 
 
 ### 1.3. Cấu trúc dữ liệu trả về (Response)
@@ -970,35 +798,6 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 | Chung | Guest tự gọi API | ERROR_0010_FORBIDDEN | Bạn không có quyền thực hiện chức năng này |
 | bookingId | Không tồn tại | ERROR_0011_NOT_FOUND | Booking không tồn tại hoặc đã bị xoá |
 
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
-
 
 ### 1.7. Test case mẫu
 
@@ -1012,35 +811,6 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 | 6 | bookingId=999999 (không tồn tại) | 404 — ERROR_0011_NOT_FOUND |
 | 7 | Guest tự đăng nhập gọi API cho booking của chính mình | 403 FORBIDDEN (endpoint chỉ dành nội bộ, xem mục 1.4.a) |
 | 8 | Gọi lại GET nhiều lần liên tiếp cho cùng bookingId | Kết quả giống hệt nhau mỗi lần (miễn dữ liệu nguồn không đổi) — không có tác dụng phụ ghi DB |
-
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
 
 
 
@@ -1219,35 +989,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: invoiceId, invoiceN
 | totalAmount | Âm sau khi cộng điều chỉnh | ERROR_0012_OUT_OF_RANGE | Tổng hoá đơn không được âm — kiểm tra lại khoản giảm giá thủ công |
 | Chung | Tạo thành công | SUCCESS_0001_CREATED | Tạo hoá đơn tổng hợp thành công |
 
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
-
 
 
 ### 1.7. Test case mẫu
@@ -1327,35 +1068,6 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0017 và SUCCESS_0001 từ Spec mẫu 
 | invoiceId | int (path param) | Có | Phải tồn tại trong bảng Invoices; không tồn tại → ERROR_0011_NOT_FOUND |
 | regenerate | boolean (query, optional) | Không | Mặc định false. Chỉ Admin/Kế toán được truyền true để ép sinh lại PDF (VD: sửa lại logo/template hệ thống) dù đã có PdfPath — xem mục 1.4.b |
 | mode | enum (query, optional) | Không | "inline" (mặc định, mở trực tiếp trên trình duyệt) hoặc "download" (buộc tải về, set Content-Disposition: attachment) |
-
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
 
 
 
@@ -1439,35 +1151,6 @@ Template PDF gồm các khối theo đúng thứ tự sau, dữ liệu lấy 100
 | Chung | Lỗi lưu/đọc file trên storage (cả 2 lần thử: cache lẫn sinh mới) | ERROR_0019_STORAGE_FAILED | Không thể lưu hoặc truy xuất file hoá đơn, vui lòng thử lại |
 | Chung | Trả file thành công | 200 OK (binary, không dùng SUCCESS_0001) | Không áp dụng — thành công trả trực tiếp file, không có message JSON đi kèm |
 
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
-
 
 
 ### 1.7. Test case mẫu
@@ -1484,35 +1167,6 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 | 8 | Invoice.Status = Cancelled, tải PDF | Trả file PDF có watermark chéo "ĐÃ HUỶ / CANCELLED" đè lên nội dung |
 | 9 | mode=download | Header Content-Disposition: attachment — trình duyệt tự tải về thay vì mở tab mới |
 | 10 | Engine render PDF timeout (giả lập lỗi) | ERROR_0018_GENERATION_FAILED, PdfPath KHÔNG bị ghi (giữ nguyên rỗng để lần sau thử lại) |
-
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
 
 
 
@@ -1698,35 +1352,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | Chung | Lỗi ghi DB giữa chừng (rollback) | ERROR_0019_STORAGE_FAILED | Không thể lưu hoặc truy xuất file hoá đơn, vui lòng thử lại (tái sử dụng message chung nhóm lỗi hạ tầng) |
 | Chung | Quyết toán thành công | SUCCESS_0001_CREATED | Quyết toán hoá đơn thành công |
 
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
-
 
 
 ### 1.7. Test case mẫu
@@ -1801,35 +1426,6 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 | :--- | :--- | :--- | :--- |
 | invoiceId | int (path param) | Có | Phải tồn tại trong bảng Invoices; không tồn tại → ERROR_0011_NOT_FOUND |
 
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
-
 
 
 #### c) GET /invoices/{invoiceId}/transactions — Lịch sử giao dịch
@@ -1843,14 +1439,18 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 
 ### 1.3. Cấu trúc dữ liệu trả về (Response)
 
-GET /invoices
+
+#### `GET /invoices`
+
 | **Trường** | **Kiểu** | **Ý nghĩa** |
 | :--- | :--- | :--- |
 | items[] | array | Danh sách hoá đơn khớp điều kiện lọc, mỗi phần tử gồm invoiceId, invoiceNumber, invoiceDate, guestName, branchName, totalAmount, status |
 | total | int | Tổng số hoá đơn khớp điều kiện (phục vụ phân trang) |
 
 
-GET /invoices/{invoiceId}
+
+#### `GET /invoices/{invoiceId}`
+
 | **Trường** | **Kiểu** | **Ý nghĩa** |
 | :--- | :--- | :--- |
 | invoice | object | Toàn bộ field của Invoices + guestName, branchName (join sẵn để FE không cần gọi thêm API) |
@@ -1858,7 +1458,9 @@ GET /invoices/{invoiceId}
 | payments[] | array | Danh sách Payments liên kết (InvoiceId = invoiceId), rút gọn (paymentId, amount, method, status, paymentDate) |
 
 
-GET /invoices/{invoiceId}/transactions
+
+#### `GET /invoices/{invoiceId}/transactions`
+
 | **Trường** | **Kiểu** | **Ý nghĩa** |
 | :--- | :--- | :--- |
 | items[] | array | Danh sách đầy đủ Payments của hoá đơn: paymentId, transactionCode, amount, method, status, paymentDate, gatewayResponse (rút gọn/ẩn field nhạy cảm nếu cần) |
@@ -1939,35 +1541,6 @@ GET /invoices/{invoiceId}/transactions
 | sortBy | Giá trị khác 4 lựa chọn hợp lệ | (không lỗi) | Tự động dùng mặc định date_desc |
 | (refund) | Xem đầy đủ tại Spec C5 mục 1.10 | — (tái sử dụng nguyên bảng lỗi C5) | — |
 
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
-
 
 
 ### 1.7. Test case mẫu
@@ -1984,35 +1557,6 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 | 8 | Guest tự đăng nhập gọi GET /invoices | 403 FORBIDDEN |
 | 9 | GET /invoices/123/transactions với hoá đơn có 1 cọc Paid + 1 thanh toán số dư Paid | items có 2 dòng Payments, sắp PaymentDate giảm dần |
 | 10 | Hoá đơn Status=Unpaid, Actor cố mở nút Hoàn tiền trên UI | Nút không hiển thị (chặn ở FE theo mục 1.4.e); nếu vẫn cố gọi PATCH refund trực tiếp → xử lý theo đúng lỗi ERROR_0013 đã định nghĩa ở C5 |
-
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
 
 
 
@@ -2073,7 +1617,9 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 
 ### 1.3. Cấu trúc dữ liệu trả về
 
-GET /statistics/revenue
+
+#### `GET /statistics/revenue`
+
 | **Trường** | **Kiểu** | **Ý nghĩa** |
 | :--- | :--- | :--- |
 | date, branchName | date/string | Ngày và phạm vi chi nhánh đang xem (branchName = "All" nếu không lọc) |
@@ -2083,7 +1629,9 @@ GET /statistics/revenue
 | recentOrders[] | array | 10 FoodOrders mới nhất (mọi Status), sắp theo OrderTime giảm dần: { foodOrderId, orderTime, orderType, status, totalAmount } |
 
 
-WebSocket — payload tối thiểu mỗi sự kiện
+
+#### WebSocket — payload tối thiểu mỗi sự kiện
+
 | **Sự kiện** | **Payload tối thiểu** | **FE cập nhật gì** |
 | :--- | :--- | :--- |
 | new_booking | { bookingId, createdAt } | kpi.newBookingsToday += 1; đẩy Push Notification |
@@ -2476,35 +2024,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: UserId (từ token 
 | conversationId | ID hội thoại không tồn tại (khi gọi API quản trị / handover) | ERROR_0011_NOT_FOUND | Phiên hội thoại không tồn tại |
 | Chung | Gửi quá 20 yêu cầu / 60 giây trên cùng Client | ERROR_0018_RATE_LIMITED | Vượt quá giới hạn tần suất yêu cầu (tối đa 20 yêu cầu/phút). Vui lòng thử lại sau. |
 
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
-
 
 ### 1.7. Test case mẫu
 
@@ -2741,35 +2260,6 @@ Công cụ cho người quản trị xem chatbot SẼ tìm ra gì cho 1 câu h�
 | Kiểm thử truy xuất | q để trống | ERROR_0001_REQUIRED | Câu hỏi kiểm thử không được để trống |
 | Kiểm thử truy xuất | q > 2000 ký tự | ERROR_0003_MAX_LENGTH | Câu hỏi kiểm thử không được vượt quá 2000 ký tự |
 | Sửa thành công | — | SUCCESS_0001_CREATED (template "Cập nhật {đối tượng} thành công") | Cập nhật mục kiến thức thành công |
-
-#### Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống (ERROR_0001 → ERROR_0022)
-
-Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghiệp vụ dùng chung xuyên suốt cho toàn bộ các module C1–C14:
-
-| STT | Mã lỗi (Error Code) | Ý nghĩa nghiệp vụ | Message mẫu (Template) | Áp dụng khi |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | `ERROR_0001_REQUIRED` | Trường bắt buộc bị để trống | `{Tên trường} không được để trống` | Bỏ trống thông tin bắt buộc khi submit form hoặc gọi API |
-| 2 | `ERROR_0002_MIN_LENGTH` | Độ dài chuỗi ngắn hơn mức tối thiểu | `{Tên trường} phải có ít nhất {n} ký tự` | Độ dài chuỗi nhập vào sau trim < ngưỡng tối thiểu |
-| 3 | `ERROR_0003_MAX_LENGTH` | Độ dài chuỗi vượt quá mức tối đa | `{Tên trường} không được vượt quá {n} ký tự` | Độ dài chuỗi nhập vào > ngưỡng tối đa cho phép |
-| 4 | `ERROR_0004_INVALID_FORMAT` | Định dạng dữ liệu không hợp lệ | `{Tên trường} không đúng định dạng` | Sai cú pháp email, số điện thoại, kiểu số, cấu trúc JSON body |
-| 5 | `ERROR_0005_INVALID_VALUE` | Giá trị dữ liệu không hợp lệ | `{Tên trường} không hợp lệ` | Giá trị nằm ngoài enum / danh mục định sẵn (status, category, ...) |
-| 6 | `ERROR_0006_APPROVAL_REQUIRED` | Yêu cầu phê duyệt cấp quản lý | `Thao tác yêu cầu phê duyệt từ cấp quản lý` | Phụ thu/bồi thường vượt thẩm quyền hoặc vi phạm chính sách |
-| 7 | `ERROR_0007_DUPLICATE` | Dữ liệu bị trùng lặp | `{Tên trường} đã tồn tại trong hệ thống` | Vi phạm ràng buộc unique (serviceName, question, bookingCode...) |
-| 8 | `ERROR_0008_MISMATCH` | Dữ liệu đối chiếu không trùng khớp | `Dữ liệu xác nhận không khớp` | Xung đột phiên bản dữ liệu hoặc tham số đối chiếu không khớp |
-| 9 | `ERROR_0009_UNAUTHENTICATED` | Chưa xác thực hoặc Token hết hạn | `Bạn cần đăng nhập để thực hiện chức năng này` | Request thiếu Authorization header hoặc JWT token hết hạn / không hợp lệ |
-| 10 | `ERROR_0010_FORBIDDEN` | Không đủ quyền truy cập / thực thi | `Bạn không có quyền thực hiện chức năng này` | Role không có quyền tương ứng trong RolePermissions |
-| 11 | `ERROR_0011_NOT_FOUND` | Đối tượng tham chiếu không tồn tại | `{Tên đối tượng} không tồn tại hoặc đã bị xoá` | ID tham chiếu (CategoryId, ServiceId, StayId, OrderId...) không có trong DB |
-| 12 | `ERROR_0012_OUT_OF_RANGE` | Giá trị số nằm ngoài khoảng cho phép | `{Tên trường} phải lớn hơn {n}` | Price, Quantity, Amount ≤ 0 hoặc vượt giới hạn tối đa |
-| 13 | `ERROR_0013_INVALID_STATE_TRANSITION` | Chuyển trạng thái không hợp lệ | `Không thể chuyển trạng thái từ {A} sang {B}` | Cập nhật Status không nằm trong ma trận chuyển trạng thái hợp lệ |
-| 14 | `ERROR_0014_INACTIVE_REFERENCE` | Tham chiếu đối tượng đã ngừng hoạt động | `{Tên đối tượng} hiện không còn hoạt động` | Category/Service có Status='Inactive' nhưng bị dùng ở thao tác yêu cầu Active |
-| 15 | `ERROR_0015_PRECONDITION_FAILED` | Điều kiện tiên quyết chưa được đáp ứng | `{Điều kiện} chưa được đáp ứng` | Stay chưa ở CheckedIn/Extended khi tạo đơn; Booking chưa sẵn sàng thanh toán |
-| 16 | `ERROR_0016_INVALID_COMBINATION` | Tổ hợp trường không hợp lệ (XOR) | `Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}` | Gửi cả bookingId & invoiceId, hoặc thiếu cả hai khi gọi POST /payments |
-| 17 | `ERROR_0017_ALREADY_EXISTS` | Hoá đơn master đã tồn tại cho booking | `Booking này đã có hoá đơn, vui lòng dùng hoá đơn hiện có` | Booking đã có Master Invoice với Status ≠ Cancelled |
-| 18 | `ERROR_0018_GENERATION_FAILED` / `ERROR_0018_RATE_LIMITED` | Khởi tạo tài liệu lỗi / Vượt ngưỡng rate limit | `Khởi tạo tài liệu không thành công` / `Quá nhiều yêu cầu, vui lòng thử lại sau` | Lỗi sinh PDF hoá đơn hoặc client gửi >20 tin nhắn AI trong 60 giây |
-| 19 | `ERROR_0019_STORAGE_FAILED` | Lưu trữ file hoá đơn PDF thất bại | `Không thể lưu trữ tệp tin hoá đơn` | Lỗi ghi file PDF vào ổ cứng server hoặc hệ thống lưu trữ |
-| 20 | `ERROR_0020_SPLIT_SUM_MISMATCH` | Tổng tiền tách dòng không khớp số dư | `Tổng số tiền các hình thức thanh toán chưa khớp với số dư` | Σ tenders[].amount ≠ Net Outstanding Balance của hoá đơn |
-| 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
-| 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
 
 
 ### 2.6. Test case mẫu
