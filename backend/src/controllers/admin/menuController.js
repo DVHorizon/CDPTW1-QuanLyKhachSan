@@ -1,5 +1,6 @@
 const { MenuItem, MenuCategory } = require('../../models');
 const { Op } = require('sequelize');
+const { getOutOfStockDishIds } = require('../../utils/recipeInventoryHelper');
 
 // Helper bỏ dấu tiếng Việt
 function removeVietnameseTones(str) {
@@ -116,13 +117,18 @@ exports.getMenuCategories = async (req, res) => {
 // Get all Menu Items (FEAT-FNB-02)
 exports.getMenuItems = async (req, res) => {
   try {
-    const { category, keyword, status, isDeleted, page, limit } = req.query;
+    const { category, keyword, status, isDeleted, availableOnly, page, limit } = req.query;
     
     // Mặc định chỉ lấy các món chưa bị xóa mềm (IsDeleted = false)
     // Nếu truyền isDeleted=true thì lấy danh sách các món trong thùng rác / đã xóa mềm
     const whereClause = { IsDeleted: false };
     
-    if (status && status !== '') {
+    // Nếu chỉ hiển thị món còn phục vụ (còn tồn kho, không bị khóa Inactive hay OutOfStock)
+    const filterAvailableOnly = availableOnly === 'true' || status === 'Available';
+
+    if (filterAvailableOnly) {
+      whereClause.Status = 'Available';
+    } else if (status && status !== '') {
       whereClause.Status = status;
     }
     
@@ -145,6 +151,32 @@ exports.getMenuItems = async (req, res) => {
       }
     }
 
+    // Tra cứu danh sách món hết nguyên liệu tồn kho trong bếp
+    const outOfStockDishIds = await getOutOfStockDishIds();
+
+    // Nếu người dùng lọc trạng thái "Available" (hoặc cờ availableOnly), tự động loại trừ các món cạn nguyên liệu
+    if (filterAvailableOnly && outOfStockDishIds.size > 0) {
+      whereClause.MenuItemId = { [Op.notIn]: Array.from(outOfStockDishIds) };
+    } else if (status === 'OutOfStock' && outOfStockDishIds.size > 0) {
+      // Khi chọn xem "Tạm Hết", bao gồm cả món OutOfStock trong DB lẫn món thiếu nguyên liệu
+      delete whereClause.Status;
+      whereClause[Op.or] = [
+        { Status: 'OutOfStock' },
+        { MenuItemId: { [Op.in]: Array.from(outOfStockDishIds) } }
+      ];
+    }
+
+    // Helper gán trạng thái thực tế dựa theo tồn kho nguyên liệu
+    const attachStockStatus = (item) => {
+      const raw = typeof item.toJSON === 'function' ? item.toJSON() : { ...item };
+      const isMissingIngredient = outOfStockDishIds.has(Number(raw.MenuItemId));
+      if (isMissingIngredient && raw.Status === 'Available') {
+        raw.Status = 'OutOfStock';
+        raw.StockAlert = 'Hết nguyên liệu trong kho bếp';
+      }
+      return raw;
+    };
+
     // Nếu không có keyword, lấy toàn bộ món theo thứ tự ID giảm dần
     if (!keyword || keyword.trim() === '') {
       const pageNum = parseInt(page, 10) || 1;
@@ -161,8 +193,9 @@ exports.getMenuItems = async (req, res) => {
       };
 
       const items = await MenuItem.findAll(queryOptions);
+      const mapped = items.map(attachStockStatus);
 
-      return res.status(200).json({ success: true, data: items });
+      return res.status(200).json({ success: true, data: mapped });
     }
 
     // Khi có keyword, áp dụng bộ Smart Fuzzy Search Engine trên toàn bộ món
@@ -174,14 +207,16 @@ exports.getMenuItems = async (req, res) => {
       order: [['MenuItemId', 'DESC']]
     });
 
-    const filtered = items.filter(item => {
-      if (matchesSearchEngine(item.ItemName, cleanKeyword)) return true;
-      if (item.Description && matchesSearchEngine(item.Description, cleanKeyword)) return true;
-      const idStr = String(item.MenuItemId);
-      const cleanNorm = removeVietnameseTones(cleanKeyword).replace(/[^a-z0-9]/g, '');
-      if (cleanNorm && (`mn${idStr}`.includes(cleanNorm) || idStr.includes(cleanNorm))) return true;
-      return false;
-    });
+    const filtered = items
+      .filter(item => {
+        if (matchesSearchEngine(item.ItemName, cleanKeyword)) return true;
+        if (item.Description && matchesSearchEngine(item.Description, cleanKeyword)) return true;
+        const idStr = String(item.MenuItemId);
+        const cleanNorm = removeVietnameseTones(cleanKeyword).replace(/[^a-z0-9]/g, '');
+        if (cleanNorm && (`mn${idStr}`.includes(cleanNorm) || idStr.includes(cleanNorm))) return true;
+        return false;
+      })
+      .map(attachStockStatus);
 
     if (filtered.length === 0) {
       return res.status(404).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Không tìm thấy món ăn phù hợp với từ khóa.' });
@@ -520,16 +555,31 @@ exports.searchMenuWithElastic = async (req, res) => {
       }
     });
 
+    const outOfStockDishIds = await getOutOfStockDishIds();
     const hits = (esResponse.hits && esResponse.hits.hits) || [];
     const maxScore = esResponse.hits && esResponse.hits.max_score ? esResponse.hits.max_score : 1;
     const scoreThreshold = maxScore * 0.2; // Ngưỡng tương quan 20%
 
-    const filteredHits = hits.filter(h => (h._score || 0) >= scoreThreshold);
-    const data = filteredHits.map(hit => ({
-      ...hit._source,
-      _score: hit._score,
-      _engine: 'Elasticsearch'
-    }));
+    let filteredHits = hits.filter(h => (h._score || 0) >= scoreThreshold);
+    let data = filteredHits.map(hit => {
+      const src = { ...hit._source };
+      const isMissing = outOfStockDishIds.has(Number(src.MenuItemId));
+      if (isMissing && src.Status === 'Available') {
+        src.Status = 'OutOfStock';
+        src.StockAlert = 'Hết nguyên liệu trong kho bếp';
+      }
+      return {
+        ...src,
+        _score: hit._score,
+        _engine: 'Elasticsearch'
+      };
+    });
+
+    if (status === 'Available') {
+      data = data.filter(d => d.Status === 'Available' && !outOfStockDishIds.has(Number(d.MenuItemId)));
+    } else if (status === 'OutOfStock') {
+      data = data.filter(d => d.Status === 'OutOfStock' || outOfStockDishIds.has(Number(d.MenuItemId)));
+    }
 
     return res.status(200).json({
       success: true,
@@ -650,16 +700,35 @@ exports.searchMenuWithSolr = async (req, res) => {
     const docs = (solrJson.response && solrJson.response.docs) || [];
     console.log(`[SOLR FOUND] Docs count: ${docs.length}`);
 
-    const data = docs.map(doc => ({
-      MenuItemId: Number(doc.id),
-      ItemName: Array.isArray(doc.item_name) ? doc.item_name[0] : doc.item_name,
-      Description: Array.isArray(doc.description) ? doc.description[0] : (doc.description || ''),
-      CategoryName: Array.isArray(doc.category) ? doc.category[0] : (doc.category || 'Khác'),
-      Price: Array.isArray(doc.price) ? Number(doc.price[0]) : Number(doc.price || 0),
-      Status: Array.isArray(doc.status) ? doc.status[0] : (doc.status || 'Available'),
-      _score: doc.score || null,
-      _engine: 'Apache Solr'
-    }));
+    const outOfStockDishIds = await getOutOfStockDishIds();
+    let data = docs.map(doc => {
+      const mId = Number(doc.id);
+      let dishStatus = Array.isArray(doc.status) ? doc.status[0] : (doc.status || 'Available');
+      let stockAlert = null;
+
+      if (outOfStockDishIds.has(mId) && dishStatus === 'Available') {
+        dishStatus = 'OutOfStock';
+        stockAlert = 'Hết nguyên liệu trong kho bếp';
+      }
+
+      return {
+        MenuItemId: mId,
+        ItemName: Array.isArray(doc.item_name) ? doc.item_name[0] : doc.item_name,
+        Description: Array.isArray(doc.description) ? doc.description[0] : (doc.description || ''),
+        CategoryName: Array.isArray(doc.category) ? doc.category[0] : (doc.category || 'Khác'),
+        Price: Array.isArray(doc.price) ? Number(doc.price[0]) : Number(doc.price || 0),
+        Status: dishStatus,
+        StockAlert: stockAlert,
+        _score: doc.score || null,
+        _engine: 'Apache Solr'
+      };
+    });
+
+    if (status === 'Available') {
+      data = data.filter(d => d.Status === 'Available' && !outOfStockDishIds.has(Number(d.MenuItemId)));
+    } else if (status === 'OutOfStock') {
+      data = data.filter(d => d.Status === 'OutOfStock' || outOfStockDishIds.has(Number(d.MenuItemId)));
+    }
 
     return res.status(200).json({
       success: true,

@@ -1,10 +1,67 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import GuestSidebar from '../../components/layout/GuestSidebar';
 import GuestHeader from '../../components/layout/GuestHeader';
 import { useAuth } from '../../context/AuthContext';
 
 const RoomService = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+
+  // Tự động nhận diện nếu điều hướng từ Đặt Bàn sang (?target=Table hoặc state.target === 'Table')
+  const initialTarget = (searchParams.get('target') === 'Table' || location.state?.target === 'Table') ? 'Table' : 'Room';
+  const [orderTarget, setOrderTarget] = useState(initialTarget);
+  const [tableReservation, setTableReservation] = useState(null);
+  const [checkingTableRes, setCheckingTableRes] = useState(false);
+  const [tableResChecked, setTableResChecked] = useState(false);
+
+  // Hàm kiểm tra lượt đặt bàn của khách hàng
+  const checkCustomerTableReservation = async () => {
+    setCheckingTableRes(true);
+    try {
+      let savedUser = null;
+      try {
+        savedUser = JSON.parse(localStorage.getItem('hotel_user') || '{}');
+      } catch {}
+
+      const uid = user?.id || user?.UserId || user?.userId || savedUser?.id || savedUser?.UserId || savedUser?.userId;
+      const phone = user?.phone || user?.Phone || savedUser?.phone || savedUser?.Phone;
+      
+      const params = new URLSearchParams();
+      if (uid) params.append('userId', uid);
+      if (phone) params.append('phone', phone);
+
+      const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/my-table-reservation?${params.toString()}`);
+      const json = await res.json();
+      if (json && json.success && json.hasReservation && json.data) {
+        setTableReservation(json.data);
+      } else {
+        setTableReservation(null);
+      }
+    } catch (err) {
+      console.warn('Lỗi kiểm tra lượt đặt bàn:', err);
+      setTableReservation(null);
+    } finally {
+      setCheckingTableRes(false);
+      setTableResChecked(true);
+    }
+  };
+
+  // Tự động chạy kiểm tra đặt bàn khi component mount hoặc user thay đổi
+  useEffect(() => {
+    checkCustomerTableReservation();
+  }, [user]);
+
+  // Nếu URL hoặc state có target=Table thì tự động chuyển sang tab 'Table'
+  useEffect(() => {
+    if (searchParams.get('target') === 'Table' || location.state?.target === 'Table') {
+      setOrderTarget('Table');
+      checkCustomerTableReservation();
+    }
+  }, [searchParams, location.state]);
+
 
   // FEAT-FNB-04 & FEAT-FNB-07 State
   const [activeStays, setActiveStays] = useState([]);
@@ -43,21 +100,36 @@ const RoomService = () => {
   useEffect(() => {
     const fetchActiveStays = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/v1/fnb-orders/active-stays');
+        const token = localStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const uid = user?.id || user?.UserId || user?.userId;
+        const queryParam = uid ? `?userId=${uid}&userOnly=true` : '';
+        const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/active-stays${queryParam}`, { headers });
         const json = await res.json();
-        if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setActiveStays(json.data);
-          
-          // Ưu tiên chọn phòng gắn với User đang đăng nhập nếu có
-          const uid = user?.id || user?.UserId || user?.userId;
-          let matched = null;
+        if (json && json.success && Array.isArray(json.data)) {
+          // Lọc danh sách phòng nếu là khách hàng cá nhân
+          let staysList = json.data;
           if (uid) {
-            matched = json.data.find(s => String(s.userId) === String(uid));
+            const userStays = json.data.filter(s => String(s.userId) === String(uid));
+            if (userStays.length > 0) {
+              staysList = userStays;
+            }
           }
-          const defaultStay = matched || json.data[0];
-          setSelectedStay(defaultStay);
-          setStayId(defaultStay.stayId);
-          setRoomId(defaultStay.roomId);
+          setActiveStays(staysList);
+          
+          if (staysList.length > 0) {
+            const matched = uid ? staysList.find(s => String(s.userId) === String(uid)) : null;
+            const defaultStay = matched || staysList[0];
+            setSelectedStay(defaultStay);
+            setStayId(defaultStay.stayId);
+            setRoomId(defaultStay.roomId);
+          } else {
+            setSelectedStay(null);
+            setStayId(null);
+            setRoomId(null);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch active stays:', err);
@@ -87,7 +159,7 @@ const RoomService = () => {
     const fetchMenuItems = async () => {
       setIsLoadingMenu(true);
       try {
-        let url = 'http://localhost:5000/api/v1/menu-items?limit=100';
+        let url = 'http://localhost:5000/api/v1/menu-items?limit=100&availableOnly=true';
         if (selectedCategoryId && selectedCategoryId !== 'ALL') {
           url += `&category=${selectedCategoryId}`;
         }
@@ -97,9 +169,11 @@ const RoomService = () => {
         const res = await fetch(url);
         const data = await res.json();
         if (data && data.success && Array.isArray(data.data)) {
-          setMenuItems(data.data);
-          if (!selectedMenuItem && data.data.length > 0) {
-            setSelectedMenuItem(data.data[0]);
+          // Lọc chắc chắn chỉ hiển thị món Available, không bị xóa và còn đủ nguyên liệu
+          const activeOnly = data.data.filter(item => item.Status === 'Available' && !item.IsDeleted);
+          setMenuItems(activeOnly);
+          if (!selectedMenuItem && activeOnly.length > 0) {
+            setSelectedMenuItem(activeOnly[0]);
           }
         } else if (res.status === 404) {
           setMenuItems([]);
@@ -204,22 +278,29 @@ const RoomService = () => {
     setErrorMessage('');
     setSuccessMessage('');
 
-    // TC01: Kiểm tra phòng
-    if (!stayId || !roomId) {
-      setErrorMessage('Vui lòng chọn phòng hợp lệ.');
-      return;
+    // TC01: Kiểm tra mục tiêu đặt món (Bàn ăn hoặc Phòng lưu trú)
+    if (orderTarget === 'Table') {
+      if (!tableReservation) {
+        setErrorMessage('Quý khách chưa có lượt đặt bàn nào trong ngày hôm nay. Vui lòng đặt bàn trước khi gọi món.');
+        return;
+      }
+    } else {
+      if (!stayId || !roomId) {
+        setErrorMessage('Vui lòng chọn phòng lưu trú để phục vụ.');
+        return;
+      }
     }
 
     // TC02: Kiểm tra món trong giỏ
     if (!cartItems || cartItems.length === 0) {
-      setErrorMessage('Vui lòng chọn ít nhất một món.');
+      setErrorMessage('Vui lòng chọn ít nhất một món ăn.');
       return;
     }
 
     // TC03: Kiểm tra số lượng
     for (const item of cartItems) {
       if (!item.quantity || item.quantity <= 0) {
-        setErrorMessage('Số lượng không hợp lệ.');
+        setErrorMessage('Số lượng món không hợp lệ.');
         return;
       }
     }
@@ -230,9 +311,15 @@ const RoomService = () => {
       return;
     }
 
+    // Nếu gọi tại Bàn và chọn RoomInvoice nhưng không có phòng lưu trú
+    if (orderTarget === 'Table' && paymentMode === 'RoomInvoice' && !stayId) {
+      setErrorMessage('Quý khách không có phòng lưu trú để ghi nợ phòng. Vui lòng chọn Thanh toán ngay (PayNow).');
+      return;
+    }
+
     // PayNow phải chọn phương thức
     if (paymentMode === 'PayNow' && !paymentMethod) {
-      setErrorMessage('Vui lòng chọn phương thức thanh toán.');
+      setErrorMessage('Vui lòng chọn phương thức thanh toán (Tiền mặt, VNPay, MoMo, VietQR).');
       return;
     }
 
@@ -243,7 +330,7 @@ const RoomService = () => {
         method: paymentMethod,
         amount: finalTotalAmount,
         transactionCode: txnCode,
-        roomNumber: '804'
+        roomNumber: orderTarget === 'Table' ? (tableReservation?.tableNumber || 'Bàn ăn') : (selectedStay?.roomNumber || '804')
       });
       setShowQrModal(true);
       return;
@@ -258,12 +345,11 @@ const RoomService = () => {
     setErrorMessage('');
     setSuccessMessage('');
     try {
-      // Token hợp lệ với JWT_SECRET 'grand_horizon_secret_key_2026_luxury_hotel'
       const MOCK_VALID_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBob3RlbGRvbWFpbi52biIsInJvbGUiOiJBZG1pbiIsInJvbGVJZCI6MSwiaWF0IjoxNzkyMzkxMjk4LCJleHAiOjE4MjM5MjcyOTh9.Ya1QBevHhciQaMKVZ2Nhbv39Vla5AcdxIfI5Dy4vXck';
       const token = localStorage.getItem('hotel_token') || MOCK_VALID_TOKEN;
       const authHeader = { 'Authorization': `Bearer ${token}` };
 
-      // Bước 1: Tạo đơn Room Service (FEAT-FNB-04)
+      // Bước 1: Tạo đơn F&B (hỗ trợ cả Room Service và Bàn Nhà Hàng)
       const createRes = await fetch('http://localhost:5000/api/v1/fnb-orders', {
         method: 'POST',
         headers: {
@@ -271,8 +357,10 @@ const RoomService = () => {
           ...authHeader
         },
         body: JSON.stringify({
-          stayId,
-          roomId,
+          orderTarget,
+          stayId: orderTarget === 'Room' ? stayId : (stayId || undefined),
+          roomId: orderTarget === 'Room' ? roomId : (roomId || undefined),
+          tableId: orderTarget === 'Table' ? tableReservation?.tableId : undefined,
           items: cartItems.map(i => ({
             menuItemId: i.menuItemId,
             quantity: i.quantity,
@@ -312,12 +400,13 @@ const RoomService = () => {
       if (!payRes.ok) {
         setErrorMessage(payData.message || 'Thanh toán không thành công. Đơn được giữ lại, vui lòng thử lại.');
       } else {
-        setSuccessMessage(payData.message || 'Thanh toán thành công. Đơn đã được chuyển xuống bếp!');
+        const destLabel = orderTarget === 'Table' ? (tableReservation?.tableNumber || 'Bàn ăn') : (`Phòng ${selectedStay?.roomNumber || '804'}`);
+        setSuccessMessage(`Đặt món thành công! Đơn cho ${destLabel} đã được chuyển xuống bếp.`);
         setCartItems([]);
         setShowQrModal(false);
       }
     } catch (error) {
-      console.error('Room service submit error:', error);
+      console.error('Submit order error:', error);
       setErrorMessage('Không thể kết nối đến máy chủ.');
     } finally {
       setIsSubmitting(false);
@@ -347,35 +436,94 @@ const RoomService = () => {
             </div>
 
             {/* Bộ Chọn Phòng Lưu Trú */}
-            <div className="flex items-center gap-3 bg-emerald-50/80 border border-emerald-200/80 px-4 py-2.5 rounded-xl shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-700 text-[22px]">meeting_room</span>
-                <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Chọn Phòng Của Quý Khách:</span>
+            {/* Bộ Chọn Hình Thức: Giao Phòng vs Bàn Ăn */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => { setOrderTarget('Room'); setErrorMessage(''); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${orderTarget === 'Room' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">room_service</span>
+                  <span>Giao Tận Phòng</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setOrderTarget('Table'); setErrorMessage(''); checkCustomerTableReservation(); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${orderTarget === 'Table' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">restaurant</span>
+                  <span>Gọi Món Tại Bàn</span>
+                  {tableReservation && <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>}
+                </button>
               </div>
-              <select
-                value={stayId || ''}
-                onChange={(e) => {
-                  const sId = Number(e.target.value);
-                  const found = activeStays.find(s => s.stayId === sId);
-                  if (found) {
-                    setSelectedStay(found);
-                    setStayId(found.stayId);
-                    setRoomId(found.roomId);
-                    setErrorMessage('');
-                  }
-                }}
-                className="bg-white border border-emerald-300 rounded-lg px-3 py-1.5 font-bold text-emerald-800 text-xs shadow-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
-              >
-                {activeStays.length === 0 ? (
-                  <option value="">Đang tải phòng lưu trú...</option>
-                ) : (
-                  activeStays.map(s => (
-                    <option key={s.stayId} value={s.stayId}>
-                      Phòng #{s.roomNumber} • {s.guestName} (Tầng {s.floor})
-                    </option>
-                  ))
-                )}
-              </select>
+
+              {orderTarget === 'Room' ? (
+                <div className="flex items-center gap-2 bg-emerald-50/80 border border-emerald-200/80 px-3 py-1.5 rounded-xl shadow-sm">
+                  <span className="material-symbols-outlined text-emerald-700 text-[18px]">meeting_room</span>
+                  <span className="text-xs font-bold text-slate-700">Phòng:</span>
+                  {activeStays.length === 1 ? (
+                    <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-xs px-2.5 py-1 rounded-lg shadow-inner">
+                      <span>Phòng #{activeStays[0].roomNumber}</span>
+                      <span className="text-[11px] font-semibold text-emerald-700">({activeStays[0].guestName})</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={stayId || ''}
+                      onChange={(e) => {
+                        const sId = Number(e.target.value);
+                        const found = activeStays.find(s => s.stayId === sId);
+                        if (found) {
+                          setSelectedStay(found);
+                          setStayId(found.stayId);
+                          setRoomId(found.roomId);
+                          setErrorMessage('');
+                        }
+                      }}
+                      className="bg-white border border-emerald-300 rounded-lg px-2.5 py-1 font-bold text-emerald-800 text-xs shadow-sm focus:outline-none cursor-pointer"
+                    >
+                      {activeStays.length === 0 ? (
+                        <option value="">Chưa có phòng lưu trú</option>
+                      ) : (
+                        activeStays.map(s => (
+                          <option key={s.stayId} value={s.stayId}>
+                            Phòng #{s.roomNumber} - {s.guestName}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl shadow-sm">
+                  <span className="material-symbols-outlined text-amber-700 text-[18px]">table_restaurant</span>
+                  <span className="text-xs font-bold text-amber-900">Bàn Ăn:</span>
+                  {checkingTableRes ? (
+                    <span className="text-xs text-slate-500 italic">Đang kiểm tra bàn đã đặt...</span>
+                  ) : tableReservation ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-xs text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300">
+                        {tableReservation.tableNumber} ({tableReservation.location})
+                      </span>
+                      <span className="text-[11px] text-emerald-700 font-medium">✓ Đã đặt trước</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-rose-600 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[15px]">error</span>
+                        Chưa đặt bàn
+                      </span>
+                      <Link
+                        to="/dat-ban"
+                        className="px-2.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-0.5"
+                      >
+                        <span>Đặt Bàn</span>
+                        <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           {/* Primary 3-Column Console Canvas */}
@@ -385,34 +533,75 @@ const RoomService = () => {
             {/* CỘT 1: HỒ SƠ KHÁCH IN-HOUSE & THÔNG SỐ GIAO MÓN (28% -> Col span 3 or 4) */}
             {/* ========================================================================= */}
             <div className="xl:col-span-3 space-y-space-md">
-              {/* Thẻ Khách Hàng Lưu Trú */}
+              {/* Thẻ Khách Hàng / Bàn Ăn */}
               <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm space-y-space-md">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Hồ sơ khách In-House</span>
-                  <span className="px-space-xs py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
-                    Tầng {selectedStay?.floor || 8} • Tháp B
-                  </span>
-                </div>
-                <div className="flex items-start gap-space-md pt-space-xs">
-                  <div className="min-w-[48px] px-2.5 py-2 rounded-xl bg-surface-container-high flex items-center justify-center text-admin-primary flex-shrink-0 shadow-inner">
-                    <span className="font-headline-sm text-label-md font-bold text-center tracking-tight">
-                      {selectedStay?.roomNumber || '804'}
-                    </span>
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-headline-lg text-headline-sm text-on-surface font-bold truncate">
-                      {selectedStay?.guestName || user?.fullName || 'Arthur Dent'}
-                    </span>
-                    <div className="flex items-center gap-space-xs mt-0.5">
-                      <span className="px-space-xs py-0.2 rounded-full bg-secondary/10 text-secondary font-label-sm text-label-sm font-semibold">
-                        {user?.tierName ? `Hạng ${user.tierName}` : 'Silver Resident'}
-                      </span>
-                      <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
-                        Stay #{selectedStay?.stayId || 1}
+                {orderTarget === "Table" ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Thông Tin Bàn Ăn</span>
+                      <span className={`px-space-xs py-0.5 rounded font-label-sm text-label-sm font-bold ${tableReservation ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                        {tableReservation ? "ĐÃ ĐẶT BÀN" : "CHƯA ĐẶT BÀN"}
                       </span>
                     </div>
-                  </div>
-                </div>
+                    {tableReservation ? (
+                      <div className="flex items-start gap-space-md pt-space-xs">
+                        <div className="min-w-[48px] px-2.5 py-2 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 flex-shrink-0 shadow-inner">
+                          <span className="material-symbols-outlined text-[24px]">restaurant</span>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-headline-lg text-headline-sm text-on-surface font-bold truncate text-emerald-900">
+                            {tableReservation.tableNumber}
+                          </span>
+                          <div className="flex items-center gap-space-xs mt-0.5 text-xs text-slate-500">
+                            <span>{tableReservation.location}</span>
+                            <span>•</span>
+                            <span>{tableReservation.guestCount} Khách</span>
+                          </div>
+                          <span className="text-[11px] text-emerald-700 font-medium mt-1">
+                            Lượt #{tableReservation.reservationId} • {tableReservation.customerName}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-center space-y-2">
+                        <p className="text-xs text-rose-700 font-semibold">Quý khách chưa có lượt đặt bàn nào trong ngày hôm nay.</p>
+                        <Link to="/dat-ban" className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all">
+                          <span className="material-symbols-outlined text-[15px]">table_restaurant</span>
+                          <span>Đi Đến Đặt Bàn Ngay</span>
+                        </Link>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Hồ Sơ Khách In-House</span>
+                      <span className="px-space-xs py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
+                        Tầng {selectedStay?.floor || 8} • Tháp B
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-space-md pt-space-xs">
+                      <div className="min-w-[48px] px-2.5 py-2 rounded-xl bg-surface-container-high flex items-center justify-center text-admin-primary flex-shrink-0 shadow-inner">
+                        <span className="font-headline-sm text-label-md font-bold text-center tracking-tight">
+                          {selectedStay?.roomNumber || "804"}
+                        </span>
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-headline-lg text-headline-sm text-on-surface font-bold truncate">
+                          {selectedStay?.guestName || user?.fullName || "Arthur Dent"}
+                        </span>
+                        <div className="flex items-center gap-space-xs mt-0.5">
+                          <span className="px-space-xs py-0.2 rounded-full bg-secondary/10 text-secondary font-label-sm text-label-sm font-semibold">
+                            {user?.tierName ? `Hạng ${user.tierName}` : "Silver Resident"}
+                          </span>
+                          <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
+                            Stay #{selectedStay?.stayId || 1}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
                 {/* Ghi chú đơn hàng cho Bếp (Lưu vào FoodOrders.Note) */}
                 <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-2">
                   <div className="flex items-center justify-between">

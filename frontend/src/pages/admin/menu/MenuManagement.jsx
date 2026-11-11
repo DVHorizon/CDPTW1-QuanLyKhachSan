@@ -525,9 +525,9 @@ const MenuManagement = () => {
                             {Number(item.Price).toLocaleString('vi-VN')} đ
                           </td>
                           <td className="py-3 px-3 text-center">
-                            <span className={`inline-flex items-center gap-1 font-label-sm text-label-sm px-2.5 py-1 rounded-full font-bold ${item.Status === 'Available' ? 'bg-[#10B981]/15 text-[#10B981]' : item.Status === 'OutOfStock' ? 'bg-[#F59E0B]/15 text-[#F59E0B]' : 'bg-[#EF4444]/15 text-[#EF4444]'}`}>
+                            <span className={`inline-flex items-center gap-1 font-label-sm text-label-sm px-2.5 py-1 rounded-full font-bold ${item.Status === 'Available' ? 'bg-[#10B981]/15 text-[#10B981]' : item.Status === 'OutOfStock' ? 'bg-[#F59E0B]/15 text-[#F59E0B]' : 'bg-[#EF4444]/15 text-[#EF4444]'}`} title={item.StockAlert || ''}>
                               <span className={`w-1.5 h-1.5 rounded-full ${item.Status === 'Available' ? 'bg-[#10B981]' : item.Status === 'OutOfStock' ? 'bg-[#F59E0B]' : 'bg-[#EF4444]'}`}></span>
-                              {item.Status === 'Available' ? 'Đang Phục Vụ' : item.Status === 'OutOfStock' ? 'Tạm Hết' : 'Ngừng Bán'}
+                              {item.Status === 'Available' ? 'Đang Phục Vụ' : item.Status === 'OutOfStock' ? (item.StockAlert ? 'Hết Nguyên Liệu' : 'Tạm Hết') : 'Ngừng Bán'}
                             </span>
                           </td>
                           <td className="py-3 px-3 text-center">
