@@ -173,7 +173,8 @@ export default function CheckOutDesk() {
       setConnectionError(
         'MẤT KẾT NỐI TỚI CƠ SỞ DỮ LIỆU MYSQL! Vui lòng kiểm tra Docker container (hotel_backend, hotel_mysql) hoặc dịch vụ mạng.'
       );
-      addToast('error', 'Mất kết nối tới CSDL MySQL! Không thể đồng bộ danh sách phòng lưu trú.', 'ERR_MYSQL_DISCONNECTED');
+      console.error('[CheckOutDesk] ERR_MYSQL_DISCONNECTED');
+      addToast('error', 'Mất kết nối tới CSDL MySQL! Không thể đồng bộ danh sách phòng lưu trú.', 'Lỗi Kết Nối CSDL');
     } finally {
       setIsLoadingStays(false);
     }
@@ -400,7 +401,8 @@ export default function CheckOutDesk() {
     if (!item) return;
 
     if (action === 'WAIVE' && !reasonCode) {
-      addToast('warn', 'Vui lòng nhập lý do cho thao tác miễn hoặc điều chỉnh khoản phí', 'CHECKOUT_0007_REASON_REQUIRED');
+      console.warn('[CheckOutDesk] CHECKOUT_0007_REASON_REQUIRED');
+      addToast('warn', 'Vui lòng nhập lý do cho thao tác miễn hoặc điều chỉnh khoản phí', 'Yêu Cầu Lý Do');
       return;
     }
 
@@ -427,13 +429,15 @@ export default function CheckOutDesk() {
 
     const unreviewedDamages = (previewData.damageItems || []).filter((d) => d.Status === 'SUBMITTED');
     if (unreviewedDamages.length > 0) {
-      addToast('warn', 'Khoản bồi thường cần được giám sát xác nhận trước khi tính phí', 'CHECKOUT_0006_APPROVAL_REQUIRED');
+      console.warn('[CheckOutDesk] CHECKOUT_0006_APPROVAL_REQUIRED');
+      addToast('warn', 'Khoản bồi thường cần được giám sát xác nhận trước khi tính phí', 'Cần Phê Duyệt');
       return;
     }
 
     const disputedDamages = (previewData.damageItems || []).filter((d) => d.Status === 'DISPUTED');
     if (disputedDamages.length > 0) {
-      addToast('warn', 'Khoản hư hỏng đang được tranh chấp và chưa thể xác nhận thu phí. Vui lòng chuyển giám sát giải quyết.', 'CHECKOUT_0010_DAMAGE_DISPUTED');
+      console.warn('[CheckOutDesk] CHECKOUT_0010_DAMAGE_DISPUTED');
+      addToast('warn', 'Khoản hư hỏng đang được tranh chấp và chưa thể xác nhận thu phí. Vui lòng chuyển giám sát giải quyết.', 'Phòng Hư Hỏng');
       return;
     }
 
@@ -451,13 +455,15 @@ export default function CheckOutDesk() {
       };
       const res = await checkOutApi.completeCheckout(selectedStayId, payload);
       if (res && res.success) {
-        addToast('success', 'Trả phòng thành công! Hóa đơn đã được quyết toán và danh sách phòng đã được làm mới.', 'SUCCESS_CHECKOUT_0001_COMPLETED');
+        console.log('[CheckOutDesk] SUCCESS_CHECKOUT_0001_COMPLETED');
+        addToast('success', 'Trả phòng thành công! Hóa đơn đã được quyết toán và danh sách phòng đã được làm mới.', 'Trả Phòng Thành Công');
         setCompletedResult(res.data);
         setIsSuccessModalOpen(true);
         // Cập nhật ngay danh sách phòng và số lượng phòng quá hạn
         await loadStays(searchQuery);
       } else {
-        addToast('error', res?.message || 'Không thể hoàn tất trả phòng.', 'CHECKOUT_0008_CHARGE_FAILED');
+        console.error('[CheckOutDesk] CHECKOUT_0008_CHARGE_FAILED');
+        addToast('error', res?.message || 'Không thể hoàn tất trả phòng.', 'Lỗi Cập Nhật Phí');
       }
     } catch (err) {
       addToast('error', err.message || 'Lỗi xử lý hoàn tất check-out', 'Lỗi Giao Dịch');
@@ -2046,7 +2052,7 @@ export default function CheckOutDesk() {
 
               <div>
                 <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-widest block">
-                  SUCCESS_CHECKOUT_0001_COMPLETED
+                  HOÀN TẤT TRẢ PHÒNG
                 </span>
                 <h3 className="text-xl font-serif font-black uppercase text-[#203044] mt-1">
                   Trả Phòng &amp; Kiểm Phòng Thành Công!

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import bookingApi from '../../api/bookingApi';
+import { cleanMessage, extractErrorCode, logSystemEvent } from '../../utils/toastSanitizer';
 
 const fmtMoney = (n) => {
   if (n === null || n === undefined || isNaN(Number(n))) return '0 ₫';
@@ -35,7 +36,18 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
       const res = await bookingApi.getBookingCharges(bookingId);
       setData(res?.data || res);
     } catch (err) {
-      setError(err?.message || 'Không thể tải bảng kê chi phí lưu trú.');
+      const cleaned = cleanMessage(err) || 'Không thể tải bảng kê chi phí lưu trú.';
+      const code = extractErrorCode ? extractErrorCode(err) : (err?.code || 'ERROR_LOAD_CHARGES');
+      if (typeof logSystemEvent === 'function') {
+        logSystemEvent({
+          code,
+          message: cleaned,
+          rawMessage: err?.message,
+          type: 'error',
+          context: 'BookingChargesModal',
+        });
+      }
+      setError(cleaned);
     } finally {
       setLoading(false);
     }
@@ -587,11 +599,15 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
   const minibar = data?.minibar || [];
   const services = data?.services || [];
   const fnb = data?.foodAndBeverage || [];
+  const damages = data?.damages || [];
+  const extensions = data?.extensions || [];
   const summary = data?.summary || {
     roomSubtotal: 0,
+    extensionSubtotal: 0,
     minibarSubtotal: 0,
     serviceSubtotal: 0,
     foodSubtotal: 0,
+    damageSubtotal: 0,
     surcharge: 0,
     discount: 0,
     grandTotal: 0,
@@ -658,6 +674,13 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
               <span className="material-symbols-outlined text-base">print</span>
               <span>In Bảng Kê</span>
             </button>
+            <a
+              href={`/admin/charges/${bookingId}`}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-sm">open_in_new</span>
+              <span>Chi Tiết & Xuất Hóa Đơn</span>
+            </a>
             <button
               type="button"
               onClick={onClose}
@@ -792,6 +815,32 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
                           </tr>
                         ))
                       )}
+                      {extensions.length > 0 &&
+                        extensions.map((ext, i) => (
+                          <tr key={`ext-${ext.extensionId || i}`} className="bg-blue-50/50 hover:bg-blue-50/80">
+                            <td className="py-2.5 px-3 font-mono font-bold text-blue-700">
+                              {ext.roomNumber}
+                            </td>
+                            <td className="py-2.5 px-3 text-blue-900 font-medium">
+                              Gia hạn lưu trú
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-[11px] text-blue-700">
+                              Ghi nhận: {fmtDateTime(ext.createdAt)}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono font-semibold text-blue-800">
+                              +{ext.nights} đêm
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-right text-slate-600">
+                              {fmtMoney(ext.total / (ext.nights || 1))}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-right text-slate-500 text-[11px]">
+                              —
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-right font-bold text-blue-800">
+                              +{fmtMoney(ext.total)}
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
@@ -955,6 +1004,54 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
                 </div>
               </div>
 
+              {/* 5. MỤC BỒI THƯỜNG THIỆT HẠI & PHẠT BUỒNG PHÒNG */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-slate-100/80 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-rose-600 text-base">handyman</span>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      5. Bồi Thường Thiệt Hại Buồng Phòng & Phạt ({damages.length} khoản)
+                    </h4>
+                  </div>
+                  <span className="font-mono font-bold text-xs text-rose-800">
+                    {fmtMoney(summary.damageSubtotal)}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500 font-semibold bg-slate-50/50">
+                        <th className="py-2 px-3">Tài sản / Khoản phạt</th>
+                        <th className="py-2 px-3">Lý do ghi nhận</th>
+                        <th className="py-2 px-3 font-mono text-center">Phòng</th>
+                        <th className="py-2 px-3 text-right">Chi phí bồi thường</th>
+                        <th className="py-2 px-3 text-right">Thời điểm lập biên bản</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {damages.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-3 px-3 text-center text-slate-400 italic">
+                            Không phát sinh bồi thường thiệt hại buồng phòng
+                          </td>
+                        </tr>
+                      ) : (
+                        damages.map((dam, i) => (
+                          <tr key={dam.damageId || i} className="hover:bg-slate-50/60">
+                            <td className="py-2 px-3 font-medium text-slate-800">{dam.item}</td>
+                            <td className="py-2 px-3 text-slate-600">{dam.reason || 'Kiểm phòng phát hiện'}</td>
+                            <td className="py-2 px-3 font-mono text-center text-blue-700">{dam.roomNumber || '—'}</td>
+                            <td className="py-2 px-3 font-mono text-right font-bold text-rose-700">{fmtMoney(dam.total)}</td>
+                            <td className="py-2 px-3 font-mono text-right text-slate-500 text-[11px]">{fmtDateTime(dam.createdAt)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               {/* KHỐI TỔNG KẾT TÀI CHÍNH & QUYẾT TOÁN (GRAND TOTAL & BALANCE) */}
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-5 shadow-xl border border-slate-700">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -968,6 +1065,12 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
                       <span>Tiền phòng & phụ thu:</span>
                       <span className="font-mono">{fmtMoney(summary.roomSubtotal)}</span>
                     </div>
+                    {summary.extensionSubtotal > 0 && (
+                      <div className="flex justify-between items-center text-blue-300">
+                        <span>Phí gia hạn lưu trú:</span>
+                        <span className="font-mono">+{fmtMoney(summary.extensionSubtotal)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-slate-300">
                       <span>Tiêu dùng Minibar:</span>
                       <span className="font-mono">{fmtMoney(summary.minibarSubtotal)}</span>
@@ -980,6 +1083,12 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
                       <span>Ẩm thực F&B ghi nợ phòng:</span>
                       <span className="font-mono">{fmtMoney(summary.foodSubtotal)}</span>
                     </div>
+                    {summary.damageSubtotal > 0 && (
+                      <div className="flex justify-between items-center text-rose-300">
+                        <span>Bồi thường thiệt hại & phạt:</span>
+                        <span className="font-mono">+{fmtMoney(summary.damageSubtotal)}</span>
+                      </div>
+                    )}
                     {summary.surcharge > 0 && (
                       <div className="flex justify-between items-center text-amber-300">
                         <span>Phụ phí khác:</span>
@@ -1038,7 +1147,7 @@ export default function BookingChargesModal({ bookingId, isOpen, onClose }) {
         <div className="px-6 py-3.5 bg-slate-100 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
           <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-sm text-slate-400">info</span>
-            <span>Bảng kê được gom tự động theo thời gian thực từ API `FEAT-INVOICE-01`.</span>
+            <span>Bảng kê được tổng hợp tự động theo thời gian thực từ hệ thống lưu trú.</span>
           </div>
 
           <div className="flex items-center gap-2">

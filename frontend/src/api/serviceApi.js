@@ -25,10 +25,11 @@ export const fetchServicesApi = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.page) query.append('page', params.page);
   if (params.pageSize) query.append('pageSize', params.pageSize);
+  if (params.all) query.append('all', params.all);
   if (params.search) query.append('search', params.search);
   const targetGroup = params.group !== undefined ? params.group : params.categoryId;
   if (targetGroup && targetGroup !== 'All') query.append('group', targetGroup);
-  if (params.status && params.status !== 'All') query.append('status', params.status);
+  if (params.status) query.append('status', params.status);
   if (params.minPrice !== undefined && params.minPrice !== '') query.append('minPrice', params.minPrice);
   if (params.maxPrice !== undefined && params.maxPrice !== '') query.append('maxPrice', params.maxPrice);
   if (params.sortBy) query.append('sortBy', params.sortBy);
@@ -45,8 +46,11 @@ export const fetchServicesApi = async (params = {}) => {
 /**
  * 2. Lấy danh sách nhóm dịch vụ (ServiceCategories)
  */
-export const fetchCategoriesApi = async () => {
-  const res = await fetch(`${BASE_URL}/categories`, { headers: getAuthHeaders() });
+export const fetchCategoriesApi = async (params = {}) => {
+  const query = new URLSearchParams();
+  if (params.status) query.append('status', params.status);
+  const url = `${BASE_URL}/categories${query.toString() ? '?' + query.toString() : ''}`;
+  const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw err;
@@ -193,7 +197,7 @@ export const createServiceOrderApi = async (orderPayload) => {
 export const fetchServiceOrdersApi = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.stayId) query.append('stayId', params.stayId);
-  if (params.status && params.status !== 'All') query.append('status', params.status);
+  if (params.status) query.append('status', params.status);
 
   const url = `${ORDERS_BASE_URL}${query.toString() ? '?' + query.toString() : ''}`;
   const res = await fetch(url, {
@@ -221,3 +225,33 @@ export const updateServiceOrderStatusApi = async (orderId, payload) => {
   return data;
 };
 
+
+/**
+ * 13. Xuất danh mục dịch vụ Excel (.xlsx) chuẩn chỉnh
+ * GET /api/v1/services/export
+ */
+export const exportServicesExcelApi = async (params = {}) => {
+  const query = new URLSearchParams();
+  if (params.search) query.append('search', params.search);
+  const targetGroup = params.group !== undefined ? params.group : params.categoryId;
+  if (targetGroup && targetGroup !== 'All') query.append('group', targetGroup);
+  if (params.status) query.append('status', params.status);
+  if (params.minPrice !== undefined && params.minPrice !== '') query.append('minPrice', params.minPrice);
+  if (params.maxPrice !== undefined && params.maxPrice !== '') query.append('maxPrice', params.maxPrice);
+  if (params.sortBy) query.append('sortBy', params.sortBy);
+
+  const url = `${BASE_URL}/export${query.toString() ? '?' + query.toString() : ''}`;
+  const res = await fetch(url, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw err;
+  }
+  const blob = await res.blob();
+  const contentDisposition = res.headers.get('Content-Disposition') || '';
+  let filename = `Bang_Gia_Dich_Vu_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+  const fnMatch = /filename="?([^"]+)"?/.exec(contentDisposition);
+  if (fnMatch && fnMatch[1]) {
+    filename = fnMatch[1];
+  }
+  return { blob, filename };
+};

@@ -10,6 +10,7 @@
 
 const { sequelize, Booking, BookingGuest, RoomType, Payment, User } = require('../models');
 const { broadcastRoomEvent } = require('../sockets/socketHandler');
+const { generateTransactionCode } = require('../modules/payments/services/paymentGatewayService');
 
 // 15 phút thời hạn phiên giữ phòng
 const SESSION_EXPIRY_MS = 15 * 60 * 1000;
@@ -268,8 +269,8 @@ exports.processDepositPayment = async (req, res) => {
       }
     }
 
-    // 5. DB Transaction: Tạo bản ghi Payments và cập nhật trạng thái Booking
-    const transactionCode = 'TXN-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+    // 5. DB Transaction: Tạo bản ghi Payments (theo chuẩn mã giao dịch C5 PMT-...) và cập nhật trạng thái Booking
+    const transactionCode = generateTransactionCode();
 
     const paymentRecord = await Payment.create({
       BookingId: booking.BookingId,

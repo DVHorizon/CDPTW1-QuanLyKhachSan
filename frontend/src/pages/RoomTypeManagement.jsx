@@ -105,7 +105,14 @@ const RoomTypeManagement = () => {
   }, [user]);
 
   const showToast = (msg, type = 'success', code = '') => {
-    setToast({ msg, type, code });
+    if (code) {
+      if (type === 'error') {
+        console.error('[Mã lỗi hệ thống]: ' + code, { msg });
+      } else {
+        console.log('[Mã phản hồi]: ' + code, { msg });
+      }
+    }
+    setToast({ msg, type });
     setTimeout(() => setToast(null), 4500);
   };
 
@@ -920,9 +927,7 @@ const RoomTypeManagement = () => {
             </span>
             <div className="flex flex-col">
               <span className="text-[14px] leading-snug">{toast.msg}</span>
-              {toast.code && (
-                <span className="text-[11px] font-mono opacity-80 mt-0.5">Mã lỗi: {toast.code}</span>
-              )}
+              
             </div>
           </div>
         )}

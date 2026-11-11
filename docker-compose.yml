@@ -25,6 +25,8 @@ services:
       - ./db/phpmyadmin-config.php:/etc/phpmyadmin/config.user.inc.php
     depends_on:
       - mysql
+    links:
+      - mysql
 
   backend:
     build: ./backend
