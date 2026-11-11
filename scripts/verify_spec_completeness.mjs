@@ -170,4 +170,59 @@ if (missingFormulas > 0) {
     process.exit(1);
 }
 
+// 8. Kiểm tra không lặp lại bảng mã lỗi Master (chỉ được chèn đúng 1 lần tại Mục 0.1)
+console.log('\n--- KIỂM TRA TẦN SUẤT BẢNG MÃ LỖI MASTER ---');
+const masterTablePattern = /Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống/g;
+const masterTableMatches = mdContent.match(masterTablePattern) || [];
+if (masterTableMatches.length === 1) {
+    console.log(`✅ Bảng mã lỗi Master xuất hiện đúng 1 lần tại Mục 0.1 (không bị lặp rác).`);
+} else {
+    console.error(`❌ Bảng mã lỗi Master xuất hiện ${masterTableMatches.length} lần! Kỳ vọng duy nhất 1 lần.`);
+    process.exit(1);
+}
+
+// 9. Kiểm tra phân cấp tiêu đề Markdown (Heading Hierarchy — MD001)
+console.log('\n--- KIỂM TRA PHÂN CẤP TIÊU ĐỀ MARKDOWN (MD001) ---');
+let prevLevel = 0;
+let headingJumps = 0;
+for (let lineNum = 0; lineNum < mdLines.length; lineNum++) {
+    const line = mdLines[lineNum].trim();
+    const m = line.match(/^(#{1,6})\s+(.*)$/);
+    if (m) {
+        const level = m[1].length;
+        if (prevLevel > 0 && level > prevLevel + 1) {
+            console.error(`❌ Dòng ${lineNum + 1}: Lỗi phân cấp tiêu đề H${prevLevel} -> H${level} ("${m[2]}")`);
+            headingJumps++;
+        }
+        prevLevel = level;
+    }
+}
+if (headingJumps === 0) {
+    console.log(`✅ Phân cấp tiêu đề hợp lệ 100% (Không có lỗi nhảy bậc H1->H3, H2->H4).`);
+} else {
+    console.error(`❌ Có ${headingJumps} lỗi nhảy bậc tiêu đề!`);
+    process.exit(1);
+}
+
+// 10. Kiểm tra dòng trắng liên tiếp (MD012)
+console.log('\n--- KIỂM TRA VỆ SINH DÒNG TRẮNG LIÊN TIẾP (MD012) ---');
+let consecutiveBlanks = 0;
+let excessiveBlanks = 0;
+for (let lineNum = 0; lineNum < mdLines.length; lineNum++) {
+    if (mdLines[lineNum].trim() === '') {
+        consecutiveBlanks++;
+        if (consecutiveBlanks > 2) {
+            excessiveBlanks++;
+        }
+    } else {
+        consecutiveBlanks = 0;
+    }
+}
+if (excessiveBlanks === 0) {
+    console.log(`✅ Khoảng cách dòng trắng đạt chuẩn Markdown sạch (Lỗi dòng trắng thừa: 0).`);
+} else {
+    console.error(`❌ Có ${excessiveBlanks} vị trí chứa quá nhiều dòng trắng liên tiếp!`);
+    process.exit(1);
+}
+
 console.log('\n🎉 TẤT CẢ CÁC BÀI KIỂM THỬ ĐỐI CHIẾU ĐÃ ĐẠT 100%! TÀI LIỆU MARKDOWN ĐẢM BẢO HOÀN TOÀN TÍNH TOÀN VẸN VÀ CHUẨN ĐỊNH DẠNG.');

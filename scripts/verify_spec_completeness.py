@@ -162,6 +162,50 @@ def main():
     if missing_formulas > 0:
         sys.exit(1)
 
+    # 8. Kiểm tra không lặp lại bảng mã lỗi Master (chỉ được chèn đúng 1 lần tại Mục 0.1)
+    print("\n--- KIỂM TRA TẦN SUẤT BẢNG MÃ LỖI MASTER ---")
+    master_table_matches = re.findall(r"Bảng danh mục 22 mã lỗi chuẩn toàn hệ thống", md_content)
+    if len(master_table_matches) == 1:
+        print("✅ Bảng mã lỗi Master xuất hiện đúng 1 lần tại Mục 0.1 (không bị lặp rác).")
+    else:
+        print(f"❌ Bảng mã lỗi Master xuất hiện {len(master_table_matches)} lần! Kỳ vọng duy nhất 1 lần.")
+        sys.exit(1)
+
+    # 9. Kiểm tra phân cấp tiêu đề Markdown (Heading Hierarchy — MD001)
+    print("\n--- KIỂM TRA PHÂN CẤP TIÊU ĐỀ MARKDOWN (MD001) ---")
+    prev_level = 0
+    heading_jumps = 0
+    for line_num, line in enumerate(md_lines):
+        m = re.match(r"^(#{1,6})\s+(.*)$", line.strip())
+        if m:
+            level = len(m.group(1))
+            if prev_level > 0 and level > prev_level + 1:
+                print(f"❌ Dòng {line_num + 1}: Lỗi phân cấp tiêu đề H{prev_level} -> H{level} (\"{m.group(2)}\")")
+                heading_jumps += 1
+            prev_level = level
+    if heading_jumps == 0:
+        print("✅ Phân cấp tiêu đề hợp lệ 100% (Không có lỗi nhảy bậc H1->H3, H2->H4).")
+    else:
+        print(f"❌ Có {heading_jumps} lỗi nhảy bậc tiêu đề!")
+        sys.exit(1)
+
+    # 10. Kiểm tra dòng trắng liên tiếp (MD012)
+    print("\n--- KIỂM TRA VỆ SINH DÒNG TRẮNG LIÊN TIẾP (MD012) ---")
+    consecutive_blanks = 0
+    excessive_blanks = 0
+    for line in md_lines:
+        if line.strip() == '':
+            consecutive_blanks += 1
+            if consecutive_blanks > 2:
+                excessive_blanks += 1
+        else:
+            consecutive_blanks = 0
+    if excessive_blanks == 0:
+        print("✅ Khoảng cách dòng trắng đạt chuẩn Markdown sạch (Lỗi dòng trắng thừa: 0).")
+    else:
+        print(f"❌ Có {excessive_blanks} vị trí chứa quá nhiều dòng trắng liên tiếp!")
+        sys.exit(1)
+
     print("\n🎉 TẤT CẢ CÁC BÀI KIỂM THỬ ĐỐI CHIẾU ĐÃ ĐẠT 100%! TÀI LIỆU MARKDOWN ĐẢM BẢO HOÀN TOÀN TÍNH TOÀN VẸN VÀ CHUẨN ĐỊNH DẠNG.")
 
 if __name__ == '__main__':

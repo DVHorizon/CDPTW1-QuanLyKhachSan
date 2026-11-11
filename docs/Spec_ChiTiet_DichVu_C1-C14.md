@@ -31,12 +31,9 @@
 
 ---
 
-
-
 # PHẦN I: QUY ƯỚC DÙNG CHUNG TOÀN HỆ THỐNG
 
 ## 0. QUY ƯỚC DÙNG CHUNG CHO CẢ 4 TÍNH NĂNG
-
 
 ### 0.1. Bảng mã lỗi bổ sung (mở rộng danh mục của Spec mẫu)
 
@@ -78,7 +75,6 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 | 21 | `ERROR_0021_INSUFFICIENT_CASH` | Tiền mặt khách đưa không đủ | `Số tiền mặt khách đưa ({A}) nhỏ hơn số tiền phải thanh toán ({B})` | tender.cashGiven < tender.amount trong giao dịch tiền mặt |
 | 22 | `ERROR_0022_ALREADY_SETTLED` | Hoá đơn đã được thanh toán đủ trước đó | `Hoá đơn này đã được thanh toán đủ, không còn số dư cần thanh toán` | Gọi thanh toán khi Invoices.Status đã là Paid và outstandingBalance ≤ 0 |
 
-
 ### 0.2. Quy ước kỹ thuật chung
 
 - Tiền tố API: Toàn bộ API của Module C phục vụ hệ thống thống nhất theo prefix chuẩn `/api/v1/` (Backend đồng thời hỗ trợ alias không có `/v1` để tương thích ngược).
@@ -89,13 +85,11 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 - Danh sách rỗng KHÔNG phải là lỗi: API luôn trả HTTP 200 kèm mảng rỗng + total = 0; FE tự hiển thị thông báo "Không tìm thấy..." tương ứng, không dùng mã ERROR cho trường hợp này.
 - Việc kiểm tra quyền (Authorization) luôn thực hiện TRƯỚC TIÊN, trước cả bước validate dữ liệu nhập — áp dụng thống nhất cho cả 4 tính năng, giống nguyên tắc ở Spec mẫu mục 3.1.
 
-
 ---
 
 ## C1. FEAT-SERVICE-01 — Quản lý danh mục dịch vụ khách sạn (CRUD)
 
 **Tương ứng:** C1 trong Bảng truy vết  |  **Màn hình:** 22 (mục IV báo cáo)  |  **Bảng DB:** Services, ServiceCategories
-
 
 ### 1.1. Tổng quan tính năng
 
@@ -108,7 +102,6 @@ Hệ thống quản lý khách sạn chuẩn hoá danh mục 22 mã lỗi nghi�
 | Trigger | Actor bấm "+ New Service" / chọn 1 dịch vụ trong danh sách để sửa / bấm "Ngừng cung cấp" trên màn 22. |
 | Điều kiện tiên quyết | Đã đăng nhập, role có quyền tương ứng. |
 
-
 Danh sách Endpoint API:
 - `GET /api/v1/services/categories` — Lấy danh sách nhóm dịch vụ
 - `POST /api/v1/services/categories` — Thêm mới nhóm dịch vụ (Category)
@@ -120,14 +113,12 @@ Danh sách Endpoint API:
 
 ### 1.2. Danh sách trường dữ liệu (INPUT)
 
-
 #### a) ServiceCategories (nhóm dịch vụ — phải có sẵn ít nhất 1 nhóm Active trước khi tạo dịch vụ):
 
 | **Trường** | **Tên hiển thị** | **Kiểu** | **Bắt buộc** | **Ràng buộc chính** |
 | :--- | :--- | :--- | :--- | :--- |
 | categoryName | Tên nhóm dịch vụ | string | Có | 2–100 ký tự sau trim; KHÔNG trùng (không phân biệt hoa/thường) với CategoryName đang tồn tại |
 | description | Mô tả | string | Không | Tối đa 500 ký tự |
-
 
 #### b) Services (dịch vụ cụ thể):
 
@@ -141,9 +132,7 @@ Danh sách Endpoint API:
 | description | Mô tả dịch vụ | string | Không | Tối đa 1000 ký tự |
 | status | Trạng thái | enum | Hệ thống set | Chỉ nhận 2 giá trị: Active \| Inactive. Luôn = Active khi tạo mới, KHÔNG cho set tay ở bước tạo |
 
-
 ### 1.3. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền truy cập
 
@@ -201,7 +190,6 @@ Danh sách Endpoint API:
 | Chung | Không đủ quyền | ERROR_0010_FORBIDDEN | Bạn không có quyền thực hiện chức năng này |
 | Chung | Lưu thành công | SUCCESS_0001_CREATED | Thêm mới dịch vụ thành công |
 
-
 ### 1.6. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -214,14 +202,11 @@ Danh sách Endpoint API:
 | 6 | Tất cả field hợp lệ | Tạo thành công, serviceCode tự sinh vd SVC-SPA-001, status = Active |
 | 7 | Admin bấm "Ngừng cung cấp" 1 dịch vụ đang có đơn ServiceOrders ở trạng thái InProgress | Cho phép Inactive bình thường (không chặn) — đơn cũ vẫn xử lý tiếp bình thường vì FK ServiceId không đổi |
 
-
-
 ---
 
 ## C2. FEAT-SERVICE-02 — Xem danh sách, tìm kiếm và phân loại dịch vụ
 
 **Tương ứng:** C2 trong Bảng truy vết  |  **Màn hình:** 22 (khu vực tra cứu)  |  **Endpoint:** GET /api/v1/services?group=&search= (alias: GET /services)
-
 
 ### 2.1. Tổng quan tính năng
 
@@ -234,7 +219,6 @@ Danh sách Endpoint API:
 | Trigger | Actor mở trang Dịch vụ / gõ từ khoá tìm kiếm / chọn filter nhóm dịch vụ. |
 | Điều kiện tiên quyết | Không có — endpoint công khai (public), không yêu cầu đăng nhập. |
 
-
 ### 2.2. Tham số đầu vào (Query Params)
 
 | **Tham số** | **Kiểu** | **Bắt buộc** | **Mô tả / Ràng buộc** |
@@ -244,7 +228,6 @@ Danh sách Endpoint API:
 | minPrice / maxPrice | decimal | Không | Lọc theo khoảng giá; nếu minPrice > maxPrice → ERROR_0004_INVALID_FORMAT ("Khoảng giá không hợp lệ") |
 | sortBy | enum | Không | Nhận 1 trong: name_asc (mặc định), price_asc, price_desc. Giá trị khác → dùng mặc định name_asc, KHÔNG báo lỗi |
 | page / pageSize | int | Không | Theo quy ước phân trang chung (mục 0.2) |
-
 
 ### 2.3. Quy tắc nghiệp vụ
 
@@ -263,14 +246,11 @@ Danh sách Endpoint API:
 | 4 | Dịch vụ có Status=Active nhưng Category cha Status=Inactive | KHÔNG xuất hiện trong kết quả |
 | 5 | sortBy = "abc" (giá trị rác) | Áp dụng mặc định name_asc, không trả lỗi |
 
-
-
 ---
 
 ## C3. FEAT-SERVICE-03 — Đặt dịch vụ (khách tự đặt / lễ tân ghi nhận)
 
-**Tương ứng:** C3 trong Bảng truy vết  |  **Màn hình:** 23  |  Endpoint chính: POST /api/v1/service-orders (alias: POST /service-orders)  |  **Bảng DB:** ServiceOrders
-
+**Tương ứng:** C3 trong Bảng truy vết  |  **Màn hình:** 23  |  **Endpoint chính:** POST /api/v1/service-orders (alias: POST /service-orders)  |  **Bảng DB:** ServiceOrders
 
 **Danh sách Endpoint hỗ trợ:**
 
@@ -290,7 +270,6 @@ Danh sách Endpoint API:
 | Trigger | Actor chọn dịch vụ, nhập số lượng và bấm "Xác nhận đặt dịch vụ". |
 | Điều kiện tiên quyết | Đã đăng nhập; Stay tương ứng đang ở trạng thái CheckedIn hoặc Extended. |
 
-
 ### 3.2. Danh sách trường dữ liệu (INPUT)
 
 Hệ thống hỗ trợ 2 hình thức gửi dữ liệu:
@@ -302,7 +281,6 @@ Hệ thống hỗ trợ 2 hình thức gửi dữ liệu:
 | quantity | Số lượng | decimal | Có | > 0 và ≤ 100; Đối với đơn vị rời rạc (Lượt, Phần, Chai, Vé) bắt buộc là số nguyên dương; Đối với đơn vị thời gian (Giờ) cho phép số thập phân bước nhảy 0.5 |
 | note | Ghi chú | string | Không | Tối đa 500 ký tự |
 
-
 2. Đặt nhiều dịch vụ cùng lúc (Batch Order):
 | **Trường** | **Tên hiển thị** | **Kiểu** | **Bắt buộc** | **Ràng buộc chính** |
 | :--- | :--- | :--- | :--- | :--- |
@@ -310,11 +288,9 @@ Hệ thống hỗ trợ 2 hình thức gửi dữ liệu:
 | items | Danh sách dịch vụ | array | Có | Mảng các đối tượng { serviceId, quantity, note }, tối thiểu 1 phần tử |
 | note | Ghi chú chung | string | Không | Tối đa 500 ký tự (dùng làm ghi chú mặc định cho các item không có note riêng) |
 
-
 Các trường hệ thống tự sinh, KHÔNG nhận từ client: unitPrice (snapshot Services.Price tại thời điểm đặt), totalPrice (= quantity × unitPrice), orderDate (= NOW()), status (= 'Received'), createdBy (= UserId của người đang đăng nhập thực hiện thao tác).
 
 ### 3.3. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền thực hiện
 
@@ -362,7 +338,6 @@ Các trường hệ thống tự sinh, KHÔNG nhận từ client: unitPrice (sna
 | note | > 500 ký tự | ERROR_0003_MAX_LENGTH | Ghi chú không được vượt quá 500 ký tự |
 | Chung | Tạo đơn thành công | SUCCESS_0001_CREATED | Thêm mới đơn dịch vụ thành công |
 
-
 ### 3.6. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -374,14 +349,11 @@ Các trường hệ thống tự sinh, KHÔNG nhận từ client: unitPrice (sna
 | 5 | Đặt hợp lệ, Services.Price hiện tại = 350.000đ; sau đó Admin đổi giá thành 400.000đ | ServiceOrders.UnitPrice của đơn đã tạo vẫn giữ 350.000đ (snapshot), không đổi theo giá catalog mới |
 | 6 | Lễ tân đặt hộ cho Stay bất kỳ đang Extended | Tạo thành công, createdBy = UserId của lễ tân |
 
-
-
 ---
 
 ## C4. FEAT-SERVICE-04 — Quản lý tiến độ thực hiện dịch vụ
 
 **Tương ứng:** C4 trong Bảng truy vết  |  **Màn hình:** 24  |  **Endpoint:** PATCH /api/v1/service-orders/{orderId}/status (alias: PATCH /service-orders/{orderId}/status)
-
 
 ### 4.1. Tổng quan tính năng
 
@@ -394,7 +366,6 @@ Các trường hệ thống tự sinh, KHÔNG nhận từ client: unitPrice (sna
 | Trigger | Actor bấm nút chuyển trạng thái tương ứng trên màn 24 (Start / Complete / Cancel). |
 | Điều kiện tiên quyết | Đơn dịch vụ (OrderId) đã tồn tại. |
 
-
 ### 4.2. Danh sách trường dữ liệu (INPUT)
 
 | **Trường** | **Tên hiển thị** | **Kiểu** | **Bắt buộc** | **Ràng buộc chính** |
@@ -402,7 +373,6 @@ Các trường hệ thống tự sinh, KHÔNG nhận từ client: unitPrice (sna
 | orderId | Mã đơn dịch vụ | int (path param) | Có | Phải tồn tại trong ServiceOrders |
 | newStatus | Trạng thái mới | enum | Có | 1 trong: InProgress, Completed, Cancelled — không nhận Received (không có transition nào quay lại Received) |
 | cancelReason | Lý do huỷ | string | Bắt buộc CHỈ KHI newStatus = Cancelled | 2–500 ký tự sau trim; ghi đè vào ServiceOrders.Note |
-
 
 ### 4.3. Ma trận chuyển trạng thái hợp lệ (State Transition Matrix)
 
@@ -450,7 +420,6 @@ Mọi transition không nằm trong bảng trên → trả ERROR_0013_INVALID_ST
 | cancelReason | Độ dài > 500 ký tự | ERROR_0003_MAX_LENGTH | Lý do huỷ không được vượt quá 500 ký tự |
 | Chung | Cập nhật thành công | SUCCESS_0001_CREATED (biến thể: dùng chung template "Cập nhật {đối tượng} thành công") | Cập nhật trạng thái đơn dịch vụ thành công |
 
-
 ### 4.7. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -462,13 +431,10 @@ Mọi transition không nằm trong bảng trên → trả ERROR_0013_INVALID_ST
 | 5 | orderId đang Received, nhân viên chuyển thẳng sang Completed | Thành công (bỏ qua InProgress được cho phép theo mục 4.3) |
 | 6 | orderId không tồn tại (999999) | ERROR_0011_NOT_FOUND |
 
-
-
-
 ---
 
 # PHẦN II: CORE PAYMENT MODULE (C5)
-### Thông tin định danh phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C5 — Core Payment Module (Thanh toán dùng chung)
+## Thông tin phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C5 — Core Payment Module (Thanh toán dùng chung)
 
 - **Phụ trách nghiệp vụ (báo cáo đồ án):** Đặng Văn Hà
 
@@ -476,10 +442,7 @@ Mọi transition không nằm trong bảng trên → trả ERROR_0013_INVALID_ST
 
 - **Mục tiêu tài liệu:** Đặc tả Core Payment Module như một dịch vụ dùng chung (shared service) mà các tính năng khác (Đặt cọc booking – A8, Minibar/checkout – B, Thanh toán hoá đơn tổng – C6-C9) đều gọi vào, không tự cài đặt logic thanh toán riêng lẻ.
 
-
-
 ### 0. QUY ƯỚC BỔ SUNG CHO C5
-
 
 #### 0.1. Mã lỗi mới bổ sung
 
@@ -488,20 +451,17 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0015 và SUCCESS_0001 từ Spec mẫu 
 | :--- | :--- | :--- | :--- |
 | ERROR_0016_INVALID_COMBINATION | Tổ hợp trường không hợp lệ (loại trừ lẫn nhau) | Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B} | Client gửi cả bookingId & invoiceId, hoặc gửi thiếu cả hai, trong khi API POST /payments yêu cầu đúng 1 trong 2 (Lưu ý: Ràng buộc này chỉ áp dụng cho payload gọi API, KHÔNG áp dụng cho bảng Payments trong DB sau khi liên kết cọc ở C7) |
 
-
 #### 0.2. Quy ước riêng cho module Thanh toán
 
 - Toàn bộ tiền vào Payments.Amount là số tiền GUEST/NHÂN VIÊN thực trả trong 1 lần giao dịch — không phải tổng công nợ; 1 booking hoặc 1 invoice có thể có NHIỀU dòng Payments (trả nhiều lần / cọc rồi trả nốt).
 - PaymentDate được set NGAY khi tạo bản ghi (= thời điểm khởi tạo giao dịch, không phải thời điểm hoàn tất) — vì cột này NOT NULL trong khi thanh toán online có thể ở trạng thái Pending một khoảng thời gian trước khi có kết quả. Thời điểm hoàn tất thực tế (nếu cần đối soát chi tiết) được đọc từ GatewayResponse (JSON gateway trả về có timestamp riêng).
 - 6 giá trị PaymentMethod chia 3 nhóm hành vi khác nhau (mục 1.4.c): Cash / Card / BankTransfer = xử lý tại quầy (staff-only, Paid ngay); VNPay / MoMo = cổng redirect (Pending → chờ callback); VietQR = mã QR động (Pending → chờ callback hoặc xác nhận thủ công).
 
-
 ---
 
 ## C5. FEAT-PAYMENT-01 — Core Payment Module
 
 **Tương ứng:** C5 trong Bảng truy vết  |  **Màn hình:** 7 (Thanh toán tiền cọc), 26 (Thanh toán hoá đơn & Mã QR)  |  **Bảng DB:** Payments
-
 
 ### 1.1. Tổng quan tính năng
 
@@ -514,7 +474,6 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0015 và SUCCESS_0001 từ Spec mẫu 
 | Trigger | Actor bấm nút thanh toán trên màn 7/26 (hoặc bất kỳ màn nào khác cần thu tiền) → FE gọi POST /payments; Gateway gọi POST /payments/webhook/{method} khi có kết quả. |
 | Điều kiện tiên quyết | Đã có đối tượng cần thanh toán: Booking (đang chờ cọc) hoặc Invoice (Unpaid/PartiallyPaid). |
 
-
 ### 1.2. Danh sách Endpoint
 
 | **Endpoint** | **Method** | **Actor gọi** | **Mục đích** |
@@ -524,8 +483,7 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0015 và SUCCESS_0001 từ Spec mẫu 
 | /api/v1/payments/webhook/{method} | POST | Gateway (VNPay/MoMo) hoặc trang Mock nội bộ | Nhận kết quả thanh toán, cập nhật Status Pending → Paid/Failed |
 | /api/v1/payments/{paymentId}/refund | PATCH | Admin / Kế toán | Hoàn tiền 1 giao dịch đã Paid (mục 1.9) |
 
-
-### 1.3. Danh sách trường dữ liệu (INPUT — POST /payments)
+### 1.3. Danh sách trường dữ liệu (INPUT — `POST /payments`)
 
 | **Trường** | **Tên hiển thị** | **Kiểu** | **Bắt buộc** | **Ràng buộc chính** |
 | :--- | :--- | :--- | :--- | :--- |
@@ -538,7 +496,6 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0015 và SUCCESS_0001 từ Spec mẫu 
 Trường hệ thống tự sinh, KHÔNG nhận từ client: paymentId, userId (lấy từ token), transactionCode (định dạng PMT-{yyyyMMddHHmmss}-{4 số ngẫu nhiên}, duy nhất), paymentDate (= NOW()), status (= 'Pending' cho VNPay/MoMo/VietQR, = 'Paid' ngay cho Cash/Card/BankTransfer), gatewayResponse (rỗng lúc tạo, được ghi khi có callback).
 
 ### 1.4. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền thực hiện
 
@@ -648,7 +605,6 @@ Mọi transition không nằm trong bảng trên → ERROR_0013_INVALID_STATE_TR
 | refundReason | Để trống | ERROR_0001_REQUIRED | Lý do hoàn tiền không được để trống |
 | Chung | Tạo/xử lý thành công | SUCCESS_0001_CREATED | Tạo yêu cầu thanh toán thành công |
 
-
 ### 1.11. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -664,13 +620,10 @@ Mọi transition không nằm trong bảng trên → ERROR_0013_INVALID_STATE_TR
 | 9 | Admin refund 1 Payment đang Status = Pending | ERROR_0013 — Không thể hoàn tiền — giao dịch không ở trạng thái đã thanh toán |
 | 10 | Thu ngân tạo Payment method=Cash, amount hợp lệ, đúng bookingId đang Pending | Tạo thành công, Status = Paid ngay, không có paymentUrl/qrCodeData trong response |
 
-
-
-
 ---
 
 # PHẦN III: HỆ THỐNG HOÁ ĐƠN & QUYẾT TOÁN (C6 – C10)
-### Thông tin định danh phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C6 — Tự động gom chi phí lưu trú (Booking Charges Aggregation)
+## Thông tin phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C6 — Tự động gom chi phí lưu trú (Booking Charges Aggregation)
 
 - **Phụ trách nghiệp vụ (báo cáo đồ án):** Đặng Văn Hà
 
@@ -678,14 +631,11 @@ Mọi transition không nằm trong bảng trên → ERROR_0013_INVALID_STATE_TR
 
 - **Mục tiêu tài liệu:** Đặc tả cách hệ thống tổng hợp tạm tính toàn bộ chi phí của 1 booking (phòng + gia hạn/đổi phòng + dịch vụ + minibar + F&B + bồi thường/phụ thu) trước khi phát hành hoá đơn chính thức (C7).
 
-
-
 ---
 
 ## C6. FEAT-INVOICE-01 — Tự động gom chi phí lưu trú (Booking Charges Aggregation)
 
 **Tương ứng:** C6 trong Bảng truy vết  |  **Màn hình:** 20 (Check-out), 25 (Hoá đơn tổng hợp)  |  **Endpoint:** GET /api/v1/bookings/{bookingId}/charges (alias: GET /bookings/{bookingId}/charges)
-
 
 ### 1.1. Tổng quan tính năng
 
@@ -698,13 +648,11 @@ Mọi transition không nằm trong bảng trên → ERROR_0013_INVALID_STATE_TR
 | Trigger | Nhân viên mở màn 20 (Check-out) hoặc màn 25 (Hoá đơn tổng hợp) cho 1 booking cụ thể. |
 | Điều kiện tiên quyết | Booking đã tồn tại trong hệ thống (không bắt buộc đã check-in). |
 
-
 ### 1.2. Tham số đầu vào
 
 | **Tham số** | **Kiểu** | **Bắt buộc** | **Mô tả / Ràng buộc** |
 | :--- | :--- | :--- | :--- |
 | bookingId | int (path param) | Có | Phải tồn tại trong bảng Bookings; không tồn tại → ERROR_0011_NOT_FOUND |
-
 
 ### 1.3. Cấu trúc dữ liệu trả về (Response)
 
@@ -738,9 +686,7 @@ Mọi transition không nằm trong bảng trên → ERROR_0013_INVALID_STATE_TR
 | totalPaid | decimal | = MAX(tổng Payments hợp lệ thuộc PAID_STATUSES trừ RefundAmount, Bookings.DepositAmount) |
 | remainingBalance | decimal | = MAX(0, grandTotal − totalPaid) — số tiền còn phải thu tại quầy |
 
-
 ### 1.4. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền truy cập
 
@@ -798,7 +744,6 @@ Mọi transition không nằm trong bảng trên → ERROR_0013_INVALID_STATE_TR
 | Chung | Guest tự gọi API | ERROR_0010_FORBIDDEN | Bạn không có quyền thực hiện chức năng này |
 | bookingId | Không tồn tại | ERROR_0011_NOT_FOUND | Booking không tồn tại hoặc đã bị xoá |
 
-
 ### 1.7. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -812,19 +757,15 @@ Mọi transition không nằm trong bảng trên → ERROR_0013_INVALID_STATE_TR
 | 7 | Guest tự đăng nhập gọi API cho booking của chính mình | 403 FORBIDDEN (endpoint chỉ dành nội bộ, xem mục 1.4.a) |
 | 8 | Gọi lại GET nhiều lần liên tiếp cho cùng bookingId | Kết quả giống hệt nhau mỗi lần (miễn dữ liệu nguồn không đổi) — không có tác dụng phụ ghi DB |
 
-
-
 ### 1.8. Liên kết dữ liệu sang Master Invoice (C7)
 
 - Toàn bộ kết quả tính toán từ hàm `calculateBookingChargesData(bookingId)` của C6 được C7 (`POST /api/v1/invoices/master`) gọi lại trực tiếp bên trong DB Transaction có khoá dòng (`SELECT ... FOR UPDATE`), đảm bảo số liệu giữa Bảng kê tạm tính (C6) và Hoá đơn tổng hợp chính thức (C7) khớp nhau 100%.
 - Cột `Invoices.BookingId` (NOT NULL) và `Invoices.StayId` (NULLABLE) được áp dụng thống nhất: Booking 1 phòng lưu cả `BookingId` và `StayId`; Booking nhiều phòng lưu `BookingId` và `StayId = NULL` (Master Invoice gộp chung 1 hoá đơn cho cả đoàn/nhiều phòng).
 - Các khoản `Payments` đặt cọc đã thu trước đó (`BookingId = bookingId`, `InvoiceId = NULL`, `Status ∈ PAID_STATUSES`) được tự động liên kết ngược vào `InvoiceId` vừa tạo để khấu trừ công nợ và suy diễn trạng thái `Unpaid / PartiallyPaid / Paid`.
 
-
-
 ---
 
-### Thông tin định danh phân hệ: Module C — Dịch Vụ & Thanh Toán | C7 — Tạo hoá đơn tổng hợp (Master Invoice) tại quầy Check-out
+## Thông tin phân hệ: Module C — Dịch Vụ & Thanh Toán | C7 — Tạo hoá đơn tổng hợp (Master Invoice) tại quầy Check-out
 
 - **Phụ trách nghiệp vụ (báo cáo đồ án):** Đặng Văn Hà
 
@@ -832,10 +773,7 @@ Mọi transition không nằm trong bảng trên → ERROR_0013_INVALID_STATE_TR
 
 - **Mục tiêu tài liệu:** Đặc tả cách hệ thống chốt số liệu tạm tính từ C6 thành 1 bản ghi Invoices chính thức duy nhất cho cả booking (kể cả booking nhiều phòng), và liên kết lại các khoản Payments đã thu trước đó (đặt cọc).
 
-
-
 ### 0. QUY ƯỚC BỔ SUNG CHO C7
-
 
 #### 0.1. Mã lỗi mới bổ sung
 
@@ -844,21 +782,17 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0016 và SUCCESS_0001. Bổ sung 1 mã
 | :--- | :--- | :--- | :--- |
 | ERROR_0017_ALREADY_EXISTS | Đối tượng đích đã tồn tại, không được tạo trùng | {Đối tượng} đã tồn tại, vui lòng dùng bản ghi hiện có | Booking đã có Invoice hợp lệ (Status ≠ Cancelled), gọi tạo Master Invoice lần nữa |
 
-
-
 #### 0.2. Quy ước riêng cho C7
 
 - C7 không tự tính lại chi phí — nó gọi đúng logic đã đặc tả ở C6 (mục 1.4.b–e) để lấy grandTotal, sau đó chốt thành Invoice. Nếu logic tính tiền phòng/dịch vụ/minibar/F&B thay đổi, chỉ sửa 1 nơi (C6), C7 không định nghĩa lại.
 - InvoiceNumber sinh tự động, định dạng INV-{yyyyMMdd}-{6 chữ số tăng dần trong ngày}, duy nhất toàn hệ thống, không cho sửa sau khi tạo.
 - Một khi Invoice đã tạo (dù Status = Unpaid), không cho sửa/xoá/tạo lại qua API này — mọi điều chỉnh sau đó (thêm phụ thu phát sinh muộn, hoàn tiền...) thuộc phạm vi tính năng khác (C9 — Quản lý danh sách hoá đơn, hoặc Refund ở C5).
 
-
 ---
 
 ## C7. FEAT-INVOICE-02 — Tạo hoá đơn tổng hợp (Master Invoice) tại quầy Check-out
 
 **Tương ứng:** C7 trong Bảng truy vết  |  **Màn hình:** 20 (Check-out), 25 (Hoá đơn tổng hợp/Folio)  |  **Endpoint:** POST /api/v1/invoices/master (alias: POST /invoices/master)  |  **Bảng DB:** Invoices, InvoiceDetails, Payments (update)
-
 
 ### 1.1. Tổng quan tính năng
 
@@ -871,16 +805,13 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0016 và SUCCESS_0001. Bổ sung 1 mã
 | Trigger | Actor bấm "Đồng ý" / "Tạo hoá đơn tổng hợp" trên màn 20 hoặc 25 sau khi xem bảng chi tiết từ C6. |
 | Điều kiện tiên quyết | Booking tồn tại, có ít nhất 1 Stay, toàn bộ Stay thuộc booking đã CheckedOut, booking chưa có Invoice nào còn hiệu lực. |
 
-
-
-### 1.2. Tham số đầu vào (INPUT — POST /invoices/master)
+### 1.2. Tham số đầu vào (INPUT — `POST /invoices/master`)
 
 | **Trường** | **Tên hiển thị** | **Kiểu** | **Bắt buộc** | **Ràng buộc chính** |
 | :--- | :--- | :--- | :--- | :--- |
 | bookingId | Booking cần lập hoá đơn | int (FK) | Có | Phải tồn tại; xem điều kiện trạng thái mục 1.4.b |
 | vatRate | Tỷ lệ VAT áp dụng (%) | decimal | Không | Mặc định lấy từ cấu hình hệ thống (System Config); nếu truyền tay: 0–100 |
 | manualAdjustments[] | Phụ thu/giảm giá thủ công tại quầy | array | Không | Xem cấu trúc & ràng buộc bên dưới |
-
 
 manualAdjustments[].item:
 | **Trường** | **Kiểu** | **Bắt buộc** | **Ràng buộc** |
@@ -889,9 +820,7 @@ manualAdjustments[].item:
 | amount | decimal | Có | ≠ 0 (dương = phụ thu, âm = giảm giá thủ công); \|amount\| ≤ grandTotal từ C6 × 2 (chặn nhập nhầm số quá lớn) |
 | itemType | enum | Có | Chỉ nhận Surcharge hoặc Other — không được truyền Room/Service/Minibar/Food (các loại này hệ thống tự sinh từ C6, client không được tự khai) |
 
-
 Trường hệ thống tự sinh, KHÔNG nhận từ client: invoiceId, invoiceNumber, invoiceDate (= NOW()), subtotal, vatAmount, totalAmount, status, pdfPath (rỗng, sinh sau ở C8), toàn bộ InvoiceDetails.
-
 
 ### 1.3. Cấu trúc dữ liệu trả về (Response)
 
@@ -907,10 +836,7 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: invoiceId, invoiceN
 | details[] | array | Danh sách InvoiceDetails vừa sinh (ItemType, Description, Quantity, UnitPrice, TotalPrice) |
 | linkedPaymentIds[] | array<int> | Danh sách PaymentId đã được liên kết ngược (set InvoiceId) trong lần tạo này |
 
-
-
 ### 1.4. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền truy cập
 
@@ -959,7 +885,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: invoiceId, invoiceN
 
 - Khác với C6 (thuần đọc), C7 có ghi DB nên KHÔNG tự nhiên idempotent — do đó bước kiểm tra "đã có Invoice chưa" ở mục b là bắt buộc để chặn tạo trùng khi Lễ tân double-click hoặc mất mạng bấm lại.
 
-
 ### 1.5. Luồng xử lý
 
 - Actor xem bảng tạm tính (C6) trên màn 20/25, có thể sửa/thêm phụ thu thủ công, bấm "Tạo hoá đơn tổng hợp" → FE gọi POST /invoices/master.
@@ -971,7 +896,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: invoiceId, invoiceN
 - Tạo bản ghi Invoices + toàn bộ InvoiceDetails trong 1 transaction (mục 1.4.d).
 - Liên kết ngược Payments đã Paid, tính lại Invoices.Status (mục 1.4.e), commit transaction.
 - Trả về response theo cấu trúc mục 1.3 — HTTP 201; hiển thị "Tạo hoá đơn tổng hợp thành công" (SUCCESS_0001_CREATED, đối tượng = "hoá đơn"), chuyển sang màn thanh toán (C9/màn 26) hoặc xuất PDF (C8).
-
 
 ### 1.6. Bảng lỗi áp dụng
 
@@ -989,8 +913,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: invoiceId, invoiceN
 | totalAmount | Âm sau khi cộng điều chỉnh | ERROR_0012_OUT_OF_RANGE | Tổng hoá đơn không được âm — kiểm tra lại khoản giảm giá thủ công |
 | Chung | Tạo thành công | SUCCESS_0001_CREATED | Tạo hoá đơn tổng hợp thành công |
 
-
-
 ### 1.7. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -1006,12 +928,9 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: invoiceId, invoiceN
 | 9 | manualAdjustments itemType="Room" | ERROR_0005_INVALID_VALUE |
 | 10 | Lễ tân double-click nút Tạo hoá đơn (gọi API 2 lần liên tiếp rất nhanh) | Lần 2 trả ERROR_0017 vì lần 1 đã kịp tạo Invoice |
 
-
-
-
 ---
 
-### Thông tin định danh phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C8 — Xuất hoá đơn PDF (Invoice PDF Export)
+## Thông tin phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C8 — Xuất hoá đơn PDF (Invoice PDF Export)
 
 - **Phụ trách nghiệp vụ (báo cáo đồ án):** Đặng Văn Hà
 
@@ -1019,10 +938,7 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: invoiceId, invoiceN
 
 - **Mục tiêu tài liệu:** Đặc tả cách hệ thống xuất file PDF chính thức từ 1 bản ghi Invoices đã được chốt ở C7 (Master Invoice). C8 chỉ đọc Invoices + InvoiceDetails có sẵn, sinh file PDF, lưu đường dẫn vào Invoices.PdfPath và trả file cho người dùng.
 
-
-
 ### 0. QUY ƯỚC BỔ SUNG CHO C8
-
 
 #### 0.1. Mã lỗi mới bổ sung
 
@@ -1031,8 +947,6 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0017 và SUCCESS_0001 từ Spec mẫu 
 | :--- | :--- | :--- | :--- |
 | ERROR_0018_GENERATION_FAILED | Sinh file PDF thất bại (lỗi renderer/template) | Không thể tạo file hoá đơn PDF, vui lòng thử lại | Engine render PDF (ví dụ Puppeteer/PDFKit) lỗi khi xử lý template hoặc timeout |
 | ERROR_0019_STORAGE_FAILED | Lưu/đọc file trên storage thất bại | Không thể lưu hoặc truy xuất file hoá đơn, vui lòng thử lại | Ghi file lên storage (local disk/S3-compatible) lỗi, hoặc PdfPath có giá trị nhưng file vật lý không còn tồn tại (mục 1.4.b) |
-
-
 
 #### 0.2. Quy ước riêng cho module Xuất PDF
 
@@ -1047,7 +961,6 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0017 và SUCCESS_0001 từ Spec mẫu 
 
 **Tương ứng:** C8 trong Bảng truy vết  |  **Màn hình:** 25 (Hoá đơn tổng hợp — Folio), nút "Print Official Tax Invoice" / "Send Digital Invoice PDF"  |  **Endpoint:** GET /api/v1/invoices/{invoiceId}/pdf (alias: GET /invoices/{invoiceId}/pdf)  |  **Bảng DB:** Invoices (đọc + ghi cột PdfPath)
 
-
 ### 1.1. Tổng quan tính năng
 
 | **Trường** | **Nội dung** |
@@ -1059,8 +972,6 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0017 và SUCCESS_0001 từ Spec mẫu 
 | Trigger | Actor bấm "Print Official Tax Invoice" hoặc "Send Digital Invoice PDF" trên màn 25/26, hoặc Guest bấm "Tải hoá đơn" trên màn Lịch sử đặt phòng (màn 9). |
 | Điều kiện tiên quyết | Invoice (invoiceId) đã tồn tại — tức đã được tạo thành công qua FEAT-INVOICE-02 (C7). |
 
-
-
 ### 1.2. Tham số đầu vào
 
 | **Tham số** | **Kiểu** | **Bắt buộc** | **Mô tả / Ràng buộc** |
@@ -1068,8 +979,6 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0017 và SUCCESS_0001 từ Spec mẫu 
 | invoiceId | int (path param) | Có | Phải tồn tại trong bảng Invoices; không tồn tại → ERROR_0011_NOT_FOUND |
 | regenerate | boolean (query, optional) | Không | Mặc định false. Chỉ Admin/Kế toán được truyền true để ép sinh lại PDF (VD: sửa lại logo/template hệ thống) dù đã có PdfPath — xem mục 1.4.b |
 | mode | enum (query, optional) | Không | "inline" (mặc định, mở trực tiếp trên trình duyệt) hoặc "download" (buộc tải về, set Content-Disposition: attachment) |
-
-
 
 ### 1.3. Kết quả trả về (Response)
 
@@ -1081,11 +990,9 @@ Endpoint trả về NHỊ PHÂN (binary), không phải JSON, khi thành công:
 | Content-Disposition | inline; filename="INV-{InvoiceNumber}.pdf" (mode=inline) hoặc attachment; filename="..." (mode=download) |
 | Body | Nội dung file PDF (byte stream) |
 
-
 Ngoài ra, hệ thống cung cấp endpoint GET /invoices/{invoiceId}/pdf-info trả JSON gồm: { invoiceId, invoiceNumber, pdfAvailable: boolean, pdfGeneratedAt, pdfUrl } để FE kiểm tra trạng thái file PDF trước khi tải.
 
 ### 1.4. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền truy cập
 
@@ -1094,7 +1001,6 @@ Ngoài ra, hệ thống cung cấp endpoint GET /invoices/{invoiceId}/pdf-info t
 - Riêng query param regenerate=true: chỉ Admin hoặc tài khoản có quyền "Quản lý hoá đơn" mới được dùng; Guest hoặc Lễ tân thường truyền regenerate=true → hệ thống ÂM THẦM bỏ qua tham số này (coi như false), KHÔNG trả lỗi.
 - Không có token / hết hạn → 401 (ERROR_0009_UNAUTHENTICATED).
 
-
 #### b) Cơ chế cache PDF — sinh 1 lần, tái sử dụng nhiều lần
 
 - Khi nhận request, hệ thống đọc Invoices.PdfPath của invoiceId tương ứng:
@@ -1102,7 +1008,6 @@ Ngoài ra, hệ thống cung cấp endpoint GET /invoices/{invoiceId}/pdf-info t
   - Nếu PdfPath khác rỗng nhưng file vật lý KHÔNG còn tồn tại trên storage (bị xoá ngoài ý muốn, storage lỗi...) → ghi log cảnh báo, tự động chuyển sang nhánh "sinh mới" bên dưới như thể PdfPath đang rỗng (KHÔNG trả ERROR_0019 ngay ở bước đọc — tự phục hồi trước, chỉ trả lỗi nếu bước sinh mới cũng thất bại).
   - Nếu PdfPath rỗng/NULL, HOẶC regenerate = true (và actor đủ quyền theo mục a): tiến hành sinh PDF mới theo mục c.
 - Cơ chế vô hiệu hoá Cache PDF: Bất cứ khi nào Invoice có phát sinh thanh toán mới hoặc trạng thái Invoices.Status thay đổi (chuyển sang Paid ở C9, hoặc Cancelled/Refunded ở C10), hệ thống BẮT BUỘC vô hiệu hoá cache cũ (đặt Invoices.PdfPath = NULL hoặc tự động render lại file PDF mới) để đảm bảo tệp PDF xuất ra phản ánh chính xác 100% tình trạng quyết toán tài chính hiện thời.
-
 
 #### c) Nội dung & cấu trúc file PDF khi sinh mới
 
@@ -1117,14 +1022,11 @@ Template PDF gồm các khối theo đúng thứ tự sau, dữ liệu lấy 100
 | 6 | Thanh toán | Danh sách Payments đã liên kết (InvoiceId = invoiceId), mỗi dòng: PaymentDate, PaymentMethod, Amount, Status; số dư còn lại (TotalAmount trừ tổng Payments Paid) nếu Status ≠ Paid |
 | 7 | Chân trang | Câu xác nhận "Đây là hoá đơn điện tử hợp lệ", mã băm/QR xác thực tính toàn vẹn, thông tin liên hệ khách sạn |
 
-
-
 #### d) Ghi PdfPath sau khi sinh thành công
 
 - Sau khi engine render PDF trả về file thành công, hệ thống upload file lên storage (local disk theo cấu trúc /uploads/invoices/INV-{InvoiceNumber}.pdf hoặc S3-compatible storage), sau đó UPDATE Invoices.PdfPath = đường dẫn/khoá vừa lưu.
 - Việc ghi PdfPath là ghi ĐÈ (kể cả trường hợp regenerate=true) — không lưu lịch sử các bản PDF cũ.
 - Nếu bước upload/ghi PdfPath thất bại (lỗi storage) sau khi ĐÃ render PDF thành công: vẫn trả file PDF vừa render cho actor hiện tại (không chặn trải nghiệm người dùng), nhưng ghi log lỗi ERROR_0019_STORAGE_FAILED để lần gọi kế tiếp tự thử sinh lại (vì PdfPath vẫn đang rỗng trong DB).
-
 
 #### e) Trạng thái Invoice = Cancelled
 
@@ -1151,8 +1053,6 @@ Template PDF gồm các khối theo đúng thứ tự sau, dữ liệu lấy 100
 | Chung | Lỗi lưu/đọc file trên storage (cả 2 lần thử: cache lẫn sinh mới) | ERROR_0019_STORAGE_FAILED | Không thể lưu hoặc truy xuất file hoá đơn, vui lòng thử lại |
 | Chung | Trả file thành công | 200 OK (binary, không dùng SUCCESS_0001) | Không áp dụng — thành công trả trực tiếp file, không có message JSON đi kèm |
 
-
-
 ### 1.7. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -1168,12 +1068,9 @@ Template PDF gồm các khối theo đúng thứ tự sau, dữ liệu lấy 100
 | 9 | mode=download | Header Content-Disposition: attachment — trình duyệt tự tải về thay vì mở tab mới |
 | 10 | Engine render PDF timeout (giả lập lỗi) | ERROR_0018_GENERATION_FAILED, PdfPath KHÔNG bị ghi (giữ nguyên rỗng để lần sau thử lại) |
 
-
-
-
 ---
 
-### Thông tin định danh phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C9 — Thanh toán hoá đơn tổng hợp tại quầy (Invoice Settlement / Multi-Tender Payment)
+## Thông tin phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C9 — Thanh toán hoá đơn tổng hợp tại quầy (Invoice Settlement / Multi-Tender Payment)
 
 - **Phụ trách nghiệp vụ (báo cáo đồ án):** Đặng Văn Hà
 
@@ -1181,10 +1078,7 @@ Template PDF gồm các khối theo đúng thứ tự sau, dữ liệu lấy 100
 
 - **Mục tiêu tài liệu:** Đặc tả C9 như một lớp điều phối (orchestration layer) đứng trên Core Payment Module (C5) để quyết toán (settle) 1 Invoice tại quầy — hỗ trợ chia nhiều hình thức thanh toán trong cùng 1 lần quyết toán (split/multi-tender), tính tiền thối, tự động giải phóng khoản tạm giữ (pre-auth hold) khi hoàn tất. C9 không viết lại logic tạo Payment hay State Machine đã đặc tả ở C5 — mọi Payment con vẫn tuân thủ nguyên vẹn quy tắc của C5.
 
-
-
 ### 0. QUY ƯỚC BỔ SUNG CHO C9
-
 
 #### 0.1. Mã lỗi mới bổ sung
 
@@ -1194,8 +1088,6 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0019 và SUCCESS_0001 từ Spec mẫu 
 | ERROR_0020_SPLIT_SUM_MISMATCH | Tổng các khoản trong tenders[] không khớp số dư cần thanh toán | Tổng số tiền các hình thức thanh toán chưa khớp với số dư còn lại của hoá đơn | Σ tenders[].amount ≠ Net Outstanding Balance hiện tại của Invoice (mục 1.4.e) |
 | ERROR_0021_INSUFFICIENT_CASH | Tiền mặt khách đưa không đủ cho đúng khoản Cash đang xử lý | Số tiền mặt khách đưa không đủ để thanh toán khoản chỉ định | tender.method = Cash và cashTendered < tender.amount (mục 1.4.f) |
 | ERROR_0022_ALREADY_SETTLED | Hoá đơn đã được thanh toán đủ từ trước, không cần/không cho quyết toán lại | Hoá đơn đã được thanh toán đầy đủ, không thể thực hiện lại | Invoice.Status = Paid tại thời điểm gọi API (mục 1.4.b) — chặn double-settlement khi Thu ngân double-click |
-
-
 
 #### 0.2. Quy ước riêng cho C9
 
@@ -1209,7 +1101,6 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0019 và SUCCESS_0001 từ Spec mẫu 
 
 **Tương ứng:** C9 trong Bảng truy vết  |  **Màn hình:** 26 (Thanh toán hoá đơn & Mã QR)  |  **Endpoint:** POST /api/v1/invoices/{invoiceId}/pay (alias: POST /invoices/{invoiceId}/pay)  |  **Bảng DB:** Payments (tạo mới, đọc), Invoices (đọc + update Status)
 
-
 ### 1.1. Tổng quan tính năng
 
 | **Trường** | **Nội dung** |
@@ -1221,16 +1112,13 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0019 và SUCCESS_0001 từ Spec mẫu 
 | Trigger | Thu ngân chọn (các) phương thức thanh toán trên màn 26, nhập số tiền/tiền mặt tương ứng, bấm "Verify & Complete Settlement". |
 | Điều kiện tiên quyết | Invoice (invoiceId) đã tồn tại (tạo qua C7) và Status ∈ {Unpaid, PartiallyPaid}. |
 
-
-
-### 1.2. Danh sách trường dữ liệu (INPUT — POST /invoices/{invoiceId}/pay)
+### 1.2. Danh sách trường dữ liệu (INPUT — `POST /invoices/{invoiceId}/pay`)
 
 | **Trường** | **Kiểu** | **Bắt buộc** | **Ràng buộc chính** |
 | :--- | :--- | :--- | :--- |
 | invoiceId | int (path param) | Có | Phải tồn tại trong Invoices; Status ∈ {Unpaid, PartiallyPaid} (mục 1.4.b) |
 | tenders[] | array | Có | Tối thiểu 1 phần tử, tối đa 3 phần tử (giới hạn nghiệp vụ hợp lý cho 1 lần quyết toán tại quầy); xem cấu trúc bên dưới |
 | releaseHoldOnComplete | boolean | Không | Mặc định true — tự động giải phóng pre-auth hold khi Invoice chuyển Paid (mục 1.4.i) |
-
 
 Cấu trúc mỗi phần tử trong tenders[]:
 | **Trường** | **Kiểu** | **Bắt buộc** | **Ràng buộc chính** |
@@ -1239,7 +1127,6 @@ Cấu trúc mỗi phần tử trong tenders[]:
 | amount | decimal | Có | > 0; là số tiền thực áp vào hoá đơn (không gồm tiền thối) — xem mục 1.4.e |
 | cashTendered | decimal | Bắt buộc CHỈ KHI method = Cash | ≥ amount (mục 1.4.f); nếu < amount → ERROR_0021_INSUFFICIENT_CASH |
 | returnUrl | string | Bắt buộc CHỈ KHI method ∈ {VNPay, MoMo} | Theo đúng ràng buộc returnUrl đã định nghĩa ở C5 mục 1.3 |
-
 
 Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi ghi thành Payment vẫn tự sinh transactionCode/paymentDate/status/gatewayResponse đúng như quy tắc C5 mục 1.3.
 
@@ -1255,16 +1142,12 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | holdReleased | boolean — true nếu đã giải phóng pre-auth hold thành công trong lần gọi này (mục 1.4.i) |
 | readyToCloseFolio | boolean — true khi không còn số dư VÀ không còn tender online nào đang Pending (mục 1.4.j) |
 
-
-
 ### 1.4. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền thực hiện
 
 - Chỉ tài khoản nội bộ (role ≠ Guest), có quyền tương đương quyền dùng C5 tại quầy (Lễ tân/Thu ngân/Admin) → thực hiện được. Guest gọi trực tiếp → 403 (ERROR_0010_FORBIDDEN) — Guest tự thanh toán online dùng thẳng C5, không qua C9 (mục 0.2).
 - Không có token / hết hạn → 401 (ERROR_0009_UNAUTHENTICATED).
-
 
 #### b) Điều kiện tiên quyết của Invoice
 
@@ -1272,18 +1155,15 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 - Invoice.Status = Cancelled → ERROR_0015_PRECONDITION_FAILED, message "Hoá đơn không ở trạng thái chờ thanh toán" (tái sử dụng đúng message đã dùng ở C5 mục 1.4.b cho cùng loại điều kiện).
 - Invoice.Status = Paid → ERROR_0022_ALREADY_SETTLED — chặn Thu ngân double-click hoặc gọi lại API do mất mạng.
 
-
 #### c) Validate từng tender
 
 - method phải thuộc 6 giá trị hợp lệ; amount phải > 0 (không đạt → ERROR_0012_OUT_OF_RANGE, tái sử dụng từ C5).
 - Có thể trộn nhiều method khác nhau trong cùng mảng tenders[] (VD: [{Cash, 200000}, {Card, 300000}]); KHÔNG giới hạn phải cùng 1 method.
 
-
 #### d) Chỉ tối đa 1 tender online trong 1 lần quyết toán
 
 - Trong tenders[], tối đa 1 phần tử có method ∈ {VNPay, MoMo, VietQR} — vì mỗi giao dịch online cần đúng 1 paymentUrl/qrCodeData riêng để FE chuyển hướng/hiển thị, không thể xử lý đồng thời 2 luồng redirect trong 1 request. Có ≥ 2 tender online → ERROR_0005_INVALID_VALUE ("Chỉ được chọn tối đa 1 hình thức thanh toán trực tuyến trong 1 lần quyết toán").
 - Nếu có 1 tender online: hệ thống xử lý các tender tại quầy (Cash/Card/BankTransfer) TRƯỚC (Paid ngay), sau đó mới tạo Payment cho tender online (Status=Pending, trả kèm paymentUrl/qrCodeData) — thứ tự này đảm bảo nếu tender online bị Guest bỏ dở, phần đã trả tại quầy vẫn được ghi nhận đúng, không mất dữ liệu.
-
 
 #### e) Tổng tenders[] phải khớp số dư còn lại
 
@@ -1292,12 +1172,10 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 - Xử lý khi tender online thất bại: Nếu một tender online trong đợt quyết toán chuyển sang 'Failed' hoặc hết hạn 15 phút, hoá đơn đang ở PartiallyPaid sẽ được giải phóng số dư còn lại. Thu ngân được phép thực hiện tiếp một lượt quyết toán C9 bổ sung cho đúng số dư còn thiếu đó bằng tiền mặt hoặc thẻ tại quầy.
 - Việc thanh toán MỘT PHẦN số dư (PartiallyPaid, ví dụ khách chỉ trả trước 1 khoản rồi thôi) vẫn thực hiện được nhưng KHÔNG qua C9 — dùng thẳng C5 (POST /payments với amount nhỏ hơn số dư, method tại quầy) — C9 dành riêng cho thao tác "quyết toán dứt điểm" ở màn 26.
 
-
 #### f) Tiền mặt & tiền thối
 
 - Với tender Cash: cashTendered bắt buộc và phải ≥ amount; nếu nhỏ hơn → ERROR_0021_INSUFFICIENT_CASH.
 - changeDue = cashTendered − amount, trả về trong response để hiển thị trên màn hình thu ngân/mở ngăn kéo — KHÔNG lưu cashTendered/changeDue vào Payments (bảng Payments chỉ có cột Amount, đúng bằng amount đã áp vào hoá đơn, theo đúng schema hiện có).
-
 
 #### g) Ghi Payment con — tái sử dụng đúng hành vi theo method của C5
 
@@ -1307,18 +1185,15 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
   - VietQR → tạo Payment Status = 'Pending', sinh qrCodeData + qrExpiresAt (15 phút, đúng theo C5 mục 1.4.c).
 - Idempotency của riêng từng tender online vẫn áp dụng theo C5 mục 1.4.d (không tạo trùng Payment Pending nếu đã có 1 cái đang chờ cho đúng context) — nhưng lưu ý ở C9, do đã chặn tối đa 1 tender online/lần gọi (mục d), tình huống trùng lặp hiếm khi xảy ra trừ khi Thu ngân gọi lại API C9 khi tender online cũ vẫn còn Pending.
 
-
 #### h) Tính nguyên tử (atomicity) của các tender tại quầy
 
 - Toàn bộ tender KHÔNG-online (Cash/Card/BankTransfer) trong 1 lần gọi được tạo trong CÙNG 1 transaction DB. Nếu bất kỳ bước ghi nào giữa chừng lỗi (lỗi DB, mất kết nối...) → ROLLBACK toàn bộ, không Payment nào (thuộc nhóm tại quầy của lần gọi này) được lưu → trả ERROR_0019_STORAGE_FAILED, Thu ngân thực hiện lại từ đầu.
 - Tender online (nếu có) được tạo SAU khi transaction tại quầy đã commit thành công — vì bản chất Pending/webhook không thể nằm chung 1 transaction đồng bộ với phần Paid ngay lập tức.
 
-
 #### i) Giải phóng khoản tạm giữ (Pre-authorization Hold Release)
 
 - Kiểm tra điều kiện giải phóng tạm giữ thẻ: Hệ thống chỉ gọi API giải phóng hold khi booking có dữ liệu pre-auth hold hợp lệ trong GatewayResponse. Nếu khách thanh toán cọc bằng tiền mặt hoặc chuyển khoản (không có hold thẻ), hệ thống tự động gán `holdReleased = false` (hoặc null) và hoàn tất quyết toán bình thường, tuyệt đối KHÔNG báo lỗi hay chặn giao dịch.
 - Nếu Invoice còn 1 tender online đang Pending (chưa Paid hẳn) → CHƯA giải phóng hold, đợi webhook C5 xác nhận Paid trước (việc giải phóng hold khi đó được thực hiện tự động tại bước xử lý webhook C5).
-
 
 #### j) Cờ readyToCloseFolio
 
@@ -1352,8 +1227,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | Chung | Lỗi ghi DB giữa chừng (rollback) | ERROR_0019_STORAGE_FAILED | Không thể lưu hoặc truy xuất file hoá đơn, vui lòng thử lại (tái sử dụng message chung nhóm lỗi hạ tầng) |
 | Chung | Quyết toán thành công | SUCCESS_0001_CREATED | Quyết toán hoá đơn thành công |
 
-
-
 ### 1.7. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -1369,12 +1242,9 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | 9 | Guest tự đăng nhập gọi trực tiếp API này | 403 FORBIDDEN |
 | 10 | Lỗi DB xảy ra ngay sau khi ghi Payment Cash, trước khi ghi Payment Card (giả lập) | Rollback toàn bộ — cả Payment Cash cũng KHÔNG được lưu; trả ERROR_0019, Thu ngân thực hiện lại từ đầu |
 
-
-
-
 ---
 
-### Thông tin định danh phân hệ: Module C — Dịch Vụ & Thanh Toán | C10 — Quản lý danh sách hoá đơn & lịch sử giao dịch
+## Thông tin phân hệ: Module C — Dịch Vụ & Thanh Toán | C10 — Quản lý danh sách hoá đơn & lịch sử giao dịch
 
 - **Phụ trách nghiệp vụ (báo cáo đồ án):** Đặng Văn Hà
 
@@ -1382,14 +1252,11 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 
 - **Mục tiêu tài liệu:** Đặc tả màn hình quản trị nội bộ để Lễ tân/Thu ngân/Admin tra cứu, lọc danh sách hoá đơn toàn hệ thống, xem lại lịch sử giao dịch (Payments) của từng hoá đơn, và kích hoạt quy trình hoàn tiền (điều hướng tới API Refund của C5).
 
-
-
 ---
 
 ## C10. FEAT-INVOICE-05 — Quản lý danh sách hoá đơn & lịch sử giao dịch
 
 **Tương ứng:** C10 trong Bảng truy vết  |  **Màn hình:** 27 (Sổ cái giao dịch & Kiểm toán)  |  **Endpoint:** GET /api/v1/invoices, GET /api/v1/invoices/{invoiceId}, GET /api/v1/invoices/{invoiceId}/transactions (alias không có /v1)  |  **Bảng DB:** Invoices, InvoiceDetails, Payments (chỉ đọc); gọi chéo PATCH /payments/{paymentId}/refund (C5) khi hoàn tiền
-
 
 ### 1.1. Tổng quan tính năng
 
@@ -1402,12 +1269,9 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | Trigger | Actor mở trang "Hoá đơn" (màn 27), áp dụng bộ lọc, chọn 1 hoá đơn để xem chi tiết hoặc bấm "Hoàn tiền". |
 | Điều kiện tiên quyết | Đã đăng nhập, role có quyền tương ứng. |
 
-
-
 ### 1.2. Tham số đầu vào
 
-
-#### a) GET /invoices — Danh sách hoá đơn
+#### a) `GET /invoices` — Danh sách hoá đơn
 
 | **Tham số** | **Kiểu** | **Bắt buộc** | **Mô tả / Ràng buộc** |
 | :--- | :--- | :--- | :--- |
@@ -1418,27 +1282,20 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | page / pageSize | int | Không | Theo quy ước phân trang chung (mục 0.2, Spec C1–C4): page mặc định 1, pageSize mặc định 20, tối đa 100 |
 | sortBy | enum | Không | Nhận 1 trong: date_desc (mặc định), date_asc, amount_desc, amount_asc. Giá trị khác → dùng mặc định date_desc, KHÔNG báo lỗi |
 
-
-
-#### b) GET /invoices/{invoiceId} — Chi tiết 1 hoá đơn
+#### b) `GET /invoices/{invoiceId}` — Chi tiết 1 hoá đơn
 
 | **Tham số** | **Kiểu** | **Bắt buộc** | **Mô tả** |
 | :--- | :--- | :--- | :--- |
 | invoiceId | int (path param) | Có | Phải tồn tại trong bảng Invoices; không tồn tại → ERROR_0011_NOT_FOUND |
 
-
-
-#### c) GET /invoices/{invoiceId}/transactions — Lịch sử giao dịch
+#### c) `GET /invoices/{invoiceId}/transactions` — Lịch sử giao dịch
 
 | **Tham số** | **Kiểu** | **Bắt buộc** | **Mô tả** |
 | :--- | :--- | :--- | :--- |
 | invoiceId | int (path param) | Có | Phải tồn tại trong bảng Invoices |
 | page / pageSize | int | Không | Theo quy ước phân trang chung — áp dụng khi 1 hoá đơn có nhiều lần thanh toán/hoàn tiền |
 
-
-
 ### 1.3. Cấu trúc dữ liệu trả về (Response)
-
 
 #### `GET /invoices`
 
@@ -1446,8 +1303,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | :--- | :--- | :--- |
 | items[] | array | Danh sách hoá đơn khớp điều kiện lọc, mỗi phần tử gồm invoiceId, invoiceNumber, invoiceDate, guestName, branchName, totalAmount, status |
 | total | int | Tổng số hoá đơn khớp điều kiện (phục vụ phân trang) |
-
-
 
 #### `GET /invoices/{invoiceId}`
 
@@ -1457,8 +1312,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | details[] | array | InvoiceDetails của hoá đơn này (giống cấu trúc đã dùng ở C7 mục 1.3) |
 | payments[] | array | Danh sách Payments liên kết (InvoiceId = invoiceId), rút gọn (paymentId, amount, method, status, paymentDate) |
 
-
-
 #### `GET /invoices/{invoiceId}/transactions`
 
 | **Trường** | **Kiểu** | **Ý nghĩa** |
@@ -1466,29 +1319,26 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | items[] | array | Danh sách đầy đủ Payments của hoá đơn: paymentId, transactionCode, amount, method, status, paymentDate, gatewayResponse (rút gọn/ẩn field nhạy cảm nếu cần) |
 | total | int | Tổng số giao dịch |
 
-
-
 ### 1.4. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền truy cập
 
 - Chỉ tài khoản nội bộ role ≠ Guest, có quyền "Quản lý hoá đơn" mới gọi được cả 3 endpoint → Guest gọi trực tiếp → 403 (ERROR_0010_FORBIDDEN).
 - Không có token / hết hạn → 401 (ERROR_0009_UNAUTHENTICATED).
 
-#### b) Lọc & tìm kiếm (GET /invoices)
+#### b) Lọc & tìm kiếm (`GET /invoices`)
 
 - Danh sách rỗng KHÔNG phải là lỗi: trả HTTP 200 kèm items = [] và total = 0, đúng quy ước 0.2 của Spec C1–C4.
 - dateFrom > dateTo → ERROR_0004_INVALID_FORMAT ("Khoảng ngày không hợp lệ"), dừng xử lý, không trả danh sách rỗng lẫn lộn với trường hợp hợp lệ nhưng không có kết quả.
 - Sắp xếp mặc định (không truyền sortBy hoặc giá trị không hợp lệ): theo InvoiceDate giảm dần (mới nhất trước), đúng hành vi màn 27 hiển thị giao dịch gần nhất lên đầu.
 - search so khớp KHÔNG phân biệt hoa/thường VÀ không phân biệt dấu tiếng Việt (chuẩn hoá Unicode NFD) — nhất quán với FEAT-SERVICE-02 (C2).
 
-#### c) Chi tiết hoá đơn (GET /invoices/{invoiceId})
+#### c) Chi tiết hoá đơn (`GET /invoices/{invoiceId}`)
 
 - Trả nguyên trạng Invoices + InvoiceDetails đã chốt từ C7 — KHÔNG tính toán lại bất kỳ số liệu nào (giống nguyên tắc chỉ đọc của C8 mục 1.4.c).
 - payments[] sắp xếp theo PaymentDate giảm dần (giao dịch gần nhất lên đầu), phục vụ đối chiếu nhanh trên UI.
 
-#### d) Xem lịch sử giao dịch (GET /invoices/{invoiceId}/transactions)
+#### d) Xem lịch sử giao dịch (`GET /invoices/{invoiceId}/transactions`)
 
 - Trả toàn bộ Payments có InvoiceId = invoiceId, không lọc theo Status (hiển thị cả Pending/Failed/Refunded để phục vụ kiểm toán, đúng tinh thần màn 27 "Table transaction log theo Invoice ID").
 - Sắp xếp mặc định theo PaymentDate giảm dần; hỗ trợ phân trang khi 1 hoá đơn có nhiều lần thử thanh toán (VD Pending → Failed nhiều lần trước khi Paid).
@@ -1503,9 +1353,7 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
   - Nếu 0 < Net Paid < TotalAmount: Cập nhật Invoices.Status = 'PartiallyPaid'.
   - Đồng thời xoá cache PdfPath để lần xuất PDF tiếp theo phản ánh đúng trạng thái hoàn tiền.
 
-
 ### 1.5. Luồng xử lý
-
 
 #### a) Xem danh sách & lọc
 
@@ -1528,7 +1376,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 - Actor chọn 1 Payment, nhập refundReason (và refundAmount nếu hoàn 1 phần) → FE gọi PATCH /payments/{paymentId}/refund — TOÀN BỘ validate/flow/error tiếp theo áp dụng đúng nguyên văn Spec C5 mục 1.9, C10 không lặp lại.
 - Sau khi C5 trả thành công, FE refresh lại danh sách giao dịch (gọi lại bước b) để hiển thị Payment vừa chuyển 'Refunded'.
 
-
 ### 1.6. Bảng lỗi áp dụng
 
 | **Trường** | **Điều kiện lỗi** | **Mã lỗi** | **Message cụ thể** |
@@ -1540,8 +1387,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | status | Giá trị ngoài 4 enum hợp lệ | ERROR_0004_INVALID_FORMAT | Trạng thái lọc không hợp lệ |
 | sortBy | Giá trị khác 4 lựa chọn hợp lệ | (không lỗi) | Tự động dùng mặc định date_desc |
 | (refund) | Xem đầy đủ tại Spec C5 mục 1.10 | — (tái sử dụng nguyên bảng lỗi C5) | — |
-
-
 
 ### 1.7. Test case mẫu
 
@@ -1558,13 +1403,10 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | 9 | GET /invoices/123/transactions với hoá đơn có 1 cọc Paid + 1 thanh toán số dư Paid | items có 2 dòng Payments, sắp PaymentDate giảm dần |
 | 10 | Hoá đơn Status=Unpaid, Actor cố mở nút Hoàn tiền trên UI | Nút không hiển thị (chặn ở FE theo mục 1.4.e); nếu vẫn cố gọi PATCH refund trực tiếp → xử lý theo đúng lỗi ERROR_0013 đã định nghĩa ở C5 |
 
-
-
-
 ---
 
 # PHẦN IV: BÁO CÁO & THỐNG KÊ (C11 – C12)
-### Thông tin định danh phân hệ: Module F — Báo Cáo & Thống Kê | C11 — Master Dashboard thống kê doanh thu real-time
+## Thông tin phân hệ: Module F — Báo Cáo & Thống Kê | C11 — Master Dashboard thống kê doanh thu real-time
 
 - **Phụ trách nghiệp vụ (báo cáo đồ án):** Đặng Văn Hà
 
@@ -1572,14 +1414,11 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 
 - **Mục tiêu tài liệu:** Đặc tả Dashboard doanh thu real-time (Flow #11) — 1 lần fetch REST để khởi tạo, sau đó nhận cập nhật qua WebSocket. Tính năng này đọc dữ liệu tổng hợp từ các bảng đã có sẵn (Payments, Bookings, Rooms, FoodOrders) để hiển thị 4 KPI, 2 biểu đồ và 1 bảng đơn hàng gần nhất.
 
-
-
 ---
 
 ## C11. FEAT-REPORT-01 — Master Dashboard thống kê doanh thu real-time
 
-**Tương ứng:** mục 11 trong Bảng phân chia chức năng  |  Flow #11 (flow-nghiep-vu-hotel.md)  |  Endpoint khởi tạo: GET /api/v1/statistics/revenue (alias: GET /statistics/revenue)  |  Kênh real-time: WebSocket /ws/v1/dashboard  |  **Bảng DB:** Payments, Bookings, Rooms, FoodOrders (chỉ đọc)
-
+**Tương ứng:** mục 11 trong Bảng phân chia chức năng  |  Flow #11 (flow-nghiep-vu-hotel.md)  |  **Endpoint khởi tạo:** GET /api/v1/statistics/revenue (alias: GET /statistics/revenue)  |  **Kênh real-time:** WebSocket /ws/v1/dashboard  |  **Bảng DB:** Payments, Bookings, Rooms, FoodOrders (chỉ đọc)
 
 ### 1.1. Tổng quan tính năng
 
@@ -1592,19 +1431,14 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | Trigger | Actor mở trang Dashboard (màn hình tổng quan quản trị). |
 | Điều kiện tiên quyết | Đã đăng nhập, role có quyền tương ứng. |
 
-
-
 ### 1.2. Tham số đầu vào
 
-
-#### a) GET /statistics/revenue — khởi tạo dữ liệu
+#### a) `GET /statistics/revenue` — khởi tạo dữ liệu
 
 | **Tham số** | **Kiểu** | **Bắt buộc** | **Mô tả / Ràng buộc** |
 | :--- | :--- | :--- | :--- |
 | branchName | string | Không | Lọc theo chi nhánh (Rooms.BranchName). Không truyền → tính trên TOÀN HỆ THỐNG (mọi chi nhánh). Giá trị không khớp chi nhánh nào → KHÔNG lỗi, trả KPI = 0 (mục 1.4.h) |
 | date | date | Không | Ngày cần xem (theo giờ VN, UTC+7). Mặc định = hôm nay. Dashboard chỉ hiển thị 1 NGÀY tại 1 thời điểm — xem nhiều ngày/so sánh kỳ trước thuộc mục 12 (Occupancy & RevPAR Report), không thuộc phạm vi Dashboard real-time này |
-
-
 
 #### b) WebSocket /ws/v1/dashboard — kênh cập nhật real-time
 
@@ -1614,9 +1448,7 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 
 4 sự kiện server phát ra (phân tách room theo branchName): new_booking, payment_success, room_status_changed, new_fnb_order.
 
-
 ### 1.3. Cấu trúc dữ liệu trả về
-
 
 #### `GET /statistics/revenue`
 
@@ -1628,8 +1460,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | occupancyChart[] | array | Phân bổ số phòng theo Rooms.Status tại thời điểm gọi API: { status, count } — dữ liệu vẽ Occupancy Chart |
 | recentOrders[] | array | 10 FoodOrders mới nhất (mọi Status), sắp theo OrderTime giảm dần: { foodOrderId, orderTime, orderType, status, totalAmount } |
 
-
-
 #### WebSocket — payload tối thiểu mỗi sự kiện
 
 | **Sự kiện** | **Payload tối thiểu** | **FE cập nhật gì** |
@@ -1639,10 +1469,7 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | room_status_changed | { roomId, oldStatus, newStatus } | Cập nhật occupancyChart: giảm 1 ở oldStatus, tăng 1 ở newStatus; tính lại occupancyRate |
 | new_fnb_order | { foodOrderId, orderTime, orderType, status, totalAmount } | Chèn vào đầu recentOrders[], cắt bớt nếu vượt 10 dòng |
 
-
-
 ### 1.4. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền truy cập
 
@@ -1679,9 +1506,7 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 - Bắt buộc FE tự động gọi lại GET /statistics/revenue để ĐỒNG BỘ LẠI toàn bộ số liệu mỗi 5 phút (resync interval), hoặc ngay khi phát hiện WebSocket vừa kết nối lại sau khi bị ngắt — tránh KPI trôi dần sai lệch qua thời gian dài mở tab.
 - Server phát sự kiện vào đúng room theo branchId của đối tượng phát sinh (booking/payment/room/food order thuộc chi nhánh nào thì chỉ client đang theo dõi đúng branchName đó hoặc room "all" mới nhận được), tránh broadcast thừa toàn hệ thống.
 
-
 ### 1.5. Luồng xử lý
-
 
 #### a) Khởi tạo (REST)
 
@@ -1700,7 +1525,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 - FE nhận sự kiện → cập nhật KPI/biểu đồ/bảng cộng dồn tại chỗ (mục bảng "WebSocket — payload tối thiểu"), không cần gọi lại REST ngay lập tức.
 - Cứ mỗi 5 phút (hoặc khi socket vừa reconnect), FE tự gọi lại bước a để đồng bộ lại toàn bộ (mục 1.4.g).
 
-
 ### 1.6. Bảng lỗi áp dụng
 
 | **Trường** | **Điều kiện lỗi** | **Mã lỗi** | **Message cụ thể** |
@@ -1709,8 +1533,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | Chung | Guest hoặc role không có quyền "Xem báo cáo" | ERROR_0010_FORBIDDEN | Bạn không có quyền thực hiện chức năng này |
 | branchName | Không khớp chi nhánh nào | (không lỗi) | Trả KPI = 0, mảng rỗng — HTTP 200 |
 | date | Định dạng ngày sai | ERROR_0004_INVALID_FORMAT | Ngày không đúng định dạng |
-
-
 
 ### 1.7. Test case mẫu
 
@@ -1727,12 +1549,9 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | 9 | Booking mới tạo qua kênh OTA (BookingSource ≠ Direct) | Vẫn cộng vào kpi.newBookingsToday (mục 1.4.c không phân biệt nguồn) |
 | 10 | Phòng đang ở trạng thái OutOfOrder | Không tính vào mẫu số khi tính occupancyRate (mục 1.4.d) |
 
-
-
-
 ---
 
-### Thông tin định danh phân hệ: Module F — Báo Cáo & Thống Kê | C12 — Occupancy Report & RevPAR Report
+## Thông tin phân hệ: Module F — Báo Cáo & Thống Kê | C12 — Occupancy Report & RevPAR Report
 
 - **Phụ trách nghiệp vụ (báo cáo đồ án):** Đặng Văn Hà
 
@@ -1740,14 +1559,11 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 
 - **Mục tiêu tài liệu:** Đặc tả báo cáo lịch sử theo khoảng thời gian — tính Occupancy % và RevPAR theo công thức chuẩn ngành khách sạn, dựa trên dữ liệu Room-Nights thực tế từ bảng Stays, hỗ trợ so sánh cùng kỳ năm trước và xuất Excel/CSV.
 
-
-
 ---
 
 ## C12. FEAT-REPORT-02 — Occupancy Report & RevPAR Report
 
 **Tương ứng:** mục 12 trong Bảng phân chia chức năng  |  Flow #12 (flow-nghiep-vu-hotel.md)  |  **Endpoint:** GET /api/v1/statistics/occupancy, GET /api/v1/statistics/occupancy/export (alias không có /v1)  |  **Bảng DB:** Stays, Bookings, Rooms (chỉ đọc)
-
 
 ### 1.1. Tổng quan tính năng
 
@@ -1760,12 +1576,9 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | Trigger | Actor mở trang Báo cáo doanh thu & Công suất phòng, chọn khoảng thời gian và bấm "Xem báo cáo" / "Xuất Excel". |
 | Điều kiện tiên quyết | Đã đăng nhập, role có quyền tương ứng. |
 
-
-
 ### 1.2. Tham số đầu vào
 
-
-#### a) GET /statistics/occupancy
+#### a) `GET /statistics/occupancy`
 
 | **Tham số** | **Kiểu** | **Bắt buộc** | **Mô tả / Ràng buộc** |
 | :--- | :--- | :--- | :--- |
@@ -1775,18 +1588,14 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | branchName | string | Không | Lọc theo chi nhánh (Rooms.BranchName). Không truyền → tính trên TOÀN HỆ THỐNG. Không khớp chi nhánh nào → KHÔNG lỗi, trả toàn bộ chỉ số = 0 |
 | compareLastYear | boolean | Không | Mặc định false. true → tính thêm 1 khối dữ liệu của kỳ tương ứng năm trước để so sánh (mục 1.4.f) |
 
-
-
-#### b) GET /statistics/occupancy/export
+#### b) `GET /statistics/occupancy/export`
 
 | **Tham số** | **Kiểu** | **Bắt buộc** | **Mô tả / Ràng buộc** |
 | :--- | :--- | :--- | :--- |
 | dateFrom, dateTo, branchName, compareLastYear | — (giống mục a) | Giống mục a | Áp dụng đúng các ràng buộc đã nêu ở mục a |
 | format | enum | Không | csv (mặc định) hoặc xlsx |
 
-
-
-### 1.3. Cấu trúc dữ liệu trả về (GET /statistics/occupancy)
+### 1.3. Cấu trúc dữ liệu trả về (`GET /statistics/occupancy`)
 
 | **Trường** | **Kiểu** | **Ý nghĩa** |
 | :--- | :--- | :--- |
@@ -1795,10 +1604,7 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | comparison | object \| null | Chỉ có khi compareLastYear=true: { period: {dateFrom, dateTo}, summary: {...giống trên}, occupancyRateDeltaPct, revParDeltaPct } — deltaPct = (kỳ hiện tại − kỳ trước)/kỳ trước × 100 |
 | monthly[] | array | Breakdown độc lập theo TỪNG THÁNG DƯƠNG LỊCH nằm trong kỳ: { month: "YYYY-MM", roomNightsSold, roomNightsAvailable, occupancyRate, roomRevenue, revPar } — dữ liệu vẽ Line/Bar Chart + bảng chi tiết |
 
-
-
 ### 1.4. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền truy cập
 
@@ -1845,7 +1651,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 - GET /statistics/occupancy/export tính lại ĐÚNG dữ liệu như mục a–h (không dùng cache riêng), xuất file chứa: 1 bảng summary (và comparison nếu có) + 1 bảng monthly[] chi tiết theo tháng.
 - Áp dụng đúng validate dateFrom/dateTo/giới hạn 24 tháng như GET /statistics/occupancy — không định nghĩa lại rule riêng cho export.
 
-
 ### 1.5. Luồng xử lý
 
 - Actor mở trang Báo cáo, chọn dateFrom/dateTo (+ branchName nếu multi-branch, + bật compareLastYear nếu cần) → FE gọi GET /statistics/occupancy.
@@ -1858,7 +1663,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 - Trả về response theo mục 1.3 — HTTP 200 (kể cả khi mọi chỉ số = 0).
 - FE render Line/Bar Chart + bảng chi tiết theo tháng. Nếu Actor bấm "Xuất Excel/CSV" → FE gọi GET /statistics/occupancy/export với đúng tham số đang xem, trình duyệt tải file về.
 
-
 ### 1.6. Bảng lỗi áp dụng
 
 | **Trường** | **Điều kiện lỗi** | **Mã lỗi** | **Message cụ thể** |
@@ -1869,8 +1673,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | dateFrom/dateTo | Độ dài kỳ > 731 ngày | ERROR_0012_OUT_OF_RANGE | Khoảng thời gian không được vượt quá 24 tháng |
 | branchName | Không khớp chi nhánh nào | (không lỗi) | Trả occupancyRate = 0, revPar = 0 — HTTP 200 |
 | format (export) | Giá trị khác csv/xlsx | (không lỗi) | Tự động dùng mặc định csv |
-
-
 
 ### 1.7. Test case mẫu
 
@@ -1887,13 +1689,10 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | 9 | branchName="Không Tồn Tại" | 200, occupancyRate=0, revPar=0, monthly[] có phần tử nhưng mọi giá trị = 0 |
 | 10 | GET /statistics/occupancy/export?format=xlsx với tham số hợp lệ | 200, trả file .xlsx chứa đúng summary + monthly[] khớp với GET thường |
 
-
-
-
 ---
 
 # PHẦN V: CHATBOT AI CONCIERGE & CƠ SỞ TRI THỨC (C13 – C14)
-### Thông tin định danh phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C13 — Chatbot AI Concierge (Smart Hotel Concierge)
+## Thông tin phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C13 — Chatbot AI Concierge (Smart Hotel Concierge)
 
 - **Phụ trách nghiệp vụ (báo cáo đồ án):** Đặng Văn Hà
 
@@ -1901,10 +1700,7 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 
 - **Mục tiêu tài liệu:** Đặc tả kiến trúc tích hợp Google Gemini LLM kết hợp Hybrid RAG trên cơ sở dữ liệu tri thức khách sạn, hệ thống Guardrails an toàn, cơ chế chuyển tiếp nhân viên (Live Handover) và các endpoint vận hành hội thoại AI Concierge.
 
-
-
 ### 0. QUYẾT ĐỊNH KỸ THUẬT & MÃ LỖI BỔ SUNG
-
 
 #### 0.1. Chọn nhà cung cấp LLM (Google Gemini API thật) & Cơ chế Fallback RAG
 
@@ -1928,7 +1724,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: mỗi tender khi gh
 | Sequelize Models & Associations | `ChatbotKnowledgeBase`, `ChatbotConversations`, `ChatbotMessages` kèm liên kết `User` (`user`, `handledByStaff`) và `messages`. | Quản lý trọn vẹn vòng đời hội thoại AI, lịch sử tin nhắn và trạng thái chuyển tiếp nhân viên (`Status ∈ {'Open', 'HandedOver', 'Closed'}`). |
 | Chống Prompt Injection & SQLi | Bộ lọc `PROMPT_INJECTION_PATTERNS` chặn mọi lệnh cố tình ghi đè `system prompt`, trích xuất `password`, `DROP TABLE`, `DELETE FROM users`, `DAN jailbreak` và trả về phản hồi an toàn `SAFE_GUARDRAIL_REPLY`. | Đảm bảo an toàn tuyệt đối cho dữ liệu nội bộ và hệ thống AI. |
 
-
 #### 0.4. Mã lỗi mới bổ sung
 
 Kế thừa toàn bộ ERROR_0001–ERROR_0017 và SUCCESS_0001 từ các spec trước. Bổ sung 1 mã mới cho C13:
@@ -1936,14 +1731,11 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0017 và SUCCESS_0001 từ các spec t
 | :--- | :--- | :--- | :--- |
 | ERROR_0018_RATE_LIMITED | Gửi yêu cầu quá nhanh, vượt hạn mức | Vượt quá giới hạn tần suất yêu cầu (tối đa 20 yêu cầu/phút). Vui lòng thử lại sau. | 1 Client (UserId hoặc IP) gửi quá 20 tin nhắn/phút tới chatbot (mục 1.4.a) — chống spam / kiểm soát chi phí gọi LLM |
 
-
-
 ---
 
 ## C13. FEAT-AI-01 — Gửi tin nhắn & nhận phản hồi Chatbot AI
 
 **Tương ứng:** C13 trong Bảng truy vết  |  **Màn hình:** 29 & Widget chat AI Concierge nổi toàn trang  |  **Endpoint:** POST /api/v1/ai/chatbot (alias: POST /ai/chatbot)  |  **Bảng DB:** ChatbotConversations, ChatbotMessages, ChatbotKnowledgeBase
-
 
 ### 1.1. Tổng quan tính năng
 
@@ -1955,7 +1747,6 @@ Kế thừa toàn bộ ERROR_0001–ERROR_0017 và SUCCESS_0001 từ các spec t
 | Actor | Khách lưu trú / Khách vãng lai trên cổng thông tin, hoặc Nhân viên/Admin kiểm thử. |
 | Trigger | Người dùng nhập câu hỏi (hoặc bấm Quick Suggestion Chip) và bấm Gửi trên Widget chat AI Concierge. |
 | Điều kiện tiên quyết | Hệ thống hoạt động bình thường (hỗ trợ cả người dùng đã đăng nhập và khách chưa đăng nhập thông qua cơ chế `resolveValidUserId`). |
-
 
 ### 1.2. Danh sách trường dữ liệu (INPUT)
 
@@ -1979,9 +1770,7 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: UserId (từ token 
 | handoverRequired / suggestedEscalation | boolean | `true` nếu khách yêu cầu gặp nhân viên/khiếu nại và hệ thống đã chuyển trạng thái sang `'HandedOver'` |
 | status | string | Trạng thái hiện tại của phiên hội thoại (`'Open'`, `'HandedOver'`, `'Closed'`) |
 
-
 ### 1.4. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Giới hạn nội dung & Tần suất (Guardrails 1, 2 & Rate Limiter)
 
@@ -2024,7 +1813,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: UserId (từ token 
 | conversationId | ID hội thoại không tồn tại (khi gọi API quản trị / handover) | ERROR_0011_NOT_FOUND | Phiên hội thoại không tồn tại |
 | Chung | Gửi quá 20 yêu cầu / 60 giây trên cùng Client | ERROR_0018_RATE_LIMITED | Vượt quá giới hạn tần suất yêu cầu (tối đa 20 yêu cầu/phút). Vui lòng thử lại sau. |
 
-
 ### 1.7. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -2036,8 +1824,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: UserId (từ token 
 | 5 | Guest gửi `message = "Phòng quá tệ, tôi muốn khiếu nại và gặp lễ tân ngay!"` | 200 OK, hội thoại tự động chuyển `status = 'HandedOver'`, `handoverRequired = true`, ghi tin nhắn điều phối hệ thống |
 | 6 | Client gửi liên tiếp 21 tin nhắn trong vòng 60 giây | 20 tin đầu 200 OK; tin thứ 21 trả về `429 ERROR_0018_RATE_LIMITED` |
 | 7 | Nhân viên gọi `POST /api/v1/ai/conversations/{id}/handover` (`action='to_staff'`) và gửi tin nhắn hỗ trợ | Hội thoại chuyển sang `HandedOver`, tin nhắn lưu với `SenderType = 'Staff'`, hiển thị đồng bộ trên Widget chat của khách |
-
-
 
 ### 2. CÁC ENDPOINT VẬN HÀNH HỘI THOẠI & TIẾP NHẬN HỖ TRỢ (LIVE HANDOVER INBOX)
 
@@ -2069,11 +1855,9 @@ Hệ thống cung cấp đầy đủ các endpoint quản trị và tiếp nhậ
 - **Tự động khôi phục phiên UI (`findOrRecoverConversation`)**: Nếu người dùng đang mở sẵn một phiên hội thoại hợp lệ trên giao diện (`0 < conversationId < 1000000`) mà cơ sở dữ liệu vừa chạy lại lệnh seed làm xoá bảng `ChatbotConversations`, Backend sẽ tự động khôi phục bản ghi phiên hội thoại đó để thao tác "Tiếp nhận hỗ trợ" / "Gửi phản hồi" của Admin luôn thành công mà không báo lỗi 404 (đồng thời vẫn giữ nguyên mã lỗi `404 ERROR_0011_NOT_FOUND` đối với các ID giả lập lớn `>= 1000000` như `99999999` trong bài kiểm thử biên).
 - **Đồng bộ 2 chiều thời gian thực (Live Event Sync)**: Khi kiểm thử trên cùng 1 trình duyệt / 1 tài khoản Admin, Widget chat AI Concierge và Màn hình quản trị AI Concierge tự động phát và lắng nghe sự kiện `gh-ai-chat-updated` & `gh-ai-staff-replied` (kết hợp polling 4 giây), giúp tin nhắn của khách và phản hồi của Lễ tân hiển thị tức thời ở cả 2 phía.
 
-
-
 ---
 
-### Thông tin định danh phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C14 — Huấn luyện Knowledge Base cho AI (Quản trị cơ sở kiến thức)
+## Thông tin phân hệ: Module C — Dịch Vụ & Thanh Toán  |  C14 — Huấn luyện Knowledge Base cho AI (Quản trị cơ sở kiến thức)
 
 - **Phụ trách nghiệp vụ (báo cáo đồ án):** Đặng Văn Hà
 
@@ -2081,10 +1865,7 @@ Hệ thống cung cấp đầy đủ các endpoint quản trị và tiếp nhậ
 
 - **Mục tiêu tài liệu:** Đặc tả cách Admin/nhân viên có quyền nhập và quản lý dữ liệu các cặp Câu hỏi – Câu trả lời mẫu trong bảng ChatbotKnowledgeBase để phục vụ tra cứu RAG cho Chatbot AI Concierge (FEAT-AI-01).
 
-
-
 ### 0. QUY ƯỚC BỔ SUNG CHO C14
-
 
 #### 0.1. Schema & mã lỗi
 
@@ -2105,14 +1886,11 @@ Hệ thống chuẩn hoá danh mục tri thức thành 7 mã chuẩn (đồng th
 | FAQ / Câu hỏi thường gặp | Các câu hỏi giải đáp nhanh về tiện ích chung (hồ bơi vô cực, phòng Gym, khu vui chơi trẻ em) |
 | Transport / Di chuyển | Lịch trình xe đưa đón sân bay, tàu cao tốc, thuê xe tự lái/có tài xế |
 
-
-
 ---
 
 ## C14. FEAT-AI-02 — Thêm mục kiến thức mới (Huấn luyện dữ liệu cho AI)
 
 **Tương ứng:** C14 trong Bảng truy vết  |  **Màn hình:** 29 (nút "Cơ sở kiến thức")  |  **Endpoint:** POST /api/v1/ai/knowledge-base (alias: POST /ai/knowledge-base)  |  **Bảng DB:** ChatbotKnowledgeBase
-
 
 ### 1.1. Tổng quan tính năng
 
@@ -2124,7 +1902,6 @@ Hệ thống chuẩn hoá danh mục tri thức thành 7 mã chuẩn (đồng th
 | Actor | Admin hoặc tài khoản có quyền "Quản lý cơ sở kiến thức" (RolePermissions). |
 | Trigger | Actor bấm nút "Cơ sở kiến thức" → "+ Thêm mới" rồi "Lưu". |
 | Điều kiện tiên quyết | Đã đăng nhập và có quyền tương ứng. |
-
 
 ### 1.2. Danh sách trường dữ liệu (INPUT)
 
@@ -2138,7 +1915,6 @@ Hệ thống chuẩn hoá danh mục tri thức thành 7 mã chuẩn (đồng th
 Trường hệ thống tự sinh, KHÔNG nhận từ client: knowledgeId, status (luôn 'Active' khi tạo), createdAt/updatedAt (=NOW()).
 
 ### 1.3. Quy tắc nghiệp vụ chi tiết
-
 
 #### a) Quyền truy cập
 
@@ -2202,7 +1978,6 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: knowledgeId, status
 | Từ khoá | Tổng > 1000 ký tự | ERROR_0003_MAX_LENGTH | Từ khoá không được vượt quá 1000 ký tự |
 | Chung | Lưu thành công | SUCCESS_0001_CREATED | Thêm mới mục kiến thức thành công |
 
-
 ### 1.6. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -2215,13 +1990,11 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: knowledgeId, status
 | 6 | answer = "<script>alert(1)</script>Giờ nhận phòng là 14:00" | Lưu thành văn bản thuần, không còn thẻ script |
 | 7 | Lưu thành công 1 mục Category=Nội quy, sau đó Guest hỏi đúng nội dung đó qua chatbot | FEAT-AI-01 tìm thấy mục vừa tạo ngay (knowledgeId khớp), không cần thao tác đồng bộ |
 
-
-
 ### 2. CÁC THAO TÁC QUẢN LÝ ĐI KÈM
 
 Cùng nhóm quyền "Quản lý cơ sở kiến thức" và cùng quy tắc chuẩn hoá/validate như mục 1. Chỉ nêu phần KHÁC BIỆT.
 
-### 2.1. Xem danh sách & tìm kiếm — GET /ai/knowledge-base
+### 2.1. Xem danh sách & tìm kiếm — `GET /ai/knowledge-base`
 
 | **Tham số** | **Kiểu** | **Mô tả / Ràng buộc** |
 | :--- | :--- | :--- |
@@ -2232,20 +2005,20 @@ Cùng nhóm quyền "Quản lý cơ sở kiến thức" và cùng quy tắc chu�
 
 - Sắp xếp mặc định: updatedAt giảm dần (mục vừa chỉnh sửa lên đầu). Danh sách rỗng trả 200 + mảng rỗng, không phải lỗi.
 
-### 2.2. Sửa mục kiến thức — PUT /ai/knowledge-base/{knowledgeId}
+### 2.2. Sửa mục kiến thức — `PUT /ai/knowledge-base/{knowledgeId}`
 
 - Cho sửa question, answer, category, keywords (cùng ràng buộc mục 1.2). KHÔNG cho sửa status qua endpoint này (dùng mục 2.3).
 - knowledgeId không tồn tại → ERROR_0011_NOT_FOUND ("Mục kiến thức không tồn tại hoặc đã bị xoá").
 - Kiểm tra trùng question LOẠI TRỪ CHÍNH bản ghi đang sửa (giữ nguyên question cũ không bị báo trùng với chính nó).
 - Cập nhật updatedAt=NOW(). Tin nhắn AI cũ không bị ảnh hưởng (mục 1.3.f).
 
-### 2.3. Ngừng dùng / kích hoạt lại — PATCH /ai/knowledge-base/{knowledgeId}/status
+### 2.3. Ngừng dùng / kích hoạt lại — `PATCH /ai/knowledge-base/{knowledgeId}/status`
 
 - Input: status ∈ {Active, Inactive}; giá trị khác → ERROR_0005_INVALID_VALUE.
 - Inactive: mục biến mất khỏi kết quả tra cứu của chatbot (truy vấn FULLTEXT ở C13 luôn lọc Status='Active') nhưng vẫn hiện ở màn quản trị và vẫn giữ liên kết trong lịch sử ChatbotMessages.
 - Đặt lại đúng trạng thái đang có (VD Active → Active) → trả 200, không đổi gì (không coi là lỗi chuyển trạng thái, vì chỉ có 2 giá trị và có thể chuyển qua lại tự do).
 
-### 2.4. Kiểm thử truy xuất — GET /ai/knowledge-base/test?q=
+### 2.4. Kiểm thử truy xuất — `GET /ai/knowledge-base/test?q=`
 
 Công cụ cho người quản trị xem chatbot SẼ tìm ra gì cho 1 câu hỏi giả định mà không cần mở hội thoại thật (không ghi ChatbotConversations/ChatbotMessages, không gọi LLM, không tốn hạn mức).
 - q: bắt buộc, 1–2000 ký tự (cùng giới hạn message ở C13). Trả tối đa 3 mục Active có relevanceScore cao nhất kèm điểm số và cờ belowThreshold (điểm < relevanceThreshold ở C13 mục 0.2).
@@ -2261,7 +2034,6 @@ Công cụ cho người quản trị xem chatbot SẼ tìm ra gì cho 1 câu h�
 | Kiểm thử truy xuất | q > 2000 ký tự | ERROR_0003_MAX_LENGTH | Câu hỏi kiểm thử không được vượt quá 2000 ký tự |
 | Sửa thành công | — | SUCCESS_0001_CREATED (template "Cập nhật {đối tượng} thành công") | Cập nhật mục kiến thức thành công |
 
-
 ### 2.6. Test case mẫu
 
 | **STT** | **Input** | **Kết quả mong đợi** |
@@ -2272,5 +2044,4 @@ Công cụ cho người quản trị xem chatbot SẼ tìm ra gì cho 1 câu h�
 | 4 | Xem lại ChatbotMessages cũ từng dùng mục vừa Inactive | Tin nhắn cũ vẫn nguyên, KnowledgeId vẫn trỏ đúng bản ghi (còn tồn tại, chỉ Inactive) |
 | 5 | GET /test?q=hồ bơi mở cửa mấy giờ | Trả ≤3 mục Active kèm relevanceScore giảm dần; không phát sinh bản ghi hội thoại nào |
 | 6 | GET list với search="an uong" | Khớp cả mục có chữ "ăn uống" (bỏ dấu) |
-
 

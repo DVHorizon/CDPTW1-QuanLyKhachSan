@@ -206,7 +206,7 @@ while (idx < lines.length) {
         } else if (trimmed.includes('C14 —')) {
             currentFeature = 'C14';
         }
-        mdLines.push(`### Thông tin định danh phân hệ: ${trimmed}`);
+        mdLines.push(`## Thông tin phân hệ: ${trimmed}`);
         mdLines.push('');
         idx++;
         continue;
@@ -284,7 +284,8 @@ while (idx < lines.length) {
     // Sub-headings inside features
     if (/^[0-9]+\.[0-9]+(\.[0-9]+)*\.\s+/.test(trimmed)) {
         mdLines.push('');
-        mdLines.push(`### ${trimmed}`);
+        let formatted = trimmed.replace(/\b(GET|POST|PUT|PATCH|DELETE)\s+(\/[^\s\)]+)/g, '`$1 $2`');
+        mdLines.push(`### ${formatted}`);
         mdLines.push('');
         idx++;
         continue;
@@ -302,7 +303,8 @@ while (idx < lines.length) {
     // Section 2.1 .. 2.6 in C13 & C14
     if (/^2\.[0-9]+\.\s+/.test(trimmed)) {
         mdLines.push('');
-        mdLines.push(`#### ${trimmed}`);
+        let formatted = trimmed.replace(/\b(GET|POST|PUT|PATCH|DELETE)\s+(\/[^\s]+)/g, '`$1 $2`');
+        mdLines.push(`#### ${formatted}`);
         mdLines.push('');
         idx++;
         continue;
@@ -311,7 +313,8 @@ while (idx < lines.length) {
     // Alphabet headings: a) Quyền truy cập, b) ..., c) ...
     if (/^[a-z]\)\s+/.test(trimmed)) {
         mdLines.push('');
-        mdLines.push(`#### ${trimmed}`);
+        let formatted = trimmed.replace(/\b(GET|POST|PUT|PATCH|DELETE)\s+(\/[^\s—\)]+)/g, '`$1 $2`');
+        mdLines.push(`#### ${formatted}`);
         mdLines.push('');
         idx++;
         continue;
@@ -394,6 +397,9 @@ while (idx < lines.length) {
             .replace(/Tương ứng:/g, '**Tương ứng:**')
             .replace(/Màn hình:/g, '**Màn hình:**')
             .replace(/Màn hình\s+([0-9]+)/g, '**Màn hình:** $1')
+            .replace(/Endpoint chính:/g, '**Endpoint chính:**')
+            .replace(/Endpoint khởi tạo:/g, '**Endpoint khởi tạo:**')
+            .replace(/Kênh real-time:/g, '**Kênh real-time:**')
             .replace(/Endpoint:/g, '**Endpoint:**')
             .replace(/Bảng DB:/g, '**Bảng DB:**');
         mdLines.push(formatted);
@@ -407,7 +413,8 @@ while (idx < lines.length) {
     idx++;
 }
 
-const finalMarkdown = mdLines.join('\n');
+// Clean consecutive blank lines (normalize to max 1 empty line between blocks)
+const finalMarkdown = mdLines.join('\n').replace(/\n{3,}/g, '\n\n');
 fs.writeFileSync(dstPath, finalMarkdown, 'utf8');
 
 console.log(`Markdown written to ${dstPath}.`);
