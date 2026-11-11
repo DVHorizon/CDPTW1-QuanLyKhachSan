@@ -38,6 +38,8 @@ import MockPaymentGateway from './pages/client/MockPaymentGateway';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ExtendStayAndMove from './pages/admin/ExtendStayAndMove';
 import MinibarManagement from './pages/admin/MinibarManagement';
+import RoomComparisonMatrix from './pages/client/RoomComparisonMatrix';
+
 
 // tuyen/7 imports:
 import MarketingDashboard from './pages/admin/marketing/MarketingDashboard';
@@ -65,6 +67,10 @@ function App() {
             <Route path="/rooms" element={<SearchRooms />} />
             <Route path="/rooms/search" element={<SearchRooms />} />
             <Route path="/tim-kiem" element={<SearchRooms />} />
+            <Route path="/rooms/compare" element={<RoomComparisonMatrix />} />
+            <Route path="/compare" element={<RoomComparisonMatrix />} />
+            <Route path="/so-sanh" element={<RoomComparisonMatrix />} />
+            <Route path="/so-sanh-phong" element={<RoomComparisonMatrix />} />
             <Route path="/rooms/:id" element={<RoomDetail />} />
             <Route path="/room/:id" element={<RoomDetail />} />
             <Route path="/dat-phong" element={<BookingEngine />} />

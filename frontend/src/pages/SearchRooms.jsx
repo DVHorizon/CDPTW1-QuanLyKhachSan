@@ -144,9 +144,39 @@ export default function SearchRooms() {
     executeSearch({ engine: engineId });
   };
   const [wishlist, setWishlist] = useState([]);
+  const [compareList, setCompareList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('compare_room_ids');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  });
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
+  const [compareCollapsed, setCompareCollapsed] = useState(false);
+
+  // Toggle so sánh phòng (FEAT-GUEST-13B: Giới hạn tối đa 3 phòng)
+  const toggleCompare = (roomTypeId) => {
+    setCompareList(prev => {
+      let updated;
+      if (prev.includes(roomTypeId)) {
+        updated = prev.filter(id => id !== roomTypeId);
+      } else {
+        if (prev.length >= 3) {
+          alert('Hệ thống hỗ trợ so sánh tối đa 3 loại phòng cùng lúc');
+          return prev;
+        }
+        updated = [...prev, roomTypeId];
+      }
+      localStorage.setItem('compare_room_ids', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
 
   // Suggester Autocomplete state (hỗ trợ hiển thị gợi ý từ 1-2 ký tự)
   const [suggestions, setSuggestions] = useState(null);
@@ -1104,6 +1134,7 @@ export default function SearchRooms() {
               <div className="flex flex-col gap-space-lg">
                 {rooms.map((room) => {
                   const isSaved = wishlist.includes(room.RoomTypeId);
+                  const isCompared = compareList.includes(room.RoomTypeId);
                   return (
                     <article
                       key={room.RoomTypeId}
@@ -1132,18 +1163,34 @@ export default function SearchRooms() {
                           )}
                         </div>
 
-                        {/* Favorite Button */}
-                        <button
-                          type="button"
-                          onClick={() => toggleWishlist(room.RoomTypeId)}
-                          className={`absolute bottom-4 right-4 w-9 h-9 rounded-full bg-surface-container-lowest/90 flex items-center justify-center transition-colors shadow-sm ${
-                            isSaved ? 'text-red-500' : 'text-on-surface hover:text-secondary'
-                          }`}
-                        >
-                          <span className="material-symbols-outlined text-[18px]">
-                            {isSaved ? 'favorite' : 'favorite_border'}
-                          </span>
-                        </button>
+                        {/* Action Buttons: Compare & Favorite */}
+                        <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleCompare(room.RoomTypeId)}
+                            title={isCompared ? 'Bỏ so sánh' : 'So sánh phòng này'}
+                            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-sm ${
+                              isCompared
+                                ? 'bg-[#006c49] text-white font-bold ring-2 ring-emerald-300'
+                                : 'bg-surface-container-lowest/90 text-on-surface hover:text-[#006c49] hover:bg-white'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              compare
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleWishlist(room.RoomTypeId)}
+                            className={`w-9 h-9 rounded-full bg-surface-container-lowest/90 flex items-center justify-center transition-colors shadow-sm ${
+                              isSaved ? 'text-red-500' : 'text-on-surface hover:text-secondary'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              {isSaved ? 'favorite' : 'favorite_border'}
+                            </span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Content Area */}
@@ -1383,6 +1430,134 @@ export default function SearchRooms() {
             }}
           />
         )}
+
+        {/* Thanh So Sánh Phòng Nổi (Floating Compare Bar Chuẩn Thế Giới Di Động / Điện Máy Xanh) */}
+        {compareList.length > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none pb-2 sm:pb-3 px-3">
+            <div className="pointer-events-auto bg-white rounded-2xl shadow-[0_4px_30px_rgba(0,0,0,0.18)] border border-slate-200/90 transition-all duration-300 overflow-hidden max-w-full">
+              {/* Khi đang thu gọn (Được phóng to & đổi sang tone nâu sang trọng) */}
+              {compareCollapsed ? (
+                <div className="flex items-center gap-4 px-6 py-3.5 bg-white/95 backdrop-blur-md rounded-2xl border border-[#dedad0] shadow-[0_10px_35px_rgba(0,0,0,0.12)]">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-3 h-3 rounded-full bg-[#b9a277] animate-pulse"></span>
+                    <span className="text-sm font-bold text-[#203044]">
+                      So sánh ({compareList.length}/3 phòng)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCompareCollapsed(false)}
+                    className="flex items-center gap-1.5 text-sm font-bold text-[#b9a277] hover:text-[#8f7952] px-3 py-1.5 rounded-xl hover:bg-[#faf7f2] transition-all cursor-pointer"
+                  >
+                    <span>Mở rộng</span>
+                    <span className="material-symbols-outlined text-[18px]">expand_less</span>
+                  </button>
+                </div>
+              ) : (
+                /* Thanh đầy đủ theo thiết kế mẫu tối giản, sang trọng */
+                <div className="flex items-center gap-2.5 sm:gap-3.5 p-2.5 sm:p-3 relative">
+                  {/* Danh sách các card phòng so sánh (Tối đa 3 ô) */}
+                  <div className="flex items-center gap-2.5 sm:gap-3.5 overflow-x-auto max-w-[85vw] sm:max-w-[700px] py-1 px-1">
+                    {compareList.map(id => {
+                      const r = rooms.find(item => item.RoomTypeId === id);
+                      return (
+                        <div
+                          key={id}
+                          className="relative flex items-center gap-2.5 p-2 rounded-xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all w-[190px] sm:w-[220px] h-[72px] shrink-0"
+                        >
+                          {/* Nút X tròn góc trên bên phải card */}
+                          <button
+                            type="button"
+                            onClick={() => toggleCompare(id)}
+                            title="Xóa phòng này"
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-400 hover:bg-rose-500 text-white flex items-center justify-center transition-colors shadow-xs z-20 cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[12px] font-bold">close</span>
+                          </button>
+
+                          {/* Ảnh đại diện phòng: kích thước chuẩn cố định */}
+                          <div className="w-14 h-14 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
+                            <img
+                              src={r?.ImageUrl || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=200&q=80'}
+                              alt={r?.TypeName || ''}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+
+                          {/* Tên và giá phòng */}
+                          <div className="flex flex-col justify-center min-w-0 flex-1 overflow-hidden pr-1">
+                            <span
+                              className="text-xs font-semibold text-slate-800 line-clamp-2 leading-tight"
+                              title={r?.TypeName || `Phòng #${id}`}
+                            >
+                              {r?.TypeName || `Phòng #${id}`}
+                            </span>
+                            {r?.BasePrice && (
+                              <span className="text-[11px] font-bold text-[#b9a277] mt-1 truncate">
+                                {formatVND(r.BasePrice)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Ô trống gợi ý thêm phòng nếu chưa đủ 3 */}
+                    {compareList.length < 3 && (
+                      <div className="hidden md:flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl w-[120px] h-[72px] shrink-0 text-slate-400 px-2 text-center select-none">
+                        <span className="material-symbols-outlined text-[18px]">add</span>
+                        <span className="text-[10px] font-medium leading-tight">Thêm phòng ({compareList.length}/3)</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nút Xóa tất cả */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCompareList([]);
+                      localStorage.removeItem('compare_room_ids');
+                    }}
+                    className="text-xs text-slate-500 hover:text-slate-800 transition-colors font-medium px-1.5 py-1 whitespace-nowrap cursor-pointer hover:underline"
+                  >
+                    Xóa tất cả
+                  </button>
+
+                  {/* Nút Nâu Sang Trọng "So sánh ngay" theo đúng tone màu thương hiệu */}
+                  <button
+                    type="button"
+                    disabled={compareList.length < 2}
+                    onClick={() => {
+                      if (compareList.length < 2) {
+                        alert('Vui lòng chọn ít nhất 2 loại phòng để tiến hành so sánh');
+                        return;
+                      }
+                      navigate(`/rooms/compare?ids=${compareList.join(',')}`);
+                    }}
+                    className={`px-5 sm:px-6 h-[50px] rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm flex items-center justify-center shrink-0 cursor-pointer ${
+                      compareList.length >= 2
+                        ? 'bg-[#b9a277] hover:bg-[#a58e65] text-white shadow-[#b9a277]/25 hover:shadow-md active:scale-95'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <span>So sánh ngay</span>
+                  </button>
+
+                  {/* Nút "Thu gọn" có mũi tên v */}
+                  <button
+                    type="button"
+                    onClick={() => setCompareCollapsed(true)}
+                    className="h-[50px] px-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+                  >
+                    <span>Thu gọn</span>
+                    <span className="material-symbols-outlined text-[16px]">expand_more</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
 
       </div>
     </MainLayout>

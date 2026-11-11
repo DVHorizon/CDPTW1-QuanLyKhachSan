@@ -3,12 +3,17 @@
 const express = require('express');
 const router = express.Router();
 const roomSearchController = require('../controllers/roomSearchController');
+const roomCompareController = require('../controllers/roomCompareController');
 const bookingEngineController = require('../controllers/bookingEngineController');
 const dynamicPricingController = require('../controllers/dynamicPricingController');
 const { verifyToken } = require('../middlewares/authMiddleware');
 const { handleSearch } = require('../controllers/esRoomController');
 const { unifiedSearchRooms } = require('../controllers/dualSearchController');
 const { searchRoomsSolr } = require('../controllers/solrRoomController');
+
+// Đăng ký đường dẫn so sánh phòng trực quan (FEAT-GUEST-13B / A13)
+// GET /rooms/compare?ids=101,304,501
+router.get('/compare', roomCompareController.compareRooms);
 
 //Đăng ký đường dẫn API
 router.get('/search', unifiedSearchRooms); // Dual Engine API (M?c d?nh)
