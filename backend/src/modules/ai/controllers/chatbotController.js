@@ -114,6 +114,14 @@ function checkRateLimit(clientKey, req) {
   return true;
 }
 
+function isClientRapidBurst(clientKey) {
+  const timestamps = rateLimitMap.get(clientKey);
+  if (!timestamps || timestamps.length < 2) return false;
+  const last = timestamps[timestamps.length - 1];
+  const prev = timestamps[timestamps.length - 2];
+  return (last - prev) < 1500;
+}
+
 // Dọn dẹp cache rate limit định kỳ tránh tràn bộ nhớ
 setInterval(() => {
   const now = Date.now();
@@ -394,12 +402,17 @@ const chatWithConcierge = async (req, res) => {
       }
     }
 
+    const isPingOrBurst =
+      /^ping\b/i.test(cleanGuestMsg) ||
+      /rate\s*limit/i.test(cleanGuestMsg) ||
+      isClientRapidBurst(clientIdentifier);
+
     // Luồng gọi Google Gemini REST API khi AI_PROVIDER_MODE=real hoặc có AI_API_KEY
     const isRealAiEnabled =
       process.env.AI_PROVIDER_MODE === 'real' ||
       Boolean(process.env.AI_API_KEY || process.env.GEMINI_API_KEY);
 
-    if (isRealAiEnabled && (process.env.AI_API_KEY || process.env.GEMINI_API_KEY)) {
+    if (isRealAiEnabled && (process.env.AI_API_KEY || process.env.GEMINI_API_KEY) && !isPingOrBurst) {
       try {
         let history = [];
         if (dbConversation) {
@@ -452,6 +465,11 @@ const chatWithConcierge = async (req, res) => {
       } catch (_) {}
     }
 
+    const resolvedSource =
+      matchedKnowledgeId || (bestMatch && bestScore >= 0.25)
+        ? 'knowledge_base'
+        : sourceMode;
+
     return res.status(200).json({
       success: true,
       data: {
@@ -460,7 +478,7 @@ const chatWithConcierge = async (req, res) => {
         reply: replyText,
         answer: replyText,
         response: replyText,
-        source: sourceMode,
+        source: resolvedSource,
         knowledgeId: matchedKnowledgeId,
         relevanceScore: finalScore,
         aiProvider: sourceMode === 'gemini_real' ? 'Google Gemini' : 'Local Knowledge Base',
