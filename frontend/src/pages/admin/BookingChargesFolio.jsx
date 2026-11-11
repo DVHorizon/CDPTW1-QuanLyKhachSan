@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import AdminLayout from '../../components/admin/layout/AdminLayout';
 import bookingApi from '../../api/bookingApi';
+import invoiceApi from '../../api/invoiceApi';
+import MultiTenderSettlementModal from '../../components/admin/finance/MultiTenderSettlementModal';
+import { cleanMessage, extractErrorCode, logSystemEvent } from '../../utils/toastSanitizer';
 
 const fmtMoney = (n) => {
   if (n === null || n === undefined || isNaN(Number(n))) return '0 ₫';
@@ -26,7 +29,7 @@ const fmtDate = (d) => {
 
 export default function BookingChargesFolio() {
   const { bookingId: paramBookingId } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const activeBookingId = paramBookingId || searchParams.get('bookingId') || '';
@@ -35,6 +38,80 @@ export default function BookingChargesFolio() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // State Hóa đơn Master & Xuất PDF
+  const [invoice, setInvoice] = useState(null);
+  const [loadingInvoice, setLoadingInvoice] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [vatRate, setVatRate] = useState(10);
+  const [manualAdjustments, setManualAdjustments] = useState([]);
+  const [newAdjDesc, setNewAdjDesc] = useState('');
+  const [newAdjAmount, setNewAdjAmount] = useState('');
+  const [newAdjType, setNewAdjType] = useState('Surcharge');
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [createInvoiceError, setCreateInvoiceError] = useState(null);
+
+  // Trạng thái tải file PDF
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  // State Quyết toán tại quầy
+  const [showSettleModal, setShowSettleModal] = useState(false);
+  const [settleMethod, setSettleMethod] = useState('Cash');
+  const [settleLoading, setSettleLoading] = useState(false);
+  const [settleError, setSettleError] = useState(null);
+
+  // Thông báo người dùng (Chỉ hiển thị nội dung, mã lưu/ghi log ra console)
+  const [toast, setToast] = useState(null); // { message, type: 'success' | 'error' | 'info' }
+
+  const showToast = (rawMsg, codeOrType = null, typeOrCode = 'success') => {
+    let code = null;
+    let type = 'success';
+    if (['success', 'error', 'info', 'warn', 'warning'].includes(codeOrType)) {
+      type = codeOrType;
+      code = typeOrCode !== 'success' ? typeOrCode : null;
+    } else {
+      code = codeOrType;
+      type = typeOrCode || 'success';
+    }
+    const message = cleanMessage(rawMsg);
+    const extractedCode = extractErrorCode(rawMsg, code);
+
+    setToast({ message, type });
+
+    logSystemEvent({
+      code: extractedCode,
+      message,
+      rawMessage: rawMsg,
+      type,
+      context: { page: 'BookingChargesFolio', bookingId: activeBookingId, invoiceId: invoice?.InvoiceId }
+    });
+
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const fetchInvoice = useCallback(async (idToFetch) => {
+    if (!idToFetch) {
+      setInvoice(null);
+      return;
+    }
+    setLoadingInvoice(true);
+    try {
+      const inv = await invoiceApi.getInvoiceByBookingId(idToFetch);
+      setInvoice(inv);
+      if (inv) {
+        console.log('[Hóa Đơn] Đã tải thông tin hóa đơn:', {
+          invoiceId: inv.InvoiceId,
+          invoiceNumber: inv.InvoiceNumber,
+          status: inv.Status,
+        });
+      }
+    } catch (err) {
+      console.warn('[Hóa Đơn] Lỗi khi tra cứu hóa đơn:', err);
+      setInvoice(null);
+    } finally {
+      setLoadingInvoice(false);
+    }
+  }, []);
 
   const fetchCharges = useCallback(async (idToFetch) => {
     if (!idToFetch) {
@@ -47,13 +124,21 @@ export default function BookingChargesFolio() {
     try {
       const res = await bookingApi.getBookingCharges(idToFetch);
       setData(res);
+      console.log('[Bảng Kê Chi Phí] Tổng hợp chi phí thành công cho Booking:', idToFetch, {
+        grandTotal: res.summary?.grandTotal,
+        totalPaid: res.summary?.totalPaid,
+        remainingBalance: res.summary?.remainingBalance,
+      });
+      fetchInvoice(idToFetch);
     } catch (err) {
-      setError(err?.message || 'Không thể tổng hợp chi phí cho mã đặt phòng này.');
+      const code = err?.errorCode || err?.code || err?.status || 'ERROR_CHARGES_FAILED';
+      console.error(`[Mã lỗi tổng hợp chi phí]: ${code}`, err);
+      setError(cleanMessage(err?.message) || 'Không thể tổng hợp chi phí cho mã đặt phòng này.');
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchInvoice]);
 
   useEffect(() => {
     if (activeBookingId) {
@@ -61,6 +146,7 @@ export default function BookingChargesFolio() {
       fetchCharges(activeBookingId);
     } else {
       setData(null);
+      setInvoice(null);
     }
   }, [activeBookingId, fetchCharges]);
 
@@ -75,15 +161,132 @@ export default function BookingChargesFolio() {
     window.print();
   };
 
+  // Mở xem trực tiếp PDF trên tab mới với Bearer Token an toàn qua Blob
+  const handleViewPdf = async () => {
+    if (!invoice?.InvoiceId) return;
+    setPdfLoading(true);
+    try {
+      const blob = await invoiceApi.fetchInvoicePdfBlob(invoice.InvoiceId, 'inline');
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      console.log('[Mã phản hồi xuất PDF]: SUCCESS_0001_VIEW_PDF', { invoiceId: invoice.InvoiceId });
+      showToast('Đã mở hóa đơn PDF trong tab mới.', 'SUCCESS_0001_VIEW_PDF', 'success');
+    } catch (err) {
+      const code = err?.code || 'ERROR_0018_GENERATION_FAILED';
+      console.error(`[Mã lỗi mở PDF]: ${code}`, err);
+      showToast(cleanMessage(err?.message) || 'Không thể mở hóa đơn PDF.', code, 'error');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  // Tải file PDF về máy với Bearer Token an toàn qua Blob
+  const handleDownloadPdf = async () => {
+    if (!invoice?.InvoiceId) return;
+    setPdfLoading(true);
+    try {
+      const blob = await invoiceApi.fetchInvoicePdfBlob(invoice.InvoiceId, 'download');
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `INV-${invoice.InvoiceNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      console.log('[Mã phản hồi tải PDF]: SUCCESS_0001_DOWNLOAD_PDF', { invoiceId: invoice.InvoiceId });
+      showToast('Đã tải thành công file hóa đơn PDF.', 'SUCCESS_0001_DOWNLOAD_PDF', 'success');
+    } catch (err) {
+      const code = err?.code || 'ERROR_0019_STORAGE_FAILED';
+      console.error(`[Mã lỗi tải PDF]: ${code}`, err);
+      showToast(cleanMessage(err?.message) || 'Không thể tải file hóa đơn PDF.', code, 'error');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  // Thêm khoản phụ thu / giảm giá thủ công vào danh sách trước khi chốt hoá đơn
+  const handleAddAdjustment = () => {
+    if (!newAdjDesc.trim()) return;
+    const amt = Number(newAdjAmount);
+    if (isNaN(amt) || amt === 0) return;
+
+    setManualAdjustments((prev) => [
+      ...prev,
+      {
+        description: newAdjDesc.trim(),
+        amount: newAdjType === 'Other' && amt > 0 ? -amt : amt,
+        itemType: newAdjType,
+      },
+    ]);
+    setNewAdjDesc('');
+    setNewAdjAmount('');
+  };
+
+  const handleRemoveAdjustment = (idx) => {
+    setManualAdjustments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Gửi yêu cầu lập Master Invoice
+  const handleConfirmCreateInvoice = async () => {
+    setCreatingInvoice(true);
+    setCreateInvoiceError(null);
+    try {
+      const res = await invoiceApi.createMasterInvoice({
+        bookingId: activeBookingId,
+        vatRate: Number(vatRate) || 10,
+        bypassCheckOutRule: true,
+        manualAdjustments,
+      });
+
+      const successCode = res?.code || 'SUCCESS_0001_CREATED';
+      console.log(`[Mã phản hồi tạo hóa đơn]: ${successCode}`, {
+        invoiceId: res?.data?.invoiceId,
+        invoiceNumber: res?.data?.invoiceNumber,
+        totalAmount: res?.data?.totalAmount,
+      });
+
+      showToast('Tạo hóa đơn tổng hợp thành công!', successCode, 'success');
+      setShowCreateModal(false);
+      setManualAdjustments([]);
+      fetchCharges(activeBookingId);
+    } catch (err) {
+      const errCode = err?.code || 'ERROR_CREATE_INVOICE_FAILED';
+      console.error(`[Mã lỗi tạo hóa đơn]: ${errCode}`, err);
+
+      if (err?.code === 'ERROR_0017_ALREADY_EXISTS') {
+        showToast('Booking này đã có hóa đơn trên hệ thống.', errCode, 'info');
+        setShowCreateModal(false);
+        fetchCharges(activeBookingId);
+      } else {
+        setCreateInvoiceError(cleanMessage(err?.message) || 'Không thể tạo hóa đơn tổng hợp.');
+      }
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
+
+  // Xử lý quyết toán thành công từ MultiTenderSettlementModal
+  const handleSettlementSuccess = (settleResult) => {
+    showToast('Quyết toán hoá đơn thành công!', 'SUCCESS_INVOICE_SETTLED', 'success');
+    setShowSettleModal(false);
+    fetchCharges(activeBookingId);
+    fetchInvoice(activeBookingId);
+  };
+
   const stays = data?.stays || [];
   const minibar = data?.minibar || [];
   const services = data?.services || [];
   const fnb = data?.foodAndBeverage || [];
+  const damages = data?.damages || [];
+  const extensions = data?.extensions || [];
   const summary = data?.summary || {
     roomSubtotal: 0,
+    extensionSubtotal: 0,
     minibarSubtotal: 0,
     serviceSubtotal: 0,
     foodSubtotal: 0,
+    damageSubtotal: 0,
     surcharge: 0,
     discount: 0,
     grandTotal: 0,
@@ -91,23 +294,49 @@ export default function BookingChargesFolio() {
     remainingBalance: 0,
   };
 
+  // Tính nháp Subtotal & Total cho Modal
+  const modalAdjSum = manualAdjustments.reduce((sum, a) => sum + Number(a.amount || 0), 0);
+  const modalSubtotal = Math.max(0, (Number(summary.grandTotal) || 0) + modalAdjSum);
+  const modalVatAmount = Math.round(modalSubtotal * (Number(vatRate) / 100));
+  const modalGrandTotal = modalSubtotal + modalVatAmount;
+
+  const firstStayId = stays[0]?.stayId;
+
   return (
     <AdminLayout>
       <div className="space-y-6 max-w-7xl mx-auto pb-12">
+        {/* Toast thông báo người dùng (Chỉ nội dung thông báo, mã xem trong Console) */}
+        {toast && (
+          <div
+            className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-sm font-semibold animate-in fade-in slide-in-from-top-4 ${
+              toast.type === 'error'
+                ? 'bg-rose-600 text-white'
+                : toast.type === 'info'
+                ? 'bg-blue-600 text-white'
+                : 'bg-emerald-600 text-white'
+            }`}
+          >
+            <span className="material-symbols-outlined text-lg">
+              {toast.type === 'error' ? 'error' : toast.type === 'info' ? 'info' : 'check_circle'}
+            </span>
+            <span>{toast.message}</span>
+          </div>
+        )}
+
         {/* Header Trang */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm print:hidden">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-blue-600 text-2xl">receipt_long</span>
               <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
-                Bảng Kê Chi Phí Lưu Trú (Master Folio Preview)
+                Bảng Kê Chi Phí & Hóa Đơn Tổng Hợp
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                Màn 25 / FEAT-INVOICE-01
+                Master Folio
               </span>
             </div>
             <p className="text-xs text-slate-500">
-              Tự động gom tạm tính toàn bộ chi phí lưu trú (Phòng, Minibar, Laundry, Spa, Tour, Nhà hàng/Bar) theo Booking
+              Tổng hợp toàn bộ chi phí lưu trú (phòng, minibar, dịch vụ, ẩm thực F&B), lập hóa đơn tổng hợp và xuất hóa đơn VAT
             </p>
           </div>
 
@@ -184,7 +413,7 @@ export default function BookingChargesFolio() {
             <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 text-white p-4 rounded-2xl shadow-lg print:hidden">
               <div className="flex items-center gap-3">
                 <span className="px-3 py-1 rounded-lg bg-blue-500/20 border border-blue-400/30 text-blue-300 font-mono text-xs font-bold">
-                  BOOKING #{data.bookingId}
+                  ĐẶT PHÒNG #{data.bookingId}
                 </span>
                 <span className="text-xs text-slate-300">
                   Khách đại diện: <strong className="text-white">{data.guestName || '—'}</strong> • Phòng: <strong className="text-blue-300">{data.roomNumber || 'Chưa gán'}</strong>
@@ -208,10 +437,10 @@ export default function BookingChargesFolio() {
                 <button
                   type="button"
                   onClick={handlePrint}
-                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
                 >
                   <span className="material-symbols-outlined text-sm">print</span>
-                  <span>In Bảng Kê (Folio)</span>
+                  <span>In Bảng Kê</span>
                 </button>
                 <Link
                   to="/admin/bookings"
@@ -228,42 +457,160 @@ export default function BookingChargesFolio() {
                 <span className="material-symbols-outlined text-amber-600 text-2xl flex-shrink-0">
                   warning
                 </span>
-                <div className="leading-relaxed">
-                  <strong className="font-bold text-amber-950 uppercase tracking-wide">Cảnh báo nghiệp vụ lễ tân:</strong> Booking này hiện đang có đơn dịch vụ (giặt ủi, spa, tour...) ở trạng thái tiếp nhận hoặc đang xử lý. Chi phí của các dịch vụ chưa hoàn thành này tạm thời chưa được tính vào tổng thanh toán. Vui lòng kiểm tra với bộ phận liên quan trước khi chốt hóa đơn trả phòng.
+                <div>
+                  <p className="font-bold">Cảnh báo dịch vụ lưu trú chưa hoàn tất!</p>
+                  <p className="text-amber-800">
+                    Booking này còn ít nhất một dịch vụ phòng (giặt ủi, spa hoặc ẩm thực) đang ở trạng thái tiếp nhận hoặc đang xử lý.
+                    Vui lòng xác nhận hoàn tất trước khi chốt hóa đơn.
+                  </p>
                 </div>
               </div>
             )}
 
-            {/* THẺ TÓM TẮT THÔNG TIN LƯU TRÚ */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-xs">
-              <div>
-                <span className="text-slate-400 block mb-0.5">Khách hàng đại diện:</span>
-                <strong className="text-sm font-bold text-slate-900">{data.guestName || '—'}</strong>
-              </div>
-              <div>
-                <span className="text-slate-400 block mb-0.5">Phòng lưu trú:</span>
-                <strong className="text-sm font-bold font-mono text-blue-700">{data.roomNumber || 'Chưa gán'}</strong>
-              </div>
-              <div>
-                <span className="text-slate-400 block mb-0.5">Ngày nhận phòng (Check-in):</span>
-                <span className="text-sm font-mono font-medium text-slate-800">{fmtDate(data.checkInDate)}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block mb-0.5">Ngày trả phòng (Check-out):</span>
-                <span className="text-sm font-mono font-medium text-slate-800">{fmtDate(data.checkOutDate)}</span>
-              </div>
+            {/* KHỐI MASTER INVOICE & XUẤT HOÁ ĐƠN PDF */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+              {invoice ? (
+                /* Trường hợp 1: Đã có Master Invoice */
+                <div className="space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-emerald-600 text-2xl">verified</span>
+                        <h2 className="text-base font-bold text-slate-900">
+                          Hóa Đơn Tổng Hợp Chính Thức
+                        </h2>
+                        <span
+                          className={`px-3 py-0.5 rounded-full text-xs font-bold border ${
+                            invoice.Status === 'Paid'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : invoice.Status === 'PartiallyPaid'
+                              ? 'bg-amber-50 text-amber-700 border-amber-300'
+                              : 'bg-rose-50 text-rose-700 border-rose-300'
+                          }`}
+                        >
+                          {invoice.Status === 'Paid'
+                            ? 'Đã Thanh Toán Đủ'
+                            : invoice.Status === 'PartiallyPaid'
+                            ? 'Thanh Toán Một Phần'
+                            : 'Chờ Thanh Toán'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Số Hóa Đơn: <strong className="font-mono text-slate-800">{invoice.InvoiceNumber}</strong> • Ngày lập:{' '}
+                        {fmtDateTime(invoice.InvoiceDate || invoice.CreatedAt)}
+                      </p>
+                    </div>
+
+                    {/* NÚT THAO TÁC XUẤT PDF & QUYẾT TOÁN */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleViewPdf}
+                        disabled={pdfLoading}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                      >
+                        {pdfLoading ? (
+                          <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        ) : (
+                          <span className="material-symbols-outlined text-base">picture_as_pdf</span>
+                        )}
+                        <span>In / Xem Hóa Đơn VAT</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDownloadPdf}
+                        disabled={pdfLoading}
+                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-300"
+                      >
+                        <span className="material-symbols-outlined text-base">download</span>
+                        <span>Tải File PDF</span>
+                      </button>
+
+                      {invoice.Status !== 'Paid' ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowSettleModal(true)}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-base">payments</span>
+                          <span>Quyết Toán Tại Quầy</span>
+                        </button>
+                      ) : (
+                        <span className="px-3.5 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-emerald-300">
+                          <span className="material-symbols-outlined text-base">verified</span>
+                          <span>Đã Quyết Toán Đủ</span>
+                        </span>
+                      )}
+
+                      <Link
+                        to="/admin/tai-chinh"
+                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-300"
+                        title="Mở Sổ Cái Hoá Đơn"
+                      >
+                        <span className="material-symbols-outlined text-base">account_balance</span>
+                        <span>Sổ Cái Hoá Đơn</span>
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Chi tiết tài chính Hóa Đơn */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <span className="text-[11px] font-semibold text-slate-500 block uppercase">Tạm tính (Subtotal)</span>
+                      <span className="text-sm font-bold font-mono text-slate-800">{fmtMoney(invoice.Subtotal)}</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <span className="text-[11px] font-semibold text-slate-500 block uppercase">Thuế VAT ({invoice.VATRate || 10}%)</span>
+                      <span className="text-sm font-bold font-mono text-slate-800">{fmtMoney(invoice.VATAmount)}</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <span className="text-[11px] font-semibold text-slate-500 block uppercase">Tổng Hóa Đơn (Total)</span>
+                      <span className="text-base font-extrabold font-mono text-blue-700">{fmtMoney(invoice.TotalAmount)}</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <span className="text-[11px] font-semibold text-slate-500 block uppercase">Đã Thu / Đặt Cọc</span>
+                      <span className="text-sm font-bold font-mono text-emerald-600">{fmtMoney(summary.totalPaid)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Trường hợp 2: Chưa lập Master Invoice */
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200">
+                      <span className="material-symbols-outlined text-2xl">receipt</span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800">Booking này chưa lập hóa đơn tổng hợp chính thức</h3>
+                      <p className="text-xs text-slate-500">
+                        Bảng kê dưới đây đang là số liệu tạm tính. Bấm nút bên phải để chốt hóa đơn điện tử VAT và xuất PDF.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(true)}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer flex items-center gap-2 flex-shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-base">post_add</span>
+                    <span>Lập Hóa Đơn Tổng Hợp</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* BẢNG 1: TIỀN PHÒNG & LƯU TRÚ (ROOM CHARGES) */}
+            {/* BẢNG 1: TIỀN PHÒNG & THỜI GIAN LƯU TRÚ THEO TỪNG STAY */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="bg-slate-50/80 px-6 py-3.5 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-blue-600 text-lg">hotel</span>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    1. Chi Phí Tiền Phòng & Lưu Trú ({stays.length} lượt ở)
+                    1. Chi Phí Tiền Phòng Lưu Trú ({stays.length} lượt lưu trú / phòng)
                   </h3>
                 </div>
-                <span className="font-mono font-extrabold text-sm text-blue-900">
+                <span className="font-mono font-extrabold text-sm text-slate-900">
                   {fmtMoney(summary.roomSubtotal)}
                 </span>
               </div>
@@ -272,66 +619,63 @@ export default function BookingChargesFolio() {
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 text-slate-500 font-semibold bg-slate-50/40">
-                      <th className="py-3 px-4">Số phòng</th>
+                      <th className="py-3 px-4">Phòng</th>
                       <th className="py-3 px-4">Hạng phòng</th>
-                      <th className="py-3 px-4">Khoảng thời gian lưu trú</th>
+                      <th className="py-3 px-4">Thời gian nhận phòng</th>
+                      <th className="py-3 px-4">Thời gian trả phòng</th>
                       <th className="py-3 px-4 text-center">Số đêm</th>
                       <th className="py-3 px-4 text-right">Đơn giá / đêm</th>
-                      <th className="py-3 px-4 text-right">Phụ thu nhận sớm / trả trễ</th>
-                      <th className="py-3 px-4 text-right">Thành tiền phòng</th>
+                      <th className="py-3 px-4 text-right">Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {stays.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-4 px-4 text-center text-slate-500 italic">
-                          Chưa có thông tin lượt nhận phòng (Stay). Tiền phòng được dự tính theo đặt phòng: {fmtMoney(summary.roomSubtotal)}
+                        <td colSpan={7} className="py-6 px-4 text-center text-slate-400 italic">
+                          Chưa có lượt lưu trú vật lý nào (Booking đang ở trạng thái chuẩn bị)
                         </td>
                       </tr>
                     ) : (
                       stays.map((st, i) => (
-                        <tr key={st.stayId || i} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="py-3 px-4 font-mono font-bold text-blue-700 text-sm">
-                            {st.roomNumber}
-                          </td>
-                          <td className="py-3 px-4 font-medium text-slate-800">
-                            {st.roomTypeName}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-slate-600 text-[11px]">
-                            {fmtDateTime(st.checkIn)} → {fmtDateTime(st.checkOut)}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold">
-                            {st.nights}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-right text-slate-700">
-                            {fmtMoney(st.pricePerNight)}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-right text-slate-600 text-[11px]">
-                            {st.earlyCheckInFee || st.lateCheckOutFee
-                              ? `+${fmtMoney((st.earlyCheckInFee || 0) + (st.lateCheckOutFee || 0))}`
-                              : '0 ₫'}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-right font-bold text-slate-900 text-sm">
-                            {fmtMoney(st.roomTotal)}
-                          </td>
+                        <tr key={i} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3 px-4 font-bold text-blue-600">{st.roomNumber}</td>
+                          <td className="py-3 px-4 text-slate-700 font-medium">{st.roomTypeName || st.roomType}</td>
+                          <td className="py-3 px-4 font-mono text-slate-600">{fmtDateTime(st.checkIn)}</td>
+                          <td className="py-3 px-4 font-mono text-slate-600">{fmtDateTime(st.checkOut)}</td>
+                          <td className="py-3 px-4 font-mono text-center font-bold">{st.nights} đêm</td>
+                          <td className="py-3 px-4 font-mono text-right text-slate-700">{fmtMoney(st.pricePerNight ?? st.ratePerNight)}</td>
+                          <td className="py-3 px-4 font-mono text-right font-bold text-slate-900">{fmtMoney(st.roomTotal ?? st.totalRoomCost)}</td>
                         </tr>
                       ))
                     )}
+                    {extensions.length > 0 &&
+                      extensions.map((ext, i) => (
+                        <tr key={`ext-${ext.extensionId || i}`} className="bg-blue-50/40 hover:bg-blue-50/70 transition-colors">
+                          <td className="py-3 px-4 font-bold text-blue-700">{ext.roomNumber}</td>
+                          <td className="py-3 px-4 text-blue-900 font-medium">Gia hạn lưu trú</td>
+                          <td className="py-3 px-4 font-mono text-xs text-blue-700" colSpan={2}>
+                            Ghi nhận: {fmtDateTime(ext.createdAt)}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-center font-bold text-blue-800">+{ext.nights} đêm</td>
+                          <td className="py-3 px-4 font-mono text-right text-slate-600">{fmtMoney(ext.total / (ext.nights || 1))}</td>
+                          <td className="py-3 px-4 font-mono text-right font-bold text-blue-800">+{fmtMoney(ext.total)}</td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* BẢNG 2: TIÊU DÙNG MINIBAR */}
+            {/* BẢNG 2: TIÊU DÙNG MINIBAR PHÒNG */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="bg-slate-50/80 px-6 py-3.5 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-600 text-lg">kitchen</span>
+                  <span className="material-symbols-outlined text-amber-600 text-lg">local_bar</span>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
                     2. Tiêu Dùng Minibar Trong Phòng ({minibar.length} món)
                   </h3>
                 </div>
-                <span className="font-mono font-extrabold text-sm text-emerald-800">
+                <span className="font-mono font-extrabold text-sm text-amber-900">
                   {fmtMoney(summary.minibarSubtotal)}
                 </span>
               </div>
@@ -340,18 +684,19 @@ export default function BookingChargesFolio() {
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 text-slate-500 font-semibold bg-slate-50/40">
-                      <th className="py-3 px-4">Tên sản phẩm minibar</th>
-                      <th className="py-3 px-4 text-center">Số lượng tiêu dùng</th>
-                      <th className="py-3 px-4 text-right">Đơn giá niêm yết</th>
+                      <th className="py-3 px-4">Tên đồ dùng / Thức uống</th>
+                      <th className="py-3 px-4 text-center">Số lượng</th>
+                      <th className="py-3 px-4 text-right">Đơn giá</th>
                       <th className="py-3 px-4 text-right">Thành tiền</th>
+                      <th className="py-3 px-4 font-mono text-center">Phòng sử dụng</th>
                       <th className="py-3 px-4 text-right">Thời điểm ghi nhận</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {minibar.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-4 px-4 text-center text-slate-400 italic">
-                          Không phát sinh tiêu dùng minibar trong suốt kỳ lưu trú
+                        <td colSpan={6} className="py-4 px-4 text-center text-slate-400 italic">
+                          Không phát sinh tiêu dùng minibar
                         </td>
                       </tr>
                     ) : (
@@ -361,7 +706,8 @@ export default function BookingChargesFolio() {
                           <td className="py-2.5 px-4 text-center font-mono font-bold">{mb.quantity}</td>
                           <td className="py-2.5 px-4 font-mono text-right text-slate-700">{fmtMoney(mb.price)}</td>
                           <td className="py-2.5 px-4 font-mono text-right font-bold text-slate-900">{fmtMoney(mb.total)}</td>
-                          <td className="py-2.5 px-4 font-mono text-right text-slate-500 text-[11px]">{fmtDateTime(mb.consumedAt)}</td>
+                          <td className="py-2.5 px-4 font-mono text-center text-blue-600 font-semibold">{mb.roomNumber || '—'}</td>
+                          <td className="py-2.5 px-4 font-mono text-right text-slate-500 text-[11px]">{fmtDateTime(mb.consumedAt || mb.usedAt)}</td>
                         </tr>
                       ))
                     )}
@@ -370,13 +716,13 @@ export default function BookingChargesFolio() {
               </div>
             </div>
 
-            {/* BẢNG 3: DỊCH VỤ PHÒNG (LAUNDRY, SPA, TOUR...) */}
+            {/* BẢNG 3: DỊCH VỤ KHÁCH SẠN */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="bg-slate-50/80 px-6 py-3.5 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-purple-600 text-lg">room_service</span>
+                  <span className="material-symbols-outlined text-purple-600 text-lg">dry_cleaning</span>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    3. Dịch Vụ Khách Sạn (Giặt Ủi, Spa, Tour, Room Service) ({services.length} lượt)
+                    3. Dịch Vụ Khách Sạn & Spa ({services.length} lượt sử dụng)
                   </h3>
                 </div>
                 <span className="font-mono font-extrabold text-sm text-purple-900">
@@ -394,7 +740,7 @@ export default function BookingChargesFolio() {
                       <th className="py-3 px-4 text-right">Đơn giá</th>
                       <th className="py-3 px-4 text-right">Thành tiền</th>
                       <th className="py-3 px-4 text-center">Trạng thái</th>
-                      <th className="py-3 px-4 text-right">Thời gian gọi dịch vụ</th>
+                      <th className="py-3 px-4 text-right">Thời gian đặt</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -430,7 +776,7 @@ export default function BookingChargesFolio() {
               </div>
             </div>
 
-            {/* BẢNG 4: NHÀ HÀNG & QUẦY BAR (F&B - GHI NỢ PHÒNG) */}
+            {/* BẢNG 4: NHÀ HÀNG & QUẦY BAR (F&B) */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="bg-slate-50/80 px-6 py-3.5 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -480,7 +826,55 @@ export default function BookingChargesFolio() {
               </div>
             </div>
 
-            {/* CARD QUYẾT TOÁN TÀI CHÍNH TỔNG THỂ (GRAND TOTAL & BALANCE) */}
+            {/* BẢNG 5: BỒI THƯỜNG THIỆT HẠI BUỒNG PHÒNG & PHẠT */}
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="bg-slate-50/80 px-6 py-3.5 border-b border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-rose-600 text-lg">handyman</span>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    5. Bồi Thường Thiệt Hại Buồng Phòng & Phạt ({damages.length} khoản)
+                  </h3>
+                </div>
+                <span className="font-mono font-extrabold text-sm text-rose-800">
+                  {fmtMoney(summary.damageSubtotal)}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500 font-semibold bg-slate-50/40">
+                      <th className="py-3 px-4">Tài sản / Khoản phạt</th>
+                      <th className="py-3 px-4">Lý do ghi nhận</th>
+                      <th className="py-3 px-4 font-mono text-center">Phòng</th>
+                      <th className="py-3 px-4 text-right">Chi phí bồi thường</th>
+                      <th className="py-3 px-4 text-right">Thời điểm lập biên bản</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {damages.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-4 px-4 text-center text-slate-400 italic">
+                          Không phát sinh bồi thường thiệt hại buồng phòng
+                        </td>
+                      </tr>
+                    ) : (
+                      damages.map((dam, i) => (
+                        <tr key={dam.damageId || i} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-2.5 px-4 font-medium text-slate-800">{dam.item}</td>
+                          <td className="py-2.5 px-4 text-slate-600">{dam.reason || 'Kiểm phòng phát hiện'}</td>
+                          <td className="py-2.5 px-4 font-mono text-center text-blue-600 font-semibold">{dam.roomNumber || '—'}</td>
+                          <td className="py-2.5 px-4 font-mono text-right font-bold text-rose-700">{fmtMoney(dam.total)}</td>
+                          <td className="py-2.5 px-4 font-mono text-right text-slate-500 text-[11px]">{fmtDateTime(dam.createdAt)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* CARD QUYẾT TOÁN TÀI CHÍNH TỔNG THỂ */}
             <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white rounded-3xl p-8 shadow-2xl border border-slate-700">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Cột trái: Tóm tắt từng khoản */}
@@ -493,18 +887,30 @@ export default function BookingChargesFolio() {
                     <span>1. Tiền phòng & phụ thu lưu trú:</span>
                     <span className="font-mono text-sm">{fmtMoney(summary.roomSubtotal)}</span>
                   </div>
+                  {summary.extensionSubtotal > 0 && (
+                    <div className="flex justify-between items-center text-blue-300 py-1 border-b border-slate-800">
+                      <span>1b. Phí gia hạn lưu trú:</span>
+                      <span className="font-mono text-sm">+{fmtMoney(summary.extensionSubtotal)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-slate-300 py-1 border-b border-slate-800">
                     <span>2. Tiêu dùng Minibar trong phòng:</span>
                     <span className="font-mono text-sm">{fmtMoney(summary.minibarSubtotal)}</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-300 py-1 border-b border-slate-800">
-                    <span>3. Dịch vụ khách sạn (Laundry, Spa...):</span>
+                    <span>3. Dịch vụ khách sạn (giặt ủi, spa...):</span>
                     <span className="font-mono text-sm">{fmtMoney(summary.serviceSubtotal)}</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-300 py-1 border-b border-slate-800">
                     <span>4. Ẩm thực F&B ghi nợ phòng:</span>
                     <span className="font-mono text-sm">{fmtMoney(summary.foodSubtotal)}</span>
                   </div>
+                  {summary.damageSubtotal > 0 && (
+                    <div className="flex justify-between items-center text-rose-300 py-1 border-b border-slate-800">
+                      <span>5. Bồi thường thiệt hại buồng phòng & phạt:</span>
+                      <span className="font-mono text-sm">+{fmtMoney(summary.damageSubtotal)}</span>
+                    </div>
+                  )}
                   {summary.surcharge > 0 && (
                     <div className="flex justify-between items-center text-amber-300 py-1 border-b border-slate-800">
                       <span>Phụ phí phát sinh khác:</span>
@@ -557,6 +963,203 @@ export default function BookingChargesFolio() {
             </div>
           </div>
         )}
+
+        {/* MODAL LẬP HÓA ĐƠN TỔNG HỢP */}
+        {showCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200">
+              {/* Header Modal */}
+              <div className="bg-slate-900 text-white px-6 py-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-blue-400 text-2xl">post_add</span>
+                  <div>
+                    <h3 className="text-base font-bold">Lập Hóa Đơn Tổng Hợp</h3>
+                    <p className="text-xs text-slate-400">Đơn đặt phòng #{activeBookingId}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              </div>
+
+              {/* Body Modal */}
+              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                {createInvoiceError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-base">error</span>
+                    <span>{createInvoiceError}</span>
+                  </div>
+                )}
+
+                {data?.hasPendingServices && (
+                  <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-xs text-amber-900 flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-base text-amber-600 flex-shrink-0 mt-0.5">warning</span>
+                    <div>
+                      <strong className="block font-bold">Lưu ý dịch vụ chưa hoàn tất:</strong>
+                      <span>Booking này vẫn còn dịch vụ đang tiếp nhận hoặc đang xử lý. Các đơn chưa hoàn thành sẽ KHÔNG được đưa vào hóa đơn này.</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Chọn Thuế suất VAT */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 block uppercase">Thuế Suất GTGT (VAT %)</label>
+                  <div className="flex gap-2">
+                    {[0, 5, 8, 10].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => setVatRate(rate)}
+                        className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                          vatRate === rate
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {rate}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Thêm phụ thu / giảm giá thủ công */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-700 uppercase">
+                      Điều chỉnh tại quầy (Phụ thu / Giảm giá thủ công)
+                    </label>
+                    <span className="text-[11px] text-slate-400">{manualAdjustments.length} khoản</span>
+                  </div>
+
+                  {manualAdjustments.length > 0 && (
+                    <div className="space-y-1.5 border border-slate-200 rounded-xl p-2.5 bg-slate-50">
+                      {manualAdjustments.map((adj, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs py-1 px-2 bg-white rounded-lg border border-slate-150">
+                          <span className="text-slate-800">{adj.description}</span>
+                          <div className="flex items-center gap-3">
+                            <span className={`font-mono font-bold ${adj.amount >= 0 ? 'text-amber-600' : 'text-rose-600'}`}>
+                              {adj.amount >= 0 ? `+${fmtMoney(adj.amount)}` : fmtMoney(adj.amount)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAdjustment(i)}
+                              className="text-slate-400 hover:text-rose-500 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-12 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Mô tả (VD: Trả phòng muộn, Khách VIP...)"
+                      value={newAdjDesc}
+                      onChange={(e) => setNewAdjDesc(e.target.value)}
+                      className="col-span-6 px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:border-blue-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Số tiền..."
+                      value={newAdjAmount}
+                      onChange={(e) => setNewAdjAmount(e.target.value)}
+                      className="col-span-3 px-3 py-2 text-xs font-mono rounded-xl border border-slate-300 focus:outline-none focus:border-blue-500"
+                    />
+                    <select
+                      value={newAdjType}
+                      onChange={(e) => setNewAdjType(e.target.value)}
+                      className="col-span-2 px-2 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                    >
+                      <option value="Surcharge">Phụ thu (+)</option>
+                      <option value="Other">Giảm giá (-)</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleAddAdjustment}
+                      className="col-span-1 bg-slate-800 hover:bg-slate-700 text-white rounded-xl flex items-center justify-center cursor-pointer transition-colors"
+                      title="Thêm khoản điều chỉnh"
+                    >
+                      <span className="material-symbols-outlined text-base">add</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Khối xem trước số liệu hoá đơn */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Tổng chi phí gom từ lưu trú:</span>
+                    <span className="font-mono">{fmtMoney(summary.grandTotal)}</span>
+                  </div>
+                  {modalAdjSum !== 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Điều chỉnh thủ công tại quầy:</span>
+                      <span className="font-mono">{modalAdjSum >= 0 ? `+${fmtMoney(modalAdjSum)}` : fmtMoney(modalAdjSum)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-slate-700 font-bold border-t border-slate-200 pt-1.5">
+                    <span>Tạm tính (Subtotal):</span>
+                    <span className="font-mono">{fmtMoney(modalSubtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Thuế GTGT ({vatRate}%):</span>
+                    <span className="font-mono">+{fmtMoney(modalVatAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-blue-700 font-extrabold text-sm border-t border-slate-200 pt-1.5">
+                    <span>TỔNG HÓA ĐƠN CHÍNH THỨC:</span>
+                    <span className="font-mono">{fmtMoney(modalGrandTotal)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Modal */}
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  disabled={creatingInvoice}
+                  className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmCreateInvoice}
+                  disabled={creatingInvoice}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 shadow-sm"
+                >
+                  {creatingInvoice ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Đang tạo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">verified</span>
+                      <span>Xác Nhận Lập Hóa Đơn</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL QUYẾT TOÁN ĐA PHƯƠNG THỨC TẠI QUẦY (C9) */}
+        <MultiTenderSettlementModal
+          isOpen={showSettleModal}
+          onClose={() => setShowSettleModal(false)}
+          invoice={invoice}
+          outstandingBalance={summary.remainingBalance}
+          customerName={data?.guestName || data?.customerName || data?.customer?.fullName || data?.customer?.name}
+          onSuccess={handleSettlementSuccess}
+        />
       </div>
     </AdminLayout>
   );
