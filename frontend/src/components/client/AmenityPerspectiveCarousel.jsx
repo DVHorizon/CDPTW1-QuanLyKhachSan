@@ -100,12 +100,12 @@ export default function AmenityPerspectiveCarousel() {
   }, []);
 
   return (
-    <div className="relative w-full max-w-[1400px] mx-auto py-8 sm:py-12 px-2 sm:px-6 select-none overflow-hidden">
+    <div className="relative w-full py-4 sm:py-8 px-0 select-none overflow-hidden">
       {/* 3D Perspective Coverflow Stage */}
       <div 
         ref={containerRef}
-        className="relative h-[620px] sm:h-[670px] lg:h-[720px] w-full flex items-center justify-center"
-        style={{ perspective: '1400px' }}
+        className="relative h-[620px] sm:h-[670px] lg:h-[720px] w-full flex items-center justify-center overflow-visible"
+        style={{ perspective: '1600px' }}
       >
         {LUXURY_AMENITIES.map((item, index) => {
           // Tính offset vòng tròn (circular offset)
@@ -135,39 +135,39 @@ export default function AmenityPerspectiveCarousel() {
             rotateY = 0;
           } else if (offset === 1) {
             // Bên phải kề cận
-            translateX = '60%';
-            translateZ = '-110px';
+            translateX = '75%';
+            translateZ = '-120px';
             scale = 0.90;
             opacity = 0.65;
             zIndex = 20;
             rotateY = -6;
           } else if (offset === -1) {
             // Bên trái kề cận
-            translateX = '-60%';
-            translateZ = '-110px';
+            translateX = '-75%';
+            translateZ = '-120px';
             scale = 0.90;
             opacity = 0.65;
             zIndex = 20;
             rotateY = 6;
           } else if (offset === 2) {
             // Bên phải ngoài cùng
-            translateX = '112%';
-            translateZ = '-220px';
+            translateX = '148%';
+            translateZ = '-240px';
             scale = 0.78;
             opacity = 0.35;
             zIndex = 10;
             rotateY = -10;
           } else if (offset === -2) {
             // Bên trái ngoài cùng
-            translateX = '-112%';
-            translateZ = '-220px';
+            translateX = '-148%';
+            translateZ = '-240px';
             scale = 0.78;
             opacity = 0.35;
             zIndex = 10;
             rotateY = 10;
           } else {
             // Ẩn đi
-            translateX = offset > 0 ? '160%' : '-160%';
+            translateX = offset > 0 ? '200%' : '-200%';
             scale = 0.6;
             opacity = 0;
             zIndex = 1;
@@ -249,7 +249,7 @@ export default function AmenityPerspectiveCarousel() {
           type="button"
           onClick={handlePrev}
           aria-label="Tiện nghi trước"
-          className="absolute left-1 sm:left-4 md:left-6 lg:left-8 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
+          className="absolute left-3 sm:left-8 lg:left-14 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
         >
           <span className="material-symbols-outlined text-[28px] sm:text-[32px] group-hover:-translate-x-0.5 transition-transform">
             chevron_left
@@ -261,7 +261,7 @@ export default function AmenityPerspectiveCarousel() {
           type="button"
           onClick={handleNext}
           aria-label="Tiện nghi tiếp theo"
-          className="absolute right-1 sm:right-4 md:right-6 lg:right-8 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
+          className="absolute right-3 sm:right-8 lg:right-14 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
         >
           <span className="material-symbols-outlined text-[28px] sm:text-[32px] group-hover:translate-x-0.5 transition-transform">
             chevron_right
