@@ -426,7 +426,7 @@ function Home() {
 
         {/* ================= 2. FEATURE HIGHLIGHTS & STATS ================= */}
         <section id="gioi-thieu" className="w-full py-12 bg-white border-b border-[#dedad0] scroll-mt-20">
-          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <div className="w-full px-4 sm:px-8 lg:px-12">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center divide-y lg:divide-y-0 lg:divide-x divide-[#dedad0]">
               <div className="flex flex-col items-center justify-center p-3">
                 <div className="flex items-center gap-1 mb-1">
@@ -475,7 +475,7 @@ function Home() {
 
         {/* ================= 2.5. HOTEL SELECTION SECTION (BƯỚC 1: CHỌN KHÁCH SẠN) ================= */}
         <section id="he-thong-khach-san" className="w-full py-16 lg:py-20 bg-white border-b border-[#dedad0]">
-          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <div className="w-full px-4 sm:px-8 lg:px-12">
             <div className="text-center max-w-3xl mx-auto mb-10">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#fbf8f2] text-[#8c6d3b] border border-[#d8c49e] text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
                 <span className="material-symbols-outlined text-base">stars</span>
