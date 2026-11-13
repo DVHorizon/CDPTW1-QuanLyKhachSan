@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 /**
  * Component Footer dùng chung cho toàn bộ dự án Grand Horizon
@@ -47,12 +48,12 @@ const Footer = () => {
             <h3 className="text-[14.5px] sm:text-[15px] font-bold text-[#203044] uppercase tracking-wider mb-1">
               Khám Phá
             </h3>
-            <a className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#trang-chu">Trang chủ</a>
-            <a className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="/hotels">Khách sạn &amp; Resort</a>
-            <a className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#room-collection">Bộ sưu tập phòng</a>
-            <a className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#uu-dai">Gói khuyến mãi</a>
-            <a className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#trai-nghiem">Dịch vụ Spa &amp; Wellness</a>
-            <a className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#am-thuc">Ẩm thực The Azure</a>
+            <Link className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" to="/">Trang Chủ</Link>
+            <Link className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" to="/hotels">Khách Sạn &amp; Resort</Link>
+            <a className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#uu-dai">Gói Ưu Đãi</a>
+            <a className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#trai-nghiem">Dịch Vụ &amp; Tiện Ích</a>
+            <a className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#am-thuc">Ẩm Thực</a>
+            <a className="text-[14.5px] sm:text-[15px] text-[#373435]/85 hover:text-[#b9a277] transition-colors" href="#hoi-vien">Hội Viên Elite</a>
           </div>
 
           {/* Contact Details (col-span-3) */}
