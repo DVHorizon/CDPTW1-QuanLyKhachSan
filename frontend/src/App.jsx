@@ -44,6 +44,7 @@ import InvoiceLedger from './pages/admin/finance/InvoiceLedger';
 import MasterRevenueDashboard from './pages/admin/statistics/MasterRevenueDashboard';
 import AiConciergeManagement from './pages/admin/ai/AiConciergeManagement';
 import FloatingAiConcierge from './components/client/FloatingAiConcierge';
+import FloatingAcademicBadge from './components/common/FloatingAcademicBadge';
 import ClientConcierge from './pages/client/ClientConcierge';
 
 // tuyen/7 imports:
@@ -246,6 +247,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
           <FloatingAiConcierge />
+          <FloatingAcademicBadge />
         </Router>
       </SocketProvider>
     </AuthProvider>
