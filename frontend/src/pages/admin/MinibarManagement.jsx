@@ -171,7 +171,8 @@ export default function MinibarManagement() {
   // 3. Xử lý thay đổi số lượng còn lại (remainingQty)
   const handleRemainingQtyChange = (index, value) => {
     if (inspectionData?.Status === 'CONFIRMED') {
-      addToast('warn', 'Kiểm kê minibar đã được xác nhận và không thể sửa trực tiếp', 'MINIBAR_0005_ALREADY_CONFIRMED');
+      console.warn('[Minibar] MINIBAR_0005_ALREADY_CONFIRMED');
+      addToast('warn', 'Kiểm kê minibar đã được xác nhận và không thể sửa trực tiếp', 'Cảnh Báo');
       return;
     }
     const val = Number(value);
@@ -270,12 +271,14 @@ export default function MinibarManagement() {
     if (!selectedStayId) return;
 
     if (calculatedTotals.hasQuantityMismatch) {
-      addToast('warn', 'Số lượng kiểm kê không khớp. Vui lòng kiểm tra lại số lượng nạp và số lượng còn lại.', 'MINIBAR_0003_QUANTITY_MISMATCH');
+      console.warn('[Minibar] MINIBAR_0003_QUANTITY_MISMATCH');
+      addToast('warn', 'Số lượng kiểm kê không khớp. Vui lòng kiểm tra lại số lượng nạp và số lượng còn lại.', 'Cảnh Báo');
       return;
     }
 
     if (targetStatus === 'SUBMITTED' && calculatedTotals.hasVarianceWithoutReason) {
-      addToast('warn', 'Vui lòng chọn lý do cho số lượng chênh lệch', 'MINIBAR_0007_REASON_REQUIRED');
+      console.warn('[Minibar] MINIBAR_0007_REASON_REQUIRED');
+      addToast('warn', 'Vui lòng chọn lý do cho số lượng chênh lệch', 'Cảnh Báo');
       return;
     }
 
@@ -332,15 +335,18 @@ export default function MinibarManagement() {
       });
 
       if (res.success) {
-        addToast('success', 'Đã xác nhận kiểm kê minibar và cập nhật khoản phí vào hóa đơn', 'SUCCESS_MINIBAR_0001_CONFIRMED');
+        console.log('[Minibar] SUCCESS_MINIBAR_0001_CONFIRMED');
+        addToast('success', 'Đã xác nhận kiểm kê minibar và cập nhật khoản phí vào hóa đơn', 'Thành Công');
         setIsConfirmModalOpen(false);
         await loadStayMinibar(selectedStayId);
         await loadStays(searchQuery);
       } else {
-        addToast('error', res.message || 'Không thể xác nhận kiểm kê minibar', res.errorCode || 'MINIBAR_0010_CHARGE_FAILED');
+        console.error('[Minibar] Lỗi xác nhận:', res.errorCode || 'MINIBAR_0010_CHARGE_FAILED');
+        addToast('error', res.message || 'Không thể xác nhận kiểm kê minibar', 'Lỗi Xử Lý');
       }
     } catch (err) {
-      addToast('error', err.message || 'Lỗi khi xác nhận kiểm kê minibar', err.errorCode || 'MINIBAR_0010_CHARGE_FAILED');
+      console.error('[Minibar] Lỗi ngoại lệ:', err.errorCode || 'MINIBAR_0010_CHARGE_FAILED', err);
+      addToast('error', err.message || 'Lỗi khi xác nhận kiểm kê minibar', 'Lỗi Xử Lý');
     } finally {
       setIsConfirming(false);
     }
@@ -361,7 +367,8 @@ export default function MinibarManagement() {
     if (!adjustTargetLine || !inspectionData?.InspectionId) return;
 
     if (!adjustForm.reasonCode) {
-      addToast('warn', 'Vui lòng chọn lý do cho thao tác điều chỉnh', 'MINIBAR_0007_REASON_REQUIRED');
+      console.warn('[Minibar] MINIBAR_0007_REASON_REQUIRED');
+      addToast('warn', 'Vui lòng chọn lý do cho thao tác điều chỉnh', 'Cảnh Báo');
       return;
     }
 
@@ -394,7 +401,8 @@ export default function MinibarManagement() {
   const handleExecuteOverride = async () => {
     if (!selectedStayId) return;
     if (!overrideForm.reason.trim()) {
-      addToast('warn', 'Vui lòng nhập lý do miễn hoặc bỏ qua kiểm kê minibar', 'MINIBAR_0007_REASON_REQUIRED');
+      console.warn('[Minibar] MINIBAR_0007_REASON_REQUIRED');
+      addToast('warn', 'Vui lòng nhập lý do miễn hoặc bỏ qua kiểm kê minibar', 'Cảnh Báo');
       return;
     }
 

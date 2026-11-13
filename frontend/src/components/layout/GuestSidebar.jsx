@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
-export default function GuestSidebar() {
+export default function GuestSidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [stayInfo, setStayInfo] = useState(null);
@@ -10,19 +10,22 @@ export default function GuestSidebar() {
   useEffect(() => {
     const fetchGuestStay = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('hotel_token') || localStorage.getItem('token');
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
         const uid = user?.id || user?.UserId || user?.userId;
-        const queryParam = uid ? `?userId=${uid}&userOnly=true` : '';
+        const queryParam = uid ? `?userId=${uid}&userOnly=true` : '?userOnly=true';
         const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/active-stays${queryParam}`, { headers });
         const json = await res.json();
         if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
           const matched = uid ? json.data.find(s => String(s.userId) === String(uid)) : null;
-          setStayInfo(matched || json.data[0]);
+          setStayInfo(matched || (uid ? null : json.data[0]));
+        } else {
+          setStayInfo(null);
         }
       } catch (err) {
         console.error('Failed to load guest stay info for sidebar:', err);
+        setStayInfo(null);
       }
     };
     fetchGuestStay();
@@ -41,44 +44,87 @@ export default function GuestSidebar() {
     }`;
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-72 bg-white z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)] select-none">
-      <div className="flex flex-col">
-        {/* Brand Header */}
-        <div className="h-20 px-6 flex items-center gap-3 bg-white">
-          <div className="w-10 h-10 rounded-lg bg-emerald-700 flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.25)]">
-            <span className="material-symbols-outlined text-white text-[22px]">hotel_class</span>
+    <>
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div 
+          onClick={onClose}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+        />
+      )}
+
+      <aside className={`fixed left-0 top-0 h-full w-72 bg-white z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.08)] select-none transition-transform duration-300 ease-in-out ${
+        isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      }`}>
+        <div className="flex flex-col">
+          {/* Brand Header */}
+          <div className="h-20 px-6 flex items-center justify-between bg-white border-b lg:border-none border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-700 flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+                <span className="material-symbols-outlined text-white text-[22px]">hotel_class</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-sm text-emerald-800 tracking-tight truncate">GRAND HORIZON</span>
+                <span className="text-[10px] text-slate-400 tracking-wider uppercase truncate">Khách Sạn & Nghỉ Dưỡng</span>
+              </div>
+            </div>
+
+            {/* Mobile Close Button */}
+            <button 
+              onClick={onClose}
+              type="button"
+              className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="font-bold text-sm text-emerald-800 tracking-tight truncate">GRAND HORIZON</span>
-            <span className="text-[10px] text-slate-400 tracking-wider uppercase truncate">Khách Sạn & Nghỉ Dưỡng Phú Quốc</span>
-          </div>
-        </div>
 
         {/* Thông tin phòng & lưu trú của khách */}
         <div className="px-3 py-2">
-          <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100 flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-emerald-800 uppercase tracking-wider font-bold">Kỳ Nghỉ Của Quý Khách</span>
-              <span className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                {stayInfo ? "Đang Lưu Trú" : "Đặt Phòng Trực Tuyến"}
-              </span>
+          {stayInfo ? (
+            <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex flex-col gap-1.5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-emerald-800 uppercase tracking-wider font-bold">Kỳ Nghỉ Của Quý Khách</span>
+                <span className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Đang Lưu Trú
+                </span>
+              </div>
+              <div className="text-sm font-bold text-slate-800 truncate">
+                Phòng #{stayInfo.roomNumber}
+              </div>
+              <div className="text-xs text-slate-500 flex items-center justify-between">
+                <span>Tầng {stayInfo.floor || 1} • Tháp B</span>
+                <span className="font-bold text-emerald-700 text-[11px]">Stay #{stayInfo.stayId}</span>
+              </div>
             </div>
-            <div className="text-sm font-bold text-slate-800 truncate">
-              {stayInfo ? `Phòng #${stayInfo.roomNumber}` : "Standard Garden Villa"}
+          ) : (
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col gap-1.5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Kỳ Nghỉ Của Quý Khách</span>
+                <span className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                  Chưa Check-in
+                </span>
+              </div>
+              <div className="text-sm font-bold text-slate-600 truncate">
+                Chưa Đặt Phòng
+              </div>
+              <div className="text-xs text-slate-400 flex items-center justify-between">
+                <span>Trực Tuyến</span>
+                <NavLink to="/rooms" className="text-emerald-700 font-bold hover:underline text-[11px]">
+                  Đặt ngay
+                </NavLink>
+              </div>
             </div>
-            <div className="text-xs text-slate-500 flex items-center justify-between">
-              <span>{stayInfo ? `Tầng ${stayInfo.floor || 5}` : "Khu Nghỉ Dưỡng"}</span>
-              <span className="font-bold text-emerald-700">Tháp B</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Cổng khách hàng & Dịch vụ */}
         <div className="px-3 pt-3 pb-1">
           <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider px-2">Dịch Vụ Khách Hàng</span>
         </div>
-        <nav className="px-3 flex flex-col gap-1">
+        <nav className="px-3 flex flex-col gap-1" onClick={() => { if (onClose) onClose(); }}>
           <NavLink to="/fnb/dat-ban" className={navItemClass}>
             <span className="material-symbols-outlined text-[20px]">restaurant</span>
             <span className="text-sm">Đặt Bàn Thưởng Vị</span>
@@ -122,16 +168,19 @@ export default function GuestSidebar() {
           </div>
         </div>
         <div className="flex items-center justify-between pt-1 border-t border-slate-200/50">
-          <span className="text-xs text-slate-500">Phòng: #804 Deluxe</span>
+          <span className="text-xs text-slate-500 truncate mr-2">
+            {stayInfo ? `Phòng: #${stayInfo.roomNumber}` : 'Chưa nhận phòng'}
+          </span>
           <button
             onClick={handleLogout}
             title="Đăng xuất"
-            className="text-rose-600 hover:text-rose-700 transition-colors flex items-center"
+            className="text-rose-600 hover:text-rose-700 transition-colors flex items-center shrink-0"
           >
             <span className="material-symbols-outlined text-[18px]">logout</span>
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
