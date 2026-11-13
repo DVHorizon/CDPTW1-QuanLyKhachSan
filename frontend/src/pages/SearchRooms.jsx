@@ -876,22 +876,50 @@ export default function SearchRooms() {
           {/* Breadcrumb & Editorial Sub-header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-space-lg gap-space-sm">
             <div>
-              <div className="flex items-center gap-space-xs font-label-sm text-label-sm text-outline mb-space-xs">
+              <div className="flex items-center gap-space-xs font-label-sm text-label-sm text-outline mb-space-xs flex-wrap">
                 <span className="hover:text-secondary cursor-pointer" onClick={() => navigate('/')}>Trang Chủ</span>
                 <span>/</span>
-                <span>Đặt Phòng</span>
-                <span>/</span>
-                <span className="text-secondary font-semibold">{currentBranchName}</span>
+                <span className="hover:text-secondary cursor-pointer" onClick={handleBackToHotels}>Nơi Lưu Trú</span>
+                {viewMode === 'rooms' && (
+                  <>
+                    <span>/</span>
+                    <span className="text-secondary font-semibold">{currentBranchName}</span>
+                  </>
+                )}
               </div>
-              <h1 className="font-headline-lg text-headline-lg text-on-surface">Không Gian Lưu Trú Thượng Tuyển</h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="font-headline-lg text-headline-lg text-on-surface">
+                  {viewMode === 'hotels' ? 'Nơi Lưu Trú & Khu Nghỉ Dưỡng Thượng Tuyển' : currentBranchName}
+                </h1>
+                {viewMode === 'rooms' && (
+                  <span className="flex text-amber-400 text-base tracking-tight shrink-0 select-none">
+                    ★★★★★
+                  </span>
+                )}
+              </div>
               <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-                Khám phá các gian phòng suite và villa ngập tràn thanh âm sóng biển bồng bềnh tại {currentBranchName}.
+                {viewMode === 'hotels'
+                  ? 'Khám phá chuỗi khách sạn và khu nghỉ dưỡng 5 sao Grand Horizon trên toàn quốc.'
+                  : `${currentBranchObj?.Address || 'Vị trí đắc địa ven biển'} • ${rooms.length} hạng phòng & biệt thự khả dụng.`
+                }
               </p>
             </div>
-            <div className="flex items-center gap-space-sm text-on-surface-variant font-label-md text-label-md bg-surface-container-lowest px-space-md py-space-sm rounded-lg shadow-sm border border-[#dedad0]/40">
-              <span className="material-symbols-outlined text-on-tertiary-container text-[18px]">verified_user</span>
-              <span>Cam kết giá tốt nhất cho hội viên trực tiếp</span>
-            </div>
+            
+            {viewMode === 'rooms' ? (
+              <button
+                type="button"
+                onClick={handleBackToHotels}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#fbf8f2] hover:bg-[#8c6d3b] text-[#8c6d3b] hover:text-white border border-[#d8c49e] font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0 self-start md:self-auto"
+              >
+                <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                <span>Chọn khách sạn khác</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-space-sm text-on-surface-variant font-label-md text-label-md bg-surface-container-lowest px-space-md py-space-sm rounded-lg shadow-sm border border-[#dedad0]/40">
+                <span className="material-symbols-outlined text-on-tertiary-container text-[18px]">verified_user</span>
+                <span>Cam kết giá tốt nhất cho hội viên trực tiếp</span>
+              </div>
+            )}
           </div>
 
           {/* 2-Column Responsive Layout */}
@@ -1173,41 +1201,7 @@ export default function SearchRooms() {
                 ══════════════════════════════════════════════════════════ */
                 <div className="flex flex-col gap-space-lg">
 
-                  {/* KHÁCH SẠN ĐÃ CHỌN HEADER BAR (SẠCH SẼ, KHÔNG STEPPER BARRING) */}
-                  <div className="bg-gradient-to-r from-[#131b2e] to-[#203044] text-white p-4 sm:p-5 rounded-2xl shadow-md border border-[#ffd985]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-12 h-12 rounded-xl bg-[#ffd985]/20 border border-[#ffd985]/40 flex items-center justify-center text-[#ffd985] shrink-0">
-                        <span className="material-symbols-outlined text-2xl">hotel</span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10.5px] font-bold uppercase tracking-wider text-[#ffd985] bg-white/10 px-2 py-0.5 rounded">
-                            {currentBranchObj?.City || 'Việt Nam'}
-                          </span>
-                          <span className="text-white/40 text-xs">•</span>
-                          <span className="text-amber-300 text-xs">★★★★★</span>
-                        </div>
-                        <h2 className="font-serif text-lg sm:text-xl font-bold text-white mt-1">
-                          {currentBranchName}
-                        </h2>
-                        <p className="text-xs text-white/70 flex items-center gap-1 mt-0.5">
-                          <span className="material-symbols-outlined text-xs text-[#ffd985]">location_on</span>
-                          <span>{currentBranchObj?.Address || 'Khu nghỉ dưỡng thiên đường'}</span>
-                          <span className="mx-1.5">•</span>
-                          <span className="font-semibold text-emerald-300">{rooms.length} hạng phòng &amp; biệt thự khả dụng</span>
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <button
-                      type="button"
-                      onClick={handleBackToHotels}
-                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-[#ffd985] hover:text-white text-xs font-semibold flex items-center gap-2 transition-all shrink-0 self-start sm:self-auto cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-sm">arrow_back</span>
-                      <span>Đổi khách sạn khác</span>
-                    </button>
-                  </div>
+                  
                   
                   {/* WIDGET CỐ VẤN AI GỢI Ý PHÒNG THÔNG MINH (RAG + GEMINI) */}
                   <AiRoomAdvisorWidget
@@ -1226,6 +1220,14 @@ export default function SearchRooms() {
                       <span className="font-label-sm text-label-sm text-on-tertiary-container font-semibold">
                         {currentBranchName}
                       </span>
+                      <button
+                        type="button"
+                        onClick={handleBackToHotels}
+                        className="text-[11px] font-bold text-[#8c6d3b] hover:text-[#74572b] hover:underline cursor-pointer"
+                        title="Đổi sang khách sạn khác"
+                      >
+                        (Đổi)
+                      </button>
                       <span className="mx-space-xs text-outline">•</span>
                       <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
                         {formatDisplayDate(checkInDate)} — {formatDisplayDate(checkOutDate)} ({numberOfNights} đêm)
