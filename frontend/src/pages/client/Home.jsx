@@ -6,6 +6,7 @@ import QuickBookingModal from '../../components/modals/QuickBookingModal';
 import AmenityPerspectiveCarousel from '../../components/client/AmenityPerspectiveCarousel';
 import ScrollIcon from '../../components/common/ScrollIcon';
 import StickyScrollStory from '../../components/common/StickyScrollStory';
+import PillBranchDropdown from '../../components/common/PillBranchDropdown';
 import { fetchHomeData } from '../../api/hotelApi';
 import {
   mockBranches,
@@ -284,34 +285,17 @@ function Home() {
             <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] p-4 sm:p-5 lg:p-6 border border-[#dedad0]">
               <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4 items-end text-left">
                 
-                {/* Điểm đến / Chi nhánh */}
+                {/* Điểm đến / Chi nhánh (Framer Pill-Dropdown-Nav) */}
                 <div className="lg:col-span-4 flex flex-col gap-1.5">
                   <label className="text-[11px] font-bold text-[#8a8782] uppercase tracking-wider flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[16px] text-[#b9a277]">location_on</span>
                     Điểm Đến / Chi Nhánh
                   </label>
-                  <div className="relative bg-[#fbf8f2] rounded-xl border border-[#dedad0] px-3.5 py-2.5 focus-within:border-[#b9a277] transition-all">
-                    <select
-                      value={selectedBranch}
-                      onChange={(e) => setSelectedBranch(e.target.value)}
-                      className="w-full bg-transparent text-[13px] font-bold text-[#203044] focus:outline-none cursor-pointer pr-6 truncate"
-                    >
-                      {homeData.branches.map(branch => {
-                        const rawCity = branch.City
-                          ? branch.City.split(',')[0].trim()
-                          : (branch.Address ? branch.Address.split(',').pop()?.trim() : '');
-                        const cityClean = rawCity ? rawCity.replace(/^(Tỉnh|Thành phố|TP\.?)\s+/i, '') : '';
-                        return (
-                          <option key={branch.BranchId} value={branch.BranchId} className="text-[#203044]">
-                            {branch.BranchName} {cityClean ? `(${cityClean})` : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#8a8782] text-[18px]">
-                      expand_more
-                    </span>
-                  </div>
+                  <PillBranchDropdown
+                    branches={homeData.branches}
+                    selectedBranchId={selectedBranch}
+                    onSelectBranch={(id) => setSelectedBranch(id)}
+                  />
                 </div>
 
                 {/* Ngày nhận - Ngày trả */}
