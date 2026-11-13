@@ -161,9 +161,6 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
           <Link className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" to="/hotels">
             {t.hotels}
           </Link>
-          <Link className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" to="/rooms">
-            {t.rooms}
-          </Link>
           <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#uu-dai">
             {t.offers}
           </a>
@@ -342,9 +339,9 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">home</span>
               <span>{t.home}</span>
             </Link>
-            <Link onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" to="/rooms">
-              <span className="material-symbols-outlined text-[#b9a277] text-[20px]">meeting_room</span>
-              <span>{t.rooms}</span>
+            <Link onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" to="/hotels">
+              <span className="material-symbols-outlined text-[#b9a277] text-[20px]">apartment</span>
+              <span>{t.hotels}</span>
             </Link>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#uu-dai">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">loyalty</span>
