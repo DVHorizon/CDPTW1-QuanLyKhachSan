@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../../../components/admin/layout/AdminLayout';
 
@@ -196,7 +196,7 @@ export default function BanquetMiceBooking() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.setup && parsed[0]?.financial) {
           return parsed;
         }
       }
@@ -248,7 +248,10 @@ export default function BanquetMiceBooking() {
           try {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (!saved) {
-              persistEvents(data.events);
+              const valid = data.events.filter((e) => e && e.financial && e.setup && e.contactPerson);
+              if (valid.length > 0) {
+                persistEvents(valid);
+              }
             }
           } catch (_) {}
         }
@@ -310,9 +313,31 @@ export default function BanquetMiceBooking() {
     message: 'Kiểm tra tín hiệu màn LED P3, giàn âm thanh Line Array và 8 mic không dây trước 15:30.',
   });
 
-  // Current selected event object
+  // Current selected event object (with full fallback safeguards to avoid any null/undefined crash)
   const currentEvent = useMemo(() => {
-    return events.find((e) => e.id === selectedEventId) || events[0];
+    const fallbackEv = INITIAL_EVENTS[2] || INITIAL_EVENTS[0];
+    const found = events.find((e) => e && e.id === selectedEventId) || events[0] || fallbackEv;
+    return {
+      ...fallbackEv,
+      ...found,
+      contactPerson: {
+        ...(fallbackEv.contactPerson || {}),
+        ...(found?.contactPerson || {}),
+      },
+      setup: {
+        ...(fallbackEv.setup || {}),
+        ...(found?.setup || {}),
+      },
+      catering: {
+        ...(fallbackEv.catering || {}),
+        ...(found?.catering || {}),
+      },
+      financial: {
+        ...(fallbackEv.financial || {}),
+        ...(found?.financial || {}),
+        paymentHistory: found?.financial?.paymentHistory || fallbackEv.financial.paymentHistory || [],
+      },
+    };
   }, [events, selectedEventId]);
 
   const showNotification = (msg, type = 'success') => {
