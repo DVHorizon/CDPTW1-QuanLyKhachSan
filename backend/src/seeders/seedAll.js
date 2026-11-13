@@ -13,9 +13,9 @@ async function seed() {
     });
 
     console.log(`Starting Database Sync...`);
-    // Turn off constraints for MySQL during mass sync/seed
+    // Turn off constraints for SQLite during mass sync/seed
     await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-    // await db.sequelize.sync({ force: true });
+    await db.MenuItem.destroy({ where: {}, truncate: true });
     console.log('Database synced and reset successfully.');
 
     // 1. Seed Categories
@@ -50,11 +50,7 @@ async function seed() {
         Description: `Món ăn đặc biệt chuẩn 5 sao (Mã hệ thống: ${i})`,
         ImageUrl: `https://loremflickr.com/320/240/food,dish?lock=${i}`,
         Status: statuses[Math.floor(Math.random() * statuses.length)],
-        SKU: `SKU-100${i}`,
-        Ingredients: ingredientsList[Math.floor(Math.random() * ingredientsList.length)],
-        Allergens: allergensList[Math.floor(Math.random() * allergensList.length)],
-        ServingTime: servingTimes[Math.floor(Math.random() * servingTimes.length)],
-        KitchenStation: stations[Math.floor(Math.random() * stations.length)]
+        IsDeleted: false
       });
 
       // Insert chunk

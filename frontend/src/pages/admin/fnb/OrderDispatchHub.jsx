@@ -38,7 +38,6 @@ const OrderDispatchHub = () => {
 
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
-  const alertSound = useRef(new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg"));
 
   const showNotice = (msg) => {
     setActionNotice(msg);
@@ -79,7 +78,6 @@ const OrderDispatchHub = () => {
           const msg = JSON.parse(event.data);
           if (msg.type === "ORDER_STATUS_CHANGED" && msg.data) {
             const updated = msg.data;
-            try { alertSound.current.play(); } catch (e) { }
 
             setOrders((prev) => {
               const existingIdx = prev.findIndex((o) => o.foodOrderId === updated.foodOrderId);
@@ -162,6 +160,18 @@ const OrderDispatchHub = () => {
       if (!data.success) {
         setErrorMessage("Không thể cập nhật trạng thái đơn.");
       } else {
+        // Cập nhật danh sách đơn ở ngoài
+        setOrders((prev) =>
+          prev.map((o) => (o.foodOrderId === orderId ? { ...o, status: newStatus } : o))
+        );
+        // Cập nhật danh sách đơn trong modal đang mở
+        setAllOrdersModal((prev) => {
+          if (!prev.isOpen) return prev;
+          const nextOrders = prev.orders.map((o) =>
+            o.foodOrderId === orderId ? { ...o, status: newStatus } : o
+          );
+          return { ...prev, orders: nextOrders };
+        });
         showNotice(`Đã chuyển đơn #${orderId} sang trạng thái: ${newStatus}`);
       }
     } catch (e) {

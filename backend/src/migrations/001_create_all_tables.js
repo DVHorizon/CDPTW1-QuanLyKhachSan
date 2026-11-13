@@ -60,7 +60,7 @@ module.exports = {
       UpdatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
 
-    // 6. Users
+    // 6. Users (Tích hợp phân quyền RBAC & hồ sơ mở rộng)
     await queryInterface.createTable('Users', {
       UserId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
       RoleId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Roles', key: 'RoleId' } },
@@ -74,6 +74,14 @@ module.exports = {
       DateOfBirth: { type: Sequelize.DATEONLY, allowNull: true },
       Gender: { type: Sequelize.STRING(20), allowNull: true },
       Status: { type: Sequelize.STRING(30), defaultValue: 'Active' },
+      Department: { type: Sequelize.STRING(100), allowNull: true },
+      Permissions: { type: Sequelize.TEXT, allowNull: true },
+      SecurityPolicy: { type: Sequelize.TEXT, allowNull: true },
+      FailedLoginAttempts: { type: Sequelize.INTEGER, defaultValue: 0 },
+      LockoutUntil: { type: Sequelize.DATE, allowNull: true },
+      PasswordChangedAt: { type: Sequelize.DATE, allowNull: true },
+      MustChangePassword: { type: Sequelize.BOOLEAN, defaultValue: false },
+      IsDeleted: { type: Sequelize.BOOLEAN, defaultValue: false, allowNull: false },
       CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       UpdatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
@@ -89,9 +97,10 @@ module.exports = {
       CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
 
-    // 8. RoomTypes
+    // 8. RoomTypes (Tích hợp thông số buồng phòng mở rộng & TypeCode)
     await queryInterface.createTable('RoomTypes', {
       RoomTypeId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
+      TypeCode: { type: Sequelize.STRING(20), allowNull: true },
       TypeName: { type: Sequelize.STRING(100), allowNull: false },
       Description: { type: Sequelize.STRING(1000), allowNull: true },
       BasePrice: { type: Sequelize.DECIMAL(18, 2), allowNull: false },
@@ -99,11 +108,22 @@ module.exports = {
       AdultCapacity: { type: Sequelize.INTEGER, defaultValue: 2 },
       ChildCapacity: { type: Sequelize.INTEGER, defaultValue: 1 },
       ImageUrl: { type: Sequelize.STRING(1000), allowNull: true },
+      AreaSqm: { type: Sequelize.DECIMAL(8, 2), allowNull: true },
+      TotalRooms: { type: Sequelize.INTEGER, defaultValue: 0 },
+      BedType: { type: Sequelize.STRING(100), allowNull: true },
+      ViewType: { type: Sequelize.STRING(100), allowNull: true },
+      FloorRange: { type: Sequelize.STRING(50), allowNull: true },
+      TurnoverMinutes: { type: Sequelize.INTEGER, defaultValue: 30 },
+      WeekendMultiplier: { type: Sequelize.DECIMAL(4, 2), defaultValue: 1.00 },
+      Amenities: { type: Sequelize.TEXT, allowNull: true },
       Status: { type: Sequelize.STRING(30), defaultValue: 'Active' },
       IsDeleted: { type: Sequelize.BOOLEAN, defaultValue: false },
       CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       UpdatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
+    try {
+      await queryInterface.addIndex('RoomTypes', ['TypeCode'], { unique: true, name: 'idx_roomtypes_typecode' });
+    } catch (_) {}
 
     // 9. Amenities
     await queryInterface.createTable('Amenities', {
@@ -188,7 +208,7 @@ module.exports = {
       LastSyncedAt: { type: Sequelize.DATE, allowNull: true }
     });
 
-    // 16. Bookings
+    // 16. Bookings (Tích hợp phân bổ phòng, xác thực danh tính & check-in audit)
     await queryInterface.createTable('Bookings', {
       BookingId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
       UserId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Users', key: 'UserId' } },
@@ -211,6 +231,23 @@ module.exports = {
       BookingQrCode: { type: Sequelize.STRING(500), allowNull: true },
       ConfirmationCode: { type: Sequelize.STRING(100), allowNull: true },
       ConfirmationSentAt: { type: Sequelize.DATE, allowNull: true },
+      Note: { type: Sequelize.TEXT, allowNull: true },
+      ConfirmedBy: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'Users', key: 'UserId' } },
+      ConfirmedAt: { type: Sequelize.DATE, allowNull: true },
+      AllocatedAt: { type: Sequelize.DATE, allowNull: true },
+      AllocatedBy: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'Users', key: 'UserId' } },
+      AllocationStatus: { type: Sequelize.STRING(30), defaultValue: 'UNALLOCATED' },
+      SpecialRequests: { type: Sequelize.TEXT, allowNull: true },
+      AutoAllocationHoldUntil: { type: Sequelize.DATE, allowNull: true },
+      AllocationAuditTrail: { type: Sequelize.TEXT, allowNull: true },
+      CheckedInBy: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'Users', key: 'UserId' } },
+      CheckedInAt: { type: Sequelize.DATE, allowNull: true },
+      ExpectedCheckIn: { type: Sequelize.DATE, allowNull: true },
+      CheckInNotes: { type: Sequelize.TEXT, allowNull: true },
+      DepositPaymentMethod: { type: Sequelize.STRING(50), allowNull: true },
+      DepositAmountPaid: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
+      TotalPrepaidAmount: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
+      IdentityVerified: { type: Sequelize.BOOLEAN, defaultValue: false },
       CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       UpdatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
@@ -230,7 +267,7 @@ module.exports = {
       CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
 
-    // 18. Stays
+    // 18. Stays (Tích hợp CheckIn/OutTime & Version lock)
     await queryInterface.createTable('Stays', {
       StayId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
       BookingId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Bookings', key: 'BookingId' } },
@@ -238,13 +275,16 @@ module.exports = {
       ActualCheckIn: { type: Sequelize.DATE, allowNull: true },
       ExpectedCheckOut: { type: Sequelize.DATE, allowNull: true },
       ActualCheckOut: { type: Sequelize.DATE, allowNull: true },
+      CheckInTime: { type: Sequelize.DATE, allowNull: true },
+      CheckOutTime: { type: Sequelize.DATE, allowNull: true },
+      Version: { type: Sequelize.INTEGER, defaultValue: 1, allowNull: false },
       Status: { type: Sequelize.STRING(30), defaultValue: 'CheckedIn' },
       DepositAmount: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
       CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       UpdatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
 
-    // 19. RoomMoveHistory
+    // 19. RoomMoveHistory (Tích hợp đổi phòng đa tiêu chí & audit log)
     await queryInterface.createTable('RoomMoveHistory', {
       MoveId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
       StayId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Stays', key: 'StayId' } },
@@ -252,7 +292,22 @@ module.exports = {
       ToRoomId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Rooms', key: 'RoomId' } },
       MoveDate: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       Reason: { type: Sequelize.STRING(500), allowNull: true },
-      MovedBy: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'Users', key: 'UserId' } }
+      MovedBy: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'Users', key: 'UserId' } },
+      MoveType: { type: Sequelize.STRING(30), defaultValue: 'OPERATIONAL' },
+      MoveReasonCode: { type: Sequelize.STRING(50), defaultValue: 'GUEST_UPGRADE' },
+      GuestDiscontent: { type: Sequelize.BOOLEAN, defaultValue: false },
+      DiscontentNotes: { type: Sequelize.TEXT, allowNull: true },
+      PriceDifferenceFee: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
+      FeeWaived: { type: Sequelize.BOOLEAN, defaultValue: false },
+      FeeWaivedReason: { type: Sequelize.TEXT, allowNull: true },
+      OldKeycardsRevoked: { type: Sequelize.BOOLEAN, defaultValue: true },
+      NewKeycardsIssued: { type: Sequelize.INTEGER, defaultValue: 2 },
+      OldKeycardsPhysicalCount: { type: Sequelize.INTEGER, defaultValue: 2 },
+      KeycardStatusNote: { type: Sequelize.TEXT, allowNull: true },
+      LuggageAssistanceRequired: { type: Sequelize.BOOLEAN, defaultValue: false },
+      BellmanAssigned: { type: Sequelize.STRING(100), allowNull: true },
+      MoveExecutionStatus: { type: Sequelize.STRING(30), defaultValue: 'COMPLETED' },
+      AuditTrail: { type: Sequelize.TEXT, allowNull: true }
     });
 
     // 20. HousekeepingAssignments
@@ -370,11 +425,6 @@ module.exports = {
       Price: { type: Sequelize.DECIMAL(18, 2), allowNull: false },
       Description: { type: Sequelize.STRING(1000), allowNull: true },
       ImageUrl: { type: Sequelize.STRING(1000), allowNull: true },
-      SKU: { type: Sequelize.STRING(50), allowNull: true },
-      Ingredients: { type: Sequelize.STRING(1000), allowNull: true },
-      Allergens: { type: Sequelize.STRING(500), allowNull: true },
-      ServingTime: { type: Sequelize.STRING(100), allowNull: true },
-      KitchenStation: { type: Sequelize.STRING(100), allowNull: true },
       Status: { type: Sequelize.STRING(30), defaultValue: 'Available' },
       IsDeleted: { type: Sequelize.BOOLEAN, defaultValue: false },
       CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
@@ -431,16 +481,20 @@ module.exports = {
       CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
 
-    // 33. InventoryItems
+    // 33. InventoryItems (Tích hợp quản lý Minibar & đồ tiêu hao phòng)
     await queryInterface.createTable('InventoryItems', {
       ItemId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
       ItemCode: { type: Sequelize.STRING(50), allowNull: false, unique: true },
       ItemName: { type: Sequelize.STRING(150), allowNull: false },
       ItemType: { type: Sequelize.STRING(30), defaultValue: 'Consumable' },
+      Category: { type: Sequelize.STRING(50), defaultValue: 'Beverage' },
       Unit: { type: Sequelize.STRING(30), defaultValue: 'Cái' },
       Quantity: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
       MinQuantity: { type: Sequelize.DECIMAL(18, 2), defaultValue: 10.00 },
+      DefaultOpeningQty: { type: Sequelize.DECIMAL(10, 2), defaultValue: 2.00 },
+      IsComplimentary: { type: Sequelize.BOOLEAN, defaultValue: false },
       UnitCost: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
+      UnitPrice: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
       Status: { type: Sequelize.STRING(30), defaultValue: 'Active' },
       IsDeleted: { type: Sequelize.BOOLEAN, defaultValue: false },
       CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
@@ -460,16 +514,21 @@ module.exports = {
       Note: { type: Sequelize.STRING(500), allowNull: true }
     });
 
-    // 35. MinibarUsages
+    // 35. MinibarUsages (Tích hợp RoomId, Version, Status & Idempotency)
     await queryInterface.createTable('MinibarUsages', {
       UsageId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
       StayId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Stays', key: 'StayId' } },
+      RoomId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'Rooms', key: 'RoomId' } },
       ItemId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'InventoryItems', key: 'ItemId' } },
       RecordedBy: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'Users', key: 'UserId' } },
       Quantity: { type: Sequelize.DECIMAL(18, 2), defaultValue: 1.00 },
       UsageDate: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       UnitPrice: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
-      TotalAmount: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 }
+      TotalAmount: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
+      Status: { type: Sequelize.STRING(30), defaultValue: 'CONFIRMED' },
+      Version: { type: Sequelize.INTEGER, defaultValue: 1 },
+      Notes: { type: Sequelize.STRING(500), allowNull: true },
+      IdempotencyKey: { type: Sequelize.STRING(100), allowNull: true }
     });
 
     // 36. Reviews
@@ -514,14 +573,18 @@ module.exports = {
       UpdatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
 
-    // 39. ChatbotConversations
+    // 39. ChatbotConversations (Tích hợp HandledBy hỗ trợ nhân viên tiếp quản)
     await queryInterface.createTable('ChatbotConversations', {
       ConversationId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
       UserId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Users', key: 'UserId' } },
+      HandledBy: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'Users', key: 'UserId' }, onUpdate: 'CASCADE', onDelete: 'SET NULL' },
       StartTime: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       EndTime: { type: Sequelize.DATE, allowNull: true },
       Status: { type: Sequelize.STRING(30), defaultValue: 'Open' }
     });
+    try {
+      await queryInterface.addIndex('ChatbotConversations', ['HandledBy'], { name: 'idx_chatbot_conversations_handledby' });
+    } catch (_) {}
 
     // 40. ChatbotMessages
     await queryInterface.createTable('ChatbotMessages', {
@@ -756,6 +819,103 @@ module.exports = {
       SubscribedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
     });
 
+    // 58. RoomSearchIndex (A5 - Full-text Search Index)
+    await queryInterface.createTable('RoomSearchIndex', {
+      IndexId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
+      RoomTypeId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'RoomTypes', key: 'RoomTypeId' }, onDelete: 'CASCADE' },
+      BranchId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Branches', key: 'BranchId' }, onDelete: 'CASCADE' },
+      Keyword: { type: Sequelize.STRING(100), allowNull: false },
+      KeywordUnaccent: { type: Sequelize.STRING(100), allowNull: false },
+      Weight: { type: Sequelize.FLOAT, defaultValue: 1.0 },
+      MaxOccupancy: { type: Sequelize.INTEGER, defaultValue: 2 },
+      BasePrice: { type: Sequelize.DECIMAL(12, 2), defaultValue: 0.00 },
+      CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
+      UpdatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
+    });
+    try {
+      await queryInterface.addIndex('RoomSearchIndex', ['Keyword'], { name: 'idx_rsi_keyword' });
+      await queryInterface.addIndex('RoomSearchIndex', ['KeywordUnaccent'], { name: 'idx_rsi_unaccent' });
+      await queryInterface.addIndex('RoomSearchIndex', ['BranchId', 'MaxOccupancy', 'BasePrice'], { name: 'idx_rsi_filter' });
+      await queryInterface.addIndex('RoomSearchIndex', ['RoomTypeId', 'Keyword'], { unique: true, name: 'idx_rsi_rt_kw_unique' });
+    } catch (_) {}
+
+    // 59. RoomInspectionReports (Spec 11 - Check-out Inspection)
+    await queryInterface.createTable('RoomInspectionReports', {
+      InspectionId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
+      StayId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Stays', key: 'StayId' } },
+      RoomId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Rooms', key: 'RoomId' } },
+      InspectorId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'Users', key: 'UserId' } },
+      InspectorName: { type: Sequelize.STRING(100), defaultValue: 'R. Gomez (Housekeeping Staff #409)' },
+      InspectionTime: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
+      Status: { type: Sequelize.STRING(30), defaultValue: 'COMPLETED' },
+      KeycardsIssued: { type: Sequelize.INTEGER, defaultValue: 2 },
+      KeycardsReturned: { type: Sequelize.INTEGER, defaultValue: 2 },
+      KeycardLossPenalty: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
+      RoomCondition: { type: Sequelize.STRING(30), defaultValue: 'NOMINAL' },
+      LinenDamageFee: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
+      GuestAcknowledgement: { type: Sequelize.STRING(30), defaultValue: 'ACKNOWLEDGED' },
+      GuestNotes: { type: Sequelize.TEXT, allowNull: true },
+      SupervisorId: { type: Sequelize.INTEGER, allowNull: true },
+      SupervisorNotes: { type: Sequelize.TEXT, allowNull: true },
+      SignOffProofUrl: { type: Sequelize.STRING(500), allowNull: true },
+      CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
+      UpdatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
+    });
+    try {
+      await queryInterface.addIndex('RoomInspectionReports', ['StayId'], { name: 'idx_inspection_stay' });
+      await queryInterface.addIndex('RoomInspectionReports', ['RoomId'], { name: 'idx_inspection_room' });
+    } catch (_) {}
+
+    // 60. DamageItems (Spec 11 - Inspection Damage Claims)
+    await queryInterface.createTable('DamageItems', {
+      DamageItemId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
+      InspectionId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'RoomInspectionReports', key: 'InspectionId' } },
+      StayId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Stays', key: 'StayId' } },
+      RoomId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'Rooms', key: 'RoomId' } },
+      ItemName: { type: Sequelize.STRING(150), allowNull: false },
+      ItemLocation: { type: Sequelize.STRING(100), defaultValue: 'Phòng ngủ chính / Master Bedroom' },
+      DamageDescription: { type: Sequelize.TEXT, allowNull: false },
+      Severity: { type: Sequelize.STRING(30), defaultValue: 'MODERATE' },
+      EvidenceUrls: { type: Sequelize.TEXT('long'), allowNull: true },
+      ProposedCharge: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
+      ApprovedCharge: { type: Sequelize.DECIMAL(18, 2), defaultValue: 0.00 },
+      Status: { type: Sequelize.STRING(30), defaultValue: 'SUBMITTED' },
+      ReasonCode: { type: Sequelize.STRING(50), allowNull: true },
+      DisputeNote: { type: Sequelize.TEXT, allowNull: true },
+      CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
+      UpdatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
+    });
+    try {
+      await queryInterface.addIndex('DamageItems', ['StayId'], { name: 'idx_damage_stay' });
+      await queryInterface.addIndex('DamageItems', ['InspectionId'], { name: 'idx_damage_insp' });
+    } catch (_) {}
+
+    // 61. LateFeePolicies (Spec 11 - Late Check-out Policy)
+    await queryInterface.createTable('LateFeePolicies', {
+      PolicyId: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
+      BranchId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'Branches', key: 'BranchId' } },
+      PolicyName: { type: Sequelize.STRING(100), allowNull: false },
+      GracePeriodMinutes: { type: Sequelize.INTEGER, defaultValue: 30 },
+      HourlyFee: { type: Sequelize.DECIMAL(18, 2), defaultValue: 200000.00 },
+      HalfDayThresholdHours: { type: Sequelize.INTEGER, defaultValue: 3 },
+      HalfDayFeePercent: { type: Sequelize.DECIMAL(5, 2), defaultValue: 50.00 },
+      FullDayThresholdHours: { type: Sequelize.INTEGER, defaultValue: 6 },
+      FullDayFeePercent: { type: Sequelize.DECIMAL(5, 2), defaultValue: 100.00 },
+      MaxFee: { type: Sequelize.DECIMAL(18, 2), defaultValue: 3000000.00 },
+      TaxRate: { type: Sequelize.DECIMAL(5, 2), defaultValue: 10.00 },
+      IsActive: { type: Sequelize.BOOLEAN, defaultValue: true },
+      CreatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
+      UpdatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') }
+    });
+    try {
+      await queryInterface.sequelize.query(`
+        INSERT INTO LateFeePolicies (BranchId, PolicyName, GracePeriodMinutes, HourlyFee, HalfDayThresholdHours, HalfDayFeePercent, FullDayThresholdHours, FullDayFeePercent, MaxFee, TaxRate, IsActive)
+        SELECT 1, 'Chính sách trả phòng trễ tiêu chuẩn', 30, 200000.00, 3, 50.00, 6, 100.00, 3000000.00, 10.00, 1
+        WHERE NOT EXISTS (SELECT 1 FROM LateFeePolicies WHERE PolicyId = 1);
+      `);
+    } catch (_) {}
+
+
     // Bật lại kiểm tra khóa ngoại
     await queryInterface.sequelize.query('SET FOREIGN_KEY_CHECKS = 1;');
   },
@@ -764,7 +924,7 @@ module.exports = {
     await queryInterface.sequelize.query('SET FOREIGN_KEY_CHECKS = 0;');
 
     const tables = [
-      'NewsletterSubscribers', 'Wishlists', 'AuditLogs', 'StaffSchedules', 'BanquetEvents',
+      'DamageItems', 'RoomInspectionReports', 'LateFeePolicies', 'RoomSearchIndex', 'NewsletterSubscribers', 'Wishlists', 'AuditLogs', 'StaffSchedules', 'BanquetEvents',
       'PoliceDeclarations', 'ShuttleSchedules', 'Vehicles', 'NightAuditReports', 'CashShifts',
       'SmartLockLogs', 'LostAndFoundItems', 'MaintenanceTicketPhotos', 'MaintenanceTickets',
       'CampaignRecipients', 'MarketingCampaigns', 'LoyaltyPointTransactions', 'ChatbotMessages',
