@@ -1076,61 +1076,6 @@ function Home() {
             </div>
           </div>
         </section>
-
-        {/* ================= 8. FREQUENTLY ASKED QUESTIONS (FAQ) ================= */}
-        <section id="faq" className="w-full py-16 lg:py-20 bg-[#fbf8f2] border-t border-[#dedad0]">
-          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
-            <div className="text-center mb-10">
-              <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
-                Giải Đáp Thắc Mắc
-              </span>
-              <h2 className="font-serif text-[26px] lg:text-[34px] text-[#203044] mt-1 font-bold tracking-tight leading-[1.25]">
-                Câu Hỏi Thường Gặp
-              </h2>
-              <p className="text-[13.5px] text-[#373435]/80 mt-1">
-                Mọi thông tin chi tiết về nhận phòng, dịch vụ đưa đón và chính sách lưu trú.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              {homeData.faqs.map((faq) => {
-                const isOpen = openFaqId === faq.id;
-                return (
-                  <div
-                    key={faq.id}
-                    className="bg-white rounded-xl border border-[#dedad0] overflow-hidden transition-all shadow-sm"
-                  >
-                    <button
-                      onClick={() => setOpenFaqId(isOpen ? null : faq.id)}
-                      className="w-full px-5 py-4 text-left flex items-center justify-between gap-4 font-bold text-[14.5px] text-[#203044] hover:text-[#b9a277] transition-colors"
-                      type="button"
-                    >
-                      <span>{faq.question}</span>
-                      <span className={`material-symbols-outlined text-[20px] transition-transform duration-300 text-[#b9a277] shrink-0 ${isOpen ? 'rotate-180' : ''}`}>
-                        expand_more
-                      </span>
-                    </button>
-
-                    {isOpen && (
-                      <div className="px-5 pb-5 pt-1 text-[13.5px] text-[#373435]/85 leading-relaxed border-t border-[#dedad0]/50 bg-[#fafaf8]/50 animate-fade-in">
-                        {faq.answer}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-8 text-center">
-              <p className="text-[13px] text-[#8a8782]">
-                Cần thêm thông tin hỗ trợ? Gọi ngay tổng đài 24/7:{' '}
-                <a href="tel:19006868" className="text-[#b9a277] font-bold hover:underline">
-                  1900 6868
-                </a>
-              </p>
-            </div>
-          </div>
-        </section>
       </div>
 
       {/* MODALS */}

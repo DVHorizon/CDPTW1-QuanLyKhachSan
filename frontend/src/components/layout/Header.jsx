@@ -176,9 +176,6 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
           <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#hoi-vien">
             {t.elite}
           </a>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#faq">
-            {t.faq}
-          </a>
         </nav>
 
         {/* Right CTA & Account Actions */}
@@ -364,10 +361,6 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#hoi-vien">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">stars</span>
               <span>{t.elite}</span>
-            </a>
-            <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#faq">
-              <span className="material-symbols-outlined text-[#b9a277] text-[20px]">help_outline</span>
-              <span>{t.faq}</span>
             </a>
           </div>
 
