@@ -621,17 +621,6 @@ function Home() {
                 </>
               );
             })()}
-
-            {/* Banner CTA xem toàn bộ */}
-            <div className="mt-8 text-center">
-              <Link
-                to="/hotels"
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#fafaf8] border border-[#b9a277] text-[#203044] hover:bg-[#b9a277] hover:text-white font-semibold text-xs transition-all shadow-xs"
-              >
-                <span>Khám phá toàn bộ {homeData.branches.length} khu nghỉ dưỡng Grand Horizon</span>
-                <span className="material-symbols-outlined text-sm">arrow_forward</span>
-              </Link>
-            </div>
           </div>
         </section>
 
