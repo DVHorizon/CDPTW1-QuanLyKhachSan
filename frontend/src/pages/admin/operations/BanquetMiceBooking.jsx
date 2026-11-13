@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AdminLayout from '../../../components/admin/layout/AdminLayout';
 
 const MIcon = ({ name, className = '', style = {} }) => (
   <span
@@ -199,9 +200,6 @@ export default function BanquetMiceBooking() {
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Live camera surveillance preview index
-  const [activeCameraIdx, setActiveCameraIdx] = useState(0);
-
   // New Event Form State (5-step wizard)
   const [wizardStep, setWizardStep] = useState(1);
   const [contractForm, setContractForm] = useState({
@@ -377,178 +375,62 @@ export default function BanquetMiceBooking() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#f4f7f5] text-slate-800 font-sans overflow-hidden">
-      {/* Toast Notification */}
-      {toast && (
-        <div
-          className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border text-sm font-semibold transition-all duration-300 ${
-            toast.type === 'error'
-              ? 'bg-rose-950 text-white border-rose-700'
-              : 'bg-[#0f1f1a] text-white border-emerald-500'
-          }`}
-        >
-          <MIcon
-            name={toast.type === 'error' ? 'error' : 'verified'}
-            className={toast.type === 'error' ? 'text-rose-400' : 'text-emerald-400'}
-          />
-          <span>{toast.msg}</span>
-        </div>
-      )}
-
-      {/* LEFT SIDEBAR: DARK NOCTURNE EXECUTIVE OPS (MATCHING THE UPLOADED SCREENSHOT) */}
-      <aside className="w-64 flex-shrink-0 bg-[#13221e] text-[#d1ded8] flex flex-col justify-between border-r border-[#1e342e] select-none z-20">
-        <div>
-          {/* Brand Header */}
-          <div className="p-4 border-b border-[#1f362f]">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-emerald-400 text-sm">✦</span>
-              <span className="text-[11px] font-bold tracking-widest text-emerald-400 uppercase">NOCTURNE OPS</span>
-            </div>
-            <h1 className="font-serif text-xl font-bold text-white tracking-wide leading-tight">Grand Horizon</h1>
-            <p className="text-[11px] text-[#7d9b91] tracking-wide mt-0.5">Resort & Suites • PMS Core</p>
+    <AdminLayout>
+      <div className="min-h-screen bg-[#f4f7f5] text-slate-800 font-sans pb-12 -mx-space-lg -mt-16 px-space-lg pt-20">
+        {/* Toast Notification */}
+        {toast && (
+          <div
+            className={`fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border text-sm font-semibold transition-all duration-300 ${
+              toast.type === 'error'
+                ? 'bg-rose-950 text-white border-rose-700'
+                : 'bg-[#0f1f1a] text-white border-emerald-500'
+            }`}
+          >
+            <MIcon
+              name={toast.type === 'error' ? 'error' : 'verified'}
+              className={toast.type === 'error' ? 'text-rose-400' : 'text-emerald-400'}
+            />
+            <span>{toast.msg}</span>
           </div>
+        )}
 
-          {/* Operational Shift Live Pill */}
-          <div className="p-4 border-b border-[#1f362f]">
-            <div className="flex items-center justify-between text-[11px] text-[#8ea89f] font-mono">
-              <span className="uppercase tracking-wider">OPERATIONAL SHIFT</span>
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#173a2e] text-emerald-400 border border-emerald-500/40">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                LIVE
-              </span>
-            </div>
-            <div className="mt-1 font-mono text-xs text-white">AM / ROTATION 06:00 - 14:30</div>
-            <div className="text-[10px] text-[#6d887f] font-mono">GMT+7</div>
-          </div>
-
-          {/* EXECUTIVE MODULES MENU */}
-          <div className="px-3 py-4">
-            <div className="text-[10px] font-bold tracking-widest text-[#66837a] uppercase px-3 mb-2">
-              EXECUTIVE MODULES
-            </div>
-            <nav className="space-y-1 text-sm font-medium">
-              {/* 51. Police Declaration */}
-              <button
-                onClick={() => navigate('/admin/police-declaration')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[#9cb4ab] hover:bg-[#1a2f29] hover:text-white transition-colors text-left"
-              >
-                <MIcon name="local_police" className="text-[#84a397]" />
-                <span className="truncate">51. Police Declaration</span>
-              </button>
-
-              {/* 52. Channel & OTA Sync */}
-              <button
-                onClick={() => navigate('/admin/channel-manager')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[#9cb4ab] hover:bg-[#1a2f29] hover:text-white transition-colors text-left"
-              >
-                <MIcon name="sync_alt" className="text-[#84a397]" />
-                <span className="truncate">52. Channel & OTA Sync</span>
-              </button>
-
-              {/* 53. Banquet & MICE (ACTIVE HIGHLIGHTED ITEM IN IMAGE) */}
-              <div className="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-[#193d31] text-white font-semibold shadow-inner border-l-4 border-emerald-400">
-                <MIcon name="celebration" className="text-emerald-400" />
-                <span className="truncate">53. Banquet & MICE</span>
-              </div>
-
-              {/* 54. Security & Audit */}
-              <button
-                onClick={() => navigate('/admin/audit-logs')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[#9cb4ab] hover:bg-[#1a2f29] hover:text-white transition-colors text-left"
-              >
-                <MIcon name="timer" className="text-[#84a397]" />
-                <span className="truncate">54. Security & Audit</span>
-              </button>
-
-              {/* 55. Roster & Shifts */}
-              <button
-                onClick={() => navigate('/admin/roster')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[#9cb4ab] hover:bg-[#1a2f29] hover:text-white transition-colors text-left"
-              >
-                <MIcon name="schedule" className="text-[#84a397]" />
-                <span className="truncate">55. Roster & Shifts</span>
-              </button>
-            </nav>
-          </div>
-        </div>
-
-        {/* Console Node Bottom */}
-        <div className="p-4 border-t border-[#1f362f] bg-[#0f1c18] flex items-center justify-between text-[10px] font-mono text-[#6c867e]">
-          <div>
-            <div>CONSOLE NODE</div>
-            <div className="text-white font-bold text-[11px]">WS-SANCTUARY-04</div>
-          </div>
-          <span className="px-2 py-0.5 rounded bg-[#182d26] text-emerald-400 border border-[#234238] font-bold">
-            V4.92-PROD
-          </span>
-        </div>
-      </aside>
-
-      {/* MAIN CONTAINER */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* TOP BAR / HEADER (MATCHING THE UPLOADED SCREENSHOT) */}
-        <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
-          {/* Location & KPI Pills */}
+        {/* TOP CONTEXT BAR: Location, Occupancy & Operational Shift */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-3 mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div>
-              <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5 cursor-pointer hover:text-emerald-700">
+              <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <span>Phú Quốc Sanctuary</span>
+                <span className="text-slate-300">•</span>
+                <span className="text-slate-600 font-normal">Tower A • Ocean Wing</span>
               </div>
-              <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                <span>Tower A • Ocean Wing</span>
-                <MIcon name="expand_more" className="text-xs text-slate-400" />
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Ca trực vận hành: <span className="font-semibold text-slate-700">AM / ROTATION 06:00 - 14:30 GMT+7</span>
               </div>
             </div>
 
-            <div className="h-6 w-px bg-slate-200"></div>
+            <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
 
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 text-xs font-semibold rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+              <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 occ 84%
               </span>
-              <span className="px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-700 border border-slate-200">
+              <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                 REVPAR $428
               </span>
             </div>
           </div>
 
-          {/* Search bar */}
-          <div className="w-96 relative">
-            <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-              <MIcon name="search" className="text-sm" />
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
+              CONSOLE: WS-SANCTUARY-04 [V4.92-PROD]
             </span>
-            <input
-              type="text"
-              placeholder="Search room, reservation, guest (18984; K"
-              className="w-full pl-9 pr-4 py-1.5 text-xs rounded-full bg-slate-100 border border-slate-200 focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 text-slate-700 placeholder-slate-400 transition"
-            />
           </div>
+        </div>
 
-          {/* User profile & Notification */}
-          <div className="flex items-center gap-4">
-            <button className="relative p-1 text-slate-500 hover:text-slate-800 transition">
-              <MIcon name="notifications" className="text-lg" />
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white"></span>
-            </button>
-
-            <div className="flex items-center gap-2.5">
-              <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-                  MA
-                </div>
-                <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white"></span>
-              </div>
-              <div className="text-left leading-tight hidden sm:block">
-                <div className="text-xs font-bold text-slate-800">Lê Minh Anh</div>
-                <div className="text-[10px] text-slate-500">Front Desk Manager</div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* WORKSPACE SCROLL AREA */}
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* TITLE & BREADCRUMB ROW (MATCHING THE UPLOADED SCREENSHOT) */}
+        {/* WORKSPACE CONTENT AREA */}
+        <div className="space-y-6">
+          {/* TITLE & ACTION BUTTONS ROW (MATCHING SCREENSHOT) */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-[11px] font-bold tracking-wider text-emerald-800 uppercase mb-1">
@@ -565,7 +447,7 @@ export default function BanquetMiceBooking() {
               </p>
             </div>
 
-            {/* ACTION BUTTONS (TOP RIGHT IN SCREENSHOT) */}
+            {/* TOP RIGHT ACTION BUTTONS */}
             <div className="flex items-center gap-2.5 flex-wrap">
               <button
                 onClick={() => setShow3DFloorPlanModal(true)}
@@ -596,7 +478,7 @@ export default function BanquetMiceBooking() {
             </div>
           </div>
 
-          {/* 4 STAT CARDS ROW (MATCHING THE UPLOADED SCREENSHOT) */}
+          {/* 4 STAT CARDS ROW */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card 1: Sự kiện diễn ra trong tuần */}
             <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
@@ -1043,7 +925,7 @@ export default function BanquetMiceBooking() {
                   </div>
                 </div>
 
-                {/* BOTTOM ACTION BUTTONS (MATCHING THE UPLOADED SCREENSHOT) */}
+                {/* BOTTOM ACTION BUTTONS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   <button
                     onClick={() => setShowBEOExportModal(true)}
@@ -1064,738 +946,738 @@ export default function BanquetMiceBooking() {
               </div>
             </div>
           </div>
-        </main>
-      </div>
+        </div>
 
-      {/* ========================================================================= */}
-      {/* MODAL 1: LẬP HỢP ĐỒNG SỰ KIỆN MỚI (5-STEP WIZARD) */}
-      {/* ========================================================================= */}
-      {showNewContractModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden max-h-[92vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-bold tracking-wider text-emerald-800 uppercase">
-                  QUY TRÌNH TƯ VẤN & ĐẶT SẢNH TIỆC MICE
+        {/* ========================================================================= */}
+        {/* MODAL 1: LẬP HỢP ĐỒNG SỰ KIỆN MỚI (5-STEP WIZARD) */}
+        {/* ========================================================================= */}
+        {showNewContractModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden max-h-[92vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] font-bold tracking-wider text-emerald-800 uppercase">
+                    QUY TRÌNH TƯ VẤN & ĐẶT SẢNH TIỆC MICE
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 font-serif">
+                    Lập Hợp Đồng Sự Kiện & Tạo Lệnh Điều Hành BEO
+                  </h3>
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 font-serif">
-                  Lập Hợp Đồng Sự Kiện & Tạo Lệnh Điều Hành BEO
-                </h3>
+                <button
+                  onClick={() => setShowNewContractModal(false)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center transition"
+                >
+                  <MIcon name="close" className="text-lg" />
+                </button>
               </div>
-              <button
-                onClick={() => setShowNewContractModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center transition"
-              >
-                <MIcon name="close" className="text-lg" />
-              </button>
+
+              {/* Stepper Indicator */}
+              <div className="px-6 py-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs font-semibold text-slate-600">
+                <span className={wizardStep === 1 ? 'text-emerald-800 font-bold' : ''}>1. Khách & Ngày Giờ</span>
+                <span>›</span>
+                <span className={wizardStep === 2 ? 'text-emerald-800 font-bold' : ''}>2. Sảnh Tiệc</span>
+                <span>›</span>
+                <span className={wizardStep === 3 ? 'text-emerald-800 font-bold' : ''}>3. Bàn Ghế & AV</span>
+                <span>›</span>
+                <span className={wizardStep === 4 ? 'text-emerald-800 font-bold' : ''}>4. Thực Đơn F&B</span>
+                <span>›</span>
+                <span className={wizardStep === 5 ? 'text-emerald-800 font-bold' : ''}>5. Hợp Đồng & Cọc</span>
+              </div>
+
+              {/* Modal Body */}
+              <form onSubmit={handleCreateContract} className="p-6 overflow-y-auto space-y-4 flex-1">
+                {wizardStep === 1 && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <h4 className="font-bold text-slate-900 text-sm border-b pb-2">Bước 1: Thông Tin Khách Hàng & Sự Kiện</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Tên Sự Kiện *</label>
+                        <input
+                          type="text"
+                          required
+                          value={contractForm.title}
+                          onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })}
+                          placeholder="VD: Hội Nghị Thượng Đỉnh Ngành Dược 2025"
+                          className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Loại Hình Sự Kiện</label>
+                        <select
+                          value={contractForm.eventType}
+                          onChange={(e) => setContractForm({ ...contractForm, eventType: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-1 focus:ring-emerald-500"
+                        >
+                          <option>Hội nghị quốc tế</option>
+                          <option>Tiệc cưới hoàng hôn bãi biển</option>
+                          <option>Gala Dinner Doanh Nghiệp</option>
+                          <option>Dạ Tiệc Tri Ân Khách Hàng</option>
+                          <option>Hội Thảo Ra Mắt Sản Phẩm</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Công Ty / Đơn Vị Chủ Trì *</label>
+                        <input
+                          type="text"
+                          required
+                          value={contractForm.company}
+                          onChange={(e) => setContractForm({ ...contractForm, company: e.target.value })}
+                          placeholder="VD: Tập đoàn Dược phẩm Vinapharm"
+                          className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Số Lượng Khách Dự Kiến (PAX) *</label>
+                        <input
+                          type="number"
+                          min="20"
+                          max="800"
+                          value={contractForm.pax}
+                          onChange={(e) => setContractForm({ ...contractForm, pax: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Người Liên Hệ / Đại Diện</label>
+                        <input
+                          type="text"
+                          value={contractForm.contactName}
+                          onChange={(e) => setContractForm({ ...contractForm, contactName: e.target.value })}
+                          placeholder="VD: Bà Trần Thu Trang"
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Số Điện Thoại</label>
+                        <input
+                          type="text"
+                          value={contractForm.contactPhone}
+                          onChange={(e) => setContractForm({ ...contractForm, contactPhone: e.target.value })}
+                          placeholder="+84 912 345 889"
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Ngày Tổ Chức</label>
+                        <input
+                          type="date"
+                          value={contractForm.date}
+                          onChange={(e) => setContractForm({ ...contractForm, date: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Khung Giờ</label>
+                        <input
+                          type="text"
+                          value={contractForm.timeRange}
+                          onChange={(e) => setContractForm({ ...contractForm, timeRange: e.target.value })}
+                          placeholder="18:00 - 22:30"
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <h4 className="font-bold text-slate-900 text-sm border-b pb-2">Bước 2: Chọn Sảnh Tiệc & Không Gian Vận Hành</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {VENUES.map((v) => (
+                        <div
+                          key={v.id}
+                          onClick={() => setContractForm({ ...contractForm, venueId: v.id })}
+                          className={`p-3.5 rounded-xl border cursor-pointer transition ${
+                            contractForm.venueId === v.id
+                              ? 'bg-emerald-50 border-emerald-600 ring-1 ring-emerald-500'
+                              : 'bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="font-bold text-slate-900 text-xs mb-1">{v.name}</div>
+                          <div className="text-[11px] text-slate-600 space-y-0.5">
+                            <div>Sức chứa: <span className="font-semibold text-slate-800">{v.capacity}</span></div>
+                            <div>Diện tích: {v.area} • Trần cao: {v.ceiling}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <h4 className="font-bold text-slate-900 text-sm border-b pb-2">Bước 3: Quy Cách Sắp Đặt Bàn Ghế & Kỹ Thuật AV</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Phong Cách Sắp Đặt Bàn Ghế</label>
+                        <select
+                          value={contractForm.seatingStyle}
+                          onChange={(e) => setContractForm({ ...contractForm, seatingStyle: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        >
+                          <option>Bàn tròn 10 người/bàn (Banquet Round Tables)</option>
+                          <option>Kiểu Rạp Hát (Theater Style 400 - 600 pax)</option>
+                          <option>Kiểu Lớp Học (Classroom Style có bàn ghi chép)</option>
+                          <option>Kiểu Chữ U Hội Nghị (U-Shape VIP Boardroom)</option>
+                          <option>Tiệc Đứng Cocktail (Cocktail High Tables)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Mô Tả Quy Cách Bàn Ghế & Décor</label>
+                        <input
+                          type="text"
+                          value={contractForm.tablesChairs}
+                          onChange={(e) => setContractForm({ ...contractForm, tablesChairs: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Sân Khấu & Màn Hình LED</label>
+                        <input
+                          type="text"
+                          value={contractForm.stageLed}
+                          onChange={(e) => setContractForm({ ...contractForm, stageLed: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Âm Thanh & Ánh Sáng</label>
+                        <input
+                          type="text"
+                          value={contractForm.soundLight}
+                          onChange={(e) => setContractForm({ ...contractForm, soundLight: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 4 && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <h4 className="font-bold text-slate-900 text-sm border-b pb-2">Bước 4: Thực Đơn Tiệc Đoàn & F&B Catering</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Gói Thực Đơn Chính</label>
+                        <select
+                          value={contractForm.menuType}
+                          onChange={(e) => setContractForm({ ...contractForm, menuType: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        >
+                          <option>Set Menu Gala 6 Món Cao Cấp (Bào ngư, Wagyu)</option>
+                          <option>Set Menu Hoàng Gia 8 Món Hải Sản & Bò Úc</option>
+                          <option>Buffet Quốc Tế Á - Âu 60 Món (Horizon Terrace)</option>
+                          <option>Tiệc Cưới Bãi Biển Riviera BBQ Hải Sản Sống</option>
+                          <option>Teabreak VIP & Finger Food Canapé</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Chi Tiết Món Ăn Gala Tối</label>
+                        <textarea
+                          rows="2"
+                          value={contractForm.galaDinner}
+                          onChange={(e) => setContractForm({ ...contractForm, galaDinner: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        ></textarea>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Rượu Vang & Đồ Uống Đón Khách</label>
+                        <input
+                          type="text"
+                          value={contractForm.welcomeWine}
+                          onChange={(e) => setContractForm({ ...contractForm, welcomeWine: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 5 && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <h4 className="font-bold text-slate-900 text-sm border-b pb-2">
+                      Bước 5: Kê Khai Chi Phí & Phân Kỳ Đặt Cọc Hợp Đồng MICE
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Tổng Giá Trị Hợp Đồng (VNĐ)</label>
+                        <input
+                          type="number"
+                          step="10000000"
+                          value={contractForm.totalAmount}
+                          onChange={(e) => setContractForm({ ...contractForm, totalAmount: e.target.value })}
+                          className="w-full px-3 py-2 text-xs font-mono font-bold text-slate-900 border rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Tỷ Lệ Đặt Cọc Đợt 1 (%)</label>
+                        <select
+                          value={contractForm.depositPercent}
+                          onChange={(e) => setContractForm({ ...contractForm, depositPercent: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        >
+                          <option value="50">50% (Tiêu chuẩn hợp đồng MICE)</option>
+                          <option value="30">30% (Doanh nghiệp đối tác thân thiết)</option>
+                          <option value="70">70% (Tiệc cưới & Đặt chỗ cao điểm)</option>
+                          <option value="100">100% (Thanh toán toàn bộ)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Phương Thức Thanh Toán Cọc</label>
+                        <select
+                          value={contractForm.paymentMethod}
+                          onChange={(e) => setContractForm({ ...contractForm, paymentMethod: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        >
+                          <option>Chuyển khoản VCB</option>
+                          <option>Thẻ Tín Dụng Doanh Nghiệp (Corporate Card)</option>
+                          <option>Bảo Lãnh Ngân Hàng</option>
+                          <option>Tiền Mặt Tại Quầy Lễ Tân</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Hình Thức Bảo Lãnh</label>
+                        <input
+                          type="text"
+                          value={contractForm.guaranteeType}
+                          onChange={(e) => setContractForm({ ...contractForm, guaranteeType: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border rounded-lg"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Summary preview */}
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1">
+                      <div className="flex justify-between font-semibold text-emerald-950">
+                        <span>Số tiền cọc Đợt 1 cần thu ngay:</span>
+                        <span className="font-mono font-bold">
+                          {fmtVnd((contractForm.totalAmount * contractForm.depositPercent) / 100)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-slate-600">
+                        <span>Dư nợ Master Folio chờ quyết toán:</span>
+                        <span className="font-mono">
+                          {fmtVnd(contractForm.totalAmount - (contractForm.totalAmount * contractForm.depositPercent) / 100)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Wizard Nav Controls */}
+                <div className="pt-4 border-t flex items-center justify-between">
+                  {wizardStep > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(wizardStep - 1)}
+                      className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Quay Lại
+                    </button>
+                  ) : (
+                    <div></div>
+                  )}
+
+                  {wizardStep < 5 ? (
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(wizardStep + 1)}
+                      className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
+                    >
+                      Tiếp Tục ›
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      className="px-6 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-md shadow-emerald-200 transition"
+                    >
+                      Xác Nhận Ký Hợp Đồng & Phát Hành BEO
+                    </button>
+                  )}
+                </div>
+              </form>
             </div>
+          </div>
+        )}
 
-            {/* Stepper Indicator */}
-            <div className="px-6 py-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs font-semibold text-slate-600">
-              <span className={wizardStep === 1 ? 'text-emerald-800 font-bold' : ''}>1. Khách & Ngày Giờ</span>
-              <span>›</span>
-              <span className={wizardStep === 2 ? 'text-emerald-800 font-bold' : ''}>2. Sảnh Tiệc</span>
-              <span>›</span>
-              <span className={wizardStep === 3 ? 'text-emerald-800 font-bold' : ''}>3. Bàn Ghế & AV</span>
-              <span>›</span>
-              <span className={wizardStep === 4 ? 'text-emerald-800 font-bold' : ''}>4. Thực Đơn F&B</span>
-              <span>›</span>
-              <span className={wizardStep === 5 ? 'text-emerald-800 font-bold' : ''}>5. Hợp Đồng & Cọc</span>
-            </div>
-
-            {/* Modal Body */}
-            <form onSubmit={handleCreateContract} className="p-6 overflow-y-auto space-y-4 flex-1">
-              {wizardStep === 1 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <h4 className="font-bold text-slate-900 text-sm border-b pb-2">Bước 1: Thông Tin Khách Hàng & Sự Kiện</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Tên Sự Kiện *</label>
-                      <input
-                        type="text"
-                        required
-                        value={contractForm.title}
-                        onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })}
-                        placeholder="VD: Hội Nghị Thượng Đỉnh Ngành Dược 2025"
-                        className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-1 focus:ring-emerald-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Loại Hình Sự Kiện</label>
-                      <select
-                        value={contractForm.eventType}
-                        onChange={(e) => setContractForm({ ...contractForm, eventType: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-1 focus:ring-emerald-500"
-                      >
-                        <option>Hội nghị quốc tế</option>
-                        <option>Tiệc cưới hoàng hôn bãi biển</option>
-                        <option>Gala Dinner Doanh Nghiệp</option>
-                        <option>Dạ Tiệc Tri Ân Khách Hàng</option>
-                        <option>Hội Thảo Ra Mắt Sản Phẩm</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Công Ty / Đơn Vị Chủ Trì *</label>
-                      <input
-                        type="text"
-                        required
-                        value={contractForm.company}
-                        onChange={(e) => setContractForm({ ...contractForm, company: e.target.value })}
-                        placeholder="VD: Tập đoàn Dược phẩm Vinapharm"
-                        className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-1 focus:ring-emerald-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Số Lượng Khách Dự Kiến (PAX) *</label>
-                      <input
-                        type="number"
-                        min="20"
-                        max="800"
-                        value={contractForm.pax}
-                        onChange={(e) => setContractForm({ ...contractForm, pax: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-1 focus:ring-emerald-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Người Liên Hệ / Đại Diện</label>
-                      <input
-                        type="text"
-                        value={contractForm.contactName}
-                        onChange={(e) => setContractForm({ ...contractForm, contactName: e.target.value })}
-                        placeholder="VD: Bà Trần Thu Trang"
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Số Điện Thoại</label>
-                      <input
-                        type="text"
-                        value={contractForm.contactPhone}
-                        onChange={(e) => setContractForm({ ...contractForm, contactPhone: e.target.value })}
-                        placeholder="+84 912 345 889"
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Ngày Tổ Chức</label>
-                      <input
-                        type="date"
-                        value={contractForm.date}
-                        onChange={(e) => setContractForm({ ...contractForm, date: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Khung Giờ</label>
-                      <input
-                        type="text"
-                        value={contractForm.timeRange}
-                        onChange={(e) => setContractForm({ ...contractForm, timeRange: e.target.value })}
-                        placeholder="18:00 - 22:30"
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      />
+        {/* ========================================================================= */}
+        {/* MODAL 2: SƠ ĐỒ SẢNH TIỆC 3D (3D / 2D INTERACTIVE VENUE LAYOUT) */}
+        {/* ========================================================================= */}
+        {show3DFloorPlanModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 w-full max-w-4xl overflow-hidden max-h-[92vh] flex flex-col">
+              <div className="p-4 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <MIcon name="view_in_ar" className="text-emerald-400 text-xl" />
+                  <div>
+                    <h3 className="font-bold text-sm tracking-wide text-white">
+                      Sơ Đồ Sảnh Tiệc 3D & Bản Vẽ Bố Trí Bàn Ghế
+                    </h3>
+                    <div className="text-[11px] text-slate-400 font-mono">
+                      {currentEvent.venueFull} • {currentEvent.setup.diagramCode}
                     </div>
                   </div>
                 </div>
-              )}
+                <button
+                  onClick={() => setShow3DFloorPlanModal(false)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-800 text-slate-400 flex items-center justify-center"
+                >
+                  <MIcon name="close" className="text-base" />
+                </button>
+              </div>
 
-              {wizardStep === 2 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <h4 className="font-bold text-slate-900 text-sm border-b pb-2">Bước 2: Chọn Sảnh Tiệc & Không Gian Vận Hành</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {VENUES.map((v) => (
+              <div className="p-6 overflow-y-auto space-y-4">
+                {/* Interactive Visual Floor Layout Simulation */}
+                <div className="p-6 rounded-xl bg-slate-950 border border-slate-800 relative min-h-[360px] flex flex-col justify-between select-none">
+                  {/* Stage Area */}
+                  <div className="mx-auto w-3/4 py-3 bg-emerald-950/80 border-2 border-emerald-500/50 rounded-xl text-center shadow-lg shadow-emerald-950">
+                    <div className="text-xs font-bold text-emerald-400 uppercase tracking-widest">
+                      SÂN KHẤU CHÍNH & MÀN HÌNH LED P3 (12m x 4m)
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      2 Bục xoay siêu xe Mercedes Maybach • Dàn Line Array 2 bên cánh gà
+                    </div>
+                  </div>
+
+                  {/* Round Tables Grid Simulation */}
+                  <div className="my-6 grid grid-cols-5 sm:grid-cols-7 gap-3 text-center">
+                    {Array.from({ length: 35 }).map((_, i) => (
                       <div
-                        key={v.id}
-                        onClick={() => setContractForm({ ...contractForm, venueId: v.id })}
-                        className={`p-3.5 rounded-xl border cursor-pointer transition ${
-                          contractForm.venueId === v.id
-                            ? 'bg-emerald-50 border-emerald-600 ring-1 ring-emerald-500'
-                            : 'bg-white border-slate-200 hover:bg-slate-50'
-                        }`}
+                        key={i}
+                        className="group p-2 rounded-full aspect-square bg-[#1a2f27] border border-emerald-600/40 hover:border-emerald-400 hover:bg-emerald-900 transition flex flex-col items-center justify-center cursor-pointer relative"
                       >
-                        <div className="font-bold text-slate-900 text-xs mb-1">{v.name}</div>
-                        <div className="text-[11px] text-slate-600 space-y-0.5">
-                          <div>Sức chứa: <span className="font-semibold text-slate-800">{v.capacity}</span></div>
-                          <div>Diện tích: {v.area} • Trần cao: {v.ceiling}</div>
-                        </div>
+                        <span className="text-[10px] font-bold text-emerald-300">T{i + 1}</span>
+                        <span className="text-[8px] text-slate-400">10 pax</span>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
 
-              {wizardStep === 3 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <h4 className="font-bold text-slate-900 text-sm border-b pb-2">Bước 3: Quy Cách Sắp Đặt Bàn Ghế & Kỹ Thuật AV</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Phong Cách Sắp Đặt Bàn Ghế</label>
-                      <select
-                        value={contractForm.seatingStyle}
-                        onChange={(e) => setContractForm({ ...contractForm, seatingStyle: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      >
-                        <option>Bàn tròn 10 người/bàn (Banquet Round Tables)</option>
-                        <option>Kiểu Rạp Hát (Theater Style 400 - 600 pax)</option>
-                        <option>Kiểu Lớp Học (Classroom Style có bàn ghi chép)</option>
-                        <option>Kiểu Chữ U Hội Nghị (U-Shape VIP Boardroom)</option>
-                        <option>Tiệc Đứng Cocktail (Cocktail High Tables)</option>
-                      </select>
+                  {/* Entrance & FOH Sound Booth */}
+                  <div className="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-800">
+                    <div className="px-3 py-1.5 rounded bg-slate-900 border border-slate-800">
+                      🚪 CỬA CHÍNH ĐÓN KHÁCH (RED CARPET)
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Mô Tả Quy Cách Bàn Ghế & Décor</label>
-                      <input
-                        type="text"
-                        value={contractForm.tablesChairs}
-                        onChange={(e) => setContractForm({ ...contractForm, tablesChairs: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      />
+                    <div className="px-3 py-1.5 rounded bg-slate-900 border border-slate-800">
+                      🎛️ KHU VỰC KỸ THUẬT FOH (ÂM THANH & ÁNH SÁNG)
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Sân Khấu & Màn Hình LED</label>
-                      <input
-                        type="text"
-                        value={contractForm.stageLed}
-                        onChange={(e) => setContractForm({ ...contractForm, stageLed: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Âm Thanh & Ánh Sáng</label>
-                      <input
-                        type="text"
-                        value={contractForm.soundLight}
-                        onChange={(e) => setContractForm({ ...contractForm, soundLight: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      />
+                    <div className="px-3 py-1.5 rounded bg-slate-900 border border-slate-800">
+                      🥂 QUẦY COCKTAIL BAR & CANAPÉ
                     </div>
                   </div>
                 </div>
-              )}
 
-              {wizardStep === 4 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <h4 className="font-bold text-slate-900 text-sm border-b pb-2">Bước 4: Thực Đơn Tiệc Đoàn & F&B Catering</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Gói Thực Đơn Chính</label>
-                      <select
-                        value={contractForm.menuType}
-                        onChange={(e) => setContractForm({ ...contractForm, menuType: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      >
-                        <option>Set Menu Gala 6 Món Cao Cấp (Bào ngư, Wagyu)</option>
-                        <option>Set Menu Hoàng Gia 8 Món Hải Sản & Bò Úc</option>
-                        <option>Buffet Quốc Tế Á - Âu 60 Món (Horizon Terrace)</option>
-                        <option>Tiệc Cưới Bãi Biển Riviera BBQ Hải Sản Sống</option>
-                        <option>Teabreak VIP & Finger Food Canapé</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Chi Tiết Món Ăn Gala Tối</label>
-                      <textarea
-                        rows="2"
-                        value={contractForm.galaDinner}
-                        onChange={(e) => setContractForm({ ...contractForm, galaDinner: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      ></textarea>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Rượu Vang & Đồ Uống Đón Khách</label>
-                      <input
-                        type="text"
-                        value={contractForm.welcomeWine}
-                        onChange={(e) => setContractForm({ ...contractForm, welcomeWine: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      />
-                    </div>
+                {/* Specs Breakdown */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 rounded-lg bg-slate-800/60 border border-slate-700">
+                    <div className="text-slate-400">Quy mô tiệc bàn tròn:</div>
+                    <div className="font-bold text-white text-sm mt-0.5">35 bàn tròn (350 pax)</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-800/60 border border-slate-700">
+                    <div className="text-slate-400">Hệ thống đèn beam & wash:</div>
+                    <div className="font-bold text-white text-sm mt-0.5">24 Moving Heads DMX</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-800/60 border border-slate-700">
+                    <div className="text-slate-400">Độ giãn cách lối đi VIP:</div>
+                    <div className="font-bold text-white text-sm mt-0.5">Tiêu chuẩn 1.8m an toàn</div>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {wizardStep === 5 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <h4 className="font-bold text-slate-900 text-sm border-b pb-2">
-                    Bước 5: Kê Khai Chi Phí & Phân Kỳ Đặt Cọc Hợp Đồng MICE
+              <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end">
+                <button
+                  onClick={() => setShow3DFloorPlanModal(false)}
+                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
+                >
+                  Đóng Sơ Đồ
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* MODAL 3: XUẤT LỆNH ĐIỀU HÀNH BEO (BANQUET EVENT ORDER DISPATCH SHEET) */}
+        {/* ========================================================================= */}
+        {showBEOExportModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden max-h-[92vh] flex flex-col">
+              <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-bold tracking-widest text-emerald-800 uppercase">
+                    LỆNH ĐIỀU HÀNH YẾN TIỆC & MICE
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 font-serif">
+                    Banquet Event Order (BEO) - {currentEvent.beoNumber}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowBEOExportModal(false)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center"
+                >
+                  <MIcon name="close" className="text-base" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto space-y-5 text-xs text-slate-800 leading-relaxed font-sans">
+                {/* Hotel Header Stamp */}
+                <div className="text-center pb-4 border-b border-slate-200">
+                  <h2 className="font-serif text-lg font-bold text-slate-900">GRAND HORIZON RESORT & SUITES PHÚ QUỐC</h2>
+                  <p className="text-[11px] text-slate-500">Ban Điều Hành Khối Yến Tiệc, Hội Nghị & Khách Đoàn</p>
+                  <div className="inline-block px-3 py-1 mt-2 rounded bg-slate-100 font-mono text-[11px] font-bold text-slate-800">
+                    {currentEvent.beoNumber} • {currentEvent.masterFolio}
+                  </div>
+                </div>
+
+                {/* Event Details Grid */}
+                <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div>
+                    <span className="text-slate-500 block">Tên Sự Kiện:</span>
+                    <strong className="text-slate-900">{currentEvent.title}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Khách Hàng:</span>
+                    <strong className="text-slate-900">{currentEvent.company}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Thời Gian Diễn Ra:</span>
+                    <span>{currentEvent.timeRange} (Ngày {currentEvent.financial.dueDate})</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Địa Điểm / Sảnh:</span>
+                    <strong className="text-emerald-800">{currentEvent.venueFull}</strong>
+                  </div>
+                </div>
+
+                {/* Departmental Instructions */}
+                <div className="space-y-3">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-slate-900 border-b pb-1">
+                    Phân Công Nhiệm Vụ 5 Khối Vận Hành:
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Tổng Giá Trị Hợp Đồng (VNĐ)</label>
-                      <input
-                        type="number"
-                        step="10000000"
-                        value={contractForm.totalAmount}
-                        onChange={(e) => setContractForm({ ...contractForm, totalAmount: e.target.value })}
-                        className="w-full px-3 py-2 text-xs font-mono font-bold text-slate-900 border rounded-lg"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Tỷ Lệ Đặt Cọc Đợt 1 (%)</label>
-                      <select
-                        value={contractForm.depositPercent}
-                        onChange={(e) => setContractForm({ ...contractForm, depositPercent: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      >
-                        <option value="50">50% (Tiêu chuẩn hợp đồng MICE)</option>
-                        <option value="30">30% (Doanh nghiệp đối tác thân thiết)</option>
-                        <option value="70">70% (Tiệc cưới & Đặt chỗ cao điểm)</option>
-                        <option value="100">100% (Thanh toán toàn bộ)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Phương Thức Thanh Toán Cọc</label>
-                      <select
-                        value={contractForm.paymentMethod}
-                        onChange={(e) => setContractForm({ ...contractForm, paymentMethod: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      >
-                        <option>Chuyển khoản VCB</option>
-                        <option>Thẻ Tín Dụng Doanh Nghiệp (Corporate Card)</option>
-                        <option>Bảo Lãnh Ngân Hàng</option>
-                        <option>Tiền Mặt Tại Quầy Lễ Tân</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Hình Thức Bảo Lãnh</label>
-                      <input
-                        type="text"
-                        value={contractForm.guaranteeType}
-                        onChange={(e) => setContractForm({ ...contractForm, guaranteeType: e.target.value })}
-                        className="w-full px-3 py-2 text-xs border rounded-lg"
-                      />
-                    </div>
+                  <div className="p-3 rounded-lg border border-slate-200 space-y-1">
+                    <div className="font-bold text-emerald-900">1. Bếp Trưởng & Ẩm Thực F&B:</div>
+                    <p className="text-slate-600">{currentEvent.catering.galaDinner}. Rượu: {currentEvent.catering.welcomeWine}.</p>
                   </div>
-
-                  {/* Summary preview */}
-                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1">
-                    <div className="flex justify-between font-semibold text-emerald-950">
-                      <span>Số tiền cọc Đợt 1 cần thu ngay:</span>
-                      <span className="font-mono font-bold">
-                        {fmtVnd((contractForm.totalAmount * contractForm.depositPercent) / 100)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-slate-600">
-                      <span>Dư nợ Master Folio chờ quyết toán:</span>
-                      <span className="font-mono">
-                        {fmtVnd(contractForm.totalAmount - (contractForm.totalAmount * contractForm.depositPercent) / 100)}
-                      </span>
-                    </div>
+                  <div className="p-3 rounded-lg border border-slate-200 space-y-1">
+                    <div className="font-bold text-emerald-900">2. Kỹ Thuật AV, Âm Thanh & Ánh Sáng:</div>
+                    <p className="text-slate-600">{currentEvent.setup.stageLed}. {currentEvent.setup.soundLight}.</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-slate-200 space-y-1">
+                    <div className="font-bold text-emerald-900">3. Bộ Phận Buồng Phòng & Setup Sảnh:</div>
+                    <p className="text-slate-600">{currentEvent.setup.tablesChairs}. Khăn trải bàn kiểm tra độ phẳng 100%.</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-slate-200 space-y-1">
+                    <div className="font-bold text-emerald-900">4. Kế Toán & Thu Ngân Master Folio:</div>
+                    <p className="text-slate-600">Đã thu {fmtVnd(currentEvent.financial.depositPaid)}. Thu nốt {fmtVnd(currentEvent.financial.remainingDue)} khi check-out.</p>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* Wizard Nav Controls */}
-              <div className="pt-4 border-t flex items-center justify-between">
-                {wizardStep > 1 ? (
+              <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500 font-mono">Trạng thái: ĐÃ PHÊ DUYỆT BỞI TỔNG QUẢN LÝ</span>
+                <button
+                  onClick={() => {
+                    window.print();
+                    showNotification('Lệnh in BEO đã được gửi đến máy in mạng bộ phận!');
+                  }}
+                  className="px-5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <MIcon name="print" className="text-sm" />
+                  <span>In Bản Lệnh BEO (PDF)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* MODAL 4: GHI NHẬN ĐẶT CỌC THEO TỪNG GIAI ĐOẠN HỢP ĐỒNG */}
+        {/* ========================================================================= */}
+        {showDepositModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MIcon name="payments" className="text-emerald-700 text-lg" />
+                  <h3 className="font-bold text-sm text-slate-900">Thu Tiền Đặt Cọc Sự Kiện MICE</h3>
+                </div>
+                <button
+                  onClick={() => setShowDepositModal(false)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center"
+                >
+                  <MIcon name="close" className="text-base" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveDeposit} className="p-5 space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Tên Hợp Đồng</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${currentEvent.title} (${currentEvent.company})`}
+                    className="w-full px-3 py-2 bg-slate-100 border rounded-lg text-slate-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Số Tiền Đặt Cọc (VNĐ) *</label>
+                  <input
+                    type="number"
+                    step="5000000"
+                    required
+                    value={depositForm.amount}
+                    onChange={(e) => setDepositForm({ ...depositForm, amount: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg font-mono font-bold text-slate-900 focus:ring-1 focus:ring-emerald-500 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Giai Đoạn Cọc</label>
+                  <input
+                    type="text"
+                    value={depositForm.stage}
+                    onChange={(e) => setDepositForm({ ...depositForm, stage: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Hình Thức Thanh Toán</label>
+                  <select
+                    value={depositForm.method}
+                    onChange={(e) => setDepositForm({ ...depositForm, method: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option>Chuyển khoản VCB</option>
+                    <option>Ủy Nhiệm Chi BIDV</option>
+                    <option>Thẻ Tín Dụng Corporate</option>
+                    <option>Tiền Mặt</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Ghi Chú Chứng Từ</label>
+                  <textarea
+                    rows="2"
+                    value={depositForm.note}
+                    onChange={(e) => setDepositForm({ ...depositForm, note: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  ></textarea>
+                </div>
+
+                <div className="pt-3 border-t flex justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setWizardStep(wizardStep - 1)}
-                    className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    onClick={() => setShowDepositModal(false)}
+                    className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-semibold"
                   >
-                    Quay Lại
+                    Hủy
                   </button>
-                ) : (
-                  <div></div>
-                )}
-
-                {wizardStep < 5 ? (
-                  <button
-                    type="button"
-                    onClick={() => setWizardStep(wizardStep + 1)}
-                    className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
-                  >
-                    Tiếp Tục ›
-                  </button>
-                ) : (
                   <button
                     type="submit"
-                    className="px-6 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-md shadow-emerald-200 transition"
+                    className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-sm"
                   >
-                    Xác Nhận Ký Hợp Đồng & Phát Hành BEO
+                    Xác Nhận Thu Cọc
                   </button>
-                )}
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* MODAL 2: SƠ ĐỒ SẢNH TIỆC 3D (3D / 2D INTERACTIVE VENUE LAYOUT) */}
-      {/* ========================================================================= */}
-      {show3DFloorPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 w-full max-w-4xl overflow-hidden max-h-[92vh] flex flex-col">
-            <div className="p-4 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <MIcon name="view_in_ar" className="text-emerald-400 text-xl" />
-                <div>
-                  <h3 className="font-bold text-sm tracking-wide text-white">
-                    Sơ Đồ Sảnh Tiệc 3D & Bản Vẽ Bố Trí Bàn Ghế
-                  </h3>
-                  <div className="text-[11px] text-slate-400 font-mono">
-                    {currentEvent.venueFull} • {currentEvent.setup.diagramCode}
-                  </div>
                 </div>
-              </div>
-              <button
-                onClick={() => setShow3DFloorPlanModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-800 text-slate-400 flex items-center justify-center"
-              >
-                <MIcon name="close" className="text-base" />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-4">
-              {/* Interactive Visual Floor Layout Simulation */}
-              <div className="p-6 rounded-xl bg-slate-950 border border-slate-800 relative min-h-[360px] flex flex-col justify-between select-none">
-                {/* Stage Area */}
-                <div className="mx-auto w-3/4 py-3 bg-emerald-950/80 border-2 border-emerald-500/50 rounded-xl text-center shadow-lg shadow-emerald-950">
-                  <div className="text-xs font-bold text-emerald-400 uppercase tracking-widest">
-                    SÂN KHẤU CHÍNH & MÀN HÌNH LED P3 (12m x 4m)
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">
-                    2 Bục xoay siêu xe Mercedes Maybach • Dàn Line Array 2 bên cánh gà
-                  </div>
-                </div>
-
-                {/* Round Tables Grid Simulation */}
-                <div className="my-6 grid grid-cols-5 sm:grid-cols-7 gap-3 text-center">
-                  {Array.from({ length: 35 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="group p-2 rounded-full aspect-square bg-[#1a2f27] border border-emerald-600/40 hover:border-emerald-400 hover:bg-emerald-900 transition flex flex-col items-center justify-center cursor-pointer relative"
-                    >
-                      <span className="text-[10px] font-bold text-emerald-300">T{i + 1}</span>
-                      <span className="text-[8px] text-slate-400">10 pax</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Entrance & FOH Sound Booth */}
-                <div className="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-800">
-                  <div className="px-3 py-1.5 rounded bg-slate-900 border border-slate-800">
-                    🚪 CỬA CHÍNH ĐÓN KHÁCH (RED CARPET)
-                  </div>
-                  <div className="px-3 py-1.5 rounded bg-slate-900 border border-slate-800">
-                    🎛️ KHU VỰC KỸ THUẬT FOH (ÂM THANH & ÁNH SÁNG)
-                  </div>
-                  <div className="px-3 py-1.5 rounded bg-slate-900 border border-slate-800">
-                    🥂 QUẦY COCKTAIL BAR & CANAPÉ
-                  </div>
-                </div>
-              </div>
-
-              {/* Specs Breakdown */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <div className="p-3 rounded-lg bg-slate-800/60 border border-slate-700">
-                  <div className="text-slate-400">Quy mô tiệc bàn tròn:</div>
-                  <div className="font-bold text-white text-sm mt-0.5">35 bàn tròn (350 pax)</div>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-800/60 border border-slate-700">
-                  <div className="text-slate-400">Hệ thống đèn beam & wash:</div>
-                  <div className="font-bold text-white text-sm mt-0.5">24 Moving Heads DMX</div>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-800/60 border border-slate-700">
-                  <div className="text-slate-400">Độ giãn cách lối đi VIP:</div>
-                  <div className="font-bold text-white text-sm mt-0.5">Tiêu chuẩn 1.8m an toàn</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end">
-              <button
-                onClick={() => setShow3DFloorPlanModal(false)}
-                className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
-              >
-                Đóng Sơ Đồ
-              </button>
+              </form>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 3: XUẤT LỆNH ĐIỀU HÀNH BEO (BANQUET EVENT ORDER DISPATCH SHEET) */}
-      {/* ========================================================================= */}
-      {showBEOExportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden max-h-[92vh] flex flex-col">
-            <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <div>
-                <div className="text-[10px] font-bold tracking-widest text-emerald-800 uppercase">
-                  LỆNH ĐIỀU HÀNH YẾN TIỆC & MICE
+        {/* ========================================================================= */}
+        {/* MODAL 5: THÔNG BÁO ĐỘI AV & KỸ THUẬT */}
+        {/* ========================================================================= */}
+        {showDispatchModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MIcon name="sensors" className="text-emerald-700 text-lg" />
+                  <h3 className="font-bold text-sm text-slate-900">Thông Báo Điều Phối Đội Kỹ Thuật AV</h3>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 font-serif">
-                  Banquet Event Order (BEO) - {currentEvent.beoNumber}
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowBEOExportModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center"
-              >
-                <MIcon name="close" className="text-base" />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-5 text-xs text-slate-800 leading-relaxed font-sans">
-              {/* Hotel Header Stamp */}
-              <div className="text-center pb-4 border-b border-slate-200">
-                <h2 className="font-serif text-lg font-bold text-slate-900">GRAND HORIZON RESORT & SUITES PHÚ QUỐC</h2>
-                <p className="text-[11px] text-slate-500">Ban Điều Hành Khối Yến Tiệc, Hội Nghị & Khách Đoàn</p>
-                <div className="inline-block px-3 py-1 mt-2 rounded bg-slate-100 font-mono text-[11px] font-bold text-slate-800">
-                  {currentEvent.beoNumber} • {currentEvent.masterFolio}
-                </div>
-              </div>
-
-              {/* Event Details Grid */}
-              <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <div>
-                  <span className="text-slate-500 block">Tên Sự Kiện:</span>
-                  <strong className="text-slate-900">{currentEvent.title}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Khách Hàng:</span>
-                  <strong className="text-slate-900">{currentEvent.company}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Thời Gian Diễn Ra:</span>
-                  <span>{currentEvent.timeRange} (Ngày {currentEvent.financial.dueDate})</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Địa Điểm / Sảnh:</span>
-                  <strong className="text-emerald-800">{currentEvent.venueFull}</strong>
-                </div>
-              </div>
-
-              {/* Departmental Instructions */}
-              <div className="space-y-3">
-                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-900 border-b pb-1">
-                  Phân Công Nhiệm Vụ 5 Khối Vận Hành:
-                </h4>
-                <div className="p-3 rounded-lg border border-slate-200 space-y-1">
-                  <div className="font-bold text-emerald-900">1. Bếp Trưởng & Ẩm Thực F&B:</div>
-                  <p className="text-slate-600">{currentEvent.catering.galaDinner}. Rượu: {currentEvent.catering.welcomeWine}.</p>
-                </div>
-                <div className="p-3 rounded-lg border border-slate-200 space-y-1">
-                  <div className="font-bold text-emerald-900">2. Kỹ Thuật AV, Âm Thanh & Ánh Sáng:</div>
-                  <p className="text-slate-600">{currentEvent.setup.stageLed}. {currentEvent.setup.soundLight}.</p>
-                </div>
-                <div className="p-3 rounded-lg border border-slate-200 space-y-1">
-                  <div className="font-bold text-emerald-900">3. Bộ Phận Buồng Phòng & Setup Sảnh:</div>
-                  <p className="text-slate-600">{currentEvent.setup.tablesChairs}. Khăn trải bàn kiểm tra độ phẳng 100%.</p>
-                </div>
-                <div className="p-3 rounded-lg border border-slate-200 space-y-1">
-                  <div className="font-bold text-emerald-900">4. Kế Toán & Thu Ngân Master Folio:</div>
-                  <p className="text-slate-600">Đã thu {fmtVnd(currentEvent.financial.depositPaid)}. Thu nốt {fmtVnd(currentEvent.financial.remainingDue)} khi check-out.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500 font-mono">Trạng thái: ĐÃ PHÊ DUYỆT BỞI TỔNG QUẢN LÝ</span>
-              <button
-                onClick={() => {
-                  window.print();
-                  showNotification('Lệnh in BEO đã được gửi đến máy in mạng bộ phận!');
-                }}
-                className="px-5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-              >
-                <MIcon name="print" className="text-sm" />
-                <span>In Bản Lệnh BEO (PDF)</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* MODAL 4: GHI NHẬN ĐẶT CỌC THEO TỪNG GIAI ĐOẠN HỢP ĐỒNG */}
-      {/* ========================================================================= */}
-      {showDepositModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MIcon name="payments" className="text-emerald-700 text-lg" />
-                <h3 className="font-bold text-sm text-slate-900">Thu Tiền Đặt Cọc Sự Kiện MICE</h3>
-              </div>
-              <button
-                onClick={() => setShowDepositModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center"
-              >
-                <MIcon name="close" className="text-base" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveDeposit} className="p-5 space-y-3.5 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Tên Hợp Đồng</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={`${currentEvent.title} (${currentEvent.company})`}
-                  className="w-full px-3 py-2 bg-slate-100 border rounded-lg text-slate-600"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Số Tiền Đặt Cọc (VNĐ) *</label>
-                <input
-                  type="number"
-                  step="5000000"
-                  required
-                  value={depositForm.amount}
-                  onChange={(e) => setDepositForm({ ...depositForm, amount: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg font-mono font-bold text-slate-900 focus:ring-1 focus:ring-emerald-500 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Giai Đoạn Cọc</label>
-                <input
-                  type="text"
-                  value={depositForm.stage}
-                  onChange={(e) => setDepositForm({ ...depositForm, stage: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Hình Thức Thanh Toán</label>
-                <select
-                  value={depositForm.method}
-                  onChange={(e) => setDepositForm({ ...depositForm, method: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  <option>Chuyển khoản VCB</option>
-                  <option>Ủy Nhiệm Chi BIDV</option>
-                  <option>Thẻ Tín Dụng Corporate</option>
-                  <option>Tiền Mặt</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Ghi Chú Chứng Từ</label>
-                <textarea
-                  rows="2"
-                  value={depositForm.note}
-                  onChange={(e) => setDepositForm({ ...depositForm, note: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg"
-                ></textarea>
-              </div>
-
-              <div className="pt-3 border-t flex justify-end gap-2">
                 <button
-                  type="button"
-                  onClick={() => setShowDepositModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-semibold"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-sm"
-                >
-                  Xác Nhận Thu Cọc
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* MODAL 5: THÔNG BÁO ĐỘI AV & KỸ THUẬT */}
-      {/* ========================================================================= */}
-      {showDispatchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MIcon name="sensors" className="text-emerald-700 text-lg" />
-                <h3 className="font-bold text-sm text-slate-900">Thông Báo Điều Phối Đội Kỹ Thuật AV</h3>
-              </div>
-              <button
-                onClick={() => setShowDispatchModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center"
-              >
-                <MIcon name="close" className="text-base" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSendDispatch} className="p-5 space-y-3.5 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Bộ Phận Tiếp Nhận</label>
-                <select
-                  value={dispatchForm.department}
-                  onChange={(e) => setDispatchForm({ ...dispatchForm, department: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg font-semibold"
-                >
-                  <option>Đội AV & Kỹ Thuật (Sound & Light)</option>
-                  <option>Bếp Trưởng & Tổ Yến Tiệc (F&B Kitchen)</option>
-                  <option>Tổ Buồng Phòng & Khăn Vải (Housekeeping)</option>
-                  <option>An Ninh & Điều Phối Bãi Đỗ Xe VIP</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Mức Độ Ưu Tiên</label>
-                <select
-                  value={dispatchForm.urgentLevel}
-                  onChange={(e) => setDispatchForm({ ...dispatchForm, urgentLevel: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg text-rose-700 font-bold"
-                >
-                  <option>KHẨN CẤP (Xử lý ngay lập tức)</option>
-                  <option>ƯU TIÊN CAO</option>
-                  <option>THÔNG BÁO TIÊU CHUẨN</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Nội Dung Điều Phối</label>
-                <textarea
-                  rows="3"
-                  value={dispatchForm.message}
-                  onChange={(e) => setDispatchForm({ ...dispatchForm, message: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg"
-                ></textarea>
-              </div>
-
-              <div className="pt-3 border-t flex justify-end gap-2">
-                <button
-                  type="button"
                   onClick={() => setShowDispatchModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-semibold"
+                  className="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center"
                 >
-                  Đóng
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-sm"
-                >
-                  Phát Lệnh Điều Phối
+                  <MIcon name="close" className="text-base" />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleSendDispatch} className="p-5 space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Bộ Phận Tiếp Nhận</label>
+                  <select
+                    value={dispatchForm.department}
+                    onChange={(e) => setDispatchForm({ ...dispatchForm, department: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg font-semibold"
+                  >
+                    <option>Đội AV & Kỹ Thuật (Sound & Light)</option>
+                    <option>Bếp Trưởng & Tổ Yến Tiệc (F&B Kitchen)</option>
+                    <option>Tổ Buồng Phòng & Khăn Vải (Housekeeping)</option>
+                    <option>An Ninh & Điều Phối Bãi Đỗ Xe VIP</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Mức Độ Ưu Tiên</label>
+                  <select
+                    value={dispatchForm.urgentLevel}
+                    onChange={(e) => setDispatchForm({ ...dispatchForm, urgentLevel: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-rose-700 font-bold"
+                  >
+                    <option>KHẨN CẤP (Xử lý ngay lập tức)</option>
+                    <option>ƯU TIÊN CAO</option>
+                    <option>THÔNG BÁO TIÊU CHUẨN</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Nội Dung Điều Phối</label>
+                  <textarea
+                    rows="3"
+                    value={dispatchForm.message}
+                    onChange={(e) => setDispatchForm({ ...dispatchForm, message: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  ></textarea>
+                </div>
+
+                <div className="pt-3 border-t flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDispatchModal(false)}
+                    className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-semibold"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-sm"
+                  >
+                    Phát Lệnh Điều Phối
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </AdminLayout>
   );
 }
