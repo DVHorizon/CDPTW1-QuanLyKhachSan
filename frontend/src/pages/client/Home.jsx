@@ -282,16 +282,18 @@ function Home() {
       <div className="flex flex-col w-full">
 
         {/* ================= 1. HERO BANNER SECTION ================= */}
-        <section id="trang-chu" className="relative isolate w-full pt-32 pb-24 lg:pb-32 overflow-hidden min-h-[720px] lg:min-h-[820px] flex flex-col items-center justify-center">
-          {/* Background image & gradient overlay */}
-          <div
-            className="absolute inset-0 bg-cover bg-center -z-20"
-            data-alt="Ultra luxury beachfront tropical resort at twilight sunset"
-            style={{
-              backgroundImage: 'url("https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=2070&auto=format&fit=crop")'
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#131b2e]/85 via-[#203044]/60 to-[#131b2e]/85 -z-10" />
+        <section id="trang-chu" className="relative w-full pt-32 pb-24 lg:pb-32 min-h-[720px] lg:min-h-[820px] flex flex-col items-center justify-center z-20">
+          {/* Background image & gradient overlay (Được bọc riêng với overflow-hidden để không cắt xén dropdown menu nổi) */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              data-alt="Ultra luxury beachfront tropical resort at twilight sunset"
+              style={{
+                backgroundImage: 'url("https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=2070&auto=format&fit=crop")'
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#131b2e]/85 via-[#203044]/60 to-[#131b2e]/85" />
+          </div>
 
           {/* Heading Typography & Highlights */}
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center flex flex-col items-center">
@@ -332,7 +334,7 @@ function Home() {
           </div>
 
           {/* FLOATING BOOKING SEARCH BAR: Trải dài đúng bằng viền đầu Logo và viền cuối Avatar */}
-          <div className="w-full px-4 sm:px-8 lg:px-12 mt-10">
+          <div className="w-full px-4 sm:px-8 lg:px-12 mt-10 relative z-30">
             <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] p-4 sm:p-5 lg:p-6 border border-[#dedad0]">
               <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4 items-end text-left">
                 
@@ -455,7 +457,7 @@ function Home() {
         </section>
 
         {/* ================= 2. FEATURE HIGHLIGHTS & STATS ================= */}
-        <section id="gioi-thieu" className="w-full py-12 bg-white border-b border-[#dedad0] scroll-mt-20">
+        <section id="gioi-thieu" className="w-full py-12 bg-white border-b border-[#dedad0] scroll-mt-20 relative z-10">
           <div className="w-full px-4 sm:px-8 lg:px-12">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center divide-y lg:divide-y-0 lg:divide-x divide-[#dedad0]">
               <div className="flex flex-col items-center justify-center p-3">
