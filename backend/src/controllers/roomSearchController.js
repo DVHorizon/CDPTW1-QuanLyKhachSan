@@ -673,8 +673,136 @@ const BRANCH_METADATA = {
     TotalReviews: 220,
     Highlight: 'Tổ hợp nghỉ dưỡng và căn hộ sang trọng ngay trái tim cung đường biển Trần Phú sầm uất',
     Tag: 'Trung tâm Trần Phú • Du thuyền riêng'
+  },
+  6: {
+    City: 'Thắng Tam, Vũng Tàu',
+    ImageUrl: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.8,
+    TotalReviews: 342,
+    Highlight: 'Cung điện cổ điển nguy nga view trọn bờ biển Bãi Sau lộng gió, hồ bơi vô cực tràn viền',
+    Tag: 'Bãi Sau Vũng Tàu • Kiến trúc Châu Âu'
+  },
+  7: {
+    City: 'Hồ Tuyền Lâm, Đà Lạt',
+    ImageUrl: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 285,
+    Highlight: 'Dinh thự ẩn mình giữa rừng thông cổ thụ bạt ngàn soi bóng xuống mặt hồ Tuyền Lâm bảng lảng sương mai',
+    Tag: 'Rừng thông Tuyền Lâm • Sưởi ấm lò sưởi Pháp'
+  },
+  8: {
+    City: 'Mường Hoa, Sa Pa',
+    ImageUrl: 'https://images.unsplash.com/photo-1506929562872-bb421503ef21?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1506929562872-bb421503ef21?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 198,
+    Highlight: 'Khu nghỉ dưỡng bồng bềnh giữa biển mây Fansipan với tầm nhìn ruộng bậc thang thung lũng Mường Hoa kỳ vĩ',
+    Tag: 'Săn mây Fansipan • Tắm khoáng Onsen nước nóng'
+  },
+  9: {
+    City: 'Cửa Đại, Hội An',
+    ImageUrl: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.8,
+    TotalReviews: 320,
+    Highlight: 'Không gian kiến trúc Đông Dương hoài niệm nằm bên dòng sông Hoài thơ mộng và biển Cửa Đại',
+    Tag: 'Phố cổ Hội An • Spa thảo dược truyền thống'
+  },
+  10: {
+    City: 'Bãi Cháy, Hạ Long',
+    ImageUrl: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 412,
+    Highlight: 'Toạ lạc trên đỉnh đồi Bãi Cháy thu trọn toàn cảnh kỳ quan thiên nhiên thế giới Vịnh Hạ Long huyền ảo',
+    Tag: 'Ngắm trọn Vịnh Hạ Long • Bến du thuyền 5 sao'
+  },
+  11: {
+    City: 'Ghềnh Ráng, Quy Nhơn',
+    ImageUrl: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.8,
+    TotalReviews: 167,
+    Highlight: 'Ốc đảo yên bình bên vịnh ngọc Quy Nhơn với bãi biển đá trứng Hoàng Hậu và ẩm thực hải sản trứ danh',
+    Tag: 'Biển xanh màu ngọc • Bãi tắm riêng tư'
+  },
+  12: {
+    City: 'Nguyễn Đình Chiểu, Mũi Né',
+    ImageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.8,
+    TotalReviews: 215,
+    Highlight: 'Hàng dừa nghiêng bóng bên bờ cát vàng óng ả Mũi Né, ngắm hoàng hôn rực rỡ nhất dải đất duyên hải Nam Trung Bộ',
+    Tag: 'Thủ phủ Resort • Lướt ván diều quốc tế'
+  },
+  13: {
+    City: 'Tây Hồ, Hà Nội',
+    ImageUrl: 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1564501049412-61c2a3083791?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 489,
+    Highlight: 'Khách sạn phong cách hoàng gia bên mặt nước phẳng lặng của Hồ Tây, trung tâm tinh hoa ẩm thực Thăng Long',
+    Tag: 'Bên bờ Hồ Tây • Trà chiều hoàng gia & Cigar Lounge'
+  },
+  14: {
+    City: 'Bến Nghé, Quận 1, TP.HCM',
+    ImageUrl: 'https://images.unsplash.com/photo-1541971875076-8f970d573be6?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1541971875076-8f970d573be6?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 530,
+    Highlight: 'Khách sạn chọc trời đẳng cấp nhìn ra khúc quanh sông Sài Gòn và nhịp sống hoa lệ giữa trung tâm Quận 1',
+    Tag: 'Trái tim Quận 1 • Sky Bar 360 độ ngắm Landmark 81'
+  },
+  15: {
+    City: 'Tràng An, Ninh Bình',
+    ImageUrl: 'https://images.unsplash.com/photo-1568084680786-a84f91d1153c?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1568084680786-a84f91d1153c?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 178,
+    Highlight: 'Khu biệt thự sinh thái tựa lưng vào dãy núi đá vôi hùng vĩ bên trong vùng đệm di sản Tràng An hữu tình',
+    Tag: 'Di sản thế giới UNESCO • Thuyền gỗ thưởng ngoạn sông'
+  },
+  16: {
+    City: 'Lê Lợi, TP. Huế',
+    ImageUrl: 'https://images.unsplash.com/photo-1529290130-4ca3753253ae?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1529290130-4ca3753253ae?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.8,
+    TotalReviews: 165,
+    Highlight: 'Khách sạn cung đình bên bờ sông Hương êm đềm, thưởng thức nhã nhạc cung đình và ẩm thực ngự thiện triều Nguyễn',
+    Tag: 'Bờ sông Hương xứ Huế • Ẩm thực Cung đình 5 sao'
   }
 };
+
+exports.BRANCH_METADATA = BRANCH_METADATA;
 
 /**
  * Lấy danh sách các chi nhánh hoạt động phục vụ selector
@@ -686,7 +814,7 @@ exports.getBranches = async (req, res) => {
       where: { Status: 'Active' },
       attributes: ['BranchId', 'BranchName', 'Address', 'Phone', 'Status'],
       order: [['BranchId', 'ASC']],
-      limit: 20
+      limit: 50
     });
 
     const enrichedBranches = await Promise.all(branches.map(async (b) => {

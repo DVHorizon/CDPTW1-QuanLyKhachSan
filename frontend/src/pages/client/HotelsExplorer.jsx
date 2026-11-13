@@ -59,17 +59,8 @@ export default function HotelsExplorer() {
             </h1>
 
             <p className="text-white/80 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-              Quy trình đặt phòng chuẩn quốc tế: Quý khách vui lòng chọn điểm đến và khách sạn nghỉ dưỡng mong muốn. Hệ thống sẽ mở ra bộ sưu tập các loại phòng ngủ và biệt thự riêng biệt của khách sạn đó.
+              Quý khách vui lòng chọn điểm đến và khách sạn nghỉ dưỡng mong muốn. Hệ thống sẽ mở ra bộ sưu tập các loại phòng ngủ và biệt thự riêng biệt của khách sạn đó.
             </p>
-
-            {/* Quy trình trực quan */}
-            <div className="mt-8 inline-flex items-center gap-2 sm:gap-4 bg-white/10 backdrop-blur-md border border-white/20 px-5 py-2.5 rounded-full text-xs sm:text-sm text-white font-medium">
-              <span className="text-[#ffd985] font-bold">1. Chọn Khách Sạn</span>
-              <span>➔</span>
-              <span className="opacity-75">2. Chọn Loại Phòng</span>
-              <span>➔</span>
-              <span className="opacity-75">3. Mua &amp; Đặt Phòng</span>
-            </div>
           </div>
         </section>
 
@@ -78,7 +69,7 @@ export default function HotelsExplorer() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#131b2e]">
-                5 Thiên Đường Nghỉ Dưỡng Tại Việt Nam
+                {branches.length > 0 ? `${branches.length} Thiên Đường Nghỉ Dưỡng Tại Việt Nam` : 'Hệ Thống Nghỉ Dưỡng Thượng Lưu Toàn Quốc'}
               </h2>
               <p className="text-sm text-slate-600 mt-1">
                 Tất cả các khu nghỉ dưỡng đều đạt tiêu chuẩn 5 sao quốc tế với bãi biển riêng và ẩm thực thượng hạng.

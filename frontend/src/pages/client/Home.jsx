@@ -77,6 +77,14 @@ function Home() {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterName, setNewsletterName] = useState('');
   const [newsletterSuccess, setNewsletterSuccess] = useState(false);
+  const [selectedHotelRegion, setSelectedHotelRegion] = useState('all');
+
+  const getBranchRegion = (b) => {
+    const id = Number(b.BranchId);
+    if ([8, 10, 13, 15].includes(id)) return 'north';
+    if ([2, 4, 5, 7, 9, 11, 16].includes(id)) return 'central';
+    return 'south';
+  };
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -442,22 +450,47 @@ function Home() {
         {/* ================= 2.5. HOTEL SELECTION SECTION (BƯỚC 1: CHỌN KHÁCH SẠN) ================= */}
         <section id="he-thong-khach-san" className="w-full py-16 lg:py-20 bg-white border-b border-[#dedad0]">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-            <div className="text-center max-w-3xl mx-auto mb-12">
+            <div className="text-center max-w-3xl mx-auto mb-10">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#fbf8f2] text-[#8c6d3b] border border-[#d8c49e] text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
                 <span className="material-symbols-outlined text-base">stars</span>
-                <span>Hệ Thống Khách Sạn &amp; Khu Nghỉ Dưỡng 5★</span>
+                <span>Hệ Thống Khách Sạn &amp; Khu Nghỉ Dưỡng 5★ Toàn Quốc</span>
               </div>
               <h2 className="font-serif text-[30px] lg:text-[40px] text-[#203044] font-bold tracking-tight leading-tight">
-                Khám Phá 5 Thiên Đường Nghỉ Dưỡng 5★
+                Khám Phá {homeData.branches.length} Thiên Đường Nghỉ Dưỡng 5★
               </h2>
               <p className="text-[#64748b] text-sm sm:text-base mt-2">
-                Trải nghiệm kỳ nghỉ dưỡng thượng lưu tại các điểm đến ven biển đẹp nhất Việt Nam của Grand Horizon.
+                Bộ sưu tập các khu nghỉ dưỡng 5 sao thượng lưu tại những vịnh biển, kỳ quan và đô thị đẹp nhất Việt Nam.
               </p>
+
+              {/* Vùng miền tabs */}
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-6">
+                {[
+                  { key: 'all', label: `Tất Cả (${homeData.branches.length})` },
+                  { key: 'north', label: 'Miền Bắc & Kỳ Quan (4)' },
+                  { key: 'central', label: 'Miền Trung & Di Sản (7)' },
+                  { key: 'south', label: 'Miền Nam & Biển Đảo (5)' },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setSelectedHotelRegion(tab.key)}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                      selectedHotelRegion === tab.key
+                        ? 'bg-[#8c6d3b] text-white shadow-sm'
+                        : 'bg-[#f4efe6] text-[#203044] hover:bg-[#eae2d3]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Grid 5 Khách Sạn */}
+            {/* Grid Khách Sạn */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {homeData.branches.map((branch, index) => (
+              {homeData.branches
+                .filter(b => selectedHotelRegion === 'all' || getBranchRegion(b) === selectedHotelRegion)
+                .map((branch, index) => (
                 <div
                   key={branch.BranchId}
                   className="group bg-[#fafaf8] rounded-2xl overflow-hidden border border-[#dedad0] hover:border-[#b9a277] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col"
