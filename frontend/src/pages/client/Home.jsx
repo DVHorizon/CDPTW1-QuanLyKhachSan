@@ -398,11 +398,39 @@ function Home() {
                 )}
               </div>
             </div>
+
+            {/* Framer-inspired Luxury Scroll Cue (Dot + CUỘN XUỐNG + Chevron) */}
+            <div className="mt-8 sm:mt-10 flex flex-col items-center justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = document.getElementById('gioi-thieu') || document.querySelector('section:nth-of-type(2)');
+                  if (target) target.scrollIntoView({ behavior: 'smooth' });
+                }}
+                aria-label="Cuộn xuống khám phá tiếp"
+                className="group flex flex-col items-center gap-1.5 cursor-pointer select-none transition-all duration-300 focus:outline-none"
+              >
+                {/* Dấu chấm tròn màu vàng kim */}
+                <span className="w-2 h-2 rounded-full bg-[#b9a277] shadow-[0_0_8px_rgba(185,162,119,0.85)] group-hover:bg-[#ffd985] group-hover:scale-125 transition-all" />
+
+                {/* Chữ CUỘN XUỐNG tracking rộng sang trọng */}
+                <span className="font-sans text-[11px] sm:text-[11.5px] font-bold text-white/90 group-hover:text-[#ffd985] tracking-[0.28em] uppercase transition-colors drop-shadow-md">
+                  CUỘN XUỐNG
+                </span>
+
+                {/* Mũi tên chevron xuống chuyển động bồng bềnh */}
+                <div className="animate-scroll-cue flex items-center justify-center text-white/80 group-hover:text-[#ffd985] transition-colors">
+                  <span className="material-symbols-outlined text-[19px] leading-none">
+                    keyboard_arrow_down
+                  </span>
+                </div>
+              </button>
+            </div>
           </div>
         </section>
 
         {/* ================= 2. FEATURE HIGHLIGHTS & STATS ================= */}
-        <section className="w-full py-12 bg-white border-b border-[#dedad0]">
+        <section id="gioi-thieu" className="w-full py-12 bg-white border-b border-[#dedad0] scroll-mt-20">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center divide-y lg:divide-y-0 lg:divide-x divide-[#dedad0]">
               <div className="flex flex-col items-center justify-center p-3">
