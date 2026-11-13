@@ -5,6 +5,7 @@ import RoomDetailModal from '../../components/modals/RoomDetailModal';
 import QuickBookingModal from '../../components/modals/QuickBookingModal';
 import AmenityPerspectiveCarousel from '../../components/client/AmenityPerspectiveCarousel';
 import ScrollIcon from '../../components/common/ScrollIcon';
+import StickyScrollStory from '../../components/common/StickyScrollStory';
 import { fetchHomeData } from '../../api/hotelApi';
 import {
   mockBranches,
@@ -472,6 +473,12 @@ function Home() {
             </div>
           </div>
         </section>
+
+        {/* ================= 2.1. STICKY SCROLL STORY (FRAMER ANIMATION) ================= */}
+        <StickyScrollStory
+          badge="HÀNH TRÌNH GRAND HORIZON"
+          tagline="CÂU CHUYỆN THƯƠNG HIỆU"
+        />
 
         {/* ================= 2.5. HOTEL SELECTION SECTION (BƯỚC 1: CHỌN KHÁCH SẠN) ================= */}
         <section id="he-thong-khach-san" className="w-full py-16 lg:py-20 bg-white border-b border-[#dedad0]">
