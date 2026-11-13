@@ -184,13 +184,80 @@ const VENUES = [
   { id: 'HALL-BOARDROOM-VIP', name: 'Imperial Presidential Boardroom', capacity: '20 - 40 pax', area: '150 m²', ceiling: '4.2m' },
 ];
 
+const STORAGE_KEY = 'grand_horizon_banquet_mice_events_v2';
+const STORAGE_SELECTED_ID = 'grand_horizon_banquet_selected_id_v2';
+
 export default function BanquetMiceBooking() {
   const navigate = useNavigate();
 
-  // Selected event (defaults to #MICE-2025-089 matching the uploaded screenshot)
-  const [events, setEvents] = useState(INITIAL_EVENTS);
-  const [selectedEventId, setSelectedEventId] = useState('MICE-2025-089');
+  // Selected event & persistence (loads from localStorage so F5 retains all changes)
+  const [events, setEvents] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return INITIAL_EVENTS;
+  });
+
+  const [selectedEventId, setSelectedEventId] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_SELECTED_ID);
+      if (saved) return saved;
+    } catch (_) {}
+    return 'MICE-2025-089';
+  });
+
   const [filterPeriod, setFilterPeriod] = useState('day'); // 'day' | 'week' | 'month'
+
+  // Persist helper
+  const persistEvents = (nextEvents) => {
+    setEvents(nextEvents);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextEvents));
+    } catch (_) {}
+  };
+
+  const handleSelectEvent = (id) => {
+    setSelectedEventId(id);
+    try {
+      localStorage.setItem(STORAGE_SELECTED_ID, id);
+    } catch (_) {}
+  };
+
+  // Reset to default initial events
+  const handleResetToDefault = () => {
+    if (window.confirm('Bạn có chắc chắn muốn khôi phục về dữ liệu sự kiện mẫu ban đầu không?')) {
+      persistEvents(INITIAL_EVENTS);
+      handleSelectEvent('MICE-2025-089');
+      showNotification('Đã khôi phục dữ liệu mẫu ban đầu!');
+    }
+  };
+
+  // Sync with backend API on mount if available
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/banquet-events')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data && data.success && Array.isArray(data.events) && data.events.length > 0) {
+          try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) {
+              persistEvents(data.events);
+            }
+          } catch (_) {}
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Modals state
   const [showNewContractModal, setShowNewContractModal] = useState(false);
@@ -254,7 +321,7 @@ export default function BanquetMiceBooking() {
   };
 
   // Handle create new event contract
-  const handleCreateContract = (e) => {
+  const handleCreateContract = async (e) => {
     e.preventDefault();
     const total = Number(contractForm.totalAmount) || 450000000;
     const depVal = Math.round((total * Number(contractForm.depositPercent || 50)) / 100);
@@ -317,15 +384,51 @@ export default function BanquetMiceBooking() {
       },
     };
 
-    setEvents([newEventObj, ...events]);
-    setSelectedEventId(newId);
+    const nextList = [newEventObj, ...events];
+    persistEvents(nextList);
+    handleSelectEvent(newId);
     setShowNewContractModal(false);
     setWizardStep(1);
     showNotification(`Đã tạo thành công Hợp đồng MICE & Lệnh BEO #${newId}!`);
+
+    // Gửi đồng bộ lên backend
+    try {
+      await fetch('/api/banquet-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: newId,
+          title: newEventObj.title,
+          eventType: newEventObj.eventType,
+          company: newEventObj.company,
+          contactName: newEventObj.contactPerson.name,
+          contactTitle: newEventObj.contactPerson.title,
+          contactPhone: newEventObj.contactPerson.phone,
+          contactEmail: newEventObj.contactPerson.email,
+          date: contractForm.date,
+          timeRange: contractForm.timeRange,
+          venueName: selectedVenue.name,
+          pax: contractForm.pax,
+          seatingStyle: contractForm.seatingStyle,
+          tablesChairs: contractForm.tablesChairs,
+          stageLed: contractForm.stageLed,
+          soundLight: contractForm.soundLight,
+          menuType: contractForm.menuType,
+          galaDinner: contractForm.galaDinner,
+          welcomeWine: contractForm.welcomeWine,
+          lunchBuffet: contractForm.lunchBuffet,
+          totalAmount: total,
+          depositPercent: contractForm.depositPercent,
+          depositPaid: depVal,
+          paymentMethod: contractForm.paymentMethod,
+          guaranteeType: contractForm.guaranteeType,
+        }),
+      });
+    } catch (_) {}
   };
 
   // Handle record deposit payment
-  const handleSaveDeposit = (e) => {
+  const handleSaveDeposit = async (e) => {
     e.preventDefault();
     const addAmt = Number(depositForm.amount) || 0;
     if (addAmt <= 0) {
@@ -362,16 +465,42 @@ export default function BanquetMiceBooking() {
       return ev;
     });
 
-    setEvents(nextEvents);
+    persistEvents(nextEvents);
     setShowDepositModal(false);
     showNotification(`Đã ghi nhận đặt cọc ${fmtVnd(addAmt)} vào Master Folio!`);
+
+    // Gửi đồng bộ lên backend
+    try {
+      await fetch(`/api/banquet-events/${currentEvent.id}/deposits`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: addAmt,
+          stage: depositForm.stage,
+          method: depositForm.method,
+          note: depositForm.note,
+        }),
+      });
+    } catch (_) {}
   };
 
   // Handle Dispatch AV
-  const handleSendDispatch = (e) => {
+  const handleSendDispatch = async (e) => {
     e.preventDefault();
     setShowDispatchModal(false);
     showNotification(`Đã gửi lệnh điều phối khẩn đến ${dispatchForm.department}!`);
+
+    try {
+      await fetch(`/api/banquet-events/${currentEvent.id}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          department: dispatchForm.department,
+          urgentLevel: dispatchForm.urgentLevel,
+          message: dispatchForm.message,
+        }),
+      });
+    } catch (_) {}
   };
 
   return (
@@ -449,6 +578,15 @@ export default function BanquetMiceBooking() {
 
             {/* TOP RIGHT ACTION BUTTONS */}
             <div className="flex items-center gap-2.5 flex-wrap">
+              <button
+                onClick={handleResetToDefault}
+                title="Khôi phục dữ liệu mẫu mặc định nếu cần làm mới"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 text-xs font-semibold shadow-sm transition active:scale-95"
+              >
+                <MIcon name="restart_alt" className="text-slate-500 text-base" />
+                <span className="hidden sm:inline">Khôi phục mẫu</span>
+              </button>
+
               <button
                 onClick={() => setShow3DFloorPlanModal(true)}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-sm transition active:scale-95"
@@ -623,7 +761,7 @@ export default function BanquetMiceBooking() {
                     return (
                       <div
                         key={ev.id}
-                        onClick={() => setSelectedEventId(ev.id)}
+                        onClick={() => handleSelectEvent(ev.id)}
                         className={`p-4 rounded-xl border transition-all cursor-pointer relative ${
                           isSelected
                             ? 'bg-emerald-50/40 border-emerald-500 shadow-sm ring-1 ring-emerald-500/30'

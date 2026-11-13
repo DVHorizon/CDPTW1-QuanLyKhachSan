@@ -880,3 +880,4 @@ exports.getHalls = async (req, res) => {
     });
   }
 };
+

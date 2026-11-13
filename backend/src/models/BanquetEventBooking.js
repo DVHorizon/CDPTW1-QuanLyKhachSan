@@ -164,3 +164,4 @@ module.exports = (sequelize) => {
 
   return BanquetEventBooking;
 };
+
