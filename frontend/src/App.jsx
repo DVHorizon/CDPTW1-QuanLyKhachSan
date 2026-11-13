@@ -60,6 +60,7 @@ import AirportTransferManagement from './pages/admin/transportation/AirportTrans
 import NightAuditManagement from './pages/admin/finance/NightAuditManagement';
 import PoliceDeclarationExport from './pages/admin/security/PoliceDeclarationExport';
 import ChannelManagerSync from './pages/admin/operations/ChannelManagerSync';
+import BanquetMiceBooking from './pages/admin/operations/BanquetMiceBooking';
 
 function App() {
   return (
@@ -239,6 +240,12 @@ function App() {
             <Route path="/admin/channel-manager" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
             <Route path="/admin/ota-sync" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
             <Route path="/admin/kenh-ban-phong" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
+
+            {/* tuyen/11 Banquet & MICE Event Booking Routes (Phân hệ 53) */}
+            <Route path="/admin/banquet-mice" element={<ProtectedRoute><BanquetMiceBooking /></ProtectedRoute>} />
+            <Route path="/admin/datsanhtiec" element={<ProtectedRoute><BanquetMiceBooking /></ProtectedRoute>} />
+            <Route path="/admin/mice" element={<ProtectedRoute><BanquetMiceBooking /></ProtectedRoute>} />
+            <Route path="/admin/banquet" element={<ProtectedRoute><BanquetMiceBooking /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

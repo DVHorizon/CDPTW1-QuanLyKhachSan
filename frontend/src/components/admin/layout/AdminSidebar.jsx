@@ -121,6 +121,12 @@ const NAV_GROUPS = [
         allowedRoles: ["Admin", "Receptionist", "Housekeeping"],
       },
       {
+        icon: "celebration",
+        label: "Đặt Sảnh Tiệc & MICE (Sự Kiện Đoàn)",
+        to: "/admin/banquet-mice",
+        allowedRoles: ["Admin", "Receptionist", "Kitchen"],
+      },
+      {
         icon: "restaurant",
         label: "Quản Lý Thực Đơn (F&B)",
         to: "/admin/menu",
@@ -246,6 +252,12 @@ const NAV_GROUPS = [
         icon: "sync_alt",
         label: "Đồng Bộ Kênh Bán Phòng OTA",
         to: "/admin/channel-manager",
+        allowedRoles: ["Admin", "Receptionist"],
+      },
+      {
+        icon: "celebration",
+        label: "Đặt Sảnh Tiệc & Hội Nghị MICE",
+        to: "/admin/banquet-mice",
         allowedRoles: ["Admin", "Receptionist"],
       },
     ],

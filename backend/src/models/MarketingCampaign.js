@@ -69,7 +69,7 @@ module.exports = (sequelize) => {
       defaultValue: 0
     },
     Status: {
-      type: DataTypes.ENUM('DRAFT', 'SCHEDULED', 'RUNNING', 'COMPLETED', 'CANCELLED'),
+      type: DataTypes.STRING(50),
       defaultValue: 'DRAFT'
     },
     StatusLabel: {
