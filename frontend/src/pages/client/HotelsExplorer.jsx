@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
-import BookingStepper from '../../components/client/BookingStepper';
 import { getBranchesApi } from '../../api/roomApi';
 
 // Format tiền tệ VND
@@ -38,14 +37,6 @@ export default function HotelsExplorer() {
   return (
     <MainLayout>
       <div className="flex flex-col w-full bg-[#fafaf8] min-h-screen">
-        {/* THANH TIẾN TRÌNH 3 BƯỚC */}
-        <div className="pt-20">
-          <BookingStepper
-            currentStep={1}
-            selectedHotelName="Chưa chọn (Đang duyệt danh sách khách sạn)"
-          />
-        </div>
-
         {/* HERO BANNER SECTION */}
         <section className="relative isolate py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-[#131b2e] overflow-hidden text-center text-white">
           <div
@@ -209,3 +200,4 @@ export default function HotelsExplorer() {
     </MainLayout>
   );
 }
+

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import Header from '../../components/layout/Header';
 import DepositInvoiceModal from '../../components/modals/DepositInvoiceModal';
-import BookingStepper from '../../components/client/BookingStepper';
 import { getRoomDetailApi, createBookingApi, releaseRoomLockApi, calculatePricingApi, validateVoucherApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
 
@@ -414,17 +413,7 @@ export default function BookingEngine() {
       {/* Thanh Header chính */}
       <Header />
 
-      {/* THANH TIẾN TRÌNH 3 BƯỚC (BƯỚC 3: MUA / ĐẶT PHÒNG) */}
-      <div className="pt-20">
-        <BookingStepper
-          currentStep={3}
-          selectedHotelName={roomDetail?.Branch?.BranchName || roomDetail?.BranchName || 'Grand Horizon Phú Quốc Luxury Resort'}
-          selectedRoomName={roomDisplayName}
-          branchId={searchParams.get('branchId') || roomDetail?.Branch?.BranchId || '1'}
-        />
-      </div>
-
-      <main className="w-full pt-4 bg-[#f8f9ff] flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+      <main className="w-full pt-24 bg-[#f8f9ff] flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
         {/* Thanh tiêu đề phòng & Quy trình đặt phòng thu nhỏ ở góc phải (Style Traveloka) */}
         <div className="flex flex-wrap items-center justify-between gap-4 py-3 mb-6 bg-white px-5 rounded-2xl border border-slate-200/80 shadow-xs">
           {/* Thông tin phòng đặt & Khách sạn */}
