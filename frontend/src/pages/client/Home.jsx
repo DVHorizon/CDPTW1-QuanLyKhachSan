@@ -134,13 +134,13 @@ function Home() {
     {
       group: 'GIA ĐÌNH & NHÓM BẠN',
       value: '2-1-1',
-      label: '2 Lớn, 1 Trẻ em',
+      label: '2 Người lớn, 1 Trẻ em',
       subLabel: 'Không gian ấm cúng cho gia đình nhỏ'
     },
     {
       group: 'GIA ĐÌNH & NHÓM BẠN',
       value: '4-2-2',
-      label: '4 Lớn, 2 Trẻ em (Villa)',
+      label: '4 Người lớn, 2 Trẻ em (Villa)',
       subLabel: 'Biệt thự hồ bơi riêng & phòng khách rộng'
     }
   ], []);
@@ -408,7 +408,7 @@ function Home() {
                     value={guestOption}
                     onChange={(val) => setGuestOption(val)}
                     placeholder="Chọn số lượng khách"
-                    menuMaxHeight={260}
+                    menuMaxHeight={360}
                   />
                 </div>
 
