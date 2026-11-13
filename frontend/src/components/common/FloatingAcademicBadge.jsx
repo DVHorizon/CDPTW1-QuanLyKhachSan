@@ -14,19 +14,19 @@ export default function FloatingAcademicBadge() {
       }}
     >
       <p
-        className="text-[17px] sm:text-[19px] font-normal tracking-wide leading-tight"
+        className="text-[18px] sm:text-[21px] font-semibold tracking-wide leading-tight"
         style={{
-          color: 'rgba(255, 255, 255, 0.75)',
-          textShadow: '0 1px 3px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.8)'
+          color: 'rgba(255, 255, 255, 0.95)',
+          textShadow: '0 1px 2px #000, 0 0 4px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(0, 0, 0, 0.85)'
         }}
       >
         Đồ án môn học
       </p>
       <p
-        className="text-[12px] sm:text-[13px] font-normal leading-tight mt-1"
+        className="text-[13px] sm:text-[14px] font-medium leading-tight mt-1"
         style={{
-          color: 'rgba(255, 255, 255, 0.65)',
-          textShadow: '0 1px 3px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.8)'
+          color: 'rgba(255, 255, 255, 0.90)',
+          textShadow: '0 1px 2px #000, 0 0 4px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(0, 0, 0, 0.85)'
         }}
       >
         Không dùng cho mục đích thương mại.
