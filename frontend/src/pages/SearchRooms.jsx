@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import RoomDetailModal from '../components/modals/RoomDetailModal';
 import QuickBookingModal from '../components/modals/QuickBookingModal';
+import AiRoomAdvisorWidget from '../components/client/AiRoomAdvisorWidget';
 import { searchRoomsApi, getBranchesApi, suggestRoomsApi } from '../api/roomApi';
 
 // Helper format VND
@@ -1018,6 +1019,12 @@ export default function SearchRooms() {
             {/* ─── RIGHT RESULTS CONTENT (75% -> 9 of 12 cols) ─── */}
             <main className="lg:col-span-9 flex flex-col gap-space-lg">
               
+              {/* WIDGET CỐ VẤN AI GỢI Ý PHÒNG THÔNG MINH (RAG + GEMINI) */}
+              <AiRoomAdvisorWidget
+                variant="search"
+                onSelectRoom={(r) => setSelectedRoomForDetail(r)}
+              />
+
               {/* Results Header & Sort Controls */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-space-md bg-surface-container-lowest rounded-xl shadow-sm gap-space-sm border border-[#dedad0]/40">
                 <div className="flex items-center gap-space-xs flex-wrap">

@@ -556,3 +556,41 @@ export const getRoomReviewsApi = async (roomId, params = {}) => {
   }
 };
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AI GỢI Ý PHÒNG THÔNG MINH THEO LỊCH SỬ / NGÂN SÁCH (RAG + GEMINI API)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const getAiRoomRecommendationsApi = async ({ maxBudget, travelStyle, guests = 2, customPrompt = '' }) => {
+  try {
+    const token = localStorage.getItem('hotel_token') || localStorage.getItem('token') || '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    let res = await fetch(`${API_BASE_URL}/v1/guest/rooms/ai-recommend`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ maxBudget, travelStyle, guests, customPrompt })
+    });
+
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/ai-recommend`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ maxBudget, travelStyle, guests, customPrompt })
+      });
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi getAiRoomRecommendationsApi:', err);
+    return {
+      success: false,
+      message: 'Không thể kết nối đến hệ thống AI gợi ý phòng.',
+      data: null
+    };
+  }
+};
+
+

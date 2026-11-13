@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import RoomDetailModal from '../../components/modals/RoomDetailModal';
 import QuickBookingModal from '../../components/modals/QuickBookingModal';
+import AiRoomAdvisorWidget from '../../components/client/AiRoomAdvisorWidget';
 import { fetchHomeData } from '../../api/hotelApi';
 import {
   mockBranches,
@@ -442,6 +443,12 @@ function Home() {
         {/* ================= 3. ROOM COLLECTION SECTION ================= */}
         <section id="room-collection" className="w-full py-16 lg:py-24 bg-[#fafaf8] scroll-mt-24">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+            {/* WIDGET CỐ VẤN AI GỢI Ý PHÒNG NGHỈ DƯỠNG (RAG + GEMINI API) */}
+            <AiRoomAdvisorWidget
+              variant="home"
+              onSelectRoom={(room) => setSelectedRoomForDetail(room)}
+            />
+
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
               <div>
                 <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
