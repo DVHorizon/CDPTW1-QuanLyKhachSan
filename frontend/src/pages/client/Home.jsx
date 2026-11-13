@@ -78,6 +78,8 @@ function Home() {
   const [newsletterName, setNewsletterName] = useState('');
   const [newsletterSuccess, setNewsletterSuccess] = useState(false);
   const [selectedHotelRegion, setSelectedHotelRegion] = useState('all');
+  const [showAllHotels, setShowAllHotels] = useState(false);
+  const [hotelDisplayLimit, setHotelDisplayLimit] = useState(3);
 
   const getBranchRegion = (b) => {
     const id = Number(b.BranchId);
@@ -462,102 +464,171 @@ function Home() {
                 Bộ sưu tập các khu nghỉ dưỡng 5 sao thượng lưu tại những vịnh biển, kỳ quan và đô thị đẹp nhất Việt Nam.
               </p>
 
-              {/* Vùng miền tabs */}
-              <div className="flex flex-wrap items-center justify-center gap-2 mt-6">
-                {[
-                  { key: 'all', label: `Tất Cả (${homeData.branches.length})` },
-                  { key: 'north', label: 'Miền Bắc & Kỳ Quan (4)' },
-                  { key: 'central', label: 'Miền Trung & Di Sản (7)' },
-                  { key: 'south', label: 'Miền Nam & Biển Đảo (5)' },
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setSelectedHotelRegion(tab.key)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                      selectedHotelRegion === tab.key
-                        ? 'bg-[#8c6d3b] text-white shadow-sm'
-                        : 'bg-[#f4efe6] text-[#203044] hover:bg-[#eae2d3]'
-                    }`}
+              {/* Dropdown Filters & Controls */}
+              <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+                {/* Dropdown Khu Vực */}
+                <div className="relative inline-flex items-center">
+                  <span className="material-symbols-outlined absolute left-3.5 text-[#8c6d3b] text-base pointer-events-none">
+                    travel_explore
+                  </span>
+                  <select
+                    value={selectedHotelRegion}
+                    onChange={(e) => {
+                      setSelectedHotelRegion(e.target.value);
+                      setShowAllHotels(false);
+                    }}
+                    className="appearance-none pl-9 pr-9 py-2 rounded-full text-xs font-bold bg-[#f4efe6] text-[#203044] border border-[#d8c49e] hover:border-[#8c6d3b] focus:outline-none cursor-pointer shadow-xs transition-all"
                   >
-                    {tab.label}
-                  </button>
-                ))}
+                    <option value="all">Tất Cả Điểm Đến ({homeData.branches.length} Khách Sạn)</option>
+                    <option value="north">Miền Bắc &amp; Kỳ Quan (4 Khách Sạn)</option>
+                    <option value="central">Miền Trung &amp; Di Sản (7 Khách Sạn)</option>
+                    <option value="south">Miền Nam &amp; Biển Đảo (5 Khách Sạn)</option>
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 text-[#8c6d3b] text-base pointer-events-none">
+                    expand_more
+                  </span>
+                </div>
+
+                {/* Dropdown Số Lượng Hiển Thị */}
+                <div className="relative inline-flex items-center">
+                  <span className="material-symbols-outlined absolute left-3 text-[#8c6d3b] text-base pointer-events-none">
+                    tune
+                  </span>
+                  <select
+                    value={showAllHotels ? 'all' : String(hotelDisplayLimit)}
+                    onChange={(e) => {
+                      if (e.target.value === 'all') {
+                        setShowAllHotels(true);
+                      } else {
+                        setShowAllHotels(false);
+                        setHotelDisplayLimit(Number(e.target.value));
+                      }
+                    }}
+                    className="appearance-none pl-8 pr-8 py-2 rounded-full text-xs font-bold bg-[#f4efe6] text-[#203044] border border-[#d8c49e] hover:border-[#8c6d3b] focus:outline-none cursor-pointer shadow-xs transition-all"
+                  >
+                    <option value="3">Hiển thị gọn (3 khách sạn)</option>
+                    <option value="6">Hiển thị 6 khách sạn</option>
+                    <option value="all">Hiển thị tất cả ({homeData.branches.length} khách sạn)</option>
+                  </select>
+                  <span className="material-symbols-outlined absolute right-2.5 text-[#8c6d3b] text-base pointer-events-none">
+                    expand_more
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Grid Khách Sạn */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {homeData.branches
-                .filter(b => selectedHotelRegion === 'all' || getBranchRegion(b) === selectedHotelRegion)
-                .map((branch, index) => (
-                <div
-                  key={branch.BranchId}
-                  className="group bg-[#fafaf8] rounded-2xl overflow-hidden border border-[#dedad0] hover:border-[#b9a277] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col"
-                >
-                  <div className="relative h-56 w-full overflow-hidden bg-slate-200">
-                    <img
-                      src={branch.ImageUrl || 'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=800&auto=format&fit=crop'}
-                      alt={branch.BranchName}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                    
-                    <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-[#131b2e]/85 backdrop-blur-md text-[#ffd985] text-[11px] font-bold border border-[#ffd985]/30">
-                      Điểm đến #{index + 1}
-                    </div>
+            {/* Grid Khách Sạn (Hiển thị gọn gàng theo giới hạn) */}
+            {(() => {
+              const filteredList = homeData.branches.filter(
+                b => selectedHotelRegion === 'all' || getBranchRegion(b) === selectedHotelRegion
+              );
+              const visibleItems = showAllHotels ? filteredList : filteredList.slice(0, hotelDisplayLimit);
 
-                    <div className="absolute bottom-3 left-3 right-3 text-white">
-                      <div className="flex items-center gap-1 text-[11px] text-[#ffd985] font-semibold uppercase tracking-wider">
-                        <span className="material-symbols-outlined text-[13px]">location_on</span>
-                        <span>{branch.City || 'Việt Nam'}</span>
-                      </div>
-                      <h3 className="font-serif text-lg font-bold leading-tight mt-0.5">
-                        {branch.BranchName}
-                      </h3>
-                    </div>
-                  </div>
-
-                  <div className="p-5 flex flex-col justify-between flex-1">
-                    <div>
-                      <p className="text-xs text-slate-500 flex items-center gap-1 line-clamp-1 mb-2">
-                        <span className="material-symbols-outlined text-xs text-[#b9a277]">pin_drop</span>
-                        <span>{branch.Address}</span>
-                      </p>
-                      <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                        {branch.Highlight || 'Trải nghiệm nghỉ dưỡng xa hoa bên bờ biển với hồ bơi vô cực và ẩm thực thượng hạng.'}
-                      </p>
-                    </div>
-
-                    <div className="pt-4 mt-4 border-t border-slate-200/70 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10.5px] text-slate-400 block">Giá phòng chỉ từ</span>
-                        <span className="text-base font-bold text-[#b9a277]">
-                          {(branch.MinPrice || 1850000).toLocaleString('vi-VN')}đ
-                        </span>
-                        <span className="text-[10px] text-slate-400"> / đêm</span>
-                      </div>
-
-                      <button
-                        onClick={() => navigate(`/rooms?branchId=${branch.BranchId}`)}
-                        className="px-4 py-2.5 rounded-xl bg-[#131b2e] group-hover:bg-[#8c6d3b] text-[#ffd985] group-hover:text-white font-bold text-xs transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+              return (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {visibleItems.map((branch, index) => (
+                      <div
+                        key={branch.BranchId}
+                        className="group bg-[#fafaf8] rounded-2xl overflow-hidden border border-[#dedad0] hover:border-[#b9a277] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col"
                       >
-                        <span>Khám phá &amp; Chọn phòng</span>
-                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                      </button>
-                    </div>
+                        <div className="relative h-56 w-full overflow-hidden bg-slate-200">
+                          <img
+                            src={branch.ImageUrl || 'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=800&auto=format&fit=crop'}
+                            alt={branch.BranchName}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                          
+                          <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-[#131b2e]/85 backdrop-blur-md text-[#ffd985] text-[11px] font-bold border border-[#ffd985]/30">
+                            Điểm đến #{index + 1}
+                          </div>
+
+                          <div className="absolute bottom-3 left-3 right-3 text-white">
+                            <div className="flex items-center gap-1 text-[11px] text-[#ffd985] font-semibold uppercase tracking-wider">
+                              <span className="material-symbols-outlined text-[13px]">location_on</span>
+                              <span>{branch.City || 'Việt Nam'}</span>
+                            </div>
+                            <h3 className="font-serif text-lg font-bold leading-tight mt-0.5">
+                              {branch.BranchName}
+                            </h3>
+                          </div>
+                        </div>
+
+                        <div className="p-5 flex flex-col justify-between flex-1">
+                          <div>
+                            <p className="text-xs text-slate-500 flex items-center gap-1 line-clamp-1 mb-2">
+                              <span className="material-symbols-outlined text-xs text-[#b9a277]">pin_drop</span>
+                              <span>{branch.Address}</span>
+                            </p>
+                            <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                              {branch.Highlight || 'Trải nghiệm nghỉ dưỡng xa hoa bên bờ biển với hồ bơi vô cực và ẩm thực thượng hạng.'}
+                            </p>
+                          </div>
+
+                          <div className="pt-4 mt-4 border-t border-slate-200/70 flex items-center justify-between">
+                            <div>
+                              <span className="text-[10.5px] text-slate-400 block">Giá phòng chỉ từ</span>
+                              <span className="text-base font-bold text-[#b9a277]">
+                                {(branch.MinPrice || 1850000).toLocaleString('vi-VN')}đ
+                              </span>
+                              <span className="text-[10px] text-slate-400"> / đêm</span>
+                            </div>
+
+                            <button
+                              onClick={() => navigate(`/rooms?branchId=${branch.BranchId}`)}
+                              className="px-4 py-2.5 rounded-xl bg-[#131b2e] group-hover:bg-[#8c6d3b] text-[#ffd985] group-hover:text-white font-bold text-xs transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <span>Khám phá &amp; Chọn phòng</span>
+                              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
+
+                  {/* Nút Dropdown Xổ Xuống Xem Thêm / Thu Gọn */}
+                  {filteredList.length > visibleItems.length ? (
+                    <div className="mt-8 text-center flex flex-col items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllHotels(true)}
+                        className="inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#8c6d3b] hover:bg-[#72572e] text-white font-bold text-xs sm:text-sm transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-95"
+                      >
+                        <span>Xem thêm {filteredList.length - visibleItems.length} khách sạn khác</span>
+                        <span className="material-symbols-outlined text-base">expand_more</span>
+                      </button>
+                      <span className="text-[11.5px] text-slate-500">
+                        Đang hiển thị {visibleItems.length} trên {filteredList.length} khách sạn
+                      </span>
+                    </div>
+                  ) : showAllHotels && filteredList.length > 3 ? (
+                    <div className="mt-8 text-center flex flex-col items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllHotels(false)}
+                        className="inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#f4efe6] hover:bg-[#eae2d3] text-[#203044] border border-[#d8c49e] font-bold text-xs sm:text-sm transition-all shadow-xs cursor-pointer active:scale-95"
+                      >
+                        <span>Thu gọn bớt khách sạn</span>
+                        <span className="material-symbols-outlined text-base">expand_less</span>
+                      </button>
+                      <span className="text-[11.5px] text-slate-500">
+                        Đang hiển thị toàn bộ {filteredList.length} khách sạn
+                      </span>
+                    </div>
+                  ) : null}
+                </>
+              );
+            })()}
 
             {/* Banner CTA xem toàn bộ */}
-            <div className="mt-10 text-center">
+            <div className="mt-8 text-center">
               <Link
                 to="/hotels"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#fafaf8] border border-[#b9a277] text-[#203044] hover:bg-[#b9a277] hover:text-white font-semibold text-xs sm:text-sm transition-all shadow-xs"
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#fafaf8] border border-[#b9a277] text-[#203044] hover:bg-[#b9a277] hover:text-white font-semibold text-xs transition-all shadow-xs"
               >
-                <span>Xem thông tin chi tiết toàn bộ 5 khu nghỉ dưỡng</span>
+                <span>Khám phá toàn bộ {homeData.branches.length} khu nghỉ dưỡng Grand Horizon</span>
                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
               </Link>
             </div>
