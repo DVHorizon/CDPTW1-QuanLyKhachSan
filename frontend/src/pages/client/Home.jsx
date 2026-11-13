@@ -4,6 +4,7 @@ import MainLayout from '../../layouts/MainLayout';
 import RoomDetailModal from '../../components/modals/RoomDetailModal';
 import QuickBookingModal from '../../components/modals/QuickBookingModal';
 import AmenityPerspectiveCarousel from '../../components/client/AmenityPerspectiveCarousel';
+import ScrollIcon from '../../components/common/ScrollIcon';
 import { fetchHomeData } from '../../api/hotelApi';
 import {
   mockBranches,
@@ -399,32 +400,25 @@ function Home() {
               </div>
             </div>
 
-            {/* Framer-inspired Luxury Scroll Cue (Dot + CUỘN XUỐNG + Chevron) */}
+            {/* Framer ScrollIcon Component (https://framer.com/m/ScrollIcon-kcl63q.js@QbSiYs7OTAywUGMWsnNt) */}
             <div className="mt-8 sm:mt-10 flex flex-col items-center justify-center">
-              <button
-                type="button"
+              <ScrollIcon
+                iconColor="#ffd985"
+                borderColor="rgba(255, 255, 255, 0.45)"
+                borderWidth={2}
+                borderRadius={18}
+                mouseWidth={26}
+                mouseHeight={42}
+                dotSize={5}
+                animationSpeed={1.5}
+                pauseDuration={0.3}
+                showLabel={true}
+                labelText="CUỘN XUỐNG"
                 onClick={() => {
                   const target = document.getElementById('gioi-thieu') || document.querySelector('section:nth-of-type(2)');
                   if (target) target.scrollIntoView({ behavior: 'smooth' });
                 }}
-                aria-label="Cuộn xuống khám phá tiếp"
-                className="group flex flex-col items-center gap-1.5 cursor-pointer select-none transition-all duration-300 focus:outline-none"
-              >
-                {/* Dấu chấm tròn màu vàng kim */}
-                <span className="w-2 h-2 rounded-full bg-[#b9a277] shadow-[0_0_8px_rgba(185,162,119,0.85)] group-hover:bg-[#ffd985] group-hover:scale-125 transition-all" />
-
-                {/* Chữ CUỘN XUỐNG tracking rộng sang trọng */}
-                <span className="font-sans text-[11px] sm:text-[11.5px] font-bold text-white/90 group-hover:text-[#ffd985] tracking-[0.28em] uppercase transition-colors drop-shadow-md">
-                  CUỘN XUỐNG
-                </span>
-
-                {/* Mũi tên chevron xuống chuyển động bồng bềnh */}
-                <div className="animate-scroll-cue flex items-center justify-center text-white/80 group-hover:text-[#ffd985] transition-colors">
-                  <span className="material-symbols-outlined text-[19px] leading-none">
-                    keyboard_arrow_down
-                  </span>
-                </div>
-              </button>
+              />
             </div>
           </div>
         </section>
