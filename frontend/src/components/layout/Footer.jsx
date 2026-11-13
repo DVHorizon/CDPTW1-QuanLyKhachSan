@@ -88,17 +88,64 @@ const Footer = () => {
               Giao dịch trực tuyến được mã hóa bảo mật chuẩn SSL 256-bit và PCI-DSS quốc tế.
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <span className="px-3.5 py-1.5 bg-white border border-[#dedad0] rounded-lg text-[12.5px] font-bold text-[#203044] shadow-xs">
-                VietQR
+              {/* VietQR */}
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#dedad0] rounded-lg shadow-xs hover:border-[#b9a277] transition-all">
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <rect x="2" y="2" width="8" height="8" rx="2" stroke="#005BAA" strokeWidth="2" />
+                  <rect x="5" y="5" width="2" height="2" fill="#005BAA" />
+                  <rect x="14" y="2" width="8" height="8" rx="2" stroke="#ED1C24" strokeWidth="2" />
+                  <rect x="17" y="5" width="2" height="2" fill="#ED1C24" />
+                  <rect x="2" y="14" width="8" height="8" rx="2" stroke="#ED1C24" strokeWidth="2" />
+                  <rect x="5" y="17" width="2" height="2" fill="#ED1C24" />
+                  <rect x="14" y="14" width="3" height="3" fill="#005BAA" />
+                  <rect x="19" y="14" width="3" height="3" fill="#ED1C24" />
+                  <rect x="14" y="19" width="3" height="3" fill="#ED1C24" />
+                  <rect x="19" y="19" width="3" height="3" fill="#005BAA" />
+                </svg>
+                <span className="text-[12px] font-bold text-[#005BAA]">
+                  Viet<span className="text-[#ED1C24]">QR</span>
+                </span>
               </span>
-              <span className="px-3.5 py-1.5 bg-white border border-[#dedad0] rounded-lg text-[12.5px] font-bold text-[#203044] shadow-xs">
-                VNPAY
+
+              {/* VNPAY */}
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#dedad0] rounded-lg shadow-xs hover:border-[#b9a277] transition-all">
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 4h7l4 10-3 3-8-13z" fill="#ED1C24" />
+                  <path d="M12 4h6l4 14h-5l-5-14z" fill="#005BAA" />
+                </svg>
+                <span className="text-[12px] font-bold text-[#005BAA]">
+                  VN<span className="text-[#ED1C24]">PAY</span>
+                </span>
               </span>
-              <span className="px-3.5 py-1.5 bg-white border border-[#dedad0] rounded-lg text-[12.5px] font-bold text-[#203044] shadow-xs">
-                MoMo
+
+              {/* MoMo */}
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#dedad0] rounded-lg shadow-xs hover:border-[#b9a277] transition-all">
+                <svg className="w-4 h-4 shrink-0 rounded-[4px]" viewBox="0 0 24 24" fill="none">
+                  <rect width="24" height="24" rx="5" fill="#A50064" />
+                  <circle cx="8" cy="12" r="3.2" stroke="#FFFFFF" strokeWidth="1.6" />
+                  <circle cx="16" cy="12" r="3.2" stroke="#FFFFFF" strokeWidth="1.6" />
+                  <circle cx="8" cy="12" r="1.1" fill="#FFFFFF" />
+                  <circle cx="16" cy="12" r="1.1" fill="#FFFFFF" />
+                </svg>
+                <span className="text-[12px] font-bold text-[#A50064]">
+                  MoMo
+                </span>
               </span>
-              <span className="px-3.5 py-1.5 bg-white border border-[#dedad0] rounded-lg text-[12.5px] font-bold text-[#203044] shadow-xs">
-                VISA / Master
+
+              {/* VISA / Master */}
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#dedad0] rounded-lg shadow-xs hover:border-[#b9a277] transition-all">
+                <span className="font-serif italic font-extrabold text-[12.5px] text-[#1434CB] tracking-tight leading-none">
+                  VISA
+                </span>
+                <span className="text-slate-300 text-xs">/</span>
+                <svg className="w-5 h-3.5 shrink-0" viewBox="0 0 32 20" fill="none">
+                  <circle cx="10" cy="10" r="9" fill="#EB001B" />
+                  <circle cx="22" cy="10" r="9" fill="#F79E1B" />
+                  <path d="M16 4.3a9 9 0 000 11.4 9 9 0 000-11.4z" fill="#FF5F00" />
+                </svg>
+                <span className="text-[12px] font-bold text-[#203044]">
+                  Master
+                </span>
               </span>
             </div>
 
