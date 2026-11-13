@@ -209,55 +209,6 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
             )}
           </a>
 
-          {/* Language Selector (VN / ENG) */}
-          <div className="relative shrink-0" ref={langDropdownRef}>
-            <button
-              onClick={() => setIsLangOpen(!isLangOpen)}
-              className="flex items-center gap-1.5 h-8.5 px-2 rounded-lg bg-white border border-[#dedad0] hover:border-[#b9a277] text-[#203044] text-[12px] font-bold transition-all shadow-xs cursor-pointer select-none"
-              title="Chọn ngôn ngữ / Select Language"
-              type="button"
-            >
-              {currentLang === 'vi' ? <FlagVN /> : <FlagEN />}
-              <span>{currentLang === 'vi' ? 'VN' : 'ENG'}</span>
-              <span className={`material-symbols-outlined text-[15px] text-[#8a8782] transition-transform duration-200 ${isLangOpen ? 'rotate-180 text-[#b9a277]' : ''}`}>
-                expand_more
-              </span>
-            </button>
-
-            {isLangOpen && (
-              <div className="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)] border border-[#dedad0] py-1.5 z-50 animate-fade-in">
-                <button
-                  type="button"
-                  onClick={() => handleSelectLang('vi')}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${currentLang === 'vi' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
-                    }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <FlagVN className="w-4 h-2.5" />
-                    <span>Tiếng Việt</span>
-                  </span>
-                  {currentLang === 'vi' && (
-                    <span className="material-symbols-outlined text-[15px] text-[#b9a277]">check</span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectLang('en')}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${currentLang === 'en' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
-                    }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <FlagEN className="w-4 h-2.5" />
-                    <span>English</span>
-                  </span>
-                  {currentLang === 'en' && (
-                    <span className="material-symbols-outlined text-[15px] text-[#b9a277]">check</span>
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Đặt Phòng Button */}
           <Link
             className="hidden sm:inline-flex items-center justify-center h-8.5 px-3.5 bg-[#b9a277] text-white rounded-lg text-[12.5px] font-bold hover:bg-[#a68e64] transition-all shadow-[0_4px_12px_rgba(185,162,119,0.3)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
@@ -425,28 +376,6 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
               <span className="material-symbols-outlined text-[#b9a277] text-[18px]">support_agent</span>
               <span>1900 6868</span>
             </a>
-
-            {/* Mobile Language Switcher */}
-            <div className="flex items-center p-0.5 rounded-lg bg-[#f5f4ef] border border-[#dedad0]">
-              <button
-                type="button"
-                onClick={() => handleSelectLang('vi')}
-                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${currentLang === 'vi' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
-                  }`}
-              >
-                <FlagVN className="w-3.5 h-2.5" />
-                <span>VN</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectLang('en')}
-                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${currentLang === 'en' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
-                  }`}
-              >
-                <FlagEN className="w-3.5 h-2.5" />
-                <span>ENG</span>
-              </button>
-            </div>
           </div>
 
           {/* Mobile Auth Button */}
