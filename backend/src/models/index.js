@@ -54,6 +54,11 @@ const defineSmartLockKey = require('./SmartLockKey');
 const defineMinibarUsage = require('./MinibarUsage');
 const definePricingRule = require('./PricingRule');
 
+// Banquet & MICE models (Phân hệ 53 - Module 53)
+const defineBanquetHall = require('./BanquetHall');
+const defineBanquetEventBooking = require('./BanquetEventBooking');
+const defineBanquetDepositStage = require('./BanquetDepositStage');
+
 // Initialize models
 const Branch = defineBranch(sequelize);
 const RoomType = defineRoomType(sequelize);
@@ -107,6 +112,18 @@ const LostAndFoundItem = defineLostAndFoundItem(sequelize);
 const SmartLockKey = defineSmartLockKey(sequelize);
 const MinibarUsage = defineMinibarUsage(sequelize);
 const PricingRule = definePricingRule(sequelize);
+
+// Initialize Banquet & MICE models (Phân hệ 53)
+const BanquetHall = defineBanquetHall(sequelize);
+const BanquetEventBooking = defineBanquetEventBooking(sequelize);
+const BanquetDepositStage = defineBanquetDepositStage(sequelize);
+
+// Banquet & MICE Associations
+BanquetHall.hasMany(BanquetEventBooking, { foreignKey: 'HallId', as: 'eventBookings' });
+BanquetEventBooking.belongsTo(BanquetHall, { foreignKey: 'HallId', as: 'hall' });
+
+BanquetEventBooking.hasMany(BanquetDepositStage, { foreignKey: 'BookingId', as: 'depositStages' });
+BanquetDepositStage.belongsTo(BanquetEventBooking, { foreignKey: 'BookingId', as: 'eventBooking' });
 
 
 // PricingRule Relationships (FEAT-GUEST-12)
@@ -335,4 +352,8 @@ module.exports = {
   ChatbotKnowledgeBase,
   ChatbotConversation,
   ChatbotMessage,
+  // Banquet & MICE models (Phân hệ 53)
+  BanquetHall,
+  BanquetEventBooking,
+  BanquetDepositStage,
 };
