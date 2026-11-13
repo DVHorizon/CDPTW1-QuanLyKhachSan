@@ -9,12 +9,6 @@ const { verifyToken } = require('../middlewares/authMiddleware');
 const { handleSearch } = require('../controllers/esRoomController');
 const { unifiedSearchRooms } = require('../controllers/dualSearchController');
 const { searchRoomsSolr } = require('../controllers/solrRoomController');
-const { optionalVerifyToken } = require('../middlewares/authMiddleware');
-const aiRoomRecommendationController = require('../controllers/aiRoomRecommendationController');
-
-// AI Gợi ý phòng thông minh (RAG + Gemini)
-router.post('/ai-recommend', optionalVerifyToken, aiRoomRecommendationController.getAiRoomRecommendations);
-router.get('/ai-recommend', optionalVerifyToken, aiRoomRecommendationController.getAiRoomRecommendations);
 
 //Đăng ký đường dẫn API
 router.get('/search', unifiedSearchRooms); // Dual Engine API (M?c d?nh)
