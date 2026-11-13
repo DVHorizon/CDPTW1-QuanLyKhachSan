@@ -100,7 +100,7 @@ export default function AmenityPerspectiveCarousel() {
   }, []);
 
   return (
-    <div className="relative w-full max-w-7xl mx-auto py-4 sm:py-6 select-none overflow-hidden">
+    <div className="relative w-full py-4 sm:py-6 select-none overflow-hidden">
       {/* 3D Perspective Coverflow Stage */}
       <div 
         ref={containerRef}
@@ -135,39 +135,39 @@ export default function AmenityPerspectiveCarousel() {
             rotateY = 0;
           } else if (offset === 1) {
             // Bên phải kề cận
-            translateX = '58%';
-            translateZ = '-100px';
+            translateX = '70%';
+            translateZ = '-110px';
             scale = 0.90;
             opacity = 0.65;
             zIndex = 20;
             rotateY = -6;
           } else if (offset === -1) {
             // Bên trái kề cận
-            translateX = '-58%';
-            translateZ = '-100px';
+            translateX = '-70%';
+            translateZ = '-110px';
             scale = 0.90;
             opacity = 0.65;
             zIndex = 20;
             rotateY = 6;
           } else if (offset === 2) {
             // Bên phải ngoài cùng
-            translateX = '108%';
-            translateZ = '-200px';
+            translateX = '140%';
+            translateZ = '-220px';
             scale = 0.78;
             opacity = 0.35;
             zIndex = 10;
             rotateY = -10;
           } else if (offset === -2) {
             // Bên trái ngoài cùng
-            translateX = '-108%';
-            translateZ = '-200px';
+            translateX = '-140%';
+            translateZ = '-220px';
             scale = 0.78;
             opacity = 0.35;
             zIndex = 10;
             rotateY = 10;
           } else {
             // Ẩn đi
-            translateX = offset > 0 ? '160%' : '-160%';
+            translateX = offset > 0 ? '210%' : '-210%';
             scale = 0.6;
             opacity = 0;
             zIndex = 1;
@@ -249,7 +249,7 @@ export default function AmenityPerspectiveCarousel() {
           type="button"
           onClick={handlePrev}
           aria-label="Tiện nghi trước"
-          className="absolute left-1 sm:left-2 md:left-4 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
+          className="absolute left-0 sm:left-1 md:left-2 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
         >
           <span className="material-symbols-outlined text-[26px] sm:text-[30px] group-hover:-translate-x-0.5 transition-transform">
             chevron_left
@@ -261,7 +261,7 @@ export default function AmenityPerspectiveCarousel() {
           type="button"
           onClick={handleNext}
           aria-label="Tiện nghi tiếp theo"
-          className="absolute right-1 sm:right-2 md:right-4 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
+          className="absolute right-0 sm:right-1 md:right-2 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
         >
           <span className="material-symbols-outlined text-[26px] sm:text-[30px] group-hover:translate-x-0.5 transition-transform">
             chevron_right

@@ -864,8 +864,8 @@ function Home() {
 
         {/* ================= 5. RESORT AMENITIES SECTION ================= */}
         <section id="trai-nghiem" className="w-full py-16 lg:py-20 bg-[#fafaf8] border-t border-[#dedad0]">
-          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-            <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
+          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-8 sm:mb-12">
+            <div className="text-center max-w-3xl mx-auto">
               <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
                 Tiện Nghi Đẳng Cấp 5 Sao
               </span>
@@ -876,8 +876,10 @@ function Home() {
                 Tận hưởng phong cách sống thượng lưu với chuỗi tiện ích chăm sóc sức khỏe, giải trí và ẩm thực chuẩn quốc tế.
               </p>
             </div>
+          </div>
 
-            {/* 3D Perspective Coverflow Carousel nằm gọn gàng bên trong viền container */}
+          {/* 3D Perspective Coverflow Carousel trải rộng đúng bằng viền Header (Logo đến Avatar Profile) */}
+          <div className="w-full px-4 sm:px-8 lg:px-12">
             <AmenityPerspectiveCarousel />
           </div>
         </section>
