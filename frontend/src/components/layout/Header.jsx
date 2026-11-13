@@ -205,7 +205,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
 
           {/* Đặt Phòng Button */}
           <Link
-            className="hidden sm:inline-flex items-center justify-center h-11 px-5.5 bg-[#b9a277] text-[#203044] rounded-xl text-[15px] font-bold hover:bg-[#a68e64] hover:text-white transition-all shadow-[0_4px_14px_rgba(185,162,119,0.3)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
+            className="hidden sm:inline-flex items-center justify-center h-11 px-7 mx-2 sm:mx-3 bg-[#b9a277] text-[#203044] rounded-xl text-[14.5px] font-bold hover:bg-[#a68e64] hover:text-white transition-all shadow-[0_4px_14px_rgba(185,162,119,0.25)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
             to="/rooms"
           >
             {t.bookNow}
@@ -213,7 +213,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
 
           {/* User Profile / Login Button */}
           {isAuthenticated && user ? (
-            <div className="relative pl-2 border-l border-[#dedad0] shrink-0" ref={userMenuRef}>
+            <div className="relative pl-3 sm:pl-4 border-l border-[#dedad0] shrink-0" ref={userMenuRef}>
               <button
                 type="button"
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
