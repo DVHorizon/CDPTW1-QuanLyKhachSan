@@ -96,25 +96,20 @@ export default function FloatingAcademicBadge() {
         </div>
       )}
 
-      {/* NÚT BADGE NỔI THU GỌN GỌN GÀNG */}
+      {/* NÚT BADGE NỔI TRÒN CHỈ CÓ ICON HỌC TẬP */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="group flex items-center gap-2.5 bg-[#1c1917] hover:bg-stone-800 text-white px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full shadow-lg border border-[#b9a277]/60 transition-all duration-200 select-none cursor-pointer active:scale-95"
-        title="Bấm để mở thông tin đồ án"
+        className="group relative w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#1c1917] hover:bg-stone-800 text-white shadow-xl border border-[#b9a277]/80 flex items-center justify-center transition-all duration-200 select-none cursor-pointer active:scale-95 hover:shadow-2xl"
+        title="Thông tin đồ án môn học (Bấm để xem)"
+        aria-label="Thông tin đồ án môn học"
       >
-        <span className="w-6.5 h-6.5 rounded-full bg-[#b9a277] text-[#1c1917] flex items-center justify-center font-bold text-xs shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-          <span className="material-symbols-outlined text-[16px]">school</span>
+        <span className="w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full bg-[#b9a277] text-[#1c1917] flex items-center justify-center font-bold shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+          <span className="material-symbols-outlined text-[18px]">school</span>
         </span>
-        <div className="text-left">
-          <div className="text-[11.5px] font-semibold tracking-wide text-[#e5d5b5] flex items-center gap-1.5">
-            <span>Đồ Án Môn Học</span>
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          </div>
-          <div className="text-[10px] text-stone-300">
-            {isOpen ? 'Đang mở • Bấm để đóng' : 'Phi thương mại • Xem thêm'}
-          </div>
-        </div>
+
+        {/* Chấm xanh nhỏ thông báo trạng thái hoạt động */}
+        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#1c1917] animate-pulse" />
       </button>
     </div>
   );
