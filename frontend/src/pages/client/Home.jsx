@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import RoomDetailModal from '../../components/modals/RoomDetailModal';
 import QuickBookingModal from '../../components/modals/QuickBookingModal';
 import AmenityPerspectiveCarousel from '../../components/client/AmenityPerspectiveCarousel';
 import ScrollIcon from '../../components/common/ScrollIcon';
+import MorphDropdown from '../../components/common/MorphDropdown';
 import { fetchHomeData } from '../../api/hotelApi';
 import {
   mockBranches,
@@ -91,6 +92,29 @@ function Home() {
   };
 
   const todayStr = new Date().toISOString().split('T')[0];
+
+  // Danh sách options cho MorphDropdown Chi Nhánh Khách Sạn
+  const branchOptions = useMemo(() => {
+    return homeData.branches.map(branch => {
+      const rawCity = branch.City
+        ? branch.City.split(',')[0].trim()
+        : (branch.Address ? branch.Address.split(',').pop()?.trim() : '');
+      const cityClean = rawCity ? rawCity.replace(/^(Tỉnh|Thành phố|TP\.?)\s+/i, '') : '';
+      return {
+        value: branch.BranchId,
+        label: `${branch.BranchName} ${cityClean ? `(${cityClean})` : ''}`,
+        subLabel: branch.Address || ''
+      };
+    });
+  }, [homeData.branches]);
+
+  // Danh sách options cho MorphDropdown Số Khách & Phòng
+  const guestOptions = useMemo(() => [
+    { value: '2-0-1', label: '2 Người lớn, 1 Phòng', subLabel: 'Phổ biến cho cặp đôi' },
+    { value: '1-0-1', label: '1 Người lớn, 1 Phòng', subLabel: 'Dành cho khách đơn' },
+    { value: '2-1-1', label: '2 Lớn, 1 Trẻ em', subLabel: 'Gia đình nhỏ' },
+    { value: '4-2-2', label: '4 Lớn, 2 Trẻ em (Villa)', subLabel: 'Biệt thự gia đình' }
+  ], []);
 
   // Tải dữ liệu từ Backend API (nếu có), fallback về Mock data
   useEffect(() => {
@@ -283,34 +307,19 @@ function Home() {
             <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] p-4 sm:p-5 lg:p-6 border border-[#dedad0]">
               <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4 items-end text-left">
                 
-                {/* Điểm đến / Chi nhánh */}
+                {/* Điểm đến / Chi nhánh (MorphDropdown Framer Component) */}
                 <div className="lg:col-span-4 flex flex-col gap-1.5">
                   <label className="text-[11px] font-bold text-[#8a8782] uppercase tracking-wider flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[16px] text-[#b9a277]">location_on</span>
                     Điểm Đến / Chi Nhánh
                   </label>
-                  <div className="relative bg-[#fbf8f2] rounded-xl border border-[#dedad0] px-3.5 py-2.5 focus-within:border-[#b9a277] transition-all">
-                    <select
-                      value={selectedBranch}
-                      onChange={(e) => setSelectedBranch(e.target.value)}
-                      className="w-full bg-transparent text-[13px] font-bold text-[#203044] focus:outline-none cursor-pointer pr-6 truncate"
-                    >
-                      {homeData.branches.map(branch => {
-                        const rawCity = branch.City
-                          ? branch.City.split(',')[0].trim()
-                          : (branch.Address ? branch.Address.split(',').pop()?.trim() : '');
-                        const cityClean = rawCity ? rawCity.replace(/^(Tỉnh|Thành phố|TP\.?)\s+/i, '') : '';
-                        return (
-                          <option key={branch.BranchId} value={branch.BranchId} className="text-[#203044]">
-                            {branch.BranchName} {cityClean ? `(${cityClean})` : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#8a8782] text-[18px]">
-                      expand_more
-                    </span>
-                  </div>
+                  <MorphDropdown
+                    options={branchOptions}
+                    value={selectedBranch}
+                    onChange={(val) => setSelectedBranch(val)}
+                    placeholder="Chọn chi nhánh khách sạn"
+                    menuMaxHeight={320}
+                  />
                 </div>
 
                 {/* Ngày nhận - Ngày trả */}
@@ -357,27 +366,19 @@ function Home() {
                   </div>
                 </div>
 
-                {/* Số Khách & Phòng */}
+                {/* Số Khách & Phòng (MorphDropdown Framer Component) */}
                 <div className="lg:col-span-3 flex flex-col gap-1.5">
                   <label className="text-[11px] font-bold text-[#8a8782] uppercase tracking-wider flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[16px] text-[#b9a277]">group</span>
                     Số Khách
                   </label>
-                  <div className="relative bg-[#fbf8f2] rounded-xl border border-[#dedad0] px-3.5 py-2.5 focus-within:border-[#b9a277] transition-all">
-                    <select
-                      value={guestOption}
-                      onChange={(e) => setGuestOption(e.target.value)}
-                      className="w-full bg-transparent text-[13px] font-bold text-[#203044] focus:outline-none cursor-pointer pr-6 truncate"
-                    >
-                      <option value="2-0-1">2 Người lớn, 1 Phòng</option>
-                      <option value="1-0-1">1 Người lớn, 1 Phòng</option>
-                      <option value="2-1-1">2 Lớn, 1 Trẻ em</option>
-                      <option value="4-2-2">4 Lớn, 2 Trẻ em (Villa)</option>
-                    </select>
-                    <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#8a8782] text-[18px]">
-                      expand_more
-                    </span>
-                  </div>
+                  <MorphDropdown
+                    options={guestOptions}
+                    value={guestOption}
+                    onChange={(val) => setGuestOption(val)}
+                    placeholder="Chọn số lượng khách"
+                    menuMaxHeight={260}
+                  />
                 </div>
 
                 {/* Nút Tìm Kiếm */}
