@@ -60,6 +60,8 @@ module.exports = (sequelize) => {
   }, {
     tableName: 'InventoryItems',
     timestamps: true,
+    createdAt: 'CreatedAt',
+    updatedAt: 'UpdatedAt',
     version: true // Sequelize native optimistic locking
   });
 

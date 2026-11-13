@@ -10,7 +10,7 @@ module.exports = (sequelize) => {
     },
     TicketCode: {
       type: DataTypes.STRING(50), // WO-2025-0891, WO-2025-0890...
-      allowNull: false,
+      allowNull: true,
       unique: true
     },
     // Vị trí & Phòng
@@ -95,7 +95,7 @@ module.exports = (sequelize) => {
 
     // Quy trình Workflow
     Status: {
-      type: DataTypes.ENUM('NEW', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'PAUSED'),
+      type: DataTypes.STRING(50), // Hỗ trợ cả legacy ('Open', 'Completed') và ('NEW', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'PAUSED')
       defaultValue: 'NEW' // Mới tạo (NEW) -> Đang sửa (IN_PROGRESS) -> Đã nghiệm thu (CLOSED)
     },
     StatusLabel: {
