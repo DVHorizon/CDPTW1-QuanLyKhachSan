@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import RoomDetailModal from '../components/modals/RoomDetailModal';
 import QuickBookingModal from '../components/modals/QuickBookingModal';
-import AiRoomAdvisorWidget from '../components/client/AiRoomAdvisorWidget';
 import TravelokaHotelCard from '../components/client/TravelokaHotelCard';
 import TravelokaHotelDetailView from '../components/client/TravelokaHotelDetailView';
 import { searchRoomsApi, getBranchesApi, suggestRoomsApi } from '../api/roomApi';
@@ -1110,18 +1109,7 @@ export default function SearchRooms() {
                 {/* ─── RIGHT RESULTS CONTENT: HOTEL CARDS (75% -> 9 of 12 cols) ─── */}
                 <main className="lg:col-span-9 flex flex-col gap-space-lg">
                   
-                  {/* AI Room / Hotel Advisor Widget */}
-                  <AiRoomAdvisorWidget
-                    variant="search"
-                    onSelectRoom={(r) => {
-                      if (r.BranchId) {
-                        handleSelectHotel(r.BranchId);
-                      } else {
-                        setSelectedRoomForDetail(r);
-                      }
-                    }}
-                  />
-
+                  
                   {/* Thanh Tiêu Đề Kết Quả Nơi Lưu Trú Chuẩn Traveloka */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#dedad0]/60 gap-3">
                     <div>

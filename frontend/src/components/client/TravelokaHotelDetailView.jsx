@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AiRoomAdvisorWidget from './AiRoomAdvisorWidget';
 
 /**
  * Component Hiển thị Thông tin chung của Khách sạn & Bảng các loại phòng còn trống
@@ -261,12 +260,6 @@ export default function TravelokaHotelDetailView({
         </div>
 
       </div>
-
-      {/* WIDGET CỐ VẤN AI GỢI Ý PHÒNG THÔNG MINH (RAG + GEMINI) */}
-      <AiRoomAdvisorWidget
-        variant="search"
-        onSelectRoom={(r) => onSelectRoomForDetail(r)}
-      />
 
       {/* ══════════════════════════════════════════════════════════════
           4. BẢNG CÁC LOẠI PHÒNG CÒN TRỐNG (ROOM TYPES INVENTORY)
