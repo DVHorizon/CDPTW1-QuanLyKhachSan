@@ -56,9 +56,28 @@ async function getHtml5QrcodeClass() {
 const API_ENDPOINTS = [
   '/api/v1/check-ins',
   '/api/v1/check-in',
+  '/api/check-ins',
+  '/api/check-in',
   'http://localhost:5000/api/v1/check-ins',
   'http://localhost:5000/api/v1/check-in',
 ];
+
+// Hàm chuyển đổi thông báo lỗi thân thiện tiếng Việt cho Toast UI
+function sanitizeErrorMessage(err, fallbackMsg = 'Đã xảy ra lỗi trong quá trình xử lý.') {
+  if (!err) return fallbackMsg;
+  const msg = typeof err === 'string' ? err : (err.message || String(err));
+  if (
+    msg.includes('Unexpected token') ||
+    msg.includes('SyntaxError') ||
+    msg.includes('is not valid JSON') ||
+    msg.includes('<!DOCTYPE') ||
+    msg.includes('<html') ||
+    msg.includes('JSON.parse')
+  ) {
+    return 'Lỗi kết nối máy chủ hoặc phản hồi định dạng không hợp lệ. Vui lòng thử lại sau.';
+  }
+  return msg;
+}
 
 // Hàm gọi API an toàn, tự động đính kèm Token Authorization
 async function safeFetchJson(path, options = {}) {
@@ -73,9 +92,12 @@ async function safeFetchJson(path, options = {}) {
     '';
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
+  // Chuẩn hóa path để không sinh ra trailing slash thừa khi path là rỗng
+  const cleanPath = path ? (path.startsWith('/') ? path : `/${path}`) : '';
+
   for (const base of API_ENDPOINTS) {
     try {
-      const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+      const url = `${base}${cleanPath}`;
       const { headers, ...restOptions } = options;
       const res = await fetch(url, {
         headers: {
@@ -87,19 +109,53 @@ async function safeFetchJson(path, options = {}) {
         ...restOptions,
       });
 
+      const contentType = res.headers.get('content-type') || '';
       const text = await res.text();
-      if (text.trim().startsWith('<') || text.trim().startsWith('<!DOCTYPE')) {
-        lastErr = new Error('Máy chủ phản hồi trang lỗi HTML thay vì JSON.');
+      const trimmed = (text || '').trim();
+
+      // Kiểm tra nếu phản hồi là HTML hoặc trang lỗi máy chủ
+      if (
+        contentType.includes('text/html') ||
+        trimmed.startsWith('<') ||
+        trimmed.toLowerCase().startsWith('<!doctype') ||
+        trimmed.toLowerCase().startsWith('<html')
+      ) {
+        lastErr = new Error(`Máy chủ phản hồi trang lỗi HTML (Mã HTTP ${res.status}) thay vì dữ liệu JSON.`);
         continue;
       }
 
-      const data = JSON.parse(text);
+      // Xử lý an toàn phân tích JSON với try-catch nội bộ
+      let data = {};
+      if (trimmed) {
+        try {
+          data = JSON.parse(trimmed.replace(/^\uFEFF/, ''));
+        } catch (parseErr) {
+          lastErr = new Error(`Dữ liệu máy chủ trả về không đúng định dạng JSON hợp lệ (Mã HTTP ${res.status}).`);
+          continue;
+        }
+      }
+
       return { status: res.status, ok: res.ok, data };
     } catch (err) {
       lastErr = err;
     }
   }
-  throw lastErr || new Error('Không thể kết nối đến máy chủ cơ sở dữ liệu backend.');
+
+  // Thông báo lỗi thân thiện tiếng Việt khi mọi endpoint đều không thành công
+  let friendlyMsg = 'Không thể kết nối đến máy chủ backend. Vui lòng kiểm tra lại dịch vụ hoặc kết nối mạng.';
+  if (lastErr && lastErr.message) {
+    if (lastErr.message.includes('HTML')) {
+      friendlyMsg = 'Máy chủ đang gặp sự cố hoặc phản hồi trang lỗi HTML thay vì JSON.';
+    } else if (lastErr.message.includes('JSON')) {
+      friendlyMsg = 'Dữ liệu phản hồi từ máy chủ không hợp lệ, không thể phân tích dữ liệu JSON.';
+    } else if (!lastErr.message.includes('Failed to fetch') && !lastErr.message.includes('NetworkError')) {
+      friendlyMsg = lastErr.message;
+    }
+  }
+
+  const finalError = new Error(friendlyMsg);
+  finalError.original = lastErr;
+  throw finalError;
 }
 
 // ─── Tiện ích định dạng ─────────────────────────────────────────────────────
@@ -1800,7 +1856,7 @@ export default function CheckInDesk() {
       }
     } catch (err) {
       console.error('Lookup error:', err);
-      addToast('error', 'Lỗi kết nối máy chủ: ' + err.message, 'LỖI MẠNG');
+      addToast('error', sanitizeErrorMessage(err, 'Lỗi kết nối máy chủ khi tra cứu thông tin đặt phòng.'), 'LỖI TRA CỨU');
     } finally {
       setLoadingLookup(false);
     }
@@ -1866,7 +1922,8 @@ export default function CheckInDesk() {
         addToast('error', data.message || 'Không đọc được giấy tờ, vui lòng quét lại.', 'LỖI OCR');
       }
     } catch (err) {
-      addToast('error', 'Không đọc được giấy tờ, vui lòng quét lại: ' + err.message, 'LỖI OCR');
+      console.error('OCR scan error:', err);
+      addToast('error', sanitizeErrorMessage(err, 'Không đọc được giấy tờ, vui lòng kiểm tra lại chất lượng hình ảnh.'), 'LỖI OCR');
     } finally {
       setOcrScanning(false);
     }
@@ -1946,7 +2003,8 @@ export default function CheckInDesk() {
         addToast('error', data.message || 'Không kết nối được đầu mã hóa thẻ.', 'LỖI MÃ HÓA THẺ');
       }
     } catch (err) {
-      addToast('error', 'Không kết nối được đầu mã hóa thẻ: ' + err.message, 'LỖI CỔNG COM-3');
+      console.error('Encode keycard error:', err);
+      addToast('error', sanitizeErrorMessage(err, 'Không kết nối được đầu mã hóa thẻ từ.'), 'LỖI MÃ HÓA THẺ');
     } finally {
       setKeycardEncoding(false);
     }
@@ -1974,7 +2032,8 @@ export default function CheckInDesk() {
         addToast('error', data.message || 'Thanh toán bị từ chối, vui lòng dùng thẻ khác.', 'LỖI THANH TOÁN');
       }
     } catch (err) {
-      addToast('error', 'Thanh toán bị từ chối, vui lòng dùng thẻ khác: ' + err.message, 'TỪ CHỐI THẺ');
+      console.error('Payment error:', err);
+      addToast('error', sanitizeErrorMessage(err, 'Thanh toán bị từ chối hoặc kết nối thanh toán gặp sự cố.'), 'TỪ CHỐI THẺ');
     } finally {
       setPaymentProcessing(false);
     }
@@ -2094,7 +2153,8 @@ export default function CheckInDesk() {
       fetchArrivals();
     } catch (err) {
       console.error('Complete check-in error:', err);
-      addToast('error', 'Không thể hoàn tất check-in, vui lòng thử lại: ' + err.message, 'ERROR_0021_CHECKIN_TRANSACTION');
+      const friendlyMsg = sanitizeErrorMessage(err, 'Không thể hoàn tất check-in, vui lòng kiểm tra lại thông tin.');
+      addToast('error', friendlyMsg, 'LỖI NHẬN PHÒNG');
     } finally {
       setCompletingCheckIn(false);
     }

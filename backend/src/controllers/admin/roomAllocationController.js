@@ -81,7 +81,7 @@ const getBookingDetail = async (req, res) => {
       LEFT JOIN Users u ON b.UserId = u.UserId
       LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
       LEFT JOIN RoomTypes rt ON b.RoomTypeId = rt.RoomTypeId
-      WHERE b.BookingId = ? AND (b.IsDeleted = 0 OR b.IsDeleted IS NULL)
+      WHERE b.BookingId = ? AND b.Status != 'Cancelled'
       LIMIT 1
     `;
 
@@ -256,8 +256,6 @@ const getAvailableRooms = async (req, res) => {
             ${bookingId ? 'AND b2.BookingId != ?' : ''}
         )
       `;
-      params.push(checkOutDate, checkInDate);
-      if (bookingId) params.push(Number(bookingId));
       params.push(checkOutDate, checkInDate);
       if (bookingId) params.push(Number(bookingId));
     }

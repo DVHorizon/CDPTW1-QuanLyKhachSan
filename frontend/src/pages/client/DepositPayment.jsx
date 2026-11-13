@@ -77,16 +77,53 @@ export default function DepositPayment() {
     let isMounted = true;
     async function fetchBooking() {
       setLoading(true);
-      const queryId = bookingIdParam || confirmationCodeParam || '1';
+      let queryId = bookingIdParam || confirmationCodeParam;
       try {
-        const res = await getBookingDetailsApi(queryId);
+        let res = null;
+        if (!queryId) {
+          // Tự động tìm booking thật từ DB (ưu tiên trạng thái Pending)
+          try {
+            const listRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bookings`);
+            const listData = await listRes.json();
+            const list = listData?.data || listData?.bookings || [];
+            const target = list.find((b) => b.status === 'Pending') || list[0];
+            if (target && target.bookingId) {
+              queryId = target.bookingId;
+            }
+          } catch (_) {}
+        }
+
+        if (queryId) {
+          res = await getBookingDetailsApi(queryId);
+        }
+
         if (isMounted && res && res.success && res.data) {
           setBooking(res.data);
-          if (res.data.timeoutSeconds !== undefined) {
-            setTimerSeconds(Math.max(0, res.data.timeoutSeconds));
+          const remSeconds = Number(res.data.timeoutSeconds) > 0 ? Number(res.data.timeoutSeconds) : 15 * 60;
+          setTimerSeconds(remSeconds);
+
+          // Nếu đơn đặt phòng vừa thanh toán thành công qua C5 MockPaymentGateway (Status = Confirmed & có giao dịch Paid/Completed)
+          const paidList = (res.data.payments || []).filter((p) =>
+            ['Paid', 'Success', 'Completed'].includes(p.Status || p.status)
+          );
+          if ((bookingIdParam || confirmationCodeParam) && res.data.status === 'Confirmed' && paidList.length > 0) {
+            const latestPaid = paidList[paidList.length - 1];
+            const totalAmt = Number(res.data.totalAmount || 0);
+            const paidAmt = paidList.reduce((s, p) => s + Number(p.Amount || p.amount || 0), 0) || Number(res.data.depositAmount || 0);
+            setPaymentSuccess({
+              paymentId: latestPaid.PaymentId || latestPaid.paymentId,
+              transactionCode: latestPaid.TransactionCode || latestPaid.transactionCode,
+              bookingId: res.data.bookingId,
+              confirmationCode: res.data.confirmationCode,
+              bookingStatus: 'Confirmed',
+              amountPaid: paidAmt,
+              remainingBalance: Math.max(0, totalAmt - paidAmt),
+              qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${res.data.confirmationCode}`,
+              paymentDate: latestPaid.PaymentDate || latestPaid.paymentDate || new Date(),
+            });
           }
         } else if (isMounted) {
-          // Mock data fallback for demonstration if no booking ID passed
+          // Mock data fallback chỉ khi DB hoàn toàn chưa có booking
           setBooking({
             bookingId: 99281,
             confirmationCode: 'GH-99281',
@@ -106,6 +143,7 @@ export default function DepositPayment() {
               ThumbnailImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCrER2uzVgC6FgGR7FHtJo44JVbpyq-6oFCdZPItYCDdTra_Ke-arCfaOsYdg2xjeaOXSEC7IL1RTh3HYzYrvqXJ6pW8SsSq-dzMeYxhVcn2r-04u9W3qpRvpo9xpJKwr7f08-OtCXjz2bzDdK6MiyAcWZFNPxsTv9huuRIo-2cRBs_wBm7Jr0QXQbxigetnPsTj3T5M3k_AO0pOugCeuACEDi9zQ3QATImt0or46BXu01R7F8Nuhx7'
             }
           });
+          setTimerSeconds(15 * 60);
         }
       } catch (err) {
         console.error('Lỗi tải booking:', err);
@@ -191,6 +229,42 @@ export default function DepositPayment() {
     setExpiryDate(raw);
   };
 
+  // Mở cổng giả lập C5 MockPaymentGateway bằng cách khởi tạo bản ghi Pending thực tế trên C5 trước
+  const handleOpenMockGatewayC5 = async (c5Method = 'VietQR') => {
+    setErrorMessage('');
+    setErrorCode('');
+    const activeBookingId = booking?.bookingId || bookingIdParam || 1;
+    const token = localStorage.getItem('hotel_token') || sessionStorage.getItem('token');
+    try {
+      setIsSubmitting(true);
+      const c5Res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/v1/payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          bookingId: Number(activeBookingId),
+          amount: Number(finalPayable),
+          method: c5Method,
+          returnUrl: window.location.href,
+        }),
+      });
+      const c5Data = await c5Res.json();
+      if (c5Res.ok && c5Data.success && c5Data.data?.paymentUrl) {
+        window.location.href = c5Data.data.paymentUrl;
+        return;
+      }
+      setErrorCode(c5Data?.code || 'ERROR_PAYMENT_FAILED');
+      setErrorMessage(c5Data?.message || 'Không thể khởi tạo cổng thanh toán C5.');
+    } catch (err) {
+      setErrorCode('ERROR_NETWORK');
+      setErrorMessage('Lỗi kết nối tới dịch vụ thanh toán C5.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Process Payment Submission
   const handleConfirmPayment = async (e) => {
     if (e) e.preventDefault();
@@ -244,6 +318,50 @@ export default function DepositPayment() {
 
     try {
       const activeBookingId = booking?.bookingId || bookingIdParam || 1;
+
+      // Nếu phương thức là VietQR hoặc Ví điện tử (VNPay/MoMo), tích hợp C5 Core Payment API
+      if (paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'DIGITAL_WALLET') {
+        const c5Method = paymentMethod === 'BANK_TRANSFER' ? 'VietQR' : (walletProvider === 'MOMO' ? 'MoMo' : 'VNPay');
+        const token = localStorage.getItem('hotel_token') || sessionStorage.getItem('token');
+
+        try {
+          const c5Res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/v1/payments`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({
+              bookingId: Number(activeBookingId),
+              amount: Number(finalPayable),
+              method: c5Method,
+              returnUrl: window.location.href
+            })
+          });
+
+          const c5Data = await c5Res.json();
+          if (c5Res.ok && c5Data.success) {
+            const paymentInfo = c5Data.data;
+            if (paymentInfo?.paymentUrl) {
+              window.location.href = paymentInfo.paymentUrl;
+              return;
+            }
+            setPaymentSuccess({
+              ...paymentInfo,
+              transactionCode: paymentInfo.transactionCode,
+              confirmationCode: bookingCodeStr,
+              amountPaid: finalPayable,
+              remainingBalance: Math.max(0, totalAmount - finalPayable),
+              paymentDate: new Date()
+            });
+            return;
+          }
+        } catch (c5Err) {
+          console.warn('C5 direct payment error, trying processDepositPaymentApi:', c5Err);
+        }
+      }
+
+      // Xử lý Thẻ hoặc Fallback
       const payload = {
         depositOption,
         paymentMethod,
@@ -252,7 +370,8 @@ export default function DepositPayment() {
         expiryDate: expiryDate.trim(),
         cvvCode: cvvCode.trim(),
         usedPoints: usePoints ? 12450 : 0,
-        walletProvider
+        walletProvider,
+        forceTimeoutCheck: false
       };
 
       const res = await processDepositPaymentApi(activeBookingId, payload);
@@ -581,6 +700,19 @@ export default function DepositPayment() {
                   <div className="flex items-center gap-2 text-slate-500 text-xs">
                     <span className="material-symbols-outlined text-[#725b38] text-[18px]">bolt</span>
                     <span>Giao dịch VietQR được hệ thống AI khớp lệnh tự động trong 3 - 5 giây.</span>
+                  </div>
+                  <div className="pt-2 flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs text-slate-500 italic">Quét mã chuyển khoản qua mọi ngân hàng</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenMockGatewayC5('VietQR')}
+                      disabled={isSubmitting}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 bg-white hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-300 shadow-2xs transition-colors cursor-pointer"
+                      title="Mở cổng giả lập Mock Gateway để test xác nhận thanh toán C5"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                      <span>Mở Cổng Giả Lập Mock Gateway (C5)</span>
+                    </button>
                   </div>
                 </div>
               )}

@@ -6,12 +6,12 @@
  * Feature: FEAT-ROOMMAP-RT-01 (Cập nhật trạng thái sơ đồ phòng real-time bằng WebSocket)
  * Spec: Spec_13.CapNhatSoDoPhongRealtime.docx
  * 
- * - Multi-endpoint handling: /ws/v1/room-map, /ws/rooms, /ws/fnb-orders, /ws
+ * - Multi-endpoint handling: /ws/v1/room-map, /ws/rooms, /ws/fnb-orders, /ws/v1/dashboard, /ws
  * - In-memory Circular Event Buffer (Outbox) with 2000 events limit
  * - Monotonic Sequence per Property & Monotonic Version per Room
  * - Heartbeat Ping/Pong (25s interval, 50s timeout)
  * - Snapshot & Cursor-based Replay for delta sync
- * - Hỗ trợ đăng ký theo dõi đơn F&B Room Service (/ws/fnb-orders)
+ * - Hỗ trợ đăng ký theo dõi đơn F&B Room Service (/ws/fnb-orders) & Dashboard Real-time (/ws/v1/dashboard)
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -595,6 +595,59 @@ function broadcastOrderStatus(orderOrOrderId, status, payload = {}) {
   });
 }
 
+/**
+ * Phát sự kiện cập nhật Dashboard Doanh thu Real-time (C11)
+ * @param {Object} payload Dữ liệu cập nhật doanh thu / KPIs
+ */
+function broadcastDashboardUpdate(payload) {
+  if (!wss) return;
+
+  const message = JSON.stringify({
+    event: 'DASHBOARD_UPDATE',
+    type: 'DASHBOARD_UPDATE',
+    data: payload,
+    timestamp: new Date().toISOString()
+  });
+
+  let sentCount = 0;
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      if (!client.pathname || client.pathname === '/ws/v1/dashboard' || client.pathname === '/ws') {
+        client.send(message);
+        sentCount++;
+      }
+    }
+  });
+
+  console.log(`📢 [WebSocket] Broadcast [DASHBOARD_UPDATE] tới ${sentCount} clients.`);
+}
+
+/**
+ * Phát thông báo sự kiện nghiệp vụ tới Dashboard Real-time
+ * @param {string} action - 'PAYMENT_SUCCESS' | 'NEW_BOOKING' | 'ROOM_STATUS_CHANGED' | 'NEW_FNB_ORDER' | 'PAYMENT_REFUNDED'
+ * @param {Object} eventData - Dữ liệu sự kiện
+ */
+function notifyDashboardEvent(action, eventData = {}) {
+  if (!wss) return;
+  const payload = {
+    event: 'DASHBOARD_UPDATE',
+    type: 'DASHBOARD_UPDATE',
+    action,
+    data: eventData,
+    timestamp: new Date().toISOString()
+  };
+  let count = 0;
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1 /* OPEN */) {
+      if (!client.pathname || client.pathname === '/ws/v1/dashboard' || client.pathname === '/ws') {
+        client.send(JSON.stringify(payload));
+        count++;
+      }
+    }
+  });
+  console.log(`📢 [WebSocket] notifyDashboardEvent [${action}] sent to ${count} clients.`);
+}
+
 function broadcastNewKitchenOrder(order) {
   broadcastRoomEvent('NEW_KITCHEN_ORDER', { order });
   broadcastRoomEvent('new_fnb_order', order);
@@ -610,6 +663,8 @@ module.exports = {
   broadcastRoomStatusChange,
   broadcastRoomEvent,
   broadcastOrderStatus,
+  broadcastDashboardUpdate,
+  notifyDashboardEvent,
   broadcastNewKitchenOrder,
   getNextSequence,
   getCurrentSequence,

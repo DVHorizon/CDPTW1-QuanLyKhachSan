@@ -16,8 +16,13 @@ router.use('/room-types',    require('./routes/roomTypeRoutes'));
 router.use('/rooms',         require('./routes/roomRoutes'));
 router.use('/room-map',      require('../../routes/admin/roomAvailability'));
 router.use('/stays',         require('../../routes/admin/stayExtensionRoutes'));
+// Check-in endpoints mounted under PMS module (/api/v1/pms/check-ins, /check-in, /checkin)
+const checkInRoutes = require('../../routes/admin/checkInRoutes');
+router.use('/check-ins', checkInRoutes);
+router.use('/check-in',  checkInRoutes);
+router.use('/checkin',   checkInRoutes);
+
 // router.use('/users',      require('./routes/userRoutes'));       // TODO: Thực
-// router.use('/checkin',    require('./routes/checkinRoutes'));     // TODO: Thực
 // router.use('/checkout',   require('./routes/checkoutRoutes'));    // TODO: Thực
 // router.use('/housekeeping', require('./routes/housekeepingRoutes')); // TODO: Thực
 // router.use('/cash-shift', require('./routes/cashShiftRoutes'));   // TODO: Thực
