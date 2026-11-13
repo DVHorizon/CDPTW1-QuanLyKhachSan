@@ -1438,7 +1438,7 @@ export default function BookingEngine() {
                   }}
                   className="w-full py-3.5 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white font-bold text-sm uppercase tracking-wide transition-all shadow-md flex items-center justify-center gap-2 group"
                 >
-                  <span>Thanh Toán Cọc Ngay (Bước 2)</span>
+                  <span>Thanh Toán Đặt Cọc Ngay</span>
                   <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
                 </button>
                 <div className="flex gap-2">

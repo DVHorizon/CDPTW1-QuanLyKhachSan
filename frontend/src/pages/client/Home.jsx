@@ -443,15 +443,15 @@ function Home() {
         <section id="he-thong-khach-san" className="w-full py-16 lg:py-20 bg-white border-b border-[#dedad0]">
           <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
             <div className="text-center max-w-3xl mx-auto mb-12">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#131b2e] text-[#ffd985] text-xs font-bold uppercase tracking-wider mb-4 shadow-xs">
-                <span className="material-symbols-outlined text-base">hotel_class</span>
-                <span>Bước 1: Chọn Khách Sạn &amp; Khu Nghỉ Dưỡng</span>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#fbf8f2] text-[#8c6d3b] border border-[#d8c49e] text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
+                <span className="material-symbols-outlined text-base">stars</span>
+                <span>Hệ Thống Khách Sạn &amp; Khu Nghỉ Dưỡng 5★</span>
               </div>
               <h2 className="font-serif text-[30px] lg:text-[40px] text-[#203044] font-bold tracking-tight leading-tight">
                 Khám Phá 5 Thiên Đường Nghỉ Dưỡng 5★
               </h2>
               <p className="text-[#64748b] text-sm sm:text-base mt-2">
-                Hệ thống đặt phòng trực tuyến tiêu chuẩn quốc tế: Quý khách chọn khách sạn điểm đến, hệ thống sẽ mở ra danh sách các loại phòng và biệt thự thuộc riêng khách sạn đó.
+                Trải nghiệm kỳ nghỉ dưỡng thượng lưu tại các điểm đến ven biển đẹp nhất Việt Nam của Grand Horizon.
               </p>
             </div>
 
@@ -507,9 +507,9 @@ function Home() {
 
                       <button
                         onClick={() => navigate(`/rooms?branchId=${branch.BranchId}`)}
-                        className="px-4 py-2.5 rounded-xl bg-[#131b2e] group-hover:bg-[#ffd985] text-[#ffd985] group-hover:text-[#131b2e] font-bold text-xs transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+                        className="px-4 py-2.5 rounded-xl bg-[#131b2e] group-hover:bg-[#8c6d3b] text-[#ffd985] group-hover:text-white font-bold text-xs transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
                       >
-                        <span>Chọn Khách Sạn (Bước 2)</span>
+                        <span>Khám phá &amp; Chọn phòng</span>
                         <span className="material-symbols-outlined text-sm">arrow_forward</span>
                       </button>
                     </div>

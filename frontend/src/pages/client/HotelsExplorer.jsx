@@ -49,8 +49,8 @@ export default function HotelsExplorer() {
 
           <div className="max-w-4xl mx-auto">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[#ffd985] text-xs font-semibold uppercase tracking-wider mb-5">
-              <span className="material-symbols-outlined text-base">hotel_class</span>
-              <span>Bước 1: Chọn Khách Sạn &amp; Điểm Đến Nghỉ Dưỡng</span>
+              <span className="material-symbols-outlined text-base">stars</span>
+              <span>Bộ Sưu Tập Điểm Đến Nghỉ Dưỡng</span>
             </div>
 
             <h1 className="font-serif text-3xl sm:text-5xl font-bold tracking-tight text-white mb-4">
@@ -187,7 +187,7 @@ export default function HotelsExplorer() {
                       onClick={() => handleSelectHotel(branch.BranchId)}
                       className="px-5 py-3 rounded-xl bg-gradient-to-r from-[#ffd985] to-[#f3c258] text-[#131b2e] font-bold text-xs sm:text-sm hover:brightness-105 active:scale-95 transition-all shadow-md flex items-center gap-2 group-hover:shadow-lg"
                     >
-                      <span>Chọn Khách Sạn Này (Bước 2)</span>
+                      <span>Khám phá &amp; Chọn phòng</span>
                       <span className="material-symbols-outlined text-sm font-bold">arrow_forward</span>
                     </button>
                   </div>
