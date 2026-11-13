@@ -100,12 +100,12 @@ export default function AmenityPerspectiveCarousel() {
   }, []);
 
   return (
-    <div className="relative w-full py-4 sm:py-8 px-0 select-none overflow-hidden">
+    <div className="relative w-full max-w-7xl mx-auto py-4 sm:py-6 select-none overflow-hidden">
       {/* 3D Perspective Coverflow Stage */}
       <div 
         ref={containerRef}
-        className="relative h-[620px] sm:h-[670px] lg:h-[720px] w-full flex items-center justify-center overflow-visible"
-        style={{ perspective: '1600px' }}
+        className="relative h-[600px] sm:h-[650px] lg:h-[680px] w-full flex items-center justify-center overflow-visible"
+        style={{ perspective: '1400px' }}
       >
         {LUXURY_AMENITIES.map((item, index) => {
           // Tính offset vòng tròn (circular offset)
@@ -135,39 +135,39 @@ export default function AmenityPerspectiveCarousel() {
             rotateY = 0;
           } else if (offset === 1) {
             // Bên phải kề cận
-            translateX = '75%';
-            translateZ = '-120px';
+            translateX = '58%';
+            translateZ = '-100px';
             scale = 0.90;
             opacity = 0.65;
             zIndex = 20;
             rotateY = -6;
           } else if (offset === -1) {
             // Bên trái kề cận
-            translateX = '-75%';
-            translateZ = '-120px';
+            translateX = '-58%';
+            translateZ = '-100px';
             scale = 0.90;
             opacity = 0.65;
             zIndex = 20;
             rotateY = 6;
           } else if (offset === 2) {
             // Bên phải ngoài cùng
-            translateX = '148%';
-            translateZ = '-240px';
+            translateX = '108%';
+            translateZ = '-200px';
             scale = 0.78;
             opacity = 0.35;
             zIndex = 10;
             rotateY = -10;
           } else if (offset === -2) {
             // Bên trái ngoài cùng
-            translateX = '-148%';
-            translateZ = '-240px';
+            translateX = '-108%';
+            translateZ = '-200px';
             scale = 0.78;
             opacity = 0.35;
             zIndex = 10;
             rotateY = 10;
           } else {
             // Ẩn đi
-            translateX = offset > 0 ? '200%' : '-200%';
+            translateX = offset > 0 ? '160%' : '-160%';
             scale = 0.6;
             opacity = 0;
             zIndex = 1;
@@ -187,10 +187,10 @@ export default function AmenityPerspectiveCarousel() {
                 pointerEvents: isHidden ? 'none' : 'auto',
                 cursor: isCenter ? 'default' : 'pointer'
               }}
-              className="absolute w-[330px] sm:w-[440px] md:w-[490px] lg:w-[530px] h-[580px] sm:h-[630px] lg:h-[670px] rounded-[32px] bg-[#f4ede1] border border-[#d8cbb8] shadow-[0_20px_50px_rgba(32,48,68,0.14)] p-5 sm:p-6 lg:p-7 flex flex-col justify-between transition-all group overflow-hidden"
+              className="absolute w-[310px] sm:w-[410px] md:w-[450px] lg:w-[480px] h-[550px] sm:h-[600px] lg:h-[630px] rounded-[28px] bg-[#f4ede1] border border-[#d8cbb8] shadow-[0_15px_40px_rgba(32,48,68,0.12)] p-5 sm:p-6 lg:p-7 flex flex-col justify-between transition-all group overflow-hidden"
             >
               {/* Top Photo */}
-              <div className="relative w-full h-[230px] sm:h-[270px] lg:h-[300px] rounded-[24px] overflow-hidden bg-slate-200 shrink-0 shadow-inner">
+              <div className="relative w-full h-[220px] sm:h-[260px] lg:h-[280px] rounded-[22px] overflow-hidden bg-slate-200 shrink-0 shadow-inner">
                 <img
                   src={item.imageUrl}
                   alt={item.title}
@@ -208,12 +208,12 @@ export default function AmenityPerspectiveCarousel() {
               <div className="flex-1 flex flex-col justify-between pt-5 pb-1">
                 <div>
                   {/* Số thứ tự Serif to bản màu vàng kim */}
-                  <div className="font-serif italic text-5xl sm:text-[58px] lg:text-[64px] text-[#b9a277] leading-none mb-1.5 font-normal tracking-tight">
+                  <div className="font-serif italic text-5xl sm:text-[56px] lg:text-[62px] text-[#b9a277] leading-none mb-1.5 font-normal tracking-tight">
                     {item.number}
                   </div>
 
                   {/* Tiêu đề tiện nghi */}
-                  <h3 className="font-serif text-[22px] sm:text-[25px] lg:text-[27px] text-[#131b2e] font-bold leading-tight mb-2 tracking-tight">
+                  <h3 className="font-serif text-[21px] sm:text-[24px] lg:text-[26px] text-[#131b2e] font-bold leading-tight mb-2 tracking-tight">
                     {item.title}
                   </h3>
 
@@ -223,7 +223,7 @@ export default function AmenityPerspectiveCarousel() {
                   </p>
 
                   {/* Mô tả trải nghiệm chuẩn khách sạn 5 sao */}
-                  <p className="text-[13.5px] sm:text-[14.5px] text-[#373435]/85 leading-relaxed line-clamp-3">
+                  <p className="text-[13px] sm:text-[14px] text-[#373435]/85 leading-relaxed line-clamp-3">
                     {item.description}
                   </p>
                 </div>
@@ -234,7 +234,7 @@ export default function AmenityPerspectiveCarousel() {
                     Grand Horizon Service
                   </span>
 
-                  <span className="text-[12.5px] font-bold text-[#b9a277] flex items-center gap-1.5">
+                  <span className="text-[12px] font-bold text-[#b9a277] flex items-center gap-1.5">
                     <span>Chuẩn 5★ Thượng Tuyển</span>
                     <span className="material-symbols-outlined text-[16px]">stars</span>
                   </span>
@@ -249,9 +249,9 @@ export default function AmenityPerspectiveCarousel() {
           type="button"
           onClick={handlePrev}
           aria-label="Tiện nghi trước"
-          className="absolute left-3 sm:left-8 lg:left-14 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
+          className="absolute left-1 sm:left-2 md:left-4 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
         >
-          <span className="material-symbols-outlined text-[28px] sm:text-[32px] group-hover:-translate-x-0.5 transition-transform">
+          <span className="material-symbols-outlined text-[26px] sm:text-[30px] group-hover:-translate-x-0.5 transition-transform">
             chevron_left
           </span>
         </button>
@@ -261,9 +261,9 @@ export default function AmenityPerspectiveCarousel() {
           type="button"
           onClick={handleNext}
           aria-label="Tiện nghi tiếp theo"
-          className="absolute right-3 sm:right-8 lg:right-14 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
+          className="absolute right-1 sm:right-2 md:right-4 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-[#8c6d3b] hover:bg-[#70562e] text-white flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 z-40 cursor-pointer active:scale-95 group"
         >
-          <span className="material-symbols-outlined text-[28px] sm:text-[32px] group-hover:translate-x-0.5 transition-transform">
+          <span className="material-symbols-outlined text-[26px] sm:text-[30px] group-hover:translate-x-0.5 transition-transform">
             chevron_right
           </span>
         </button>
