@@ -205,7 +205,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
 
           {/* Đặt Phòng Button */}
           <Link
-            className="hidden sm:inline-flex items-center justify-center px-4 py-2 bg-[#b9a277] text-[#203044] rounded-xl text-[13.5px] font-semibold hover:bg-[#a68e64] hover:text-white transition-all shadow-[0_4px_12px_rgba(185,162,119,0.25)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
+            className="hidden sm:inline-flex items-center justify-center h-11 px-5.5 bg-[#b9a277] text-[#203044] rounded-xl text-[15px] font-bold hover:bg-[#a68e64] hover:text-white transition-all shadow-[0_4px_14px_rgba(185,162,119,0.3)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
             to="/rooms"
           >
             {t.bookNow}
