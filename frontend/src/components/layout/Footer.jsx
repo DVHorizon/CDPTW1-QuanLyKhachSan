@@ -6,10 +6,6 @@ import { Link } from 'react-router-dom';
  * Cung cấp thông tin thương hiệu, danh mục liên kết, chi nhánh liên hệ và phương thức thanh toán
  */
 const Footer = () => {
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   return (
     <footer className="w-full bg-[#fbf8f2] text-[#373435] pt-14 pb-8 border-t border-[#dedad0]">
       <div className="w-full px-4 sm:px-8 lg:px-12">
@@ -147,17 +143,6 @@ const Footer = () => {
                   Master
                 </span>
               </span>
-            </div>
-
-            <div className="pt-3">
-              <button 
-                onClick={scrollToTop}
-                className="inline-flex items-center gap-2 text-[14px] font-bold text-[#b9a277] hover:text-[#203044] transition-colors cursor-pointer group"
-                type="button"
-              >
-                <span>Về đầu trang</span>
-                <span className="material-symbols-outlined text-[18px] group-hover:-translate-y-1 transition-transform">arrow_upward</span>
-              </button>
             </div>
           </div>
         </div>
