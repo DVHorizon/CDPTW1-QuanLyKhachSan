@@ -8,11 +8,6 @@ import {
   extractErrorCode,
   logSystemEvent,
 } from '../../utils/toastSanitizer';
-import { useDraggable } from '../../hooks/useDraggable';
-import {
-  computeExpandedPosition,
-  computeCollapsedPosition,
-} from '../../utils/draggableUtils';
 
 const QUICK_SUGGESTIONS = [
   'Khách sạn có dịch vụ giặt ủi không?',
@@ -31,6 +26,7 @@ const INITIAL_WELCOME_MESSAGE = {
 
 const FloatingAiConcierge = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const [messages, setMessages] = useState([INITIAL_WELCOME_MESSAGE]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,55 +38,18 @@ const FloatingAiConcierge = () => {
   const [uiNotice, setUiNotice] = useState(null);
   const messagesEndRef = useRef(null);
 
-  const {
-    position,
-    setPosition,
-    targetRef,
-    getHandleProps,
-    isDragging,
-    suppressClickRef,
-  } = useDraggable({ margin: 16, dragThreshold: 5 });
+  // Lắng nghe sự kiện cuộn trang để hiện nút Back to Top
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 300);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleToggleOpen = () => {
-    if (isDragging || suppressClickRef.current) return;
-
-    if (!isOpen) {
-      if (targetRef.current && typeof window !== 'undefined') {
-        const bubbleRect = targetRef.current.getBoundingClientRect();
-        const expandedWidth = window.innerWidth >= 640 ? 410 : 370;
-        const actualExpandedWidth = Math.min(
-          expandedWidth,
-          Math.max(280, window.innerWidth - 32)
-        );
-        const expandedHeight = 540;
-        const nextPos = computeExpandedPosition(
-          bubbleRect,
-          actualExpandedWidth,
-          expandedHeight,
-          window.innerWidth,
-          window.innerHeight,
-          16
-        );
-        setPosition(nextPos);
-      }
-      setIsOpen(true);
-    } else {
-      if (targetRef.current && typeof window !== 'undefined') {
-        const windowRect = targetRef.current.getBoundingClientRect();
-        const bubbleWidth = 230;
-        const bubbleHeight = 56;
-        const nextPos = computeCollapsedPosition(
-          windowRect,
-          bubbleWidth,
-          bubbleHeight,
-          window.innerWidth,
-          window.innerHeight,
-          16
-        );
-        setPosition(nextPos);
-      }
-      setIsOpen(false);
-    }
+    setIsOpen(prev => !prev);
   };
 
   const showSanitizedNotice = (rawErrOrMsg, type = 'error') => {
@@ -262,38 +221,14 @@ const FloatingAiConcierge = () => {
 
   return (
     <div
-      ref={targetRef}
-      style={
-        position
-          ? {
-              position: 'fixed',
-              left: `${position.x}px`,
-              top: `${position.y}px`,
-              right: 'auto',
-              bottom: 'auto',
-            }
-          : undefined
-      }
-      className={
-        position
-          ? 'fixed z-50 font-sans'
-          : 'fixed bottom-6 right-6 z-50 font-sans'
-      }
+      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end font-sans pointer-events-auto select-none"
     >
       {/* Khung cửa sổ Chat */}
       {isOpen && (
-        <div className="mb-4 w-[370px] sm:w-[410px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] bg-white rounded-2xl shadow-2xl border border-[#e6e0d4] overflow-hidden flex flex-col transition-shadow duration-200">
-          {/* Header sang trọng (Drag handle khi mở) */}
+        <div className="mb-3 w-[360px] sm:w-[410px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-100px)] bg-white rounded-2xl shadow-2xl border border-[#e6e0d4] overflow-hidden flex flex-col transition-shadow duration-200 animate-scale-in">
+          {/* Header sang trọng */}
           <div
-            {...getHandleProps({
-              isInteractiveChild: (e) =>
-                Boolean(
-                  e.target &&
-                    e.target.closest &&
-                    e.target.closest('button, input, textarea, a, select, [data-no-drag]')
-                ),
-            })}
-            className="bg-[#1c1917] text-white px-5 py-4 flex items-center justify-between border-b border-[#b9a277]/30 cursor-grab active:cursor-grabbing select-none"
+            className="bg-[#1c1917] text-white px-5 py-4 flex items-center justify-between border-b border-[#b9a277]/30 select-none"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#b9a277]/20 border border-[#b9a277] flex items-center justify-center text-[#b9a277]">
@@ -460,26 +395,33 @@ const FloatingAiConcierge = () => {
         </div>
       )}
 
-      {/* Nút mở Widget nổi (Drag handle khi thu gọn) */}
+      {/* Nút Cuộn Lên Đầu Trang (Back to Top) */}
+      {showBackToTop && !isOpen && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="mb-2.5 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 hover:bg-white text-[#203044] hover:text-[#b9a277] shadow-lg border border-[#dedad0] hover:border-[#b9a277] flex items-center justify-center transition-all duration-300 cursor-pointer active:scale-90 group animate-scale-in"
+          title="Cuộn lên đầu trang"
+          aria-label="Cuộn lên đầu trang"
+        >
+          <span className="material-symbols-outlined text-[20px] transition-transform group-hover:-translate-y-0.5">
+            north
+          </span>
+        </button>
+      )}
+
+      {/* Nút mở Widget nổi chỉ có chữ AI tròn cố định góc phải */}
       <button
         type="button"
-        {...(!isOpen ? getHandleProps() : {})}
         onClick={handleToggleOpen}
-        className={`group flex items-center gap-3 bg-[#1c1917] hover:bg-stone-800 text-white px-5 py-3.5 rounded-full shadow-xl border border-[#b9a277]/60 transition-all duration-200 select-none ${
-          !isOpen ? 'cursor-grab active:cursor-grabbing' : ''
-        }`}
+        className="group relative w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#1c1917] hover:bg-stone-800 text-white shadow-xl border border-[#b9a277]/80 flex items-center justify-center transition-all duration-200 select-none cursor-pointer active:scale-95 hover:shadow-2xl"
+        title="Trợ lý AI Concierge 24/7 (Bấm để trò chuyện)"
+        aria-label="Trợ lý AI Concierge 24/7"
       >
-        <span className="w-8 h-8 rounded-full bg-[#b9a277] text-[#1c1917] flex items-center justify-center font-bold text-sm">
+        <span className="w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full bg-[#b9a277] text-[#1c1917] flex items-center justify-center font-extrabold text-xs sm:text-sm tracking-wide shadow-xs group-hover:scale-105 transition-transform">
           AI
         </span>
-        <div className="text-left">
-          <div className="text-xs font-semibold tracking-wide text-[#e5d5b5]">
-            Trợ Lý AI Concierge
-          </div>
-          <div className="text-[11px] text-stone-300">
-            Hỗ trợ dịch vụ & phòng 24/7
-          </div>
-        </div>
+        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#1c1917] animate-pulse" />
       </button>
     </div>
   );
