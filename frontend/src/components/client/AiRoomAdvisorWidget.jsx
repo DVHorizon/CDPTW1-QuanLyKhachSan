@@ -32,7 +32,8 @@ export default function AiRoomAdvisorWidget({ variant = 'home', onSelectRoom }) 
 
   const [loading, setLoading] = useState(false);
   const [aiData, setAiData] = useState(null);
-  const [isExpanded, setIsExpanded] = useState(true);
+  // Nếu ở trang tìm kiếm phòng: mặc định thu gọn để trang gọn gàng, khách muốn dùng thì mở ra
+  const [isExpanded, setIsExpanded] = useState(variant === 'home');
 
   // Gọi AI gợi ý phòng
   const handleGetRecommendations = async (overrideStyle = null, overrideBudget = null) => {
@@ -223,8 +224,9 @@ export default function AiRoomAdvisorWidget({ variant = 'home', onSelectRoom }) 
         </div>
       )}
 
-      {/* AI Recommendation Results Section */}
-      <div className="p-5 sm:p-6">
+      {/* AI Recommendation Results Section (Chỉ hiển thị khi mở rộng) */}
+      {isExpanded && (
+        <div className="p-5 sm:p-6">
         {/* Lời chào tóm tắt từ AI */}
         {aiData?.summaryGreeting && (
           <div className="p-4 rounded-xl bg-[#f5f0e6] border border-[#e6dcce] text-[#203044] text-xs sm:text-sm flex items-start gap-3 mb-6">
@@ -353,6 +355,8 @@ export default function AiRoomAdvisorWidget({ variant = 'home', onSelectRoom }) 
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
+

@@ -37,3 +37,4 @@ const getAiRoomRecommendations = async (req, res) => {
 module.exports = {
   getAiRoomRecommendations
 };
+

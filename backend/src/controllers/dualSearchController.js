@@ -219,12 +219,53 @@ async function unifiedSearchRooms(req, res) {
         });
       }
     } catch (fallbackErr) {
-      console.error('[DualSearch] Cả hai engines đều gặp lỗi:', fallbackErr);
-      return res.status(500).json({
-        success: false,
-        message: 'Lỗi tìm kiếm Dual Engine',
-        error: error.message
-      });
+      console.warn('[DualSearch] Cả hai search engine đều không kết nối được, tự động chuyển về MySQL Database:', fallbackErr.message);
+      try {
+        const whereClause = { IsDeleted: false };
+        if (cleanKeyword) {
+          whereClause[Op.or] = [
+            { TypeName: { [Op.like]: `%${cleanKeyword}%` } },
+            { Description: { [Op.like]: `%${cleanKeyword}%` } }
+          ];
+        }
+        if (maxPrice) {
+          whereClause.BasePrice = { [Op.lte]: Number(maxPrice) };
+        }
+        if (adults) {
+          whereClause.AdultCapacity = { [Op.gte]: Number(adults) };
+        }
+
+        const dbRooms = await RoomType.findAll({
+          where: whereClause,
+          limit: 30,
+          order: [['RoomTypeId', 'ASC']]
+        });
+
+        const formatted = dbRooms.map(r => ({
+          RoomTypeId: r.RoomTypeId,
+          TypeName: r.TypeName,
+          Description: r.Description,
+          BasePrice: Number(r.BasePrice),
+          AdultCapacity: r.AdultCapacity,
+          ImageUrl: r.ImageUrl
+        }));
+
+        return res.status(200).json({
+          success: true,
+          engine: 'MySQL Database (Auto-Failover)',
+          activeEngine: 'standard',
+          fallbackNotice: 'Hệ thống tự động chuyển về cơ sở dữ liệu MySQL do Search Engine ngoại vi đang tạm dừng',
+          executionTimeMs: Date.now() - startTime,
+          total: formatted.length,
+          data: formatted
+        });
+      } catch (dbErr) {
+        return res.status(500).json({
+          success: false,
+          message: 'Lỗi tìm kiếm dữ liệu',
+          error: dbErr.message
+        });
+      }
     }
   }
 }
