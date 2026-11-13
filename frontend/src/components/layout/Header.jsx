@@ -15,7 +15,7 @@ const I18N = {
     dining: 'Ẩm Thực',
     elite: 'Hội Viên Elite',
     faq: 'FAQ',
-    bookNow: 'Đặt Phòng Ngay',
+    bookNow: 'Đặt phòng',
     memberTitle: 'Hội viên Elite',
     hotline: 'Hotline: 1900 6868',
     wishlistTitle: 'Danh sách phòng yêu thích'
@@ -205,7 +205,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
 
           {/* Đặt Phòng Button */}
           <Link
-            className="hidden sm:inline-flex items-center justify-center h-8.5 px-3.5 bg-[#b9a277] text-white rounded-lg text-[12.5px] font-bold hover:bg-[#a68e64] transition-all shadow-[0_4px_12px_rgba(185,162,119,0.3)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
+            className="hidden sm:inline-flex items-center justify-center px-4 py-2 bg-[#b9a277] text-[#203044] rounded-xl text-[13.5px] font-semibold hover:bg-[#a68e64] hover:text-white transition-all shadow-[0_4px_12px_rgba(185,162,119,0.25)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
             to="/rooms"
           >
             {t.bookNow}
@@ -433,14 +433,14 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
           </div>
 
           <div className="pt-2 sm:hidden">
-            <a
+            <Link
               onClick={() => setIsMobileMenuOpen(false)}
-              className="w-full h-11 bg-[#b9a277] hover:bg-[#a68e64] text-white rounded-xl text-[14px] font-bold flex items-center justify-center gap-2 shadow-md transition-all"
-              href="#room-collection"
+              className="w-full h-11 bg-[#b9a277] hover:bg-[#a68e64] text-[#203044] hover:text-white rounded-xl text-[14px] font-semibold flex items-center justify-center gap-2 shadow-md transition-all"
+              to="/rooms"
             >
               <span className="material-symbols-outlined text-[18px]">calendar_month</span>
               <span>{t.bookNow}</span>
-            </a>
+            </Link>
           </div>
         </div>
       )}
