@@ -31,6 +31,7 @@ router.patch('/kitchen/:orderId/ready', fnbOrderController.markOrderReady);
 router.patch('/kitchen/:orderId/restore', fnbOrderController.restoreOrder);
 
 // Xử lý thanh toán F&B (FEAT-FNB-07: A4.7)
+router.post('/initiate-payment', optionalVerifyToken, fnbOrderController.initiateOnlinePayment);
 router.patch('/:orderId/payment', verifyToken, fnbOrderController.processPayment);
 
 // FEAT-FNB-10 (Mã truy vết: A4.10): Đánh giá món ăn và chất lượng phục vụ F&B

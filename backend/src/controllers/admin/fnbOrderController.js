@@ -1,6 +1,10 @@
 const { deductIngredientsForOrder } = require('./kitchenInventoryController');
 const { sequelize, FoodOrder, FoodOrderDetail, MenuItem, Stay, Room, Booking, User, Invoice, InvoiceDetail, Payment, Review, ReviewPhoto, TableReservation, RestaurantTable } = require('../../models');
 const { broadcastOrderStatus, broadcastNewKitchenOrder } = require('../../services/websocketService');
+const {
+  generateTransactionCode,
+  createGatewayTransaction,
+} = require('../../modules/payments/services/paymentGatewayService');
 
 
 // Lấy danh sách lượt lưu trú đang hoạt động (CheckedIn / Active) để chọn phòng đặt món / đặt bàn
@@ -103,22 +107,34 @@ exports.getActiveStays = async (req, res) => {
           where: Object.keys(bookingWhere).length > 0 ? bookingWhere : undefined,
           required: Object.keys(bookingWhere).length > 0,
           include: [{ model: User, as: 'user', attributes: ['UserId', 'FullName', 'Email', 'Phone'] }] 
+        },
+        {
+          model: Invoice,
+          required: false,
+          attributes: ['InvoiceId', 'Status', 'TotalAmount']
         }
       ],
       order: [['StayId', 'DESC']]
     });
     return res.status(200).json({
       success: true,
-      data: stays.map(s => ({
-        stayId: s.StayId,
-        roomId: s.RoomId,
-        roomNumber: s.Room?.RoomNumber || `Phòng ${s.RoomId}`,
-        floor: s.Room?.Floor || 1,
-        guestName: s.Booking?.user?.FullName || ('Khách lưu trú P.' + (s.Room?.RoomNumber || s.RoomId)),
-        userId: s.Booking?.user?.UserId || null,
-        phone: s.Booking?.user?.Phone || null,
-        expectedCheckOut: s.ExpectedCheckOut
-      }))
+      data: stays.map(s => {
+        const isInvoicePaid = s.Invoice?.Status === 'Paid';
+        return {
+          stayId: s.StayId,
+          bookingId: s.BookingId,
+          BookingId: s.BookingId,
+          roomId: s.RoomId,
+          roomNumber: s.Room?.RoomNumber || `Phòng ${s.RoomId}`,
+          floor: s.Room?.Floor || 1,
+          guestName: s.Booking?.user?.FullName || ('Khách lưu trú P.' + (s.Room?.RoomNumber || s.RoomId)),
+          userId: s.Booking?.user?.UserId || null,
+          phone: s.Booking?.user?.Phone || null,
+          expectedCheckOut: s.ExpectedCheckOut,
+          isInvoicePaid: isInvoicePaid,
+          invoiceStatus: s.Invoice?.Status || 'Unpaid'
+        };
+      })
     });
   } catch (error) {
     console.error('Error fetching active stays:', error);
@@ -294,51 +310,9 @@ exports.createRoomServiceOrder = async (req, res) => {
       }
     }
 
-    // Gộp hóa đơn phòng nếu chọn RoomInvoice
-    if (finalPaymentMode === 'RoomInvoice' && stay) {
-      try {
-        let invoice = await Invoice.findOne({
-          where: { StayId: stay.StayId },
-          transaction
-        });
-
-        if (!invoice) {
-          const timestamp = Date.now();
-          const invoiceNumber = `INV-${stay.StayId}-${timestamp.toString().slice(-6)}`;
-          invoice = await Invoice.create({
-            StayId: stay.StayId,
-            BookingId: stay.BookingId,
-            InvoiceNumber: invoiceNumber,
-            Subtotal: 0.00,
-            VATRate: 10.00,
-            VATAmount: 0.00,
-            TotalAmount: 0.00,
-            Status: 'Unpaid'
-          }, { transaction });
-        }
-
-        const orderAmount = parseFloat(order.TotalAmount || 0);
-        await InvoiceDetail.create({
-          InvoiceId: invoice.InvoiceId,
-          ItemType: 'FoodOrder',
-          Description: `Gọi món F&B (${orderType}) - Đơn #${order.FoodOrderId}`,
-          Quantity: 1,
-          UnitPrice: orderAmount,
-          Amount: orderAmount
-        }, { transaction });
-
-        const newSubtotal = (parseFloat(invoice.Subtotal) || 0) + orderAmount;
-        const newVATAmount = newSubtotal * (parseFloat(invoice.VATRate) || 10) / 100;
-        const newTotalAmount = newSubtotal + newVATAmount;
-        await invoice.update({
-          Subtotal: newSubtotal,
-          VATAmount: newVATAmount,
-          TotalAmount: newTotalAmount
-        }, { transaction });
-      } catch (folioErr) {
-        console.warn('Lỗi ghi nhận RoomInvoice:', folioErr.message);
-      }
-    }
+    // Đơn F&B chọn RoomInvoice sẽ được liên kết trực tiếp theo StayId.
+    // Master Invoice Core Module (của Hà) sẽ tự động tổng hợp chi phí này vào Folio khi Trả phòng (Check-out),
+    // không tạo Invoice lẻ tại đây để tránh trùng lặp hoá đơn.
 
     await transaction.commit();
 
@@ -977,6 +951,111 @@ exports.clearExpediterPass = async (req, res) => {
   }
 };
 
+// Khởi tạo giao dịch thanh toán Online chuẩn C5 Core Payment (FEAT-FNB-07 & FEAT-PAYMENT-01)
+exports.initiateOnlinePayment = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const { amount, method = 'VietQR', bookingId, stayId, returnUrl } = req.body;
+    const currentUserId = req.user?.userId || req.user?.id || req.user?.UserId || null;
+
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0012_OUT_OF_RANGE',
+        message: 'Số tiền thanh toán phải lớn hơn 0'
+      });
+    }
+
+    const VALID_METHODS = ['VietQR', 'VNPay', 'MoMo', 'Cash', 'Card', 'BankTransfer'];
+    if (!VALID_METHODS.includes(method)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Phương thức thanh toán không hợp lệ'
+      });
+    }
+
+    // Xác định BookingId hoặc tìm/tạo InvoiceId để liên kết chuẩn theo C5
+    let resolvedBookingId = bookingId ? Number(bookingId) : null;
+    let resolvedInvoiceId = null;
+
+    if (!resolvedBookingId && stayId) {
+      const stay = await Stay.findByPk(stayId, { transaction });
+      if (stay && stay.BookingId) {
+        resolvedBookingId = stay.BookingId;
+      }
+    }
+
+    // Nếu không có BookingId (ví dụ khách vãng lai gọi món), tìm hoặc tạo Invoice độc lập
+    if (!resolvedBookingId) {
+      const timestamp = Date.now();
+      const invoiceNumber = `INV-FNB-${timestamp.toString().slice(-6)}`;
+      const inv = await Invoice.create({
+        StayId: stayId || null,
+        BookingId: null,
+        InvoiceNumber: invoiceNumber,
+        Subtotal: numAmount,
+        VATRate: 10.00,
+        VATAmount: (numAmount * 10) / 100,
+        TotalAmount: numAmount + (numAmount * 10) / 100,
+        Status: 'Unpaid'
+      }, { transaction });
+      resolvedInvoiceId = inv.InvoiceId;
+    }
+
+    // Sinh mã giao dịch chuẩn C5: PMT-{yyyyMMddHHmmss}-{4 số}
+    const transactionCode = generateTransactionCode();
+
+    // Tạo bản ghi Payment trạng thái Pending trong Database
+    const payment = await Payment.create({
+      BookingId: resolvedBookingId || null,
+      InvoiceId: resolvedInvoiceId || null,
+      UserId: currentUserId || null,
+      Amount: numAmount,
+      PaymentMethod: method,
+      TransactionCode: transactionCode,
+      PaymentDate: new Date(),
+      Status: 'Pending',
+      GatewayResponse: null
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Tạo thông tin Gateway URL qua service của C5
+    const gatewayInfo = await createGatewayTransaction({
+      transactionCode,
+      amount: numAmount,
+      method,
+      returnUrl: returnUrl || 'http://localhost:3000/room-service'
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Khởi tạo giao dịch thanh toán thành công',
+      data: {
+        paymentId: payment.PaymentId,
+        transactionCode: transactionCode,
+        amount: numAmount,
+        method: method,
+        status: 'Pending',
+        qrCodeData: gatewayInfo.qrCodeData || null,
+        paymentUrl: gatewayInfo.paymentUrl || `http://localhost:3000/mock-payment/${transactionCode}?amount=${numAmount}&method=${method}&returnUrl=${encodeURIComponent(returnUrl || 'http://localhost:3000/room-service')}`
+      }
+    });
+  } catch (error) {
+    if (transaction) await transaction.rollback();
+    console.error('Lỗi initiateOnlinePayment:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_0005_INVALID_VALUE',
+      message: 'Không thể khởi tạo giao dịch thanh toán: ' + error.message
+    });
+  }
+};
+
 // FEAT-FNB-07 (A4.7): XỬ LÝ HÌNH THỨC THANH TOÁN ĐƠN F&B
 exports.processPayment = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -1076,88 +1155,35 @@ exports.processPayment = async (req, res) => {
         });
       }
 
-      try {
-        // Tìm hoặc tạo Hóa đơn (Invoice) cho lượt lưu trú này
-        let invoice = await Invoice.findOne({
-          where: { StayId: activeStay.StayId },
-          transaction
-        });
+      // Đặt PaymentMode = RoomInvoice, đơn giữ Status = Pending để gửi Bếp/KDS
+      // Chi phí F&B này được liên kết theo StayId và sẽ được Master Invoice Module (Hà) quyết toán khi Check-out phòng
+      order.PaymentMode = 'RoomInvoice';
+      order.Status = 'Pending';
+      await order.save({ transaction });
 
-        if (!invoice) {
-          const timestamp = Date.now();
-          const invoiceNumber = `INV-${activeStay.StayId}-${timestamp.toString().slice(-6)}`;
-          invoice = await Invoice.create({
-            StayId: activeStay.StayId,
-            BookingId: activeStay.BookingId,
-            InvoiceNumber: invoiceNumber,
-            Subtotal: 0.00,
-            VATRate: 10.00,
-            VATAmount: 0.00,
-            TotalAmount: 0.00,
-            Status: 'Unpaid'
-          }, { transaction });
-        }
+      await transaction.commit();
 
-        // Tạo chi tiết khoản phí (folio charge) vào InvoiceDetails
-        const orderAmount = parseFloat(order.TotalAmount || 0);
-        await InvoiceDetail.create({
-          InvoiceId: invoice.InvoiceId,
-          ItemType: 'FoodOrder',
-          ItemId: order.FoodOrderId,
-          Description: `Khoản phí dịch vụ ăn uống F&B Đơn #${order.FoodOrderId}`,
-          Quantity: 1.00,
-          UnitPrice: orderAmount,
-          TotalPrice: orderAmount
-        }, { transaction });
+      // Gửi thông báo WebSocket xuống Bếp/KDS và Hub
+      broadcastOrderStatus({
+        orderId: order.FoodOrderId,
+        status: 'Pending',
+        paymentMode: 'RoomInvoice',
+        paymentStatus: 'ChargedToRoom',
+        totalAmount: order.TotalAmount,
+        stayId: order.StayId,
+        roomNumber: order.Stay?.Room?.RoomNumber || 'N/A',
+        updatedAt: new Date().toISOString()
+      });
 
-        // Cập nhật tổng tiền Invoice
-        const currentSubtotal = parseFloat(invoice.Subtotal || 0) + orderAmount;
-        const vatRate = parseFloat(invoice.VATRate || 10.00);
-        const vatAmount = (currentSubtotal * vatRate) / 100;
-        const totalAmount = currentSubtotal + vatAmount;
-
-        invoice.Subtotal = currentSubtotal;
-        invoice.VATAmount = vatAmount;
-        invoice.TotalAmount = totalAmount;
-        await invoice.save({ transaction });
-
-        // Đặt PaymentMode = RoomInvoice, đơn giữ Status = Pending để gửi Bếp/KDS
-        order.PaymentMode = 'RoomInvoice';
-        order.Status = 'Pending';
-        await order.save({ transaction });
-
-        await transaction.commit();
-
-        // Gửi thông báo WebSocket xuống Bếp/KDS và Hub
-        broadcastOrderStatus({
+      return res.status(200).json({
+        success: true,
+        message: 'Ghi nợ vào hóa đơn phòng thành công. Chi phí sẽ được thanh toán khi trả phòng (Check-out). Đơn đã được chuyển xuống bếp.',
+        data: {
           orderId: order.FoodOrderId,
-          status: 'Pending',
           paymentMode: 'RoomInvoice',
-          paymentStatus: 'ChargedToRoom',
-          totalAmount: order.TotalAmount,
-          stayId: order.StayId,
-          roomNumber: order.Stay?.Room?.RoomNumber || 'N/A',
-          updatedAt: new Date().toISOString()
-        });
-
-        return res.status(200).json({
-          success: true,
-          message: 'Gộp vào hóa đơn phòng thành công. Đơn đã được chuyển xuống bếp.',
-          data: {
-            orderId: order.FoodOrderId,
-            paymentMode: 'RoomInvoice',
-            invoiceNumber: invoice.InvoiceNumber,
-            status: order.Status
-          }
-        });
-      } catch (folioError) {
-        await transaction.rollback();
-        console.error('Error creating folio charge:', folioError);
-        return res.status(400).json({
-          code: 'ERROR_0005_INVALID_VALUE',
-          message: 'Không thể ghi nhận khoản phí vào hóa đơn phòng.'
-        });
-      }
+          status: order.Status
+        }
+      });
     }
 
     // 5. Xử lý Thanh toán ngay (PayNow)
@@ -1179,21 +1205,62 @@ exports.processPayment = async (req, res) => {
         });
       }
 
-      // Tạo mã giao dịch TransactionCode duy nhất
-      const transactionCode = `TXN-FNB-${order.FoodOrderId}-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      // Tìm hoặc tạo Hóa đơn (Invoice) nếu có liên kết Stay hoặc tạo Invoice độc lập cho dịch vụ F&B
+      let orderInvoiceId = null;
+      if (order.StayId) {
+        let inv = await Invoice.findOne({
+          where: { StayId: order.StayId },
+          transaction
+        });
+        if (!inv) {
+          const timestamp = Date.now();
+          const invoiceNumber = `INV-${order.StayId}-${timestamp.toString().slice(-6)}`;
+          inv = await Invoice.create({
+            StayId: order.StayId,
+            BookingId: order.Stay?.BookingId || null,
+            InvoiceNumber: invoiceNumber,
+            Subtotal: 0.00,
+            VATRate: 10.00,
+            VATAmount: 0.00,
+            TotalAmount: 0.00,
+            Status: 'Unpaid'
+          }, { transaction });
+        }
+        orderInvoiceId = inv.InvoiceId;
+      }
+
+      // Tạo mã giao dịch TransactionCode chuẩn C5 Core Payment: PMT-{yyyyMMddHHmmss}-{4 số}
+      const { transactionCode: requestedTxCode } = req.body;
+      const transactionCode = (requestedTxCode && requestedTxCode.startsWith('PMT-'))
+        ? requestedTxCode
+        : generateTransactionCode();
 
       // Kiểm tra mô phỏng thất bại từ cổng thanh toán (dành cho Unit/API test và xử lý tình huống)
       if (simulateFailure === true) {
-        // Ghi nhận bản ghi Payment Status = Failed
-        await Payment.create({
-          FoodOrderId: order.FoodOrderId,
-          UserId: currentUserId || order.UserId || null,
-          Amount: order.TotalAmount,
-          PaymentMethod: paymentMethod,
-          TransactionCode: transactionCode,
-          Status: 'Failed',
-          GatewayResponse: JSON.stringify({ error: 'Gateway timeout or card declined' })
-        }, { transaction });
+        // Tìm xem đã có bản ghi Payment Pending ứng với transactionCode chưa
+        let paymentRecord = await Payment.findOne({
+          where: { TransactionCode: transactionCode },
+          transaction
+        });
+
+        if (paymentRecord) {
+          await paymentRecord.update({
+            Status: 'Failed',
+            GatewayResponse: JSON.stringify({ error: 'Gateway timeout or user cancelled', source: 'FNB_ORDER' })
+          }, { transaction });
+        } else {
+          // Ghi nhận bản ghi Payment Status = Failed tuân thủ C5
+          await Payment.create({
+            InvoiceId: orderInvoiceId,
+            BookingId: order.Stay?.BookingId || null,
+            UserId: currentUserId || order.UserId || null,
+            Amount: order.TotalAmount,
+            PaymentMethod: paymentMethod,
+            TransactionCode: transactionCode,
+            Status: 'Failed',
+            GatewayResponse: JSON.stringify({ error: 'Gateway timeout or card declined', source: 'FNB_ORDER' })
+          }, { transaction });
+        }
 
         // Giữ đơn ở trạng thái chờ và cho phép khách thử lại
         order.PaymentMode = 'PayNow';
@@ -1208,16 +1275,30 @@ exports.processPayment = async (req, res) => {
         });
       }
 
-      // Thanh toán thành công (Happy case)
-      const paymentRecord = await Payment.create({
-        FoodOrderId: order.FoodOrderId,
-        UserId: currentUserId || order.UserId || null,
-        Amount: order.TotalAmount,
-        PaymentMethod: paymentMethod,
-        TransactionCode: transactionCode,
-        Status: 'Paid',
-        GatewayResponse: JSON.stringify({ success: true, method: paymentMethod })
-      }, { transaction });
+      // Thanh toán thành công (Happy case) - Ghi nhận bảng Payments theo chuẩn C5
+      let paymentRecord = await Payment.findOne({
+        where: { TransactionCode: transactionCode },
+        transaction
+      });
+
+      if (paymentRecord) {
+        await paymentRecord.update({
+          Status: 'Paid',
+          PaymentMethod: paymentMethod,
+          GatewayResponse: JSON.stringify({ success: true, method: paymentMethod, source: 'FNB_ORDER' })
+        }, { transaction });
+      } else {
+        paymentRecord = await Payment.create({
+          InvoiceId: orderInvoiceId,
+          BookingId: order.Stay?.BookingId || null,
+          UserId: currentUserId || order.UserId || null,
+          Amount: order.TotalAmount,
+          PaymentMethod: paymentMethod,
+          TransactionCode: transactionCode,
+          Status: 'Paid',
+          GatewayResponse: JSON.stringify({ success: true, method: paymentMethod, source: 'FNB_ORDER' })
+        }, { transaction });
+      }
 
       // Đặt PaymentMode = PayNow, Status = Pending (gửi Bếp/KDS)
       order.PaymentMode = 'PayNow';

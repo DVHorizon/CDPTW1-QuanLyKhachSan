@@ -36,6 +36,35 @@ export default function GuestOrderHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeStay, setActiveStay] = useState(null);
+
+  // Lấy thông tin phòng thực tế của người dùng
+  const fetchActiveStay = async () => {
+    try {
+      const token = localStorage.getItem("hotel_token") || localStorage.getItem("token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      let uid = user?.userId || user?.id || user?.UserId;
+      if (!uid) {
+        try {
+          const savedUser = JSON.parse(localStorage.getItem("hotel_user") || "{}");
+          uid = savedUser?.id || savedUser?.UserId || savedUser?.userId;
+        } catch {}
+      }
+      const q = uid ? `?userId=${uid}&userOnly=true` : '?userOnly=true';
+      const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/active-stays${q}`, { headers });
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+        const matched = uid ? json.data.find(s => String(s.userId) === String(uid)) : null;
+        setActiveStay(matched || (uid ? null : json.data[0]));
+      } else {
+        setActiveStay(null);
+      }
+    } catch {
+      setActiveStay(null);
+    }
+  };
 
   const fetchGuestOrders = async () => {
     setLoading(true);
@@ -81,6 +110,7 @@ export default function GuestOrderHistory() {
 
   useEffect(() => {
     fetchGuestOrders();
+    fetchActiveStay();
   }, [user]);
 
   const totalSpent = orders.reduce((sum, o) => sum + (o.status !== "Cancelled" ? Number(o.totalAmount || 0) : 0), 0);
@@ -91,65 +121,64 @@ export default function GuestOrderHistory() {
 
   return (
     <div className="bg-[#f4fbf4] min-h-screen text-slate-800 font-sans antialiased">
-      {/* Sidebar đồng bộ hoàn toàn với Đặt Bàn */}
-      <GuestSidebar />
+      {/* Sidebar đồng bộ hoàn toàn với Đặt Món */}
+      <GuestSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       {/* Main Content Area */}
-      <div className="pl-72">
+      <div className="lg:pl-72 transition-all">
         {/* Header trên cùng đồng bộ */}
-        <GuestHeader />
+        <GuestHeader onToggleSidebar={() => setIsSidebarOpen(prev => !prev)} />
 
-        <main className="relative pt-24 px-8 pb-12 w-full max-w-[1600px] mx-auto">
+        <main className="relative pt-20 sm:pt-24 px-3 sm:px-8 pb-12 w-full max-w-[1600px] mx-auto">
           {/* Immersive Dining Hero Section */}
           <div className="relative w-full rounded-2xl overflow-hidden shadow-xl mb-6 bg-white">
             <div
-              className="relative h-[300px] sm:h-[340px] w-full bg-cover bg-center"
+              className="relative h-[240px] sm:h-[300px] md:h-[340px] w-full bg-cover bg-center"
               style={{
                 backgroundImage:
                   "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCi-yZmRzW3rA99dbTUulxUSL46F4qNZcyDccM6LauKxbA3D_X4BKWiRH7LyjIxpcD01WwX9-VxJtlLoHqcAuLjU83sK319BxQn19pEcw3emqhLbDm49h75BeTG80tOGSN1jWr5-Ev4-j4Sh1UOIIF0qhC9A9x0V9-dhKr7sShAzuSa7nR4qozB3OdszP2YyoggCWKfDj_LP9olqcEorddyKDzZAHvbSNtEZnHZfBAIsqOz1S6rkOb_')",
               }}
             >
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/50 to-transparent flex flex-col justify-end p-8">
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/50 to-transparent flex flex-col justify-end p-4 sm:p-8">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <span className="px-3 py-0.5 rounded-full bg-emerald-500 text-white text-xs font-bold tracking-widest uppercase shadow-[0_0_12px_rgba(16,185,129,0.35)]">
+                  <span className="px-2.5 sm:px-3 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] sm:text-xs font-bold tracking-widest uppercase shadow-[0_0_12px_rgba(16,185,129,0.35)]">
                     Ẩm Thực Phục Vụ Tại Phòng
                   </span>
                   <span className="text-emerald-100 text-xs flex items-center gap-1">
                     <span className="material-symbols-outlined text-[16px] text-cyan-300">room_service</span>
                     Phục Vụ Tận Phòng 24/7
                   </span>
-                  <span className="text-white/60 text-xs">•</span>
-                  <span className="text-white/90 text-xs flex items-center gap-1 font-medium">
+                  <span className="text-white/60 text-xs hidden sm:inline">•</span>
+                  <span className="text-white/90 text-xs hidden sm:flex items-center gap-1 font-medium">
                     <span className="material-symbols-outlined text-[16px] text-amber-300">verified</span>
-                    Hồ Sơ Tiện Ích Phòng Khách Sạn
+                    Hồ Sơ Tiện Ích Khách Sạn
                   </span>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h1
-                      className="text-3xl sm:text-4xl text-white font-bold tracking-tight mb-2 drop-shadow-md"
-                      style={{ fontFamily: "'Playfair Display', serif" }}
+                      className="text-2xl sm:text-3xl md:text-4xl text-white font-bold tracking-tight mb-2 drop-shadow-md font-sans"
                     >
                       Lịch Sử Gọi Món Của Quý Khách
                     </h1>
-                    <p className="text-white/90 text-sm sm:text-base max-w-2xl drop-shadow">
+                    <p className="text-white/90 text-xs sm:text-sm md:text-base max-w-2xl drop-shadow line-clamp-2 sm:line-clamp-none">
                       Theo dõi trạng thái chế biến thời gian thực, tiến độ giao món đến phòng và chi tiết hóa đơn phục vụ tại phòng của quý khách.
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <button
                       onClick={() => navigate("/room-service")}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all cursor-pointer"
+                      className="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs sm:text-sm font-bold shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all cursor-pointer active:scale-95"
                     >
-                      <span className="material-symbols-outlined text-[20px]">restaurant_menu</span>
-                      Đặt Thêm Món
+                      <span className="material-symbols-outlined text-[18px] sm:text-[20px]">restaurant_menu</span>
+                      <span>Đặt Thêm Món</span>
                     </button>
                     <button
                       onClick={fetchGuestOrders}
                       disabled={loading}
-                      className="p-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white border border-white/20 backdrop-blur-md transition-colors cursor-pointer"
+                      className="p-2 sm:p-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white border border-white/20 backdrop-blur-md transition-colors cursor-pointer"
                       title="Làm mới dữ liệu"
                     >
                       <span className={`material-symbols-outlined text-[20px] ${loading ? "animate-spin text-emerald-300" : ""}`}>
@@ -168,10 +197,27 @@ export default function GuestOrderHistory() {
               <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
                 <span className="material-symbols-outlined text-[26px]">hotel</span>
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Phòng Lưu Trú</span>
-                <span className="text-lg font-bold text-slate-800">Deluxe #804</span>
-                <span className="text-xs text-emerald-600 block font-medium">Trạng thái: Đang lưu trú</span>
+                {activeStay ? (
+                  <>
+                    <span className="text-lg font-bold text-slate-800 block truncate">
+                      Phòng #{activeStay.roomNumber}
+                    </span>
+                    <span className="text-xs text-emerald-600 block font-medium">
+                      Trạng thái: Đang lưu trú • Tầng {activeStay.floor || 1}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-lg font-bold text-slate-500 block truncate">
+                      Chưa Đặt Phòng
+                    </span>
+                    <span className="text-xs text-slate-400 block font-medium">
+                      Trạng thái: Chưa nhận phòng
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
