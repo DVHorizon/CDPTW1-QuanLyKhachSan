@@ -612,6 +612,70 @@ exports.searchRooms = async (req, res) => {
   }
 };
 
+const BRANCH_METADATA = {
+  1: {
+    City: 'Phú Quốc, Kiên Giang',
+    ImageUrl: 'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 5.0,
+    TotalReviews: 248,
+    Highlight: 'Ốc đảo nhiệt đới riêng biệt với 1km bờ biển Bãi Khem cát trắng mịn và rừng nguyên sinh bao bọc',
+    Tag: 'Bãi biển riêng • Biệt thự hồ bơi riêng'
+  },
+  2: {
+    City: 'Cam Ranh, Khánh Hòa',
+    ImageUrl: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 195,
+    Highlight: 'Khu nghỉ dưỡng ốc đảo thanh bình ngắm trọn bình minh Bãi Dài ngọc bích với đầm sen và vườn nhiệt đới',
+    Tag: 'Vịnh biển nguyên sơ • Spa trị liệu'
+  },
+  3: {
+    City: 'Côn Đảo, Bà Rịa - Vũng Tàu',
+    ImageUrl: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 5.0,
+    TotalReviews: 182,
+    Highlight: 'Khu bảo tồn thiên nhiên biệt lập, trải nghiệm rùa biển đẻ trứng và lặn ngắm rạn san hô nguyên sơ',
+    Tag: 'Biệt lập riêng tư • Thiên nhiên bảo tồn'
+  },
+  4: {
+    City: 'Mỹ Khê, Đà Nẵng',
+    ImageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 310,
+    Highlight: 'Tuyệt tác kiến trúc hiện đại vươn mình bên bờ biển Mỹ Khê - top bãi biển quyến rũ nhất hành tinh',
+    Tag: 'Mặt biển Mỹ Khê • Hồ bơi vô cực chân mây'
+  },
+  5: {
+    City: 'Trần Phú, Nha Trang',
+    ImageUrl: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 220,
+    Highlight: 'Tổ hợp nghỉ dưỡng và căn hộ sang trọng ngay trái tim cung đường biển Trần Phú sầm uất',
+    Tag: 'Trung tâm Trần Phú • Du thuyền riêng'
+  }
+};
+
 /**
  * Lấy danh sách các chi nhánh hoạt động phục vụ selector
  * GET /api/v1/rooms/branches
@@ -624,9 +688,58 @@ exports.getBranches = async (req, res) => {
       order: [['BranchId', 'ASC']],
       limit: 20
     });
+
+    const enrichedBranches = await Promise.all(branches.map(async (b) => {
+      const meta = BRANCH_METADATA[b.BranchId] || {
+        City: b.Address ? b.Address.split(',').pop()?.trim() : 'Việt Nam',
+        ImageUrl: 'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop',
+        Gallery: [],
+        Rating: 4.9,
+        TotalReviews: 150,
+        Highlight: 'Khu nghỉ dưỡng 5 sao thượng lưu tiêu chuẩn quốc tế',
+        Tag: 'Nghỉ dưỡng 5 sao'
+      };
+
+      let totalRooms = 200;
+      let minPrice = 1850000;
+      try {
+        totalRooms = await Room.count({ where: { BranchId: b.BranchId } });
+        const roomsInBranch = await Room.findAll({
+          where: { BranchId: b.BranchId },
+          attributes: ['RoomTypeId'],
+          group: ['RoomTypeId'],
+          limit: 100
+        });
+        const typeIds = roomsInBranch.map(r => r.RoomTypeId);
+        if (typeIds.length > 0) {
+          const foundMin = await RoomType.min('BasePrice', {
+            where: { RoomTypeId: { [Op.in]: typeIds }, IsDeleted: false }
+          });
+          if (foundMin) minPrice = Number(foundMin);
+        }
+      } catch (_) {}
+
+      return {
+        BranchId: b.BranchId,
+        BranchName: b.BranchName,
+        Address: b.Address,
+        Phone: b.Phone,
+        Status: b.Status,
+        City: meta.City,
+        ImageUrl: meta.ImageUrl,
+        Gallery: meta.Gallery,
+        Rating: meta.Rating,
+        TotalReviews: meta.TotalReviews,
+        Highlight: meta.Highlight,
+        Tag: meta.Tag,
+        TotalRooms: totalRooms,
+        MinPrice: minPrice
+      };
+    }));
+
     return res.json({
       success: true,
-      data: branches
+      data: enrichedBranches
     });
   } catch (error) {
     console.error('Lỗi lấy danh sách chi nhánh:', error);
@@ -652,12 +765,36 @@ exports.getRoomDetail = async (req, res) => {
       });
     }
 
+    // Tìm chi nhánh của loại phòng này
+    let branchInfo = null;
+    try {
+      const sampleRoom = await Room.findOne({
+        where: { RoomTypeId: id, IsDeleted: false },
+        include: [{ model: Branch, as: 'branch' }]
+      });
+      if (sampleRoom && sampleRoom.branch) {
+        const b = sampleRoom.branch;
+        const bMeta = BRANCH_METADATA[b.BranchId] || {};
+        branchInfo = {
+          BranchId: b.BranchId,
+          BranchName: b.BranchName,
+          Address: b.Address,
+          Phone: b.Phone,
+          City: bMeta.City || (b.Address ? b.Address.split(',').pop()?.trim() : 'Việt Nam'),
+          ImageUrl: bMeta.ImageUrl || ''
+        };
+      }
+    } catch (_) {}
+
     const meta = ROOM_METADATA[roomType.RoomTypeId] || {};
     return res.json({
       success: true,
       data: {
         ...roomType.toJSON(),
-        ...meta
+        ...meta,
+        Branch: branchInfo,
+        BranchId: branchInfo?.BranchId || 1,
+        BranchName: branchInfo?.BranchName || 'Grand Horizon Phú Quốc Luxury Resort'
       }
     });
   } catch (error) {

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import Home from './pages/client/Home';
+import HotelsExplorer from './pages/client/HotelsExplorer';
 import SearchRooms from './pages/SearchRooms';
 import RoomDetail from './pages/client/RoomDetail';
 import BookingEngine from './pages/client/BookingEngine';
@@ -68,6 +69,8 @@ function App() {
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/hotels" element={<HotelsExplorer />} />
+            <Route path="/khach-san" element={<HotelsExplorer />} />
             <Route path="/rooms" element={<SearchRooms />} />
             <Route path="/services" element={<ServiceManagement />} />
             <Route path="/rooms/search" element={<SearchRooms />} />

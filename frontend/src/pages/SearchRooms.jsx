@@ -4,6 +4,8 @@ import MainLayout from '../layouts/MainLayout';
 import RoomDetailModal from '../components/modals/RoomDetailModal';
 import QuickBookingModal from '../components/modals/QuickBookingModal';
 import AiRoomAdvisorWidget from '../components/client/AiRoomAdvisorWidget';
+import BookingStepper from '../components/client/BookingStepper';
+import HotelSelectorBar from '../components/client/HotelSelectorBar';
 import { searchRoomsApi, getBranchesApi, suggestRoomsApi } from '../api/roomApi';
 
 // Helper format VND
@@ -72,6 +74,7 @@ export default function SearchRooms() {
 
   // UI state
   const [branches, setBranches] = useState([]);
+  const [showHotelSelector, setShowHotelSelector] = useState(true);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -143,6 +146,12 @@ export default function SearchRooms() {
     setSelectedEngine(engineId);
     setEngineDropdownOpen(false);
     executeSearch({ engine: engineId });
+  };
+
+  const handleSelectBranch = (newBranchId) => {
+    const targetId = String(newBranchId);
+    setBranchId(targetId);
+    executeSearch({ branchId: targetId });
   };
   const [wishlist, setWishlist] = useState([]);
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
@@ -365,6 +374,19 @@ export default function SearchRooms() {
       }}
     >
       <div className="flex flex-col w-full">
+
+        {/* ══════════════════════════════════════════════════════════════
+            QUY TRÌNH ĐẶT PHÒNG 3 BƯỚC (BƯỚC 2: CHỌN LOẠI PHÒNG)
+        ══════════════════════════════════════════════════════════════ */}
+        <BookingStepper
+          currentStep={2}
+          selectedHotelName={currentBranchName}
+          branchId={branchId}
+          onChangeHotel={() => {
+            setShowHotelSelector(true);
+            window.scrollTo({ top: 100, behavior: 'smooth' });
+          }}
+        />
 
         {/* ══════════════════════════════════════════════════════════════
             DYNAMIC SEARCH STRIP (STICKY TOP-20)
@@ -827,6 +849,17 @@ export default function SearchRooms() {
             </div>
           </div>
 
+          {/* ══════════════════════════════════════════════════════════════
+              BỘ CHỌN KHÁCH SẠN / CHI NHÁNH (BƯỚC 1: CHỌN KHÁCH SẠN)
+          ══════════════════════════════════════════════════════════════ */}
+          <HotelSelectorBar
+            branches={branches}
+            selectedBranchId={branchId}
+            onSelectBranch={handleSelectBranch}
+            isExpanded={showHotelSelector}
+            onToggleExpand={() => setShowHotelSelector(!showHotelSelector)}
+          />
+
           {/* 2-Column Responsive Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
             
@@ -1018,6 +1051,46 @@ export default function SearchRooms() {
 
             {/* ─── RIGHT RESULTS CONTENT (75% -> 9 of 12 cols) ─── */}
             <main className="lg:col-span-9 flex flex-col gap-space-lg">
+
+              {/* BANNER KHÁCH SẠN ĐANG ĐƯỢC CHỌN (BƯỚC 2: CHỌN LOẠI PHÒNG) */}
+              <div className="bg-gradient-to-r from-[#131b2e] to-[#203044] text-white p-4 sm:p-5 rounded-2xl shadow-md border border-[#ffd985]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-[#ffd985]/20 border border-[#ffd985]/40 flex items-center justify-center text-[#ffd985] shrink-0">
+                    <span className="material-symbols-outlined text-2xl">hotel</span>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10.5px] font-bold uppercase tracking-wider text-[#ffd985] bg-white/10 px-2 py-0.5 rounded">
+                        Bước 2: Chọn Loại Phòng Nghỉ
+                      </span>
+                      <span className="text-white/40 text-xs">•</span>
+                      <span className="text-white/80 text-xs font-semibold">{currentBranchObj?.City || 'Việt Nam'}</span>
+                    </div>
+                    <h2 className="font-serif text-lg sm:text-xl font-bold text-white mt-1">
+                      {currentBranchName}
+                    </h2>
+                    <p className="text-xs text-white/70 flex items-center gap-1 mt-0.5">
+                      <span className="material-symbols-outlined text-xs text-[#ffd985]">location_on</span>
+                      <span>{currentBranchObj?.Address || 'Khu nghỉ dưỡng thiên đường'}</span>
+                      <span className="mx-1.5">•</span>
+                      <span className="font-semibold text-emerald-300">{rooms.length} hạng phòng &amp; biệt thự khả dụng</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowHotelSelector(!showHotelSelector);
+                    if (!showHotelSelector) {
+                      window.scrollTo({ top: 120, behavior: 'smooth' });
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-[#ffd985] text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 self-start sm:self-auto cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">swap_horiz</span>
+                  <span>{showHotelSelector ? 'Thu gọn danh sách khách sạn' : 'Đổi khách sạn khác'}</span>
+                </button>
+              </div>
               
               {/* WIDGET CỐ VẤN AI GỢI Ý PHÒNG THÔNG MINH (RAG + GEMINI) */}
               <AiRoomAdvisorWidget
@@ -1176,6 +1249,15 @@ export default function SearchRooms() {
                             </span>
                           </div>
 
+                          {/* Hotel / Branch Tag */}
+                          <div className="flex items-center gap-1.5 text-xs text-[#b9a277] font-semibold mb-1">
+                            <span className="material-symbols-outlined text-sm">apartment</span>
+                            <span>Thuộc khách sạn: <strong>{room.BranchName || currentBranchName}</strong></span>
+                            {room.BranchCity && (
+                              <span className="text-slate-400 font-normal">({room.BranchCity})</span>
+                            )}
+                          </div>
+
                           {/* Room Name & Description */}
                           <h3
                             onClick={() => navigate(`/rooms/${room.RoomTypeId}`)}
@@ -1267,10 +1349,19 @@ export default function SearchRooms() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => navigate(`/dat-phong?roomTypeId=${room.RoomTypeId}&checkInDate=${checkInDate}&checkOutDate=${checkOutDate}&units=${roomsCount}&adults=${totalGuests}`)}
+                              onClick={() => {
+                                const p = new URLSearchParams();
+                                p.set('branchId', room.BranchId || branchId);
+                                p.set('roomTypeId', room.RoomTypeId);
+                                p.set('checkInDate', checkInDate);
+                                p.set('checkOutDate', checkOutDate);
+                                p.set('units', roomsCount);
+                                p.set('adults', totalGuests);
+                                navigate(`/dat-phong?${p.toString()}`);
+                              }}
                               className="px-space-xl py-3 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg hover:bg-secondary transition-all shadow-sm flex items-center gap-space-xs cursor-pointer"
                             >
-                              <span>Chọn Phòng</span>
+                              <span>Chọn Phòng Này (Bước 2)</span>
                               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                             </button>
                           </div>

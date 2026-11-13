@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 const I18N = {
   vi: {
     home: 'Trang Chủ',
+    hotels: 'Khách Sạn & Resort',
     rooms: 'Bộ Sưu Tập Phòng',
     offers: 'Gói Ưu Đãi',
     amenities: 'Dịch Vụ & Tiện Ích',
@@ -21,6 +22,7 @@ const I18N = {
   },
   en: {
     home: 'Home',
+    hotels: 'Hotels & Resorts',
     rooms: 'Rooms & Suites',
     offers: 'Special Offers',
     amenities: 'Amenities',
@@ -155,6 +157,9 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
         <nav className="hidden xl:flex items-center gap-3.5 2xl:gap-5 shrink-0">
           <Link className="text-[13px] font-semibold text-[#203044] hover:text-[#b9a277] transition-colors whitespace-nowrap" to="/">
             {t.home}
+          </Link>
+          <Link className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" to="/hotels">
+            {t.hotels}
           </Link>
           <Link className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" to="/rooms">
             {t.rooms}
