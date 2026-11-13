@@ -420,6 +420,27 @@ function Home() {
                 }}
               />
             </div>
+
+            {/* Framer ScrollIcon Component (https://framer.com/m/ScrollIcon-kcl63q.js@QbSiYs7OTAywUGMWsnNt) */}
+            <div className="mt-8 sm:mt-10 flex flex-col items-center justify-center">
+              <ScrollIcon
+                iconColor="#ffd985"
+                borderColor="rgba(255, 255, 255, 0.45)"
+                borderWidth={2}
+                borderRadius={18}
+                mouseWidth={26}
+                mouseHeight={42}
+                dotSize={5}
+                animationSpeed={1.5}
+                pauseDuration={0.3}
+                showLabel={true}
+                labelText="CUỘN XUỐNG"
+                onClick={() => {
+                  const target = document.getElementById('gioi-thieu') || document.querySelector('section:nth-of-type(2)');
+                  if (target) target.scrollIntoView({ behavior: 'smooth' });
+                }}
+              />
+            </div>
           </div>
         </section>
 
