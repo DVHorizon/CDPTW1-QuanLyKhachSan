@@ -34,7 +34,7 @@ export default function TravelokaHotelCard({
   const totalWithTax = Math.round(minPrice * 1.08);
 
   return (
-    <article className="group bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 hover:border-[#0194f3] shadow-xs hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col md:flex-row">
+    <article className="group bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 hover:border-[#b9a277] shadow-xs hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col md:flex-row">
       
       {/* ─── CỘT 1: HÌNH ẢNH KHÁCH SẠN (CAROUSEL / SLIDER) ─── */}
       <div className="relative md:w-5/12 lg:w-4/12 h-64 md:h-auto min-h-[220px] bg-slate-100 overflow-hidden shrink-0">
@@ -91,7 +91,7 @@ export default function TravelokaHotelCard({
           <div className="flex flex-wrap items-baseline gap-2 mb-1">
             <h3
               onClick={() => onSelectHotel(hotel.BranchId)}
-              className="font-bold text-base sm:text-lg text-slate-900 group-hover:text-[#0194f3] transition-colors cursor-pointer leading-snug"
+              className="font-bold text-base sm:text-lg text-slate-900 group-hover:text-[#8c6d3b] transition-colors cursor-pointer leading-snug"
             >
               {hotel.BranchName}
             </h3>
@@ -102,26 +102,26 @@ export default function TravelokaHotelCard({
 
           {/* Địa chỉ / Vị trí */}
           <div className="flex items-center gap-1 text-xs text-slate-600 mb-2.5">
-            <span className="material-symbols-outlined text-[#0194f3] text-[15px] shrink-0">location_on</span>
+            <span className="material-symbols-outlined text-[#8c6d3b] text-[15px] shrink-0">location_on</span>
             <span className="truncate">{hotel.Address || hotel.City || 'Việt Nam'}</span>
           </div>
 
           {/* Tiện ích nổi bật (Pills) */}
           <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-600">
             <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200/60 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[13px] text-[#0194f3]">beach_access</span>
+              <span className="material-symbols-outlined text-[13px] text-[#8c6d3b]">beach_access</span>
               <span>Bãi biển riêng</span>
             </span>
             <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200/60 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[13px] text-[#0194f3]">pool</span>
+              <span className="material-symbols-outlined text-[13px] text-[#8c6d3b]">pool</span>
               <span>Hồ bơi vô cực</span>
             </span>
             <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200/60 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[13px] text-[#0194f3]">restaurant</span>
+              <span className="material-symbols-outlined text-[13px] text-[#8c6d3b]">restaurant</span>
               <span>Buffet sáng miễn phí</span>
             </span>
             <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200/60 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[13px] text-[#0194f3]">meeting_room</span>
+              <span className="material-symbols-outlined text-[13px] text-[#8c6d3b]">meeting_room</span>
               <span>{hotel.TotalRooms || 200} phòng nghỉ</span>
             </span>
           </div>
@@ -130,7 +130,7 @@ export default function TravelokaHotelCard({
         {/* Khối bên phải (Đánh giá + Ưu đãi + Giá tiền + Nút Chọn phòng) */}
         <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           
-          {/* Đánh giá Traveloka */}
+          {/* Đánh giá */}
           <div className="flex items-center gap-2">
             <div className="flex flex-col text-left">
               <span className="text-xs font-bold text-slate-800 leading-tight">
@@ -140,16 +140,16 @@ export default function TravelokaHotelCard({
                 ({reviewsCount} đánh giá)
               </span>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-[#0064d2] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+            <div className="w-8 h-8 rounded-lg bg-[#203044] text-[#ffd985] flex items-center justify-center font-bold text-xs shadow-xs border border-[#b9a277]/40">
               {ratingScore}
             </div>
           </div>
 
           {/* Khối giá tiền & Nút Chọn phòng */}
           <div className="flex flex-col sm:items-end text-left sm:text-right">
-            {/* Tag ưu đãi Traveloka */}
-            <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#018843] bg-[#e8f7ee] px-2 py-0.5 rounded mb-1 w-fit sm:self-end">
-              <span className="material-symbols-outlined text-[13px]">local_offer</span>
+            {/* Tag ưu đãi */}
+            <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#8c6d3b] bg-[#fbf8f2] border border-[#d8c49e]/70 px-2.5 py-0.5 rounded-md mb-1 w-fit sm:self-end">
+              <span className="material-symbols-outlined text-[13px] text-[#8c6d3b]">local_offer</span>
               <span>{hotel.Tag || 'Special for you!'}</span>
             </div>
 
@@ -158,12 +158,12 @@ export default function TravelokaHotelCard({
               {formatPriceVND(originalPrice)}
             </span>
 
-            {/* Giá bán nổi bật */}
+            {/* Giá bán nổi bật - Tone Nâu Sang Trọng */}
             <div className="flex items-baseline gap-1 text-left sm:justify-end">
-              <span className="text-xl sm:text-2xl font-bold text-[#ff5e1f]">
+              <span className="text-xl sm:text-2xl font-bold text-[#8c6d3b]">
                 {formatPriceVND(minPrice).replace(' VND', '')}
               </span>
-              <span className="text-xs font-bold text-[#ff5e1f]">VND</span>
+              <span className="text-xs font-bold text-[#8c6d3b]">VND</span>
             </div>
 
             {/* Thuế phí */}
@@ -174,11 +174,11 @@ export default function TravelokaHotelCard({
               Bao gồm thuế và phí
             </span>
 
-            {/* Nút Chọn phòng chuẩn Traveloka */}
+            {/* Nút Chọn phòng - Tone Nâu Sang Trọng Của Website */}
             <button
               type="button"
               onClick={() => onSelectHotel(hotel.BranchId)}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-[#ff5e1f] hover:bg-[#e04f18] active:scale-98 text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-[#8c6d3b] hover:bg-[#74572b] active:scale-98 text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>Chọn phòng</span>
               <span className="material-symbols-outlined text-sm">arrow_forward</span>

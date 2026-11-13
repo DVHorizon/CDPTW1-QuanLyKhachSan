@@ -1116,12 +1116,12 @@ export default function SearchRooms() {
                     </div>
 
                     <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-sky-50/70 border border-sky-200 px-3 py-1.5 rounded-full">
-                        <span className="font-medium">Xếp theo:</span>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-700 bg-[#fbf8f2] border border-[#dedad0] hover:border-[#b9a277] px-3 py-1.5 rounded-full transition-colors">
+                        <span className="font-medium text-slate-600">Xếp theo:</span>
                         <select
                           value={hotelSortBy}
                           onChange={(e) => setHotelSortBy(e.target.value)}
-                          className="bg-transparent text-sky-900 font-bold focus:outline-none cursor-pointer"
+                          className="bg-transparent text-[#8c6d3b] font-bold focus:outline-none cursor-pointer"
                         >
                           <option value="popular">Độ phổ biến</option>
                           <option value="price_asc">Giá thấp nhất</option>
@@ -1129,8 +1129,8 @@ export default function SearchRooms() {
                         </select>
                       </div>
 
-                      <div className="text-xs px-3 py-1.5 rounded-full bg-sky-50/70 text-sky-900 border border-sky-200 font-semibold hidden md:inline-flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs text-sky-700">payments</span>
+                      <div className="text-xs px-3 py-1.5 rounded-full bg-[#fbf8f2] text-slate-700 border border-[#dedad0] font-semibold hidden md:inline-flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs text-[#8c6d3b]">payments</span>
                         <span>Mỗi phòng mỗi đêm</span>
                       </div>
                     </div>
