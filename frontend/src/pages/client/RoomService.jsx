@@ -106,6 +106,10 @@ const RoomService = () => {
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrModalData, setQrModalData] = useState(null);
 
+  // Mobile Sidebar & Cart Drawer State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+
   // Fetch Active Stays / Rooms from Database
   useEffect(() => {
     const fetchActiveStays = async () => {
@@ -164,18 +168,12 @@ const RoomService = () => {
     fetchCategories();
   }, []);
 
-  // Fetch Menu Items from Database
+  // Fetch Menu Items from Database (Lấy toàn bộ thực đơn khả dụng để hiển thị trải dài theo danh mục)
   useEffect(() => {
     const fetchMenuItems = async () => {
       setIsLoadingMenu(true);
       try {
-        let url = 'http://localhost:5000/api/v1/menu-items?limit=100&availableOnly=true';
-        if (selectedCategoryId && selectedCategoryId !== 'ALL') {
-          url += `&category=${selectedCategoryId}`;
-        }
-        if (searchKeyword.trim()) {
-          url += `&keyword=${encodeURIComponent(searchKeyword.trim())}`;
-        }
+        const url = 'http://localhost:5000/api/v1/menu-items?limit=200&availableOnly=true';
         const res = await fetch(url);
         const data = await res.json();
         if (data && data.success && Array.isArray(data.data)) {
@@ -195,12 +193,8 @@ const RoomService = () => {
       }
     };
 
-    const timer = setTimeout(() => {
-      fetchMenuItems();
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [selectedCategoryId, searchKeyword]);
+    fetchMenuItems();
+  }, []);
 
   // Cart operations
   const handleQuickAddToCart = (item, e) => {
@@ -425,327 +419,251 @@ const RoomService = () => {
 
   return (
     <div className="bg-[#f4fbf4] min-h-screen text-slate-800 font-sans antialiased">
-      <GuestSidebar />
-      <div className="pl-72">
-        <GuestHeader />
-        <main className="relative pt-24 px-8 pb-12 w-full max-w-[1600px] mx-auto">
-          {/* Header Ribbon */}
-          <div className="w-full bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[28px]">room_service</span>
+      <GuestSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <div className="lg:pl-72 transition-all">
+        <GuestHeader onToggleSidebar={() => setIsSidebarOpen(prev => !prev)} />
+        <main className="relative pt-20 sm:pt-24 px-3 sm:px-8 pb-24 lg:pb-12 w-full max-w-[1600px] mx-auto">
+          {/* Header Ribbon & Hồ Sơ Khách Hàng / Bàn Ăn ở phía trên */}
+          <div className="w-full bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-4 sm:mb-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[28px]">room_service</span>
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-widest block">
+                    Dịch Vụ Phục Vụ Ẩm Thực
+                  </span>
+                  <h1 className="text-2xl font-bold text-slate-800 font-sans tracking-tight">
+                    Đặt Món Tận Phòng &amp; Bàn Ăn
+                  </h1>
+                </div>
               </div>
-              <div>
-                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-widest block">
-                  Dịch Vụ Phục Vụ Tại Phòng
-                </span>
-                <h1 className="text-2xl font-bold text-slate-800" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Đặt Món Ẩm Thực Tận Phòng
-                </h1>
+
+              {/* Bộ Chọn Hình Thức: Giao Phòng vs Bàn Ăn */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => { setOrderTarget('Room'); setErrorMessage(''); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${orderTarget === 'Room' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">room_service</span>
+                    <span>Giao Tận Phòng</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setOrderTarget('Table'); setErrorMessage(''); checkCustomerTableReservation(); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${orderTarget === 'Table' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">restaurant</span>
+                    <span>Gọi Món Tại Bàn</span>
+                    {tableReservation && <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Bộ Chọn Phòng Lưu Trú */}
-            {/* Bộ Chọn Hình Thức: Giao Phòng vs Bàn Ăn */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => { setOrderTarget('Room'); setErrorMessage(''); }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${orderTarget === 'Room' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">room_service</span>
-                  <span>Giao Tận Phòng</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setOrderTarget('Table'); setErrorMessage(''); checkCustomerTableReservation(); }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${orderTarget === 'Table' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">restaurant</span>
-                  <span>Gọi Món Tại Bàn</span>
-                  {tableReservation && <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>}
-                </button>
-              </div>
-
-              {orderTarget === 'Room' ? (
-                <div className="flex items-center gap-2 bg-emerald-50/80 border border-emerald-200/80 px-3 py-1.5 rounded-xl shadow-sm">
-                  <span className="material-symbols-outlined text-emerald-700 text-[18px]">meeting_room</span>
-                  <span className="text-xs font-bold text-slate-700">Phòng:</span>
-                  {activeStays.length === 1 ? (
-                    <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-xs px-2.5 py-1 rounded-lg shadow-inner">
-                      <span>Phòng #{activeStays[0].roomNumber}</span>
-                      <span className="text-[11px] font-semibold text-emerald-700">({activeStays[0].guestName})</span>
-                    </div>
-                  ) : (
-                    <select
-                      value={stayId || ''}
-                      onChange={(e) => {
-                        const sId = Number(e.target.value);
-                        const found = activeStays.find(s => s.stayId === sId);
-                        if (found) {
-                          setSelectedStay(found);
-                          setStayId(found.stayId);
-                          setRoomId(found.roomId);
-                          setErrorMessage('');
-                        }
-                      }}
-                      className="bg-white border border-emerald-300 rounded-lg px-2.5 py-1 font-bold text-emerald-800 text-xs shadow-sm focus:outline-none cursor-pointer"
-                    >
-                      {activeStays.length === 0 ? (
-                        <option value="">Chưa có phòng lưu trú</option>
-                      ) : (
-                        activeStays.map(s => (
-                          <option key={s.stayId} value={s.stayId}>
-                            Phòng #{s.roomNumber} - {s.guestName}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl shadow-sm">
-                  <span className="material-symbols-outlined text-amber-700 text-[18px]">table_restaurant</span>
-                  <span className="text-xs font-bold text-amber-900">Bàn Ăn:</span>
-                  {checkingTableRes ? (
-                    <span className="text-xs text-slate-500 italic">Đang kiểm tra bàn đã đặt...</span>
-                  ) : tableReservations && tableReservations.length > 0 ? (
-                    <div className="flex items-center gap-2">
-                      {tableReservations.length === 1 ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-xs text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300">
-                            {tableReservations[0].tableNumber} ({tableReservations[0].location})
+            {/* Dải thông tin Khách hàng / Bàn ăn + Ghi chú cho Bếp */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-3 border-t border-slate-100 items-center">
+              {/* Bên trái: Thông tin vị trí & Đối tượng nhận món */}
+              <div className="md:col-span-5 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/60 flex items-center gap-3.5">
+                {orderTarget === "Table" ? (
+                  tableReservation ? (
+                    <>
+                      <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center flex-shrink-0 shadow-inner">
+                        <span className="material-symbols-outlined text-[24px]">table_restaurant</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-slate-800">{tableReservation.tableNumber}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            Đã Đặt Bàn
                           </span>
-                          <span className="text-[11px] text-emerald-700 font-medium">✓ Đã đặt trước</span>
                         </div>
-                      ) : (
+                        <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+                          <span>{tableReservation.location}</span>
+                          <span>•</span>
+                          <span>{tableReservation.guestCount} Khách</span>
+                          <span>•</span>
+                          <span className="text-emerald-700 font-medium">#{tableReservation.reservationId}</span>
+                        </div>
+                      </div>
+                      {tableReservations.length > 1 && (
                         <select
-                          value={tableReservation?.tableId || tableReservations[0]?.tableId}
+                          value={tableReservation.tableId}
                           onChange={(e) => {
                             const found = tableReservations.find(r => String(r.tableId) === String(e.target.value));
                             if (found) setTableReservation(found);
                           }}
-                          className="text-xs font-bold text-emerald-800 bg-white border border-emerald-300 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer shadow-xs"
+                          className="text-xs font-bold text-emerald-900 bg-white border border-emerald-300 rounded-lg px-2 py-1 shadow-sm focus:outline-none cursor-pointer"
                         >
                           {tableReservations.map((r) => (
                             <option key={r.reservationId} value={r.tableId}>
-                              {r.tableNumber} - {r.location} ({r.guestCount} khách)
+                              {r.tableNumber} - {r.location}
                             </option>
                           ))}
                         </select>
                       )}
-                    </div>
+                    </>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-rose-600 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[15px]">error</span>
-                        Chưa đặt bàn
-                      </span>
-                      <Link
-                        to="/dat-ban"
-                        className="px-2.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-0.5"
-                      >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2 text-rose-600 text-xs font-semibold">
+                        <span className="material-symbols-outlined text-[18px]">error</span>
+                        <span>Quý khách chưa có lượt đặt bàn nào trong ngày hôm nay.</span>
+                      </div>
+                      <Link to="/dat-ban" className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-1">
                         <span>Đặt Bàn</span>
-                        <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                        <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                       </Link>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          {/* Primary 3-Column Console Canvas */}
-          <div className="w-full px-space-lg py-space-lg">
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start px-space-lg">
-            {/* ========================================================================= */}
-            {/* CỘT 1: HỒ SƠ KHÁCH IN-HOUSE & THÔNG SỐ GIAO MÓN (28% -> Col span 3 or 4) */}
-            {/* ========================================================================= */}
-            <div className="xl:col-span-3 space-y-space-md">
-              {/* Thẻ Khách Hàng / Bàn Ăn */}
-              <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm space-y-space-md">
-                {orderTarget === "Table" ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Thông Tin Bàn Ăn</span>
-                      <div className="flex items-center gap-1.5">
-                        {tableReservations.length > 1 && (
-                          <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-label-sm text-label-sm font-bold">
-                            {tableReservations.length} BÀN ĐÃ ĐẶT
-                          </span>
-                        )}
-                        <span className={`px-space-xs py-0.5 rounded font-label-sm text-label-sm font-bold ${tableReservation ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                          {tableReservation ? "ĐÃ ĐẶT BÀN" : "CHƯA ĐẶT BÀN"}
-                        </span>
-                      </div>
-                    </div>
-                    {tableReservation ? (
-                      <div className="space-y-2 pt-space-xs">
-                        {tableReservations.length > 1 && (
-                          <div className="flex flex-col gap-1">
-                            <label className="text-[11px] font-bold text-slate-500 uppercase">Chọn bàn bạn muốn phục vụ món:</label>
-                            <select
-                              value={tableReservation.tableId}
-                              onChange={(e) => {
-                                const found = tableReservations.find(r => String(r.tableId) === String(e.target.value));
-                                if (found) setTableReservation(found);
-                              }}
-                              className="w-full text-xs font-bold text-emerald-900 bg-emerald-50/60 border border-emerald-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
-                            >
-                              {tableReservations.map((r) => (
-                                <option key={r.reservationId} value={r.tableId}>
-                                  {r.tableNumber} - {r.location} (Lượt #{r.reservationId})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                        <div className="flex items-start gap-space-md pt-1">
-                          <div className="min-w-[48px] px-2.5 py-2 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 flex-shrink-0 shadow-inner">
-                            <span className="material-symbols-outlined text-[24px]">restaurant</span>
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-headline-lg text-headline-sm text-on-surface font-bold truncate text-emerald-900">
-                              {tableReservation.tableNumber}
-                            </span>
-                            <div className="flex items-center gap-space-xs mt-0.5 text-xs text-slate-500">
-                              <span>{tableReservation.location}</span>
-                              <span>•</span>
-                              <span>{tableReservation.guestCount} Khách</span>
-                            </div>
-                            <span className="text-[11px] text-emerald-700 font-medium mt-1">
-                              Lượt #{tableReservation.reservationId} • {tableReservation.customerName}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-center space-y-2">
-                        <p className="text-xs text-rose-700 font-semibold">Quý khách chưa có lượt đặt bàn nào trong ngày hôm nay.</p>
-                        <Link to="/dat-ban" className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all">
-                          <span className="material-symbols-outlined text-[15px]">table_restaurant</span>
-                          <span>Đi Đến Đặt Bàn Ngay</span>
-                        </Link>
-                      </div>
-                    )}
-                  </>
+                  )
                 ) : (
                   <>
-                    <div className="flex items-center justify-between">
-                      <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">Hồ Sơ Khách In-House</span>
-                      <span className="px-space-xs py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
-                        Tầng {selectedStay?.floor || 8} • Tháp B
-                      </span>
+                    <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0 shadow-inner font-bold text-sm">
+                      #{selectedStay?.roomNumber || activeStays[0]?.roomNumber || "501"}
                     </div>
-                    <div className="flex items-start gap-space-md pt-space-xs">
-                      <div className="min-w-[48px] px-2.5 py-2 rounded-xl bg-surface-container-high flex items-center justify-center text-admin-primary flex-shrink-0 shadow-inner">
-                        <span className="font-headline-sm text-label-md font-bold text-center tracking-tight">
-                          {selectedStay?.roomNumber || "804"}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-slate-800 truncate">
+                          {selectedStay?.guestName || activeStays[0]?.guestName || user?.fullName || "Khách Hàng"}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                          {user?.tierName ? `Hạng ${user.tierName}` : "Hạng Standard"}
                         </span>
                       </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-headline-lg text-headline-sm text-on-surface font-bold truncate">
-                          {selectedStay?.guestName || user?.fullName || "Arthur Dent"}
-                        </span>
-                        <div className="flex items-center gap-space-xs mt-0.5">
-                          <span className="px-space-xs py-0.2 rounded-full bg-secondary/10 text-secondary font-label-sm text-label-sm font-semibold">
-                            {user?.tierName ? `Hạng ${user.tierName}` : "Silver Resident"}
-                          </span>
-                          <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
-                            Stay #{selectedStay?.stayId || 1}
-                          </span>
-                        </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        Tầng {selectedStay?.floor || 5} • Tháp B • Stay #{selectedStay?.stayId || 100}
                       </div>
                     </div>
+                    {activeStays.length > 1 && (
+                      <select
+                        value={stayId || ''}
+                        onChange={(e) => {
+                          const sId = Number(e.target.value);
+                          const found = activeStays.find(s => s.stayId === sId);
+                          if (found) {
+                            setSelectedStay(found);
+                            setStayId(found.stayId);
+                            setRoomId(found.roomId);
+                            setErrorMessage('');
+                          }
+                        }}
+                        className="bg-white border border-emerald-300 rounded-lg px-2 py-1 font-bold text-emerald-800 text-xs shadow-sm focus:outline-none cursor-pointer"
+                      >
+                        {activeStays.map(s => (
+                          <option key={s.stayId} value={s.stayId}>
+                            Phòng #{s.roomNumber}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </>
                 )}
-                {/* Ghi chú đơn hàng cho Bếp (Lưu vào FoodOrders.Note) */}
-                <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px] text-admin-primary">edit_note</span>
-                      Ghi Chú Đơn Hàng Cho Bếp
-                    </span>
-                  </div>
-                  <textarea 
-                    rows="3"
-                    value={orderNote}
-                    onChange={(e) => setOrderNote(e.target.value)}
-                    placeholder="Nhập ghi chú yêu cầu chế biến (VD: Không hành, sốt để riêng, mang thêm dao nĩa...)"
-                    className="w-full bg-surface-container-low p-space-sm rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-admin-primary resize-none placeholder:text-outline"
-                  />
-                  <p className="text-[11px] text-on-surface-variant">
-                    Ghi chú sẽ được chuyển thẳng đến màn hình điều phối bếp (KDS) và lưu trữ trên hóa đơn.
-                  </p>
-                </div>
+              </div>
+
+              {/* Bên phải: Ghi chú cho bếp 1 hàng ngang */}
+              <div className="md:col-span-7 bg-slate-50/80 p-2.5 px-3 rounded-xl border border-slate-200/60 flex items-center gap-3">
+                <span className="material-symbols-outlined text-emerald-700 text-[20px] flex-shrink-0">edit_note</span>
+                <input
+                  type="text"
+                  value={orderNote}
+                  onChange={(e) => setOrderNote(e.target.value)}
+                  placeholder="Ghi chú đơn hàng cho Bếp (VD: Không cay, mang sốt riêng, thêm dao nĩa...)"
+                  className="flex-1 bg-transparent text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                />
+                <span className="text-[10px] text-slate-400 font-medium hidden sm:inline flex-shrink-0">
+                  Chuyển trực tiếp sang màn hình Bếp (KDS)
+                </span>
               </div>
             </div>
+          </div>
 
+          {/* Primary 2-Column Console Canvas: Cột Trái = Món Ăn (8 cols) | Cột Phải = Phiếu Gọi Món & Thanh Toán (4 cols) */}
+          <div className="w-full">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
             {/* ========================================================================= */}
-            {/* CỘT 2: DANH MỤC THỰC ĐƠN & BẢNG MODIFIERS (44% -> Col span 5 or 6)       */}
+            {/* CỘT 1: DANH MỤC & MÓN ĂN (8 Cols) - CÓ THANH DANH MỤC TRẢI DÀI 1 HÀNG NGANG */}
             {/* ========================================================================= */}
-            <div className="xl:col-span-5 space-y-space-md">
-              {/* Thanh Tìm Kiếm Món & Phân Loại Thực Đơn */}
-              <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-md">
-                <div className="relative w-full">
-                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-[20px] text-outline">search</span>
-                  <input 
-                    className="w-full bg-surface-container-low rounded-lg pl-10 pr-space-md py-2 text-body-md font-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-admin-primary" 
-                    placeholder="Tìm kiếm món trong thực đơn Room Service (Ví dụ: Cá tuyết, Bò Wagyu...)" 
-                    type="text" 
-                    value={searchKeyword}
-                    onChange={(e) => setSearchKeyword(e.target.value)}
-                  />
-                  {searchKeyword && (
-                    <button 
-                      onClick={() => setSearchKeyword('')} 
-                      className="absolute right-3 top-2.5 text-outline hover:text-on-surface"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">close</span>
-                    </button>
-                  )}
-                </div>
-                {/* Phân loại Tabs từ Database */}
-                <div className="flex items-center gap-space-xs overflow-x-auto pb-1 scrollbar-thin">
-                  <button 
-                    onClick={() => setSelectedCategoryId('ALL')}
-                    className={`px-space-md py-1.5 rounded-lg font-label-sm text-label-sm whitespace-nowrap transition-colors ${
-                      selectedCategoryId === 'ALL'
-                        ? 'bg-admin-primary text-on-admin-primary shadow-sm font-bold'
-                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                    }`}
-                  >
-                    Tất Cả Danh Mục
-                  </button>
-                  {categories.map((cat) => (
-                    <button
-                      key={cat.CategoryId}
-                      onClick={() => setSelectedCategoryId(cat.CategoryId.toString())}
-                      className={`px-space-md py-1.5 rounded-lg font-label-sm text-label-sm whitespace-nowrap transition-colors ${
-                        selectedCategoryId === cat.CategoryId.toString()
-                          ? 'bg-admin-primary text-on-admin-primary shadow-sm font-bold'
-                          : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                      }`}
-                    >
-                      {cat.CategoryName}
-                    </button>
-                  ))}
-                </div>
-                {/* Đếm số lượng món */}
-                <div className="flex items-center justify-between pt-space-xs text-xs">
-                  <div className="flex items-center gap-space-xs">
-                    <span className="px-space-xs py-0.5 rounded-full bg-admin-primary/10 text-admin-primary font-label-sm text-label-sm flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">restaurant_menu</span>
-                      Menu In-House 5 Sao
+            <div className="xl:col-span-8 space-y-4">
+              {/* Tiêu đề & Thanh Danh Mục 1 Hàng Dài (Bấm để nhảy / lọc danh mục như Sơ đồ bàn ăn) */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-5 bg-emerald-600 rounded-full"></span>
+                    <h3 className="font-bold text-base text-slate-800">
+                      Thực Đơn Ẩm Thực 5 Sao
+                    </h3>
+                    <span className="text-xs text-slate-400 font-normal">
+                      ({isLoadingMenu ? '...' : `${menuItems.length} món sẵn sàng`})
                     </span>
                   </div>
-                  <span className="font-label-sm text-label-sm text-outline">
-                    {isLoadingMenu ? 'Đang tải thực đơn...' : `Hiển thị ${menuItems.length} món khả dụng`}
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs flex items-center gap-1 border border-emerald-200">
+                    <span className="material-symbols-outlined text-[14px]">restaurant_menu</span>
+                    Menu Phục Vụ Trực Tiếp
                   </span>
+                </div>
+
+                {/* Thanh Danh Mục Phân Chia Trải Dài 1 Hàng Ngang (Tương tự sơ đồ bàn ăn) */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategoryId('ALL');
+                      const el = document.getElementById('menu-scroll-container');
+                      if (el) el.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      selectedCategoryId === 'ALL'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-600'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                    }`}
+                  >
+                    <span>Tất Cả Danh Mục</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedCategoryId === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                      {menuItems.length}
+                    </span>
+                  </button>
+
+                  {/* Lấy danh sách tên danh mục thực tế từ menuItems */}
+                  {(() => {
+                    const catMap = {};
+                    menuItems.forEach(item => {
+                      const cName = item.MenuCategory?.CategoryName || 'Khác';
+                      catMap[cName] = (catMap[cName] || 0) + 1;
+                    });
+                    return Object.entries(catMap).map(([cName, count]) => {
+                      const isActive = selectedCategoryId === cName;
+                      return (
+                        <button
+                          key={cName}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCategoryId(cName);
+                            const targetSection = document.getElementById(`cat-section-${cName}`);
+                            if (targetSection) {
+                              targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                          }}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                            isActive
+                              ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-600'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : 'bg-emerald-500'}`}></span>
+                          <span>{cName}</span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
-              {/* Lưới Danh Sách Món Ăn (Menu Grid - Database Items) */}
+              {/* Danh sách món ăn hiển thị trải dài gom theo từng danh mục */}
               {isLoadingMenu ? (
                 <div className="bg-surface-container-lowest rounded-xl p-8 flex flex-col items-center justify-center text-outline gap-2 shadow-sm">
                   <span className="w-6 h-6 border-2 border-admin-primary border-t-transparent rounded-full animate-spin"></span>
@@ -754,106 +672,131 @@ const RoomService = () => {
               ) : menuItems.length === 0 ? (
                 <div className="bg-surface-container-lowest rounded-xl p-8 text-center text-outline shadow-sm space-y-2">
                   <span className="material-symbols-outlined text-4xl text-outline-variant">restaurant</span>
-                  <p className="text-sm font-semibold">Không tìm thấy món nào phù hợp</p>
-                  <p className="text-xs text-on-surface-variant">Vui lòng thử tìm từ khóa khác hoặc chọn danh mục khác.</p>
+                  <p className="text-sm font-semibold">Chưa có món ăn khả dụng</p>
+                  <p className="text-xs text-on-surface-variant">Vui lòng quay lại sau hoặc liên hệ nhân viên phục vụ.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md max-h-[560px] overflow-y-auto pr-1">
-                  {menuItems.map((item) => {
-                    const isSelected = selectedMenuItem?.MenuItemId === item.MenuItemId;
-                    const inCartItem = cartItems.find(ci => ci.menuItemId === item.MenuItemId);
-                    const formattedPrice = (parseFloat(item.Price) || 0).toLocaleString('vi-VN');
-                    const imgUrl = item.ImageUrl || 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400';
+                <div id="menu-scroll-container" className="space-y-space-lg max-h-[720px] overflow-y-auto pr-1">
+                  {(() => {
+                    // Gom nhóm toàn bộ món ăn theo danh mục
+                    const categoryGroups = {};
+                    menuItems.forEach((item) => {
+                      const catName = item.MenuCategory?.CategoryName || 'Món Đặc Sắc Khác';
+                      if (!categoryGroups[catName]) {
+                        categoryGroups[catName] = [];
+                      }
+                      categoryGroups[catName].push(item);
+                    });
 
-                    return (
-                      <div 
-                        key={item.MenuItemId}
-                        onClick={() => setSelectedMenuItem(item)}
-                        className={`bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm flex flex-col justify-between relative group cursor-pointer transition-all border ${
-                          isSelected 
-                            ? 'ring-2 ring-admin-primary border-admin-primary shadow-md' 
-                            : 'border-transparent hover:border-admin-primary/40 hover:shadow-md'
-                        }`}
-                      >
-                        <div className="relative h-32 w-full overflow-hidden bg-surface-container">
-                          <img 
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                            src={imgUrl} 
-                            alt={item.ItemName}
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400';
-                            }}
-                          />
-                          <div className="absolute top-2 right-2 bg-surface-container-lowest/90 backdrop-blur-sm px-space-xs py-0.5 rounded font-label-sm text-label-sm font-bold text-admin-primary shadow-sm">
-                            {formattedPrice} đ
-                          </div>
-                          {isSelected && (
-                            <div className="absolute top-2 left-2 flex gap-1">
-                              <span className="bg-admin-primary text-on-admin-primary px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow">
-                                Đang chọn
-                              </span>
-                            </div>
-                          )}
-                          {item.ServingTime && (
-                            <div className="absolute bottom-2 left-2">
-                              <span className="bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-medium">
-                                {item.ServingTime}
-                              </span>
-                            </div>
-                          )}
+                    return Object.entries(categoryGroups).map(([catTitle, items]) => (
+                      <div key={catTitle} id={`cat-section-${catTitle}`} className="space-y-space-xs scroll-mt-2">
+                        {/* Tiêu đề phân khu danh mục */}
+                        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md py-2 px-3.5 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+                          <span className="font-bold text-xs uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                            {catTitle}
+                          </span>
+                          <span className="text-[11px] text-slate-500 font-semibold px-2 py-0.5 rounded-full bg-slate-100">
+                            {items.length} món
+                          </span>
                         </div>
 
-                        <div className="p-space-md space-y-space-xs flex-1 flex flex-col justify-between">
-                          <div>
-                            <h4 className="font-headline-sm text-headline-sm text-on-surface font-semibold line-clamp-1">
-                              {item.ItemName}
-                            </h4>
-                            <p className="font-body-sm text-body-sm text-on-surface-variant line-clamp-2 mt-0.5">
-                              {item.Description || 'Món ăn cao cấp chuẩn bị bởi bếp trưởng Grand Horizon.'}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between pt-space-xs mt-2 border-t border-outline-variant/30">
-                            <div className="flex gap-1 flex-wrap">
-                              {item.MenuCategory && (
-                                <span className="px-1.5 py-0.5 rounded bg-surface-container text-[10px] text-on-surface-variant font-medium">
-                                  {item.MenuCategory.CategoryName}
-                                </span>
-                              )}
-                              {item.KitchenStation && (
-                                <span className="px-1.5 py-0.5 rounded bg-admin-primary/10 text-[10px] text-admin-primary font-medium">
-                                  {item.KitchenStation}
-                                </span>
-                              )}
-                              {item.Allergens && (
-                                <span className="px-1.5 py-0.5 rounded bg-error/10 text-[10px] text-error font-medium flex items-center gap-0.5" title={`Dị ứng: ${item.Allergens}`}>
-                                  <span className="material-symbols-outlined text-[12px]">warning</span>
-                                  {item.Allergens}
-                                </span>
-                              )}
-                            </div>
+                        {/* Lưới món của danh mục này (3 cột rộng rãi trên màn hình lớn vì giờ đã là 8-col) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
+                          {items.map((item) => {
+                            const isSelected = selectedMenuItem?.MenuItemId === item.MenuItemId;
+                            const inCartItem = cartItems.find(ci => ci.menuItemId === item.MenuItemId);
+                            const formattedPrice = (parseFloat(item.Price) || 0).toLocaleString('vi-VN');
+                            const imgUrl = item.ImageUrl || 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400';
 
-                            {/* Nút Thêm Món / Hiển thị số lượng đã chọn */}
-                            <div className="flex items-center gap-1.5">
-                              {inCartItem && (
-                                <span className="text-xs font-bold text-admin-primary bg-admin-primary/10 px-1.5 py-0.5 rounded-full">
-                                  {inCartItem.quantity}x
-                                </span>
-                              )}
-                              <button 
-                                type="button"
-                                onClick={(e) => handleQuickAddToCart(item, e)}
-                                title="Thêm vào giỏ hàng"
-                                className="w-8 h-8 rounded-full bg-admin-primary text-on-admin-primary flex items-center justify-center hover:brightness-110 active:scale-95 shadow-sm transition-all"
+                            return (
+                              <div 
+                                key={item.MenuItemId}
+                                onClick={() => setSelectedMenuItem(item)}
+                                className={`bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm flex flex-col justify-between relative group cursor-pointer transition-all border ${
+                                  isSelected 
+                                    ? 'ring-2 ring-admin-primary border-admin-primary shadow-md' 
+                                    : 'border-transparent hover:border-admin-primary/40 hover:shadow-md'
+                                }`}
                               >
-                                <span className="material-symbols-outlined text-[18px]">add</span>
-                              </button>
-                            </div>
-                          </div>
+                                <div className="relative h-32 w-full overflow-hidden bg-surface-container">
+                                  <img 
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                                    src={imgUrl} 
+                                    alt={item.ItemName}
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400';
+                                    }}
+                                  />
+                                  <div className="absolute top-2 right-2 bg-surface-container-lowest/90 backdrop-blur-sm px-space-xs py-0.5 rounded font-label-sm text-label-sm font-bold text-admin-primary shadow-sm">
+                                    {formattedPrice} đ
+                                  </div>
+                                  {isSelected && (
+                                    <div className="absolute top-2 left-2 flex gap-1">
+                                      <span className="bg-admin-primary text-on-admin-primary px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow">
+                                        Đang chọn
+                                      </span>
+                                    </div>
+                                  )}
+                                  {item.ServingTime && (
+                                    <div className="absolute bottom-2 left-2">
+                                      <span className="bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                        {item.ServingTime}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="p-space-md space-y-space-xs flex-1 flex flex-col justify-between">
+                                  <div>
+                                    <h4 className="font-headline-sm text-headline-sm text-on-surface font-semibold line-clamp-1">
+                                      {item.ItemName}
+                                    </h4>
+                                    <p className="font-body-sm text-body-sm text-on-surface-variant line-clamp-2 mt-0.5">
+                                      {item.Description || 'Món ăn cao cấp chuẩn bị bởi bếp trưởng Grand Horizon.'}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center justify-between pt-space-xs mt-2 border-t border-outline-variant/30">
+                                    <div className="flex gap-1 flex-wrap">
+                                      {item.KitchenStation && (
+                                        <span className="px-1.5 py-0.5 rounded bg-admin-primary/10 text-[10px] text-admin-primary font-medium">
+                                          {item.KitchenStation}
+                                        </span>
+                                      )}
+                                      {item.Allergens && (
+                                        <span className="px-1.5 py-0.5 rounded bg-error/10 text-[10px] text-error font-medium flex items-center gap-0.5" title={`Dị ứng: ${item.Allergens}`}>
+                                          <span className="material-symbols-outlined text-[12px]">warning</span>
+                                          {item.Allergens}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Nút Thêm Món / Hiển thị số lượng đã chọn */}
+                                    <div className="flex items-center gap-1.5">
+                                      {inCartItem && (
+                                        <span className="text-xs font-bold text-admin-primary bg-admin-primary/10 px-1.5 py-0.5 rounded-full">
+                                          {inCartItem.quantity}x
+                                        </span>
+                                      )}
+                                      <button 
+                                        type="button"
+                                        onClick={(e) => handleQuickAddToCart(item, e)}
+                                        title="Thêm vào giỏ hàng"
+                                        className="w-8 h-8 rounded-full bg-admin-primary text-on-admin-primary flex items-center justify-center hover:brightness-110 active:scale-95 shadow-sm transition-all"
+                                      >
+                                        <span className="material-symbols-outlined text-[18px]">add</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    );
-                  })}
+                    ));
+                  })()}
                 </div>
               )}
 
@@ -992,10 +935,37 @@ const RoomService = () => {
             </div>
 
             {/* ========================================================================= */}
-            {/* CỘT 3: PHIẾU GỌI MÓN (TICKET #IRD-4092) & QUYẾT TOÁN GHI NỢ (28% -> Col 4) */}
+            {/* CỘT 3: PHIẾU GỌI MÓN (TICKET #IRD-4092) & QUYẾT TOÁN GHI NỢ (Col 4 Desktop) */}
             {/* ========================================================================= */}
-            <div className="xl:col-span-4 space-y-space-md">
-              <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-md space-y-space-md">
+            {/* Backdrop cho Mobile Cart Drawer */}
+            {isMobileCartOpen && (
+              <div
+                onClick={() => setIsMobileCartOpen(false)}
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 xl:hidden transition-opacity"
+              />
+            )}
+
+            <div className={`xl:col-span-4 space-y-space-md transition-all duration-300 ${
+              isMobileCartOpen 
+                ? "fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto bg-white rounded-t-3xl shadow-2xl p-4 sm:p-6 block border-t border-slate-200" 
+                : "hidden xl:block"
+            }`}>
+              {/* Thanh kéo / đóng trên mobile */}
+              <div className="xl:hidden flex items-center justify-between pb-3 border-b border-slate-100 mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-5 bg-emerald-600 rounded-full"></span>
+                  <span className="font-bold text-base text-slate-800">Phiếu Gọi Món &amp; Thanh Toán</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileCartOpen(false)}
+                  className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+
+              <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-md space-y-space-md border border-slate-100">
                 {/* Header Ticket */}
                 <div className="flex items-center justify-between pb-space-xs">
                   <div className="flex items-center gap-space-xs">
@@ -1106,30 +1076,74 @@ const RoomService = () => {
                   </div>
 
                   {/* Lựa chọn 1: RoomInvoice */}
-                  <label
+                  <div
                     onClick={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
-                    className={`flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-all border ${paymentMode === 'RoomInvoice'
+                    className={`p-3.5 rounded-xl cursor-pointer transition-all border ${paymentMode === 'RoomInvoice'
                       ? 'bg-emerald-50/80 border-emerald-500 shadow-sm ring-1 ring-emerald-500/30'
                       : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                       }`}
                   >
-                    <input
-                      type="radio"
-                      name="payment_mode"
-                      checked={paymentMode === 'RoomInvoice'}
-                      onChange={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
-                      className="mt-1 text-emerald-600 focus:ring-0 accent-emerald-600 cursor-pointer"
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[18px] text-emerald-700">domain</span>
-                        Gộp vào hóa đơn phòng (RoomInvoice)
-                      </span>
-                      <span className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                        Tạo folio charge liên kết Booking lưu trú. Chi phí được tính gộp khi trả phòng (Check-out).
-                      </span>
-                    </div>
-                  </label>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="payment_mode"
+                        checked={paymentMode === 'RoomInvoice'}
+                        onChange={() => { setPaymentMode('RoomInvoice'); setPaymentMethod(''); }}
+                        className="mt-1 text-emerald-600 focus:ring-0 accent-emerald-600 cursor-pointer"
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[18px] text-emerald-700">domain</span>
+                          Gộp vào hóa đơn phòng (RoomInvoice)
+                        </span>
+                        <span className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                          Tạo folio charge liên kết Booking lưu trú. Chi phí được tính gộp khi trả phòng (Check-out).
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* Cách A: Dạng Thẻ Chip / Pill bấm 1 chạm chọn phòng ghi nợ khi khách có nhiều phòng */}
+                    {paymentMode === 'RoomInvoice' && activeStays && activeStays.length > 0 && (
+                      <div className="mt-2.5 pt-2.5 border-t border-emerald-200/60 flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px] text-emerald-700">hotel</span>
+                          Ghi nợ vào phòng ({activeStays.length} phòng):
+                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {activeStays.map((s) => {
+                            const isChosen = (stayId === s.stayId);
+                            return (
+                              <button
+                                key={s.stayId}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setSelectedStay(s);
+                                  setStayId(s.stayId);
+                                  setRoomId(s.roomId);
+                                  setErrorMessage('');
+                                }}
+                                className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                                  isChosen
+                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs scale-102'
+                                    : 'bg-white hover:bg-emerald-50 text-slate-700 border-slate-300'
+                                }`}
+                              >
+                                {isChosen && <span className="material-symbols-outlined text-[13px]">check</span>}
+                                <span>Phòng #{s.roomNumber}</span>
+                                {s.guestName && (
+                                  <span className={`text-[10px] font-normal ${isChosen ? 'text-emerald-100' : 'text-slate-400'}`}>
+                                    ({s.guestName.split(' ').slice(-1)[0]})
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Lựa chọn 2: PayNow */}
                   <div className={`p-3.5 rounded-xl transition-all border ${paymentMode === 'PayNow'
@@ -1266,6 +1280,39 @@ const RoomService = () => {
             </div>
           </div>
 
+          {/* THANH NỔI (BOTTOM FLOATING BAR) TRÊN MOBILE ĐỂ XEM GIỎ HÀNG & THANH TOÁN */}
+          <div className="xl:hidden fixed bottom-4 inset-x-3 z-40">
+            <div className="bg-slate-900/95 backdrop-blur-md text-white p-3 rounded-2xl shadow-xl flex items-center justify-between border border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="relative w-11 h-11 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-inner">
+                  <span className="material-symbols-outlined text-[24px]">shopping_bag</span>
+                  {cartItems.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center shadow-sm">
+                      {cartItems.reduce((acc, it) => acc + it.quantity, 0)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-slate-300">
+                    {cartItems.length === 0 ? "Chưa có món nào" : `${cartItems.length} loại món`}
+                  </span>
+                  <span className="text-sm font-bold text-white tracking-tight">
+                    {Math.round(cartItems.reduce((s, i) => s + (i.unitPrice * i.quantity), 0) * 1.23).toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsMobileCartOpen(true)}
+                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 active:scale-95"
+              >
+                <span>Xem Phiếu Gọi</span>
+                <span className="material-symbols-outlined text-[16px]">expand_less</span>
+              </button>
+            </div>
+          </div>
+
           {/* MODAL QUÉT MÃ QR THANH TOÁN (PAYNOW) */}
           {showQrModal && qrModalData && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
@@ -1290,7 +1337,7 @@ const RoomService = () => {
                   </span>
                 </div>
 
-                <h3 className="font-serif text-xl font-bold text-on-surface mb-1">
+                <h3 className="font-sans text-xl font-bold text-on-surface mb-1">
                   Quét Mã Để Thanh Toán
                 </h3>
                 <p className="text-xs text-on-surface-variant mb-4">
