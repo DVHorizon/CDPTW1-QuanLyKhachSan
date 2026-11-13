@@ -93,27 +93,56 @@ function Home() {
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Danh sách options cho MorphDropdown Chi Nhánh Khách Sạn
+  // Danh sách options cho MorphDropdown Chi Nhánh Khách Sạn (Phân nhóm rõ nét, chuẩn 5 sao)
   const branchOptions = useMemo(() => {
+    const getRegionGroup = (b) => {
+      const id = Number(b.BranchId);
+      if ([8, 10, 13, 15].includes(id)) return 'MIỀN BẮC & KỲ QUAN';
+      if ([2, 4, 5, 7, 9, 11, 16].includes(id)) return 'MIỀN TRUNG & DI SẢN';
+      return 'MIỀN NAM & BIỂN ĐẢO';
+    };
+
     return homeData.branches.map(branch => {
-      const rawCity = branch.City
-        ? branch.City.split(',')[0].trim()
-        : (branch.Address ? branch.Address.split(',').pop()?.trim() : '');
-      const cityClean = rawCity ? rawCity.replace(/^(Tỉnh|Thành phố|TP\.?)\s+/i, '') : '';
+      const addressParts = (branch.Address || '').split(',');
+      const shortLoc = addressParts.length >= 2
+        ? `${addressParts[0].trim()}, ${addressParts[addressParts.length - 1].trim()}`
+        : (branch.City || branch.Address || 'Việt Nam');
+
       return {
         value: branch.BranchId,
-        label: `${branch.BranchName} ${cityClean ? `(${cityClean})` : ''}`,
-        subLabel: branch.Address || ''
+        label: branch.BranchName,
+        subLabel: shortLoc,
+        group: getRegionGroup(branch)
       };
     });
   }, [homeData.branches]);
 
   // Danh sách options cho MorphDropdown Số Khách & Phòng
   const guestOptions = useMemo(() => [
-    { value: '2-0-1', label: '2 Người lớn, 1 Phòng', subLabel: 'Phổ biến cho cặp đôi' },
-    { value: '1-0-1', label: '1 Người lớn, 1 Phòng', subLabel: 'Dành cho khách đơn' },
-    { value: '2-1-1', label: '2 Lớn, 1 Trẻ em', subLabel: 'Gia đình nhỏ' },
-    { value: '4-2-2', label: '4 Lớn, 2 Trẻ em (Villa)', subLabel: 'Biệt thự gia đình' }
+    {
+      group: 'LỰA CHỌN PHỔ BIẾN',
+      value: '2-0-1',
+      label: '2 Người lớn, 1 Phòng',
+      subLabel: 'Phù hợp cho cặp đôi & kỳ nghỉ riêng tư'
+    },
+    {
+      group: 'LỰA CHỌN PHỔ BIẾN',
+      value: '1-0-1',
+      label: '1 Người lớn, 1 Phòng',
+      subLabel: 'Dành cho khách công tác hoặc du lịch đơn'
+    },
+    {
+      group: 'GIA ĐÌNH & NHÓM BẠN',
+      value: '2-1-1',
+      label: '2 Lớn, 1 Trẻ em',
+      subLabel: 'Không gian ấm cúng cho gia đình nhỏ'
+    },
+    {
+      group: 'GIA ĐÌNH & NHÓM BẠN',
+      value: '4-2-2',
+      label: '4 Lớn, 2 Trẻ em (Villa)',
+      subLabel: 'Biệt thự hồ bơi riêng & phòng khách rộng'
+    }
   ], []);
 
   // Tải dữ liệu từ Backend API (nếu có), fallback về Mock data
