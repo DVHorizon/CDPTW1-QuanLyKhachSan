@@ -248,6 +248,12 @@ const NAV_GROUPS = [
         to: "/admin/channel-manager",
         allowedRoles: ["Admin", "Receptionist"],
       },
+      {
+        icon: "celebration",
+        label: "Đặt Sảnh Tiệc & Hội Nghị MICE",
+        to: "/admin/banquet-mice",
+        allowedRoles: ["Admin", "Receptionist"],
+      },
     ],
   },
   {

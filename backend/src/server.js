@@ -193,6 +193,10 @@ app.use('/api/v1/police-declaration', require('./routes/policeDeclarationRoutes'
 app.use('/api/channel-manager', require('./routes/channelManagerRoutes'));
 app.use('/api/v1/channel-manager', require('./routes/channelManagerRoutes'));
 
+// Route Quản lý Đặt sảnh tiệc, Hội nghị & Sự kiện đoàn (Banquet & MICE Event Booking - Module 53)
+app.use('/api/banquet-events', require('./routes/banquetRoutes'));
+app.use('/api/v1/banquet-events', require('./routes/banquetRoutes'));
+
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
 app.use('/api/v1/guest',      require('./modules/guest'));
