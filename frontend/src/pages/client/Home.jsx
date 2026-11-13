@@ -650,7 +650,7 @@ function Home() {
 
         {/* ================= 3. ROOM COLLECTION SECTION ================= */}
         <section id="room-collection" className="w-full py-16 lg:py-24 bg-[#fafaf8] scroll-mt-24">
-          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <div className="w-full px-4 sm:px-8 lg:px-12">
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
               <div>
                 <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
@@ -829,7 +829,7 @@ function Home() {
           <div className="absolute top-0 right-0 w-96 h-96 bg-[#b9a277]/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#203044]/60 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
+          <div className="w-full px-4 sm:px-8 lg:px-12 relative z-10">
             <div className="text-center max-w-3xl mx-auto mb-14">
               <span className="text-[11px] uppercase tracking-widest text-[#ffd985] font-bold">
                 Đặc Quyền Nghỉ Dưỡng
@@ -909,7 +909,7 @@ function Home() {
 
         {/* ================= 6. FEATURED EXPERIENCES SECTION (4 PHOTO CARDS) ================= */}
         <section id="am-thuc" className="w-full py-20 lg:py-24 bg-[#fbf8f2] border-t border-[#dedad0]">
-          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <div className="w-full px-4 sm:px-8 lg:px-12">
             <div className="text-center max-w-3xl mx-auto mb-14">
               <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
                 Trải Nghiệm Độc Bản
@@ -965,7 +965,7 @@ function Home() {
 
         {/* ================= 7. GUEST REVIEWS & ELITE MEMBERSHIP ================= */}
         <section className="w-full py-20 lg:py-24 bg-[#fafaf8] border-t border-[#dedad0]">
-          <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <div className="w-full px-4 sm:px-8 lg:px-12">
             {/* Section Heading placed above grid so both columns align at the top */}
             <div className="mb-8">
               <span className="text-[11px] uppercase tracking-widest text-[#b9a277] font-bold">
