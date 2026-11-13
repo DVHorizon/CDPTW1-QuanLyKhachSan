@@ -136,7 +136,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${isVisible ? 'translate-y-0' : '-translate-y-full'} ${isTop ? 'bg-[#fafaf8]/95 backdrop-blur-md shadow-none border-b border-[#dedad0]/60' : 'bg-[#fafaf8]/98 backdrop-blur-xl shadow-[0_2px_15px_rgba(32,48,68,0.08)] border-b border-[#dedad0]'}`}>
-      <div className="h-20 w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between max-w-[1440px] mx-auto gap-2 lg:gap-4">
+      <div className="h-20 w-full px-4 sm:px-8 lg:px-12 flex items-center justify-between gap-3 lg:gap-6">
 
         {/* Brand Logo & Tagline */}
         <Link to="/" className="flex items-center gap-2.5 sm:gap-3 shrink-0 group">
@@ -154,29 +154,29 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
         </Link>
 
         {/* Navigation Menu for Desktop */}
-        <nav className="hidden xl:flex items-center gap-3.5 2xl:gap-5 shrink-0">
-          <Link className="text-[13px] font-semibold text-[#203044] hover:text-[#b9a277] transition-colors whitespace-nowrap" to="/">
+        <nav className="hidden xl:flex items-center gap-2.5 2xl:gap-5">
+          <Link className="text-[13px] font-semibold text-[#203044] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" to="/">
             {t.home}
           </Link>
-          <Link className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" to="/hotels">
+          <Link className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" to="/hotels">
             {t.hotels}
           </Link>
-          <Link className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" to="/rooms">
+          <Link className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" to="/rooms">
             {t.rooms}
           </Link>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#uu-dai">
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#uu-dai">
             {t.offers}
           </a>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#trai-nghiem">
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#trai-nghiem">
             {t.amenities}
           </a>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#am-thuc">
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#am-thuc">
             {t.dining}
           </a>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#hoi-vien">
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#hoi-vien">
             {t.elite}
           </a>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#faq">
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#faq">
             {t.faq}
           </a>
         </nav>
@@ -275,11 +275,11 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
                 className="flex items-center gap-2 cursor-pointer select-none group"
                 title={`${user.fullName} (${user.tierName || 'Elite'})`}
               >
-                <div className="hidden 2xl:flex flex-col text-right shrink-0">
-                  <span className="text-[11.5px] text-[#203044] font-bold leading-tight whitespace-nowrap group-hover:text-[#b9a277] transition-colors">
+                <div className="hidden 2xl:flex flex-col text-right shrink-0 max-w-[140px]">
+                  <span className="text-[11.5px] text-[#203044] font-bold leading-tight truncate group-hover:text-[#b9a277] transition-colors">
                     {user.fullName}
                   </span>
-                  <span className="text-[9.5px] text-[#b9a277] font-bold uppercase tracking-wider whitespace-nowrap">
+                  <span className="text-[9.5px] text-[#b9a277] font-bold uppercase tracking-wider truncate">
                     Hạng {user.tierName || t.memberTitle}
                   </span>
                 </div>
