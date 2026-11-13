@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import RoomDetailModal from '../../components/modals/RoomDetailModal';
 import QuickBookingModal from '../../components/modals/QuickBookingModal';
+import AmenityPerspectiveCarousel from '../../components/client/AmenityPerspectiveCarousel';
 import { fetchHomeData } from '../../api/hotelApi';
 import {
   mockBranches,
@@ -876,32 +877,8 @@ function Home() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {homeData.amenities.map((amenity) => (
-                <div
-                  key={amenity.AmenityId}
-                  className="bg-white rounded-2xl p-6 border border-[#dedad0] hover:border-[#b9a277] hover:shadow-md transition-all group flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="w-12 h-12 rounded-xl bg-[#203044] text-[#b9a277] flex items-center justify-center mb-4 group-hover:scale-105 group-hover:bg-[#b9a277] group-hover:text-white transition-all shadow-xs overflow-hidden shrink-0">
-                      <span className="material-symbols-outlined text-[26px]">
-                        {amenity.IconName || 'hotel'}
-                      </span>
-                    </div>
-                    <h3 className="font-serif text-[17px] text-[#203044] font-bold mb-2 leading-snug group-hover:text-[#b9a277] transition-colors">
-                      {amenity.AmenityName}
-                    </h3>
-                    <p className="text-[13px] text-[#373435]/80 leading-relaxed">
-                      {amenity.Description}
-                    </p>
-                  </div>
-                  <div className="pt-4 mt-4 border-t border-[#dedad0]/60 flex items-center text-[12px] font-bold text-[#b9a277] gap-1">
-                    <span>Đặc quyền phục vụ 24/7</span>
-                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {/* 3D Perspective Coverflow Carousel chuẩn phong cách Amory Luxury */}
+            <AmenityPerspectiveCarousel />
           </div>
         </section>
 
