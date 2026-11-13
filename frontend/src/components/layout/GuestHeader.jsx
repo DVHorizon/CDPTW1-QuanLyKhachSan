@@ -2,24 +2,34 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
-export default function GuestHeader() {
+export default function GuestHeader({ onToggleSidebar }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
 
   return (
-    <header className="fixed top-0 left-72 right-0 h-20 bg-white/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-8 border-b border-slate-100 select-none">
-      <div className="flex items-center gap-6">
+    <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 sm:h-20 bg-white/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-4 sm:px-8 border-b border-slate-100 select-none">
+      <div className="flex items-center gap-3 sm:gap-6">
+        {/* Mobile Hamburger Button */}
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          aria-label="Mở menu"
+          className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-emerald-700 hover:bg-slate-100 transition-colors"
+        >
+          <span className="material-symbols-outlined text-[24px]">menu</span>
+        </button>
+
         <Link to="/" className="flex flex-col group">
-          <span className="text-xl font-medium text-slate-900 tracking-tight group-hover:text-emerald-700 transition-colors" style={{ fontFamily: "'Playfair Display', serif" }}>
-            Grand Horizon Resort & Suites
+          <span className="text-base sm:text-xl font-medium text-slate-900 tracking-tight group-hover:text-emerald-700 transition-colors truncate max-w-[200px] sm:max-w-none font-sans font-bold">
+            Grand Horizon
           </span>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="hidden sm:flex items-center gap-2 text-xs">
             <span className="text-slate-400 uppercase tracking-wider font-semibold">Bãi Trường, Phú Quốc</span>
             <span className="text-slate-300">•</span>
             <span className="text-emerald-700 font-medium flex items-center gap-1">
               <span className="material-symbols-outlined text-[14px]">verified</span>
-              Khu Nghỉ Dưỡng 5 Sao Quốc Tế
+              5 Sao Quốc Tế
             </span>
           </div>
         </Link>
