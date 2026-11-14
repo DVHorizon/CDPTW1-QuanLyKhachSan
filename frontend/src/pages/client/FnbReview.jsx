@@ -48,6 +48,7 @@ const FnbReview = () => {
   // Trạng thái xử lý gửi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [reviewResult, setReviewResult] = useState(null);
 
@@ -230,12 +231,12 @@ const FnbReview = () => {
 
   return (
     <div className="bg-[#f4fbf4] min-h-screen text-slate-800 font-sans antialiased">
-      <GuestSidebar />
+      <GuestSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      <div className="pl-72">
-        <GuestHeader />
+      <div className="lg:pl-72 transition-all">
+        <GuestHeader onToggleSidebar={() => setIsSidebarOpen(prev => !prev)} />
 
-        <main className="relative pt-24 px-8 pb-12 w-full max-w-[1600px] mx-auto">
+        <main className="relative pt-20 sm:pt-24 px-3 sm:px-8 pb-12 w-full max-w-[1600px] mx-auto">
           {/* Header Banner - Sunset Beachfront Luxury Resort Atmosphere */}
           <div className="relative w-full rounded-2xl overflow-hidden shadow-xl mb-6 bg-white">
             <div
@@ -244,23 +245,23 @@ const FnbReview = () => {
                 backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuAXQJ2Gk5mN833eR3fyboRoo2wCUhJG4L9GsDPSMe1NCyP9y67hq0rz-HzbzQdFpmTIiqPyEPJAT5boYjk-_Fhlkl9naPRsQogH81hT7lKocBr4nqaOpNWD4d5iNmWI1FdUHgSh1LkM8CfkbjvxV5Y-XGGN-ASf9Bq80Pf9bEymYV0qpNMHdzja73KsnAcuR6xNkhk8CrZKkoAmqZwEc9GlPa9zAY-OSkysmTionvS5FWIDGuLRMXKO')`
               }}
             >
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent flex flex-col justify-end p-6 sm:p-8">
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent flex flex-col justify-end p-4 sm:p-8">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex flex-col gap-1.5 max-w-2xl">
                     <div className="flex items-center gap-2">
-                      <span className="px-3 py-0.5 rounded-full bg-emerald-500 text-white text-[11px] font-bold uppercase tracking-wider">
+                      <span className="px-2.5 sm:px-3 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">
                         Trải Nghiệm Thượng Lưu
                       </span>
-                      <span className="text-white/70 text-xs">•</span>
+                      <span className="text-white/70 text-xs hidden sm:inline">•</span>
                       <span className="text-white/90 text-xs font-semibold flex items-center gap-1">
                         <span className="material-symbols-outlined text-[16px] text-emerald-300">room_service</span>
                         Đơn F&B #{selectedOrderId || 'Chưa chọn đơn'}
                       </span>
                     </div>
-                    <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white tracking-tight font-sans">
                       Đánh Giá Trải Nghiệm Ẩm Thực
                     </h1>
-                    <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+                    <p className="text-xs sm:text-sm text-slate-200 leading-relaxed line-clamp-2 sm:line-clamp-none">
                       Cảm ơn Quý khách đã lựa chọn tiệc ẩm thực tại Grand Horizon. Mọi phản hồi sâu sắc từ Quý khách là kim chỉ nam để chúng tôi không ngừng hoàn thiện nghệ thuật phục vụ chuẩn 5 sao.
                     </p>
                   </div>
