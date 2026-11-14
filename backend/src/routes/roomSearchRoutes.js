@@ -29,6 +29,10 @@ router.post('/book', verifyToken, bookingEngineController.createOnlineBooking);
 
 // GET /api/v1/rooms/:roomId/pricing (FEAT-GUEST-12 / A12: Dynamic Pricing Engine)
 router.get('/:roomId/pricing', dynamicPricingController.getRoomDynamicPricing);
+// FEAT-GUEST-11: Room Review & Rating (Mã truy vết: A11)
+const roomReviewController = require('../controllers/roomReviewController');
+router.post('/:roomId/reviews', roomReviewController.createRoomReview);
+router.get('/:roomId/reviews', roomReviewController.getRoomReviews);
 
 // GET /api/v1/rooms/:id
 router.get('/:id', roomSearchController.getRoomDetail);

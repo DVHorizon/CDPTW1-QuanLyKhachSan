@@ -288,6 +288,15 @@ const bookingQrNotificationController = require('./controllers/bookingQrNotifica
 app.post('/api/v1/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
 app.post('/api/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
 
+// FEAT-GUEST-11: Room Review & Rating (Mã truy vết: A11)
+const roomReviewController = require('./controllers/roomReviewController');
+app.post('/rooms/:roomId/reviews', roomReviewController.createRoomReview);
+app.get('/rooms/:roomId/reviews', roomReviewController.getRoomReviews);
+app.post('/api/v1/rooms/:roomId/reviews', roomReviewController.createRoomReview);
+app.get('/api/v1/rooms/:roomId/reviews', roomReviewController.getRoomReviews);
+app.post('/api/rooms/:roomId/reviews', roomReviewController.createRoomReview);
+app.get('/api/rooms/:roomId/reviews', roomReviewController.getRoomReviews);
+
 // ─── Catch-all 404 Handler for API Routes (Guarantees JSON) ────────────────
 app.all(['/api', '/api/*'], (req, res) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');

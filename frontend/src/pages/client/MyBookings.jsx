@@ -55,6 +55,7 @@ export default function MyBookings() {
   const [qrModalBooking, setQrModalBooking] = useState(null);
   const [loadingQr, setLoadingQr] = useState(false);
   const [qrCodeData, setQrCodeData] = useState(null);
+
   // Debounce tìm kiếm
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -131,6 +132,7 @@ export default function MyBookings() {
       setLoadingQr(false);
     }
   };
+
   // Xử lý Hủy đặt phòng
   const handleOpenCancelModal = (booking, e) => {
     if (e) e.stopPropagation();
@@ -654,12 +656,21 @@ export default function MyBookings() {
                             )}
 
                             {isCompleted && (
-                              <Link
-                                to={`/rooms/${booking.roomType?.RoomTypeId || ''}`}
-                                className="px-4 py-2 rounded-xl bg-[#725b38] text-white text-xs font-bold hover:bg-[#584323] transition-colors shadow-xs"
-                              >
-                                Đặt Lại Phòng Này
-                              </Link>
+                              <>
+                                <Link
+                                  to={`/rooms/${booking.roomType?.RoomTypeId || booking.assignedRoom?.roomId || 1}/reviews/new?bookingId=${booking.bookingId}`}
+                                  className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-[#fedeb2] text-[#78603e] hover:bg-[#725b38] hover:text-white text-xs font-bold transition-all shadow-xs"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">rate_review</span>
+                                  <span>WRITE REVIEW</span>
+                                </Link>
+                                <Link
+                                  to={`/rooms/${booking.roomType?.RoomTypeId || ''}`}
+                                  className="px-4 py-2 rounded-xl bg-[#725b38] text-white text-xs font-bold hover:bg-[#584323] transition-colors shadow-xs"
+                                >
+                                  Đặt Lại Phòng Này
+                                </Link>
+                              </>
                             )}
                           </div>
                         </div>
@@ -802,6 +813,7 @@ export default function MyBookings() {
                   </button>
                 </div>
               )}
+
               {/* Thông tin phòng & lưu trú */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-[#eff4ff]/60 border border-[#d3e4fe]/50">
                 <div>
@@ -944,6 +956,15 @@ export default function MyBookings() {
             </div>
 
             <div className="p-5 border-t border-[#c6c6cd]/30 flex justify-end gap-3 bg-white">
+              {selectedBooking.status === 'Completed' && (
+                <Link
+                  to={`/rooms/${selectedBooking.roomType?.RoomTypeId || selectedBooking.assignedRoom?.roomId || 1}/reviews/new?bookingId=${selectedBooking.bookingId}`}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#fedeb2] text-[#78603e] hover:bg-[#725b38] hover:text-white text-xs font-bold transition-all shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-[16px]">rate_review</span>
+                  <span>WRITE REVIEW (ĐÁNH GIÁ KỲ NGHỈ)</span>
+                </Link>
+              )}
               {['Pending', 'Confirmed'].includes(selectedBooking.status) && (
                 <button
                   type="button"
