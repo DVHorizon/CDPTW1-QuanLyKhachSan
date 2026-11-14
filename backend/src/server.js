@@ -254,6 +254,10 @@ app.use('/api/v1/operations', require('./modules/operations'));
 // Guest search (backward compat — cũng hoạt động qua /api/v1/guest/rooms/search)
 app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
 app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
+// FEAT-GUEST-13B: Direct room comparison endpoint GET /rooms/compare
+app.get('/rooms/compare', require('./controllers/roomCompareController').compareRooms);
+app.get('/api/rooms/compare', require('./controllers/roomCompareController').compareRooms);
+
 // FEAT-GUEST-05: Direct booking endpoint
 app.post('/bookings', require('./middlewares/authMiddleware').verifyToken, require('./controllers/bookingEngineController').createOnlineBooking);
 

@@ -593,4 +593,34 @@ export const getAiRoomRecommendationsApi = async ({ maxBudget, travelStyle, gues
   }
 };
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * FEAT-GUEST-13B: SO SÁNH PHÒNG TRỰC QUAN (ROOM COMPARISON MATRIX - A13)
+ * GET /rooms/compare?ids=101,304,501&filterView=ALL_ATTRIBUTES
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const compareRoomsApi = async ({ ids, filterView = 'ALL_ATTRIBUTES' }) => {
+  try {
+    const idParam = Array.isArray(ids) ? ids.join(',') : ids;
+    const query = new URLSearchParams({
+      ids: idParam,
+      filterView
+    }).toString();
+
+    let res = await fetch(`${API_BASE_URL}/v1/rooms/compare?${query}`);
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/compare?${query}`);
+    }
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi compareRoomsApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ so sánh phòng.'
+    };
+  }
+};
+
 
