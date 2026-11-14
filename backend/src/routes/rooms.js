@@ -124,6 +124,70 @@ function toSpecRoom(r) {
   };
 }
 
+const BRANCH_METADATA = {
+  1: {
+    City: 'Phú Quốc, Kiên Giang',
+    ImageUrl: 'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 5.0,
+    TotalReviews: 248,
+    Highlight: 'Ốc đảo nhiệt đới riêng biệt với 1km bờ biển Bãi Khem cát trắng mịn và rừng nguyên sinh bao bọc',
+    Tag: 'Bãi biển riêng • Biệt thự hồ bơi riêng'
+  },
+  2: {
+    City: 'Cam Ranh, Khánh Hòa',
+    ImageUrl: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 195,
+    Highlight: 'Khu nghỉ dưỡng ốc đảo thanh bình ngắm trọn bình minh Bãi Dài ngọc bích với đầm sen và vườn nhiệt đới',
+    Tag: 'Vịnh biển nguyên sơ • Spa trị liệu'
+  },
+  3: {
+    City: 'Côn Đảo, Bà Rịa - Vũng Tàu',
+    ImageUrl: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 5.0,
+    TotalReviews: 182,
+    Highlight: 'Khu bảo tồn thiên nhiên biệt lập, trải nghiệm rùa biển đẻ trứng và lặn ngắm rạn san hô nguyên sơ',
+    Tag: 'Biệt lập riêng tư • Thiên nhiên bảo tồn'
+  },
+  4: {
+    City: 'Mỹ Khê, Đà Nẵng',
+    ImageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 310,
+    Highlight: 'Tuyệt tác kiến trúc hiện đại vươn mình bên bờ biển Mỹ Khê - top bãi biển quyến rũ nhất hành tinh',
+    Tag: 'Mặt biển Mỹ Khê • Hồ bơi vô cực chân mây'
+  },
+  5: {
+    City: 'Trần Phú, Nha Trang',
+    ImageUrl: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?q=80&w=1200&auto=format&fit=crop',
+    Gallery: [
+      'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop'
+    ],
+    Rating: 4.9,
+    TotalReviews: 220,
+    Highlight: 'Tổ hợp nghỉ dưỡng và căn hộ sang trọng ngay trái tim cung đường biển Trần Phú sầm uất',
+    Tag: 'Trung tâm Trần Phú • Du thuyền riêng'
+  }
+};
+
 // ─── GET DANH SÁCH CHI NHÁNH & LOẠI PHÒNG (CHO DROPDOWN) ───────────────────
 router.get('/branches', async (req, res) => {
   try {
@@ -132,7 +196,55 @@ router.get('/branches', async (req, res) => {
       attributes: ['BranchId', 'BranchName', 'Address', 'Phone'],
       order: [['BranchId', 'ASC']],
     });
-    res.json({ success: true, data: list });
+
+    const enriched = await Promise.all(list.map(async (b) => {
+      const meta = BRANCH_METADATA[b.BranchId] || {
+        City: b.Address ? b.Address.split(',').pop()?.trim() : 'Việt Nam',
+        ImageUrl: 'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop',
+        Gallery: [],
+        Rating: 4.9,
+        TotalReviews: 150,
+        Highlight: 'Khu nghỉ dưỡng 5 sao thượng lưu tiêu chuẩn quốc tế',
+        Tag: 'Nghỉ dưỡng 5 sao'
+      };
+
+      let totalRooms = 200;
+      let minPrice = 1850000;
+      try {
+        totalRooms = await Room.count({ where: { BranchId: b.BranchId } });
+        const roomsInBranch = await Room.findAll({
+          where: { BranchId: b.BranchId },
+          attributes: ['RoomTypeId'],
+          group: ['RoomTypeId'],
+          limit: 100
+        });
+        const typeIds = roomsInBranch.map(r => r.RoomTypeId);
+        if (typeIds.length > 0) {
+          const foundMin = await RoomType.min('BasePrice', {
+            where: { RoomTypeId: { [Op.in]: typeIds }, IsDeleted: false }
+          });
+          if (foundMin) minPrice = Number(foundMin);
+        }
+      } catch (_) {}
+
+      return {
+        BranchId: b.BranchId,
+        BranchName: b.BranchName,
+        Address: b.Address,
+        Phone: b.Phone,
+        City: meta.City,
+        ImageUrl: meta.ImageUrl,
+        Gallery: meta.Gallery,
+        Rating: meta.Rating,
+        TotalReviews: meta.TotalReviews,
+        Highlight: meta.Highlight,
+        Tag: meta.Tag,
+        TotalRooms: totalRooms,
+        MinPrice: minPrice
+      };
+    }));
+
+    res.json({ success: true, data: enriched });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

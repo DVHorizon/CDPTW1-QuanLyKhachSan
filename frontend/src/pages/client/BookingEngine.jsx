@@ -416,8 +416,13 @@ export default function BookingEngine() {
       <main className="w-full pt-24 bg-[#f8f9ff] flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
         {/* Thanh tiêu đề phòng & Quy trình đặt phòng thu nhỏ ở góc phải (Style Traveloka) */}
         <div className="flex flex-wrap items-center justify-between gap-4 py-3 mb-6 bg-white px-5 rounded-2xl border border-slate-200/80 shadow-xs">
-          {/* Thông tin phòng đặt */}
-          <div className="space-y-0.5">
+          {/* Thông tin phòng đặt & Khách sạn */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs text-[#b9a277] font-semibold">
+              <span className="material-symbols-outlined text-sm">apartment</span>
+              <span>Khách sạn: <strong>{roomDetail?.Branch?.BranchName || roomDetail?.BranchName || 'Grand Horizon Phú Quốc Luxury Resort'}</strong></span>
+              <span className="text-slate-400 font-normal">({roomDetail?.Branch?.Address || 'Bãi Khem, Phú Quốc'})</span>
+            </div>
             <h1 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">
               {roomDisplayName}
             </h1>
@@ -968,6 +973,32 @@ export default function BookingEngine() {
 
               {/* Details & Pricing Breakdown */}
               <div className="p-5 sm:p-6 space-y-4">
+
+                {/* Hotel Information Box */}
+                <div className="p-3.5 bg-gradient-to-r from-amber-50 to-[#fdf9f0] rounded-xl border border-amber-200/80 text-xs shadow-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-[#131b2e]">
+                    <span className="material-symbols-outlined text-sm text-[#b9a277]">apartment</span>
+                    <span>{roomDetail?.Branch?.BranchName || roomDetail?.BranchName || 'Grand Horizon Phú Quốc Luxury Resort'}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1 truncate">
+                    {roomDetail?.Branch?.Address || 'Bãi Khem, Phú Quốc, Kiên Giang'}
+                  </p>
+                  <div className="mt-2.5 pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
+                    <span
+                      onClick={() => navigate(`/rooms?branchId=${roomDetail?.Branch?.BranchId || searchParams.get('branchId') || 1}`)}
+                      className="text-blue-600 font-semibold hover:underline cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span>← Đổi loại phòng</span>
+                    </span>
+                    <span
+                      onClick={() => navigate('/hotels')}
+                      className="text-slate-600 hover:text-[#b9a277] hover:underline cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span>Đổi khách sạn</span>
+                      <span className="material-symbols-outlined text-[13px]">swap_horiz</span>
+                    </span>
+                  </div>
+                </div>
                 
                 {/* Reservation Schedule Tag */}
                 <div className="p-3 bg-[#eff4ff] rounded-xl flex items-center justify-between text-slate-900 border border-blue-100/60">
@@ -1407,7 +1438,7 @@ export default function BookingEngine() {
                   }}
                   className="w-full py-3.5 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white font-bold text-sm uppercase tracking-wide transition-all shadow-md flex items-center justify-center gap-2 group"
                 >
-                  <span>Thanh Toán Cọc Ngay (Bước 2)</span>
+                  <span>Thanh Toán Đặt Cọc Ngay</span>
                   <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
                 </button>
                 <div className="flex gap-2">
