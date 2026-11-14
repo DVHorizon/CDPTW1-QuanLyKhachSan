@@ -287,6 +287,10 @@ app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));
 app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
 app.use('/me',        require('./routes/bookingHistoryRoutes'));
 
+// FEAT-GUEST-13C: Danh sách phòng yêu thích (Wishlist & Saved Suites - Mã truy vết: A13 / Màn hình 59)
+app.use('/api/v1/me/wishlist', require('./routes/wishlistRoutes'));
+app.use('/api/me/wishlist',    require('./routes/wishlistRoutes'));
+app.use('/me/wishlist',        require('./routes/wishlistRoutes'));
 // FEAT-GUEST-10: Cổng gửi Email xác nhận & Thông báo
 const bookingQrNotificationController = require('./controllers/bookingQrNotificationController');
 app.post('/api/v1/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);

@@ -5,6 +5,7 @@ import RoomDetailModal from '../components/modals/RoomDetailModal';
 import QuickBookingModal from '../components/modals/QuickBookingModal';
 import TravelokaHotelCard from '../components/client/TravelokaHotelCard';
 import TravelokaHotelDetailView from '../components/client/TravelokaHotelDetailView';
+import { useWishlist } from '../context/WishlistContext';
 import { searchRoomsApi, getBranchesApi, suggestRoomsApi } from '../api/roomApi';
 
 // Helper format VND
@@ -148,13 +149,12 @@ export default function SearchRooms() {
     setEngineDropdownOpen(false);
     executeSearch({ engine: engineId });
   };
-
   const handleSelectBranch = (newBranchId) => {
     const targetId = String(newBranchId);
     setBranchId(targetId);
     executeSearch({ branchId: targetId });
   };
-  const [wishlist, setWishlist] = useState([]);
+  const { wishlist, wishlistCount, toggleWishlist, isWishlisted } = useWishlist();
   const [compareList, setCompareList] = useState(() => {
     try {
       const saved = localStorage.getItem('compare_room_ids');
@@ -364,13 +364,6 @@ export default function SearchRooms() {
     executeSearch();
   }, [selectedRoomTypes, selectedView, selectedAmenities, selectedRating, sortBy, priceMax, selectedEngine]);
 
-  // Xử lý Wishlist
-  const toggleWishlist = (roomId) => {
-    setWishlist(prev =>
-      prev.includes(roomId) ? prev.filter(id => id !== roomId) : [...prev, roomId]
-    );
-  };
-
   // Reset toàn bộ bộ lọc
   
   // Chuyển sang xem danh sách phòng của khách sạn được chọn (chuẩn Traveloka)
@@ -444,10 +437,8 @@ export default function SearchRooms() {
 
   return (
     <MainLayout
-      wishlistCount={wishlist.length}
-      onWishlistClick={() => {
-        window.scrollTo({ top: 300, behavior: 'smooth' });
-      }}
+      wishlistCount={wishlistCount}
+      onWishlistClick={() => navigate('/wishlist')}
     >
       <div className="flex flex-col w-full">
 

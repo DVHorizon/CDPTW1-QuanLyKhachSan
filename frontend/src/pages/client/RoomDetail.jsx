@@ -4,6 +4,7 @@ import Header from '../../components/layout/Header';
 import { checkRoomAvailabilityApi, lockRoomSessionApi, releaseRoomLockApi, getRoomDetailApi, createBookingApi, getDynamicPricingApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
+import { useWishlist } from '../../context/WishlistContext';
 
 // Helper format VND
 const formatVND = (num) => {
@@ -25,6 +26,7 @@ export default function RoomDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { isWishlisted, toggleWishlist } = useWishlist();
 
   // Dữ liệu loại phòng
   const [roomType, setRoomType] = useState(null);
@@ -426,10 +428,11 @@ export default function RoomDetail() {
                 🔗 Chia sẻ
               </button>
               <button
-                onClick={() => setIsSaved(!isSaved)}
-                className={`inline-flex items-center gap-1 transition-colors ${isSaved ? 'text-rose-500 font-semibold' : 'text-gray-600 hover:text-[#725b38]'}`}
+                type="button"
+                onClick={() => toggleWishlist(id)}
+                className={`inline-flex items-center gap-1 transition-colors cursor-pointer ${isWishlisted(id) ? 'text-rose-500 font-semibold' : 'text-gray-600 hover:text-[#725b38]'}`}
               >
-                {isSaved ? '❤️ Đã lưu' : '🤍 Lưu lại'}
+                {isWishlisted(id) ? '❤️ Đã lưu' : '🤍 Lưu lại'}
               </button>
             </div>
           </div>

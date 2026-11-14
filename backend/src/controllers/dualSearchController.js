@@ -173,6 +173,22 @@ async function unifiedSearchRooms(req, res) {
   };
 
   try {
+    const q = req.query || {};
+    keyword = typeof q.keyword === 'string' ? q.keyword : '';
+    maxPrice = q.maxPrice;
+    adults = q.adults;
+    capacity = q.capacity;
+
+    // 1. Tự động nhận diện và chuẩn hóa Full-width (全角) -> Half-width (半角)
+    isFullWidthInput = containsFullWidth(keyword);
+    cleanKeyword = normalizeFullHalfWidth(keyword);
+
+    // 2. Xác định engine được chọn an toàn (không bao giờ crash kể cả khi engine là array hoặc object)
+    const rawEngine = typeof q.engine === 'string' 
+      ? q.engine 
+      : (Array.isArray(q.engine) && typeof q.engine[0] === 'string' ? q.engine[0] : '');
+    selectedEngine = (rawEngine || 'elasticsearch').toLowerCase().trim();
+
     // ------------------------------------------------------------------
     // NHÁNH 0: CHẾ ĐỘ THƯỜNG (MYSQL DATABASE)
     // ------------------------------------------------------------------
@@ -368,8 +384,9 @@ async function unifiedSearchRooms(req, res) {
         if (maxPrice) {
           whereClause.BasePrice = { [Op.lte]: Number(maxPrice) };
         }
-        if (adults) {
-          whereClause.AdultCapacity = { [Op.gte]: Number(adults) };
+        const cap = capacity || adults;
+        if (cap) {
+          whereClause.AdultCapacity = { [Op.gte]: Number(cap) };
         }
         if (candidateRoomTypeIds && candidateRoomTypeIds.length > 0) {
           whereClause.RoomTypeId = { [Op.in]: candidateRoomTypeIds };
@@ -377,17 +394,35 @@ async function unifiedSearchRooms(req, res) {
 
         const dbRooms = await RoomType.findAll({
           where: whereClause,
+          include: [
+            {
+              model: Amenity,
+              as: 'amenityList',
+              through: { attributes: [] },
+              required: false
+            }
+          ],
           limit: 30,
           order: [['RoomTypeId', 'ASC']]
         });
 
-        const formatted = dbRooms.map(formatRoomItem);
+        const formatted = dbRooms.map((r) => {
+          const item = formatRoomItem(r);
+          if (Array.isArray(r.amenityList) && r.amenityList.length > 0) {
+            item.Amenities = r.amenityList.map(a => a.Name || a.AmenityName).join(', ');
+            item.amenities = r.amenityList.map(a => a.Name || a.AmenityName);
+          }
+          return item;
+        });
 
         return res.status(200).json({
           success: true,
-          engine: 'MySQL Database (Auto-Failover)',
+          engine: 'MySQL Database (Resilient Fallback)',
           activeEngine: 'standard',
           fallbackNotice: 'Hệ thống tự động chuyển về cơ sở dữ liệu MySQL do Search Engine ngoại vi đang tạm dừng',
+          originalKeyword: keyword || '',
+          normalizedKeyword: cleanKeyword,
+          isFullWidthInput,
           executionTimeMs: Date.now() - startTime,
           branchId: targetBranchId,
           branchName: branchInfo.BranchName,
@@ -395,6 +430,7 @@ async function unifiedSearchRooms(req, res) {
           data: formatted
         });
       } catch (dbErr) {
+        console.error('[DualSearch] Lỗi nghiêm trọng tại DB fallback:', dbErr);
         return res.status(500).json({
           success: false,
           message: 'Lỗi tìm kiếm dữ liệu',

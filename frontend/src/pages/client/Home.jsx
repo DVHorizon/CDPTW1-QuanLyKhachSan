@@ -6,6 +6,7 @@ import QuickBookingModal from "../../components/modals/QuickBookingModal";
 import AmenityPerspectiveCarousel from "../../components/client/AmenityPerspectiveCarousel";
 import ScrollIcon from "../../components/common/ScrollIcon";
 import MorphDropdown from "../../components/common/MorphDropdown";
+import { useWishlist } from "../../context/WishlistContext";
 import { fetchHomeData } from "../../api/hotelApi";
 import {
   mockBranches,
@@ -111,7 +112,7 @@ function Home() {
   const [guestOption, setGuestOption] = useState("2-0-1");
   const [searchNotification, setSearchNotification] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [wishlist, setWishlist] = useState([]);
+  const { wishlist, wishlistCount, toggleWishlist } = useWishlist();
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [openFaqId, setOpenFaqId] = useState(1);
@@ -309,15 +310,6 @@ function Home() {
     );
   };
 
-  // Toggle Wishlist
-  const toggleWishlist = (roomId) => {
-    setWishlist((prev) =>
-      prev.includes(roomId)
-        ? prev.filter((id) => id !== roomId)
-        : [...prev, roomId],
-    );
-  };
-
   // Chuyển hướng trực tiếp tới màn hình Đặt Phòng (Booking Engine)
   const handleBookNow = (rt) => {
     const guests = guestOption ? guestOption.split("-") : ["2", "0", "1"];
@@ -348,11 +340,8 @@ function Home() {
 
   return (
     <MainLayout
-      wishlistCount={wishlist.length}
-      onWishlistClick={() => {
-        const el = document.getElementById("room-collection");
-        if (el) el.scrollIntoView({ behavior: "smooth" });
-      }}
+      wishlistCount={wishlistCount}
+      onWishlistClick={() => navigate("/wishlist")}
     >
       <div className="flex flex-col w-full">
         {/* ================= 1. HERO BANNER SECTION ================= */}

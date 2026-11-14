@@ -2,10 +2,12 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { WishlistProvider } from './context/WishlistContext';
 import Home from './pages/client/Home';
 import HotelsExplorer from './pages/client/HotelsExplorer';
 import SearchRooms from './pages/SearchRooms';
 import RoomDetail from './pages/client/RoomDetail';
+import Wishlist from './pages/client/Wishlist';
 import BookingEngine from './pages/client/BookingEngine';
 import DepositPayment from './pages/client/DepositPayment';
 import BookingConfirmation from './pages/client/BookingConfirmation';
@@ -70,22 +72,26 @@ function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/hotels" element={<HotelsExplorer />} />
-            <Route path="/khach-san" element={<HotelsExplorer />} />
-            <Route path="/rooms" element={<SearchRooms />} />
-            <Route path="/services" element={<ServiceManagement />} />
-            <Route path="/rooms/search" element={<SearchRooms />} />
-            <Route path="/tim-kiem" element={<SearchRooms />} />
-            <Route path="/rooms/compare" element={<RoomComparisonMatrix />} />
-            <Route path="/compare" element={<RoomComparisonMatrix />} />
-            <Route path="/so-sanh" element={<RoomComparisonMatrix />} />
-            <Route path="/so-sanh-phong" element={<RoomComparisonMatrix />} />
-            <Route path="/rooms/:id" element={<RoomDetail />} />
-            <Route path="/room/:id" element={<RoomDetail />} />
-            <Route path="/dat-phong" element={<BookingEngine />} />
+        <WishlistProvider>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/hotels" element={<HotelsExplorer />} />
+              <Route path="/khach-san" element={<HotelsExplorer />} />
+              <Route path="/rooms" element={<SearchRooms />} />
+              <Route path="/services" element={<ServiceManagement />} />
+              <Route path="/rooms/search" element={<SearchRooms />} />
+              <Route path="/tim-kiem" element={<SearchRooms />} />
+              <Route path="/rooms/compare" element={<RoomComparisonMatrix />} />
+              <Route path="/compare" element={<RoomComparisonMatrix />} />
+              <Route path="/so-sanh" element={<RoomComparisonMatrix />} />
+              <Route path="/so-sanh-phong" element={<RoomComparisonMatrix />} />
+              <Route path="/rooms/:id" element={<RoomDetail />} />
+              <Route path="/room/:id" element={<RoomDetail />} />
+              <Route path="/wishlist" element={<Wishlist />} />
+              <Route path="/me/wishlist" element={<Wishlist />} />
+              <Route path="/danh-sach-yeu-thich" element={<Wishlist />} />
+              <Route path="/dat-phong" element={<BookingEngine />} />
             <Route path="/booking" element={<BookingEngine />} />
             <Route path="/checkout" element={<BookingEngine />} />
             <Route path="/checkout/step-1" element={<BookingEngine />} />
@@ -269,6 +275,7 @@ function App() {
           <FloatingAiConcierge />
           <FloatingAcademicBadge />
         </Router>
+        </WishlistProvider>
       </SocketProvider>
     </AuthProvider>
   );
