@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import { useAuth } from '../../context/AuthContext';
-import { updateCurrentUser } from '../../api/authApi'; 
+import { updateCurrentUser, changePasswordApi } from '../../api/authApi';
+
+const FULLNAME_REGEX = /^[\p{L}]+(?:\s[\p{L}]+)*$/u;
+const VN_PHONE_REGEX = /^(03|05|07|08|09)\d{8}$/;
+const ID_CARD_REGEX = /^(?:\d{9}|\d{12}|[A-Za-z]\d{7,8})$/;
 
 const Profile = () => {
   const { user, token, updateUser, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
-  
+
+  const [activeNav, setActiveNav] = useState('profile');
   const [formData, setFormData] = useState({
     fullName: '',
     dateOfBirth: '',
@@ -19,6 +24,13 @@ const Profile = () => {
     address: ''
   });
 
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [isChangingPwd, setIsChangingPwd] = useState(false);
+
   const [preferences, setPreferences] = useState({
     pillowType: 'Gối Lông Vũ Tự Nhiên',
     roomRequests: ['Tầng cao tĩnh lặng', 'Phòng tuyệt đối không hút thuốc', 'View biển trực diện (Front Ocean)'],
@@ -26,7 +38,15 @@ const Profile = () => {
   });
 
   const [showToast, setShowToast] = useState(false);
+  const [toastIsSuccess, setToastIsSuccess] = useState(true);
   const [toastMessage, setToastMessage] = useState('Đã lưu hồ sơ thành công!');
+
+  const triggerToast = (msg, ok = true) => {
+    setToastMessage(msg);
+    setToastIsSuccess(ok);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3800);
+  };
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -34,19 +54,23 @@ const Profile = () => {
     }
   }, [isLoading, isAuthenticated, navigate]);
 
+  const syncFormFromUser = (u) => {
+    if (!u) return;
+    setFormData((prev) => ({
+      ...prev,
+      fullName: u.fullName || '',
+      email: u.email || '',
+      phoneNumber: u.phoneNumber || u.phone || '',
+      dateOfBirth: u.dateOfBirth ? String(u.dateOfBirth).slice(0, 10) : '',
+      gender: u.gender || 'MALE',
+      identityCard: u.identityCard || u.idNumber || '',
+      address: u.address || ''
+    }));
+  };
+
   // Initialize form if user exists
   useEffect(() => {
-    if (user) {
-      setFormData(prev => ({
-        ...prev,
-        fullName: user.fullName || '',
-        email: user.email || '',
-        phoneNumber: user.phone || '',
-        dateOfBirth: user.dateOfBirth || '',
-        gender: user.gender || 'MALE',
-        identityCard: user.idNumber || ''
-      }));
-    }
+    syncFormFromUser(user);
   }, [user]);
 
   const handleChange = (e) => {
@@ -59,42 +83,127 @@ const Profile = () => {
 
   const handleSave = async () => {
     try {
+      const cleanName = (formData.fullName || '').trim();
+      if (!cleanName) {
+        triggerToast('Họ và tên không được để trống', false);
+        return;
+      }
+      if (cleanName.length < 2 || cleanName.length > 100 || !FULLNAME_REGEX.test(cleanName)) {
+        triggerToast('Họ và tên chỉ được chứa chữ cái và khoảng trắng đơn', false);
+        return;
+      }
+
+      const cleanPhone = (formData.phoneNumber || '').trim();
+      if (cleanPhone && !VN_PHONE_REGEX.test(cleanPhone)) {
+        triggerToast('Số điện thoại không hợp lệ (yêu cầu 10 chữ số)', false);
+        return;
+      }
+
+      const cleanId = (formData.identityCard || '').trim();
+      if (cleanId && !ID_CARD_REGEX.test(cleanId)) {
+        triggerToast('Số CCCD (9 hoặc 12 số) hoặc Hộ chiếu (1 chữ cái + 7-8 số) không đúng định dạng', false);
+        return;
+      }
+
+      if (formData.dateOfBirth) {
+        const dobDate = new Date(`${formData.dateOfBirth}T00:00:00Z`);
+        const today = new Date();
+        let age = today.getUTCFullYear() - dobDate.getUTCFullYear();
+        const mDiff = today.getUTCMonth() - dobDate.getUTCMonth();
+        if (mDiff < 0 || (mDiff === 0 && today.getUTCDate() < dobDate.getUTCDate())) {
+          age -= 1;
+        }
+        if (Number.isNaN(dobDate.getTime()) || dobDate > today || age < 18) {
+          triggerToast('Khách hàng phải từ đủ 18 tuổi trở lên', false);
+          return;
+        }
+      }
+
+      const cleanAddress = (formData.address || '').trim();
+      if (cleanAddress.length > 255) {
+        triggerToast('Địa chỉ liên hệ tối đa 255 ký tự', false);
+        return;
+      }
+
       const payload = {
-        fullName: formData.fullName,
-        phone: formData.phoneNumber,
-        idNumber: formData.identityCard,
-        idType: 'CCCD',
-        dateOfBirth: formData.dateOfBirth || null,
-        gender: formData.gender
+        fullName: cleanName,
+        phone: cleanPhone,
+        phoneNumber: cleanPhone,
+        identityCard: cleanId,
+        idNumber: cleanId,
+        dateOfBirth: formData.dateOfBirth || '',
+        gender: formData.gender || 'MALE',
+        address: cleanAddress
       };
 
       const result = await updateCurrentUser(token, payload);
       if (result.success) {
-        // Cập nhật state user trên toàn app
-        updateUser({
+        updateUser(result.user || {
           ...user,
           fullName: payload.fullName,
           phone: payload.phone,
+          phoneNumber: payload.phone,
           idNumber: payload.idNumber,
-          idType: payload.idType,
+          identityCard: payload.identityCard,
           dateOfBirth: payload.dateOfBirth,
-          gender: payload.gender
+          gender: payload.gender,
+          address: payload.address
         });
-        
-        setToastMessage('Đã lưu hồ sơ thành công!');
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3500);
+        triggerToast('Đã lưu hồ sơ thành công!', true);
       } else {
-        setToastMessage(result.message || 'Có lỗi xảy ra');
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3500);
+        triggerToast(result.message || 'Có lỗi xảy ra', false);
       }
     } catch (error) {
       console.error(error);
-      setToastMessage('Lỗi hệ thống khi lưu hồ sơ');
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3500);
+      triggerToast('Lỗi hệ thống khi lưu hồ sơ', false);
     }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    const { currentPassword, newPassword, confirmPassword } = passwordForm;
+    if (!currentPassword) {
+      triggerToast('Vui lòng nhập mật khẩu hiện tại', false);
+      return;
+    }
+    if (
+      !newPassword ||
+      newPassword.length < 8 ||
+      newPassword.length > 32 ||
+      /\s/.test(newPassword) ||
+      !/[A-Z]/.test(newPassword) ||
+      !/[a-z]/.test(newPassword) ||
+      !/\d/.test(newPassword) ||
+      !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?`~]/.test(newPassword)
+    ) {
+      triggerToast('Mật khẩu phải chứa chữ hoa, chữ thường, số và ký tự đặc biệt', false);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      triggerToast('Mật khẩu xác nhận không khớp', false);
+      return;
+    }
+
+    try {
+      setIsChangingPwd(true);
+      const res = await changePasswordApi(token, passwordForm);
+      if (res.success) {
+        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        triggerToast('Đổi mật khẩu thành công!', true);
+      } else {
+        triggerToast(res.message || 'Không thể đổi mật khẩu', false);
+      }
+    } catch (err) {
+      triggerToast('Lỗi hệ thống: ' + err.message, false);
+    } finally {
+      setIsChangingPwd(false);
+    }
+  };
+
+  const scrollToSection = (navId, elementId) => {
+    setActiveNav(navId);
+    const el = document.getElementById(elementId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -136,60 +245,92 @@ const Profile = () => {
                   </button>
                 </div>
                 <h2 className="font-title-lg text-title-lg text-on-surface font-semibold mb-space-xs">{formData.fullName || 'Khách hàng'}</h2>
-                <span className="font-label-sm text-label-sm text-outline tracking-wider uppercase mb-space-sm">Mã hội viên: <strong className="text-on-surface">GH-889921</strong></span>
+                <span className="font-label-sm text-label-sm text-outline tracking-wider uppercase mb-space-sm">Mã hội viên: <strong className="text-on-surface">GH-{String(user?.userId || 889921).padStart(6, '0')}</strong></span>
                 <div className="inline-flex items-center gap-space-xs px-space-md py-1 bg-secondary-container/40 rounded-full mb-space-md">
                   <span className="material-symbols-outlined text-secondary text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
-                  <span className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">Hạng Vàng (Gold Elite)</span>
+                  <span className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">{user?.tierName ? `Hạng ${user.tierName}` : 'Hội viên Horizon Elite'}</span>
                 </div>
                 <div className="w-full grid grid-cols-2 gap-space-xs bg-surface-container-low rounded-lg p-space-sm text-left">
                   <div className="flex flex-col p-space-xs">
                     <span className="font-label-sm text-label-sm text-outline">Tham gia từ</span>
-                    <span className="font-label-md text-label-md text-on-surface font-semibold">12/2021</span>
+                    <span className="font-label-md text-label-md text-on-surface font-semibold">
+                      {user?.createdAt ? `${String(new Date(user.createdAt).getMonth() + 1).padStart(2, '0')}/${new Date(user.createdAt).getFullYear()}` : '10/2026'}
+                    </span>
                   </div>
                   <div className="flex flex-col p-space-xs">
-                    <span className="font-label-sm text-label-sm text-outline">Đêm nghỉ</span>
-                    <span className="font-label-md text-label-md text-on-surface font-semibold">28 Đêm 5★</span>
+                    <span className="font-label-sm text-label-sm text-outline">Ưu đãi hạng</span>
+                    <span className="font-label-md text-label-md text-on-surface font-semibold">
+                      {user?.discountRate ? `Giảm ${user.discountRate}%` : 'Tích điểm 1.5x'}
+                    </span>
                   </div>
                 </div>
               </div>
 
               {/* Navigation Menu */}
               <nav className="bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col gap-1">
-                <a className="flex items-center justify-between px-space-md py-space-sm rounded-lg bg-secondary text-on-secondary shadow-sm transition-all" href="#">
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('profile', 'section-profile')}
+                  className={`w-full text-left flex items-center justify-between px-space-md py-space-sm rounded-lg transition-all cursor-pointer ${
+                    activeNav === 'profile' ? 'bg-secondary text-on-secondary shadow-sm font-semibold' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                  }`}
+                >
                   <div className="flex items-center gap-space-sm">
-                    <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
-                    <span className="font-label-lg text-label-lg font-semibold">Thông Tin Cá Nhân</span>
+                    <span className="material-symbols-outlined text-[20px]">person</span>
+                    <span className="font-label-lg text-label-lg">Thông Tin Cá Nhân</span>
                   </div>
                   <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                </a>
-                <a className="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" href="#">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('loyalty', 'section-loyalty')}
+                  className={`w-full text-left flex items-center justify-between px-space-md py-space-sm rounded-lg transition-all cursor-pointer ${
+                    activeNav === 'loyalty' ? 'bg-secondary text-on-secondary shadow-sm font-semibold' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                  }`}
+                >
                   <div className="flex items-center gap-space-sm">
-                    <span className="material-symbols-outlined text-[20px] text-secondary">loyalty</span>
+                    <span className="material-symbols-outlined text-[20px]">loyalty</span>
                     <span className="font-label-lg text-label-lg">Hạng & Điểm Thưởng</span>
                   </div>
-                  <span className="material-symbols-outlined text-[18px] text-outline">chevron_right</span>
-                </a>
-                <a className="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" href="#">
+                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/my-bookings')}
+                  className="w-full text-left flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all cursor-pointer"
+                >
                   <div className="flex items-center gap-space-sm">
                     <span className="material-symbols-outlined text-[20px] text-secondary">history_edu</span>
                     <span className="font-label-lg text-label-lg">Lịch Sử Đặt Phòng</span>
                   </div>
                   <span className="material-symbols-outlined text-[18px] text-outline">chevron_right</span>
-                </a>
-                <a className="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" href="#">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('preferences', 'section-preferences')}
+                  className={`w-full text-left flex items-center justify-between px-space-md py-space-sm rounded-lg transition-all cursor-pointer ${
+                    activeNav === 'preferences' ? 'bg-secondary text-on-secondary shadow-sm font-semibold' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                  }`}
+                >
                   <div className="flex items-center gap-space-sm">
-                    <span className="material-symbols-outlined text-[20px] text-secondary">room_service</span>
+                    <span className="material-symbols-outlined text-[20px]">room_service</span>
                     <span className="font-label-lg text-label-lg">Sở Thích Lưu Trú</span>
                   </div>
-                  <span className="material-symbols-outlined text-[18px] text-outline">chevron_right</span>
-                </a>
-                <a className="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-all" href="#">
+                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('security', 'section-security')}
+                  className={`w-full text-left flex items-center justify-between px-space-md py-space-sm rounded-lg transition-all cursor-pointer ${
+                    activeNav === 'security' ? 'bg-secondary text-on-secondary shadow-sm font-semibold' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                  }`}
+                >
                   <div className="flex items-center gap-space-sm">
-                    <span className="material-symbols-outlined text-[20px] text-secondary">lock</span>
+                    <span className="material-symbols-outlined text-[20px]">lock</span>
                     <span className="font-label-lg text-label-lg">Cài Đặt Bảo Mật & Mật Khẩu</span>
                   </div>
-                  <span className="material-symbols-outlined text-[18px] text-outline">chevron_right</span>
-                </a>
+                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                </button>
               </nav>
 
               {/* Butler Call to Action */}
@@ -206,13 +347,13 @@ const Profile = () => {
             {/* Main Content */}
             <div className="lg:col-span-8 flex flex-col gap-space-lg">
               {/* VIP Card */}
-              <section className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md relative overflow-hidden">
+              <section id="section-loyalty" className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md relative overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
                   <div>
                     <span className="font-label-sm text-label-sm text-secondary uppercase tracking-widest font-semibold">Đặc quyền Thượng lưu</span>
                     <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">Thẻ Hội Viên VIP & Quà Tặng Độc Quyền</h2>
                   </div>
-                  <span className="font-label-sm text-label-sm text-outline">Gia hạn ngày: 31/12/2025</span>
+                  <span className="font-label-sm text-label-sm text-outline">Hạng hiện tại: {user?.tierName || 'Standard'}</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-space-md items-stretch">
                   <div className="md:col-span-7 bg-gradient-to-br from-primary-container via-inverse-surface to-primary-container text-on-primary rounded-xl p-space-lg shadow-md flex flex-col justify-between relative overflow-hidden min-h-[190px]">
@@ -222,20 +363,26 @@ const Profile = () => {
                         <span className="material-symbols-outlined text-secondary-fixed text-[22px]">spa</span>
                         <span className="font-headline-sm text-headline-sm tracking-tight text-white">Grand Horizon</span>
                       </div>
-                      <div className="flex items-center gap-space-xs px-2 py-0.5 bg-secondary-container/20 rounded text-secondary-fixed font-label-sm text-label-sm font-semibold">
+                      <div className="flex items-center gap-space-xs px-2 py-0.5 bg-secondary-container/20 rounded text-secondary-fixed font-label-sm text-label-sm font-semibold uppercase">
                         <span className="material-symbols-outlined text-[14px]">stars</span>
-                        GOLD ELITE
+                        {user?.tierName || 'ELITE'}
                       </div>
                     </div>
                     <div className="flex flex-col my-space-xs">
-                      <span className="font-label-sm text-label-sm text-on-primary-container uppercase tracking-wider">Điểm Tích Lũy Hiện Tại</span>
+                      <span className="font-label-sm text-label-sm text-on-primary-container uppercase tracking-wider">Đặc Quyền Hạng Hội Viên</span>
                       <div className="flex items-baseline gap-space-xs">
-                        <span className="font-display-sm text-display-sm font-semibold text-secondary-fixed">12.450</span>
-                        <span className="font-label-lg text-label-lg text-on-primary">Điểm Horizon</span>
+                        <span className="font-display-sm text-display-sm font-semibold text-secondary-fixed">
+                          {user?.discountRate ? `-${user.discountRate}%` : '1.5x'}
+                        </span>
+                        <span className="font-label-lg text-label-lg text-on-primary">
+                          {user?.discountRate ? 'Ưu đãi giá phòng' : 'Điểm Horizon'}
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-end justify-between pt-space-xs">
-                      <span className="font-label-sm text-label-sm text-white/80 tracking-widest font-mono">GH • 8899 • 2199 • 002</span>
+                      <span className="font-label-sm text-label-sm text-white/80 tracking-widest font-mono">
+                        GH • 8899 • {String(user?.userId || 1).padStart(4, '0')}
+                      </span>
                       <span className="font-label-sm text-label-sm text-secondary-fixed font-semibold uppercase">{formData.fullName || 'VIP GUEST'}</span>
                     </div>
                   </div>
@@ -265,7 +412,7 @@ const Profile = () => {
               </section>
 
               {/* Edit Profile */}
-              <section className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-lg">
+              <section id="section-profile" className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
                     <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">Chỉnh Sửa Thông Tin Cá Nhân</h2>
@@ -400,7 +547,7 @@ const Profile = () => {
               </section>
 
               {/* Preferences */}
-              <section className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-lg">
+              <section id="section-preferences" className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-lg">
                 <div className="flex items-center gap-space-sm">
                   <div className="w-9 h-9 rounded-lg bg-secondary-container/40 flex items-center justify-center text-secondary">
                     <span className="material-symbols-outlined text-[22px]">hotel_class</span>
@@ -516,12 +663,73 @@ const Profile = () => {
                 </div>
               </section>
 
+              {/* Security & Password Section */}
+              <section id="section-security" className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+                <div className="flex items-center gap-space-sm">
+                  <div className="w-9 h-9 rounded-lg bg-secondary-container/40 flex items-center justify-center text-secondary">
+                    <span className="material-symbols-outlined text-[22px]">lock_reset</span>
+                  </div>
+                  <div>
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">Bảo Mật & Đổi Mật Khẩu</h2>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">Mật khẩu mới từ 8–32 ký tự gồm chữ hoa, chữ thường, số và ký tự đặc biệt.</p>
+                  </div>
+                </div>
+                <form onSubmit={handleChangePassword} className="grid grid-cols-1 md:grid-cols-3 gap-space-md items-end">
+                  <div className="flex flex-col gap-space-xs">
+                    <label className="font-label-md text-label-md text-on-surface">Mật khẩu hiện tại</label>
+                    <input
+                      type="password"
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))}
+                      placeholder="••••••••"
+                      className="w-full h-11 px-space-md rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-space-xs">
+                    <label className="font-label-md text-label-md text-on-surface">Mật khẩu mới</label>
+                    <input
+                      type="password"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
+                      placeholder="VD: Horizon@2026"
+                      className="w-full h-11 px-space-md rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-space-xs">
+                    <label className="font-label-md text-label-md text-on-surface">Xác nhận mật khẩu mới</label>
+                    <input
+                      type="password"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))}
+                      placeholder="Nhập lại mật khẩu mới"
+                      className="w-full h-11 px-space-md rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary"
+                    />
+                  </div>
+                  <div className="md:col-span-3 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isChangingPwd}
+                      className="px-space-lg py-space-xs rounded-lg bg-primary-container text-white font-label-md text-label-md hover:opacity-95 transition-all cursor-pointer disabled:opacity-60"
+                    >
+                      {isChangingPwd ? 'Đang cập nhật...' : 'Cập Nhật Mật Khẩu'}
+                    </button>
+                  </div>
+                </form>
+              </section>
+
               {/* Actions */}
               <div className="flex flex-col sm:flex-row items-center justify-end gap-space-md pt-space-xs pb-space-lg">
-                <button className="w-full sm:w-auto px-space-xl py-space-sm rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors text-center" type="button">
+                <button
+                  onClick={() => {
+                    syncFormFromUser(user);
+                    triggerToast('Đã khôi phục lại dữ liệu ban đầu', true);
+                  }}
+                  className="w-full sm:w-auto px-space-xl py-space-sm rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-colors text-center cursor-pointer"
+                  type="button"
+                >
                   Hủy Bỏ
                 </button>
-                <button onClick={handleSave} className="w-full sm:w-auto px-space-xl py-space-sm rounded-lg bg-secondary text-on-secondary hover:bg-secondary-container hover:text-on-secondary-container font-label-lg text-label-lg shadow-md transition-all flex items-center justify-center gap-space-xs" type="button">
+                <button onClick={handleSave} className="w-full sm:w-auto px-space-xl py-space-sm rounded-lg bg-secondary text-on-secondary hover:bg-secondary-container hover:text-on-secondary-container font-label-lg text-label-lg shadow-md transition-all flex items-center justify-center gap-space-xs cursor-pointer" type="button">
                   <span className="material-symbols-outlined text-[18px]">save</span>
                   Lưu Thay Đổi
                 </button>
@@ -531,15 +739,15 @@ const Profile = () => {
         </div>
 
         {/* Toast Notification */}
-        <div className={`fixed bottom-6 right-6 z-50 bg-primary text-on-primary px-space-lg py-space-sm rounded-xl shadow-xl flex items-center gap-space-sm transform transition-all duration-300 ${showToast ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0 pointer-events-none'}`}>
-          <span className="material-symbols-outlined text-tertiary-fixed text-[22px]">
-            {toastMessage.includes('thành công') ? 'check_circle' : 'error'}
+        <div className={`fixed bottom-6 right-6 z-50 px-space-lg py-space-sm rounded-xl shadow-xl flex items-center gap-space-sm transform transition-all duration-300 ${toastIsSuccess ? 'bg-primary text-on-primary' : 'bg-rose-700 text-white'} ${showToast ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0 pointer-events-none'}`}>
+          <span className="material-symbols-outlined text-[22px] text-white">
+            {toastIsSuccess ? 'check_circle' : 'error'}
           </span>
           <div className="flex flex-col">
             <span className="font-label-md text-label-md text-white font-semibold">{toastMessage}</span>
             <span className="font-body-sm text-body-sm text-white/80">
-              {toastMessage.includes('thành công') 
-                ? 'Tùy chọn nghỉ dưỡng của quý khách đã được đồng bộ.' 
+              {toastIsSuccess
+                ? 'Thông tin hồ sơ của quý khách đã được đồng bộ.'
                 : 'Vui lòng kiểm tra lại thông tin và thử lại.'}
             </span>
           </div>

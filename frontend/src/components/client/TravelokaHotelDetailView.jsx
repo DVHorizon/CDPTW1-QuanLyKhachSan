@@ -17,7 +17,11 @@ export default function TravelokaHotelDetailView({
   onBackToHotels,
   onSelectRoomForDetail,
   formatVND,
-  formatDisplayDate
+  formatDisplayDate,
+  compareList = [],
+  onToggleCompare,
+  isWishlisted,
+  onToggleWishlist
 }) {
   const navigate = useNavigate();
   const [activeGalleryTab, setActiveGalleryTab] = useState('all');
@@ -315,15 +319,53 @@ export default function TravelokaHotelDetailView({
                     </span>
                   </div>
 
-                  {room.IsLimited ? (
-                    <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
-                      Chỉ còn {room.AvailableRooms} phòng trống!
-                    </span>
-                  ) : (
-                    <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                      Còn {room.AvailableRooms} phòng trống
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {room.IsLimited ? (
+                      <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
+                        Chỉ còn {room.AvailableRooms} phòng trống!
+                      </span>
+                    ) : (
+                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        Còn {room.AvailableRooms} phòng trống
+                      </span>
+                    )}
+
+                    {onToggleWishlist && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleWishlist(room.RoomTypeId)}
+                        title="Lưu vào Danh Sách Yêu Thích"
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-colors cursor-pointer ${
+                          isWishlisted && isWishlisted(room.RoomTypeId)
+                            ? 'bg-rose-50 text-rose-600 border-rose-200'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300 hover:text-rose-600'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[15px]">
+                          {isWishlisted && isWishlisted(room.RoomTypeId) ? 'favorite' : 'favorite_border'}
+                        </span>
+                        <span>{isWishlisted && isWishlisted(room.RoomTypeId) ? 'Đã thích' : 'Yêu thích'}</span>
+                      </button>
+                    )}
+
+                    {onToggleCompare && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleCompare(room.RoomTypeId)}
+                        title="Thêm vào so sánh (tối đa 3 phòng)"
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-colors cursor-pointer ${
+                          compareList.includes(room.RoomTypeId)
+                            ? 'bg-[#203044] text-[#fedeb2] border-[#203044]'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-[#8c6d3b] hover:text-[#8c6d3b]'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[15px]">
+                          {compareList.includes(room.RoomTypeId) ? 'check_box' : 'compare_arrows'}
+                        </span>
+                        <span>{compareList.includes(room.RoomTypeId) ? 'Đang so sánh' : 'So sánh'}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Nội dung bảng phòng: Cột Trái (Ảnh & Specs) + Cột Phải (Bảng Gói & Giá) */}
@@ -519,9 +561,9 @@ export default function TravelokaHotelDetailView({
         ) : (
           <div className="p-10 bg-white rounded-2xl border border-slate-200 text-center flex flex-col items-center justify-center gap-3">
             <span className="material-symbols-outlined text-4xl text-slate-400">hotel_class</span>
-            <h4 className="font-bold text-lg text-slate-800">Không có phòng trống trong khoảng thời gian này</h4>
+            <h4 className="font-bold text-lg text-slate-800">Không có phòng nào phù hợp với bộ lọc đã chọn. Vui lòng thử bỏ bớt tiêu chí lọc.</h4>
             <p className="text-xs text-slate-500 max-w-md">
-              Hiện tại các hạng phòng tại {branch.BranchName} đã kín chỗ cho ngày bạn chọn. Vui lòng chọn khoảng ngày khác hoặc khám phá các chi nhánh khác.
+              Hiện tại không tìm thấy hạng phòng phù hợp tại {branch.BranchName} với điều kiện lọc hoặc khoảng ngày đã chọn. Vui lòng bỏ bớt tiêu chí lọc hoặc xem các chi nhánh khác.
             </p>
             <button
               type="button"

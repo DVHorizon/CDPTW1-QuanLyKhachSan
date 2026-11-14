@@ -29,14 +29,14 @@ const safeFetch = async (endpoint, options = {}) => {
  * Đăng nhập hệ thống
  * POST /api/v1/auth/login
  */
-export const loginUser = async ({ identifier, password }) => {
+export const loginUser = async ({ identifier, password, expectedRole }) => {
   try {
     const res = await safeFetch('/v1/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ identifier, password })
+      body: JSON.stringify({ identifier, password, expectedRole })
     });
 
     const text = await res.text();
@@ -63,7 +63,17 @@ export const loginUser = async ({ identifier, password }) => {
  * Đăng ký tài khoản khách hàng mới
  * POST /api/v1/auth/register
  */
-export const registerUser = async ({ fullName, email, phone, password, enrollClub = true }) => {
+export const registerUser = async ({
+  fullName,
+  email,
+  phone,
+  phoneNumber,
+  password,
+  confirmPassword,
+  enrollClub = true,
+  roleId,
+  roleName
+}) => {
   try {
     const res = await safeFetch('/v1/auth/register', {
       method: 'POST',
@@ -73,9 +83,13 @@ export const registerUser = async ({ fullName, email, phone, password, enrollClu
       body: JSON.stringify({
         fullName,
         email,
-        phone,
+        phone: phone || phoneNumber,
+        phoneNumber: phoneNumber || phone,
         password,
-        enrollClub
+        confirmPassword,
+        enrollClub,
+        roleId,
+        roleName
       })
     });
 
@@ -167,12 +181,12 @@ export const loginWithFacebook = async (payload) => {
 
 /**
  * Cập nhật thông tin tài khoản hiện tại
- * PUT /api/v1/auth/me
+ * PUT /api/v1/auth/me (fallback PUT /api/v1/me/profile)
  */
 export const updateCurrentUser = async (token, userData) => {
   try {
     if (!token) return { success: false, message: 'Chưa xác thực' };
-    const res = await safeFetch('/v1/auth/me', {
+    let res = await safeFetch('/v1/auth/me', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -181,11 +195,80 @@ export const updateCurrentUser = async (token, userData) => {
       body: JSON.stringify(userData)
     });
 
+    if (res.status === 404) {
+      res = await safeFetch('/v1/me/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(userData)
+      });
+    }
+
     const data = await res.json();
     return data;
   } catch (error) {
     console.error('Lỗi API updateCurrentUser:', error);
     return { success: false, message: 'Lỗi mạng khi cập nhật hồ sơ' };
+  }
+};
+
+/**
+ * Yêu cầu gửi mã OTP 6 số khôi phục mật khẩu
+ * POST /api/v1/auth/forgot-password
+ */
+export const forgotPasswordApi = async (email) => {
+  try {
+    const res = await safeFetch('/v1/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Lỗi API forgotPasswordApi:', error);
+    return { success: false, message: 'Không thể kết nối đến máy chủ.' };
+  }
+};
+
+/**
+ * Xác thực OTP 6 số và đặt lại mật khẩu mới
+ * POST /api/v1/auth/reset-password
+ */
+export const resetPasswordApi = async ({ email, otpCode, newPassword, confirmPassword }) => {
+  try {
+    const res = await safeFetch('/v1/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otpCode, newPassword, confirmPassword })
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Lỗi API resetPasswordApi:', error);
+    return { success: false, message: 'Không thể kết nối đến máy chủ.' };
+  }
+};
+
+/**
+ * Đổi mật khẩu khi đang đăng nhập
+ * PUT /api/v1/auth/change-password
+ */
+export const changePasswordApi = async (token, { currentPassword, newPassword, confirmPassword }) => {
+  try {
+    if (!token) return { success: false, message: 'Chưa xác thực' };
+    const res = await safeFetch('/v1/auth/change-password', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Lỗi API changePasswordApi:', error);
+    return { success: false, message: 'Không thể kết nối đến máy chủ.' };
   }
 };
 

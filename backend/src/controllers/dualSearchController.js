@@ -71,14 +71,14 @@ function containsFullWidth(str) {
  */
 async function unifiedSearchRooms(req, res) {
   const startTime = Date.now();
-  const { keyword, engine, maxPrice, adults, capacity, branchId } = req.query;
+  let { keyword, engine, maxPrice, adults, capacity, branchId } = req.query;
 
   // 1. Tự động nhận diện và chuẩn hóa Full-width (全角) -> Half-width (半角)
-  const isFullWidthInput = containsFullWidth(keyword);
-  const cleanKeyword = normalizeFullHalfWidth(keyword);
+  let isFullWidthInput = containsFullWidth(keyword);
+  let cleanKeyword = normalizeFullHalfWidth(keyword);
 
   // 2. Xác định engine được chọn (mặc định là 'elasticsearch' hoặc 'solr')
-  const selectedEngine = (engine || 'elasticsearch').toLowerCase().trim();
+  let selectedEngine = (engine || 'elasticsearch').toLowerCase().trim();
 
   // 3. Xử lý thông tin chi nhánh / khách sạn
   let targetBranchId = null;

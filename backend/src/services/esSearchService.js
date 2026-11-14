@@ -3,8 +3,14 @@
 const client = require('../config/elasticsearch');
 
 const INDEX_NAME = 'room_types'; // Tên index ta đã đồng bộ 1000 phòng
+const ES_TIMEOUT_MS = 800;
+const ES_CIRCUIT_COOLDOWN_MS = 60000;
+let esOfflineUntil = 0;
 
 async function searchRooms(keyword, filters = {}) {
+  if (Date.now() < esOfflineUntil) {
+    throw new Error('Elasticsearch offline circuit breaker open');
+  }
   const esQuery = {
     bool: {
       must: [],
@@ -39,14 +45,25 @@ async function searchRooms(keyword, filters = {}) {
     });
   }
 
-  // 4. Gửi truy vấn sang Elasticsearch
-  const response = await client.search({
-    index: INDEX_NAME,
-    body: {
-      query: esQuery,
-      size: 20 // Lấy 20 kết quả phù hợp nhất
-    }
-  });
+  // 4. Gửi truy vấn sang Elasticsearch (fail-fast 800ms + 60s circuit breaker)
+  let response;
+  try {
+    response = await Promise.race([
+      client.search({
+        index: INDEX_NAME,
+        body: {
+          query: esQuery,
+          size: 20 // Lấy 20 kết quả phù hợp nhất
+        }
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Elasticsearch timeout after 800ms')), ES_TIMEOUT_MS)
+      )
+    ]);
+  } catch (err) {
+    esOfflineUntil = Date.now() + ES_CIRCUIT_COOLDOWN_MS;
+    throw err;
+  }
 
   // 5. Trả về danh sách kết quả kèm điểm tương quan BM25 (_score)
   let hits = response.hits.hits || [];

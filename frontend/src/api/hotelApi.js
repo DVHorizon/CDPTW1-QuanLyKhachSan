@@ -46,3 +46,24 @@ export const fetchRoomTypes = async (limit = 12) => {
     return [];
   }
 };
+
+/**
+ * Đăng ký nhận bản tin / Hội viên Elite (Trang chủ)
+ */
+export const subscribeNewsletterApi = async ({ fullName, email }) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/newsletter/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullName, email })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi subscribeNewsletterApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối tới máy chủ để đăng ký nhận bản tin'
+    };
+  }
+};

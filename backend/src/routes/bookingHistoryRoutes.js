@@ -15,7 +15,12 @@
 const express = require('express');
 const router = express.Router();
 const bookingHistoryController = require('../controllers/bookingHistoryController');
+const authController = require('../controllers/authController');
 const { verifyToken } = require('../middlewares/authMiddleware');
+
+// FEAT-GUEST-01: Hồ sơ cá nhân (/api/v1/me/profile, /api/me/profile, /me/profile)
+router.get('/profile', verifyToken, authController.getMe);
+router.put('/profile', verifyToken, authController.updateProfile);
 
 // Middleware hỗ trợ cả JWT auth chính thống và kiểm thử linh hoạt
 router.get('/bookings', verifyToken, bookingHistoryController.getMyBookings);

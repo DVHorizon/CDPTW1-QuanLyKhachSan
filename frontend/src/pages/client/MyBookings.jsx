@@ -539,7 +539,7 @@ export default function MyBookings() {
                 <div className="space-y-4">
                   {bookings.map((booking) => {
                     const isUpcoming = ['Pending', 'Confirmed'].includes(booking.status);
-                    const isCompleted = booking.status === 'Completed';
+                    const isCompleted = ['Completed', 'CheckedOut'].includes(booking.status);
                     const isCancelled = booking.status === 'Cancelled';
 
                     return (
@@ -956,7 +956,7 @@ export default function MyBookings() {
             </div>
 
             <div className="p-5 border-t border-[#c6c6cd]/30 flex justify-end gap-3 bg-white">
-              {selectedBooking.status === 'Completed' && (
+              {['Completed', 'CheckedOut'].includes(selectedBooking.status) && (
                 <Link
                   to={`/rooms/${selectedBooking.roomType?.RoomTypeId || selectedBooking.assignedRoom?.roomId || 1}/reviews/new?bookingId=${selectedBooking.bookingId}`}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#fedeb2] text-[#78603e] hover:bg-[#725b38] hover:text-white text-xs font-bold transition-all shadow-xs"

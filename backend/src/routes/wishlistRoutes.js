@@ -41,6 +41,10 @@ router.use(flexibleAuth);
 
 // Định tuyến các API Wishlist
 router.get('/', wishlistController.getWishlist);
+router.post('/', (req, res, next) => {
+  req.params.roomTypeId = req.body?.roomTypeId || req.query?.roomTypeId;
+  return wishlistController.addToWishlist(req, res, next);
+});
 router.post('/sync', wishlistController.syncWishlist);
 router.post('/:roomTypeId', wishlistController.addToWishlist);
 router.delete('/:roomTypeId', wishlistController.removeFromWishlist);

@@ -38,8 +38,8 @@ export const AuthProvider = ({ children }) => {
     verifyUser();
   }, [token]);
 
-  const handleLogin = async (identifier, password) => {
-    const response = await loginUser({ identifier, password });
+  const handleLogin = async (identifier, password, expectedRole) => {
+    const response = await loginUser({ identifier, password, expectedRole });
     if (response.success && response.token) {
       setToken(response.token);
       setUser(response.user);
@@ -82,6 +82,14 @@ export const AuthProvider = ({ children }) => {
     return response;
   };
 
+  const handleUpdateUser = (updatedData) => {
+    setUser((prev) => {
+      const merged = typeof updatedData === 'function' ? updatedData(prev) : { ...(prev || {}), ...updatedData };
+      localStorage.setItem('hotel_user', JSON.stringify(merged));
+      return merged;
+    });
+  };
+
   const handleLogout = () => {
     setToken(null);
     setUser(null);
@@ -98,6 +106,7 @@ export const AuthProvider = ({ children }) => {
     register: handleRegister,
     loginGoogle: handleGoogleLogin,
     loginFacebook: handleFacebookLogin,
+    updateUser: handleUpdateUser,
     logout: handleLogout
   };
 

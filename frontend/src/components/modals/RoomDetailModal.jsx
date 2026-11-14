@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const RoomDetailModal = ({ room, isOpen, onClose, onBookNow }) => {
+const RoomDetailModal = ({ room, isOpen = true, onClose, onBookNow }) => {
   if (!isOpen || !room) return null;
 
   const [selectedImage, setSelectedImage] = useState(room.ImageUrl);

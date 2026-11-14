@@ -80,13 +80,16 @@ export default function BookingEngine() {
   // Sync user details when authenticated user changes
   useEffect(() => {
     if (user) {
-      if (user.FullName) {
-        const parts = user.FullName.trim().split(' ');
+      const fullName = user.fullName || user.FullName;
+      if (fullName) {
+        const parts = fullName.trim().split(/\s+/);
         setFirstName(parts.length > 1 ? parts[parts.length - 1] : parts[0]);
         setLastName(parts.length > 1 ? parts.slice(0, -1).join(' ') : '');
       }
-      if (user.Email) setEmail(user.Email);
-      if (user.Phone) setPhoneNumber(user.Phone);
+      const emailVal = user.email || user.Email;
+      if (emailVal) setEmail(emailVal);
+      const phoneVal = user.phoneNumber || user.phone || user.Phone;
+      if (phoneVal) setPhoneNumber(phoneVal);
     }
   }, [user]);
 
@@ -233,7 +236,7 @@ export default function BookingEngine() {
         const res = await calculatePricingApi({
           checkInDate,
           checkOutDate,
-          baseRate: currentBaseRate,
+          baseRate: roomTypeId ? undefined : currentBaseRate,
           roomTypeId: parseInt(roomTypeId, 10),
           adults: adultsCount,
           children: childrenCount,
@@ -243,7 +246,11 @@ export default function BookingEngine() {
           voucherCode: appliedVoucher ? appliedVoucher.voucherCode : undefined,
           taxesAndFeesRate: 0.12,
           depositRate: 0.20,
-          isGoldMember: user?.MembershipTier?.TierName === 'Gold' || user?.TierId === 3
+          isGoldMember:
+            user?.MembershipTier?.TierName === 'Gold' ||
+            user?.tierName === 'Gold' ||
+            user?.TierId === 3 ||
+            user?.tierId === 3
         });
 
         if (isMounted) {
@@ -382,7 +389,11 @@ export default function BookingEngine() {
         selectedAddons: selectedAddonsList,
         lateCheckOutMinutes: addonLateCO ? lateCheckOutMinutes : undefined,
         voucherCode: appliedVoucher ? appliedVoucher.voucherCode : undefined,
-        isGoldMember: user?.MembershipTier?.TierName === 'Gold' || user?.TierId === 3,
+        isGoldMember:
+          user?.MembershipTier?.TierName === 'Gold' ||
+          user?.tierName === 'Gold' ||
+          user?.TierId === 3 ||
+          user?.tierId === 3,
         totalAmount: pricingData?.totalAmount || finalTotalAmount,
         depositAmount: pricingData?.depositAmount || depositRequired,
         lockSessionId: paramLockSessionId || undefined
@@ -420,8 +431,8 @@ export default function BookingEngine() {
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-xs text-[#b9a277] font-semibold">
               <span className="material-symbols-outlined text-sm">apartment</span>
-              <span>Khách sạn: <strong>{roomDetail?.Branch?.BranchName || roomDetail?.BranchName || 'Grand Horizon Phú Quốc Luxury Resort'}</strong></span>
-              <span className="text-slate-400 font-normal">({roomDetail?.Branch?.Address || 'Bãi Khem, Phú Quốc'})</span>
+              <span>Khách sạn: <strong>{roomType?.Branch?.BranchName || roomType?.BranchName || 'Grand Horizon Phú Quốc Luxury Resort'}</strong></span>
+              <span className="text-slate-400 font-normal">({roomType?.Branch?.Address || 'Bãi Khem, Phú Quốc'})</span>
             </div>
             <h1 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">
               {roomDisplayName}
@@ -978,14 +989,14 @@ export default function BookingEngine() {
                 <div className="p-3.5 bg-gradient-to-r from-amber-50 to-[#fdf9f0] rounded-xl border border-amber-200/80 text-xs shadow-xs">
                   <div className="flex items-center gap-1.5 font-bold text-[#131b2e]">
                     <span className="material-symbols-outlined text-sm text-[#b9a277]">apartment</span>
-                    <span>{roomDetail?.Branch?.BranchName || roomDetail?.BranchName || 'Grand Horizon Phú Quốc Luxury Resort'}</span>
+                    <span>{roomType?.Branch?.BranchName || roomType?.BranchName || 'Grand Horizon Phú Quốc Luxury Resort'}</span>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-1 truncate">
-                    {roomDetail?.Branch?.Address || 'Bãi Khem, Phú Quốc, Kiên Giang'}
+                    {roomType?.Branch?.Address || 'Bãi Khem, Phú Quốc, Kiên Giang'}
                   </p>
                   <div className="mt-2.5 pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
                     <span
-                      onClick={() => navigate(`/rooms?branchId=${roomDetail?.Branch?.BranchId || searchParams.get('branchId') || 1}`)}
+                      onClick={() => navigate(`/rooms?branchId=${roomType?.Branch?.BranchId || searchParams.get('branchId') || 1}`)}
                       className="text-blue-600 font-semibold hover:underline cursor-pointer flex items-center gap-0.5"
                     >
                       <span>← Đổi loại phòng</span>
@@ -1128,15 +1139,21 @@ export default function BookingEngine() {
                   )}
 
                   {/* Ưu đãi hội viên Gold */}
-                  {pricingData && pricingData.discountAmount > 0 && !appliedVoucher && (
-                    <div className="flex justify-between items-center text-emerald-700">
-                      <span className="flex items-center gap-1 font-medium">
-                        <span className="material-symbols-outlined text-[16px]">stars</span>
-                        Ưu đãi Hội viên Gold (-10%)
-                      </span>
-                      <span className="font-bold">-{formatMoney(pricingData.discountAmount, pricingData.currency)}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const goldDisc = pricingData
+                      ? Math.max(0, Math.round((Number(pricingData.discountAmount || 0) - Number(pricingData.voucher?.discountAmount || 0)) * 100) / 100)
+                      : goldDiscount;
+                    if (!goldDisc || goldDisc <= 0) return null;
+                    return (
+                      <div className="flex justify-between items-center text-emerald-700">
+                        <span className="flex items-center gap-1 font-medium">
+                          <span className="material-symbols-outlined text-[16px]">stars</span>
+                          Ưu đãi Hội viên Gold (-10%)
+                        </span>
+                        <span className="font-bold">-{formatMoney(goldDisc, pricingData?.currency)}</span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Chiết khấu Voucher Khuyến Mãi (FEAT-GUEST-07) */}
                   {appliedVoucher && (

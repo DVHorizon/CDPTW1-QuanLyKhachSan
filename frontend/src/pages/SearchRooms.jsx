@@ -908,6 +908,10 @@ export default function SearchRooms() {
               loading={loading}
               onBackToHotels={handleBackToHotels}
               onSelectRoomForDetail={(r) => setSelectedRoomForDetail(r)}
+              compareList={compareList}
+              onToggleCompare={toggleCompare}
+              isWishlisted={isWishlisted}
+              onToggleWishlist={toggleWishlist}
               formatVND={formatVND}
               formatDisplayDate={formatDisplayDate}
             />
@@ -1178,9 +1182,9 @@ export default function SearchRooms() {
                     ) : (
                       <div className="p-10 bg-white rounded-2xl border border-slate-200 text-center flex flex-col items-center justify-center gap-3">
                         <span className="material-symbols-outlined text-4xl text-slate-400">hotel_class</span>
-                        <h3 className="font-bold text-lg text-slate-800">Không tìm thấy nơi lưu trú phù hợp</h3>
+                        <h3 className="font-bold text-lg text-slate-800">Không có phòng nào phù hợp với bộ lọc đã chọn. Vui lòng thử bỏ bớt tiêu chí lọc.</h3>
                         <p className="text-xs text-slate-500 max-w-md">
-                          Hãy thử điều chỉnh từ khóa tìm kiếm hoặc mở rộng khoảng giá để khám phá các khu nghỉ dưỡng Grand Horizon khác.
+                          Hãy thử bỏ bớt tiêu chí lọc, điều chỉnh từ khóa tìm kiếm hoặc mở rộng khoảng giá để khám phá các khu nghỉ dưỡng Grand Horizon.
                         </p>
                         <button
                           type="button"
@@ -1203,6 +1207,7 @@ export default function SearchRooms() {
         {selectedRoomForDetail && (
           <RoomDetailModal
             room={selectedRoomForDetail}
+            isOpen={Boolean(selectedRoomForDetail)}
             onClose={() => setSelectedRoomForDetail(null)}
             onBookNow={(room) => {
               setSelectedRoomForDetail(null);

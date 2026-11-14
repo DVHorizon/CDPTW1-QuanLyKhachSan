@@ -56,7 +56,16 @@ export default function DepositPayment() {
   
   // Card form inputs
   const [cardNumber, setCardNumber] = useState('');
-  const [cardholderName, setCardholderName] = useState(user?.FullName ? user.FullName.toUpperCase() : 'NGUYEN VAN AN');
+  const [cardholderName, setCardholderName] = useState(
+    (user?.fullName || user?.FullName || 'NGUYEN VAN AN').toUpperCase()
+  );
+
+  useEffect(() => {
+    const resolvedName = user?.fullName || user?.FullName;
+    if (resolvedName && (!cardholderName || cardholderName === 'NGUYEN VAN AN')) {
+      setCardholderName(resolvedName.toUpperCase());
+    }
+  }, [user]);
   const [expiryDate, setExpiryDate] = useState('12/28');
   const [cvvCode, setCvvCode] = useState('');
 

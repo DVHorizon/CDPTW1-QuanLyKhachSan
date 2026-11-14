@@ -111,7 +111,7 @@ exports.getMyBookings = async (req, res) => {
     if (normStatus === 'UPCOMING') {
       whereConditions.Status = { [Op.in]: ['Pending', 'Confirmed'] };
     } else if (normStatus === 'COMPLETED') {
-      whereConditions.Status = 'Completed';
+      whereConditions.Status = { [Op.in]: ['Completed', 'CheckedOut'] };
     } else if (normStatus === 'CANCELLED') {
       whereConditions.Status = 'Cancelled';
     } else if (normStatus === 'ACTIVE_ONLY') {
@@ -212,7 +212,7 @@ exports.getMyBookings = async (req, res) => {
       where: { UserId: userId, Status: { [Op.in]: ['Pending', 'Confirmed'] } }
     });
     const completedCount = await Booking.count({
-      where: { UserId: userId, Status: 'Completed' }
+      where: { UserId: userId, Status: { [Op.in]: ['Completed', 'CheckedOut'] } }
     });
     const cancelledCount = await Booking.count({
       where: { UserId: userId, Status: 'Cancelled' }

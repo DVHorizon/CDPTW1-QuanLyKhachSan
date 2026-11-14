@@ -229,7 +229,33 @@ exports.createOnlineBooking = async (req, res) => {
     const numberOfNights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     const basePrice = parseFloat(roomType.BasePrice || 0);
     const effectiveBaseRate = basePrice;
-    const roomSubtotal = numberOfNights * basePrice * effectiveUnits;
+    let roomSubtotal = numberOfNights * basePrice * effectiveUnits;
+
+    try {
+      const dpRes = await dynamicPricingService.calculateDynamicPricing({
+        roomId: parseInt(roomTypeId, 10),
+        checkInDate,
+        checkOutDate
+      });
+      if (dpRes && dpRes.totalRoomPrice && dpRes.nights > 0) {
+        roomSubtotal = Math.round(dpRes.totalRoomPrice * effectiveUnits * 100) / 100;
+      }
+    } catch (dpErr) {
+      console.warn('Dynamic pricing skipped in createOnlineBooking:', dpErr.message);
+    }
+
+    const isVNDPrice = effectiveBaseRate >= 100000;
+    const stdAdults = parseInt(roomType.AdultCapacity, 10) || 2;
+    const stdChildren = parseInt(roomType.ChildCapacity, 10) || 0;
+    const extraAdultsCnt = Math.max(0, effectiveAdults - stdAdults * effectiveUnits);
+    const extraChildrenCnt = Math.max(0, effectiveChildren - stdChildren * effectiveUnits);
+    const extraGuestSurcharge = Math.round(
+      (extraAdultsCnt * (isVNDPrice ? 500000 : 30) * numberOfNights +
+        extraChildrenCnt * (isVNDPrice ? 250000 : 15) * numberOfNights) *
+        100
+    ) / 100;
+
+    await require('./voucherController').ensureDefaultVouchers();
 
     // Gold discount 10% if applicable
     let discountAmount = 0;
@@ -271,7 +297,11 @@ exports.createOnlineBooking = async (req, res) => {
             {
               where: {
                 VoucherId: voucher.VoucherId,
-                UsedCount: { [Op.lt]: voucher.UsageLimit }
+                [Op.or]: [
+                  { UsageLimit: null },
+                  { UsageLimit: 0 },
+                  { UsedCount: { [Op.lt]: voucher.UsageLimit } }
+                ]
               },
               transaction
             }
@@ -343,7 +373,11 @@ exports.createOnlineBooking = async (req, res) => {
       }
     }
 
-    const finalTotal = Math.max(0, roomSubtotal - discountAmount + addonsTotal);
+    const totalSurcharge = Math.round((extraGuestSurcharge + addonsTotal) * 100) / 100;
+    const subtotalBeforeTax = Math.max(0, roomSubtotal - discountAmount + totalSurcharge);
+    const taxRate = req.body.taxesAndFeesRate !== undefined ? parseFloat(req.body.taxesAndFeesRate) : 0.12;
+    const taxesAndFees = Math.round(subtotalBeforeTax * (taxRate >= 0 ? taxRate : 0.12) * 100) / 100;
+    const finalTotal = Math.round((subtotalBeforeTax + taxesAndFees) * 100) / 100;
     const depRate = req.body.depositRate ? parseFloat(req.body.depositRate) : 0.20;
     const depositAmount = Math.round(finalTotal * depRate);
     const confirmationCode = 'GH-' + Math.floor(100000 + Math.random() * 900000);
@@ -369,7 +403,7 @@ exports.createOnlineBooking = async (req, res) => {
       RoomQuantity: effectiveUnits,
       RoomSubtotal: roomSubtotal,
       DiscountAmount: discountAmount,
-      SurchargeAmount: addonsTotal,
+      SurchargeAmount: totalSurcharge,
       TotalAmount: finalTotal,
       DepositAmount: depositAmount,
       Status: 'Pending', // Initial status PENDING_PAYMENT / Pending
@@ -712,6 +746,7 @@ exports.calculatePricing = async (req, res) => {
     let voucherData = null;
     let voucherDiscount = 0;
     if (voucherCode) {
+      await require('./voucherController').ensureDefaultVouchers();
       const cleanVoucherCode = String(voucherCode).trim().toUpperCase();
       const voucher = await Voucher.findOne({
         where: { Code: cleanVoucherCode, IsDeleted: false }

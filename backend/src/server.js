@@ -57,9 +57,13 @@ app.get('/', (req, res) => res.send('Grand Horizon Hotel Management Backend API 
 app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'Backend is healthy', timestamp: new Date().toISOString() }));
 
 // ─── Trang chủ & Auth (dùng chung) ────────────────────────────────────────
+app.use('/api/v1',       require('./routes/homeRoutes'));
 app.use('/api',          require('./routes/homeRoutes'));
+app.get('/homepage',     require('./controllers/homeController').getHomeData);
+app.post('/newsletter/subscribe', require('./controllers/homeController').subscribeNewsletter);
 app.use('/api/v1/auth',  require('./routes/authRoutes'));
 app.use('/api/auth',     require('./routes/authRoutes'));   // backward compat
+app.use('/auth',         require('./routes/authRoutes'));   // spec alias /auth/*
 
 // ─── LEGACY routes (backward compat — giữ để frontend cũ không bị break) ──
 // Admin Room & RoomType pages vẫn dùng /api/phong và /api/loai-phong

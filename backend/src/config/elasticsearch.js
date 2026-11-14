@@ -11,6 +11,10 @@ if (process.env.DB_HOST === 'mysql' && esUrl.includes('127.0.0.1')) {
   esUrl = 'http://host.docker.internal:9200';
 }
 
-const client = new Client({ node: esUrl });
+const client = new Client({
+  node: esUrl,
+  requestTimeout: 800,
+  maxRetries: 0
+});
 
 module.exports = client;

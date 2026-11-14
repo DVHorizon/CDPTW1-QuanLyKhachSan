@@ -131,13 +131,7 @@ const Header = ({ wishlistCount: propWishlistCount, onWishlistClick, lang: propL
       const currentScrollY = window.scrollY;
 
       setIsTop(currentScrollY < 20);
-
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        setIsVisible(false);
-      } else {
-        setIsVisible(true);
-      }
-
+      setIsVisible(true);
       setLastScrollY(currentScrollY);
     };
 
@@ -304,6 +298,15 @@ const Header = ({ wishlistCount: propWishlistCount, onWishlistClick, lang: propL
                   </Link>
 
                   <Link
+                    to="/rooms/compare"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-base text-[#b9a277]">compare_arrows</span>
+                    <span>So Sánh Phòng</span>
+                  </Link>
+
+                  <Link
                     to="/fnb/dat-ban"
                     onClick={() => setIsUserMenuOpen(false)}
                     className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
@@ -449,6 +452,15 @@ const Header = ({ wishlistCount: propWishlistCount, onWishlistClick, lang: propL
                 >
                   <span className="material-symbols-outlined text-[18px] text-rose-500">bookmark_heart</span>
                   <span>Danh Sách Yêu Thích {wishlistCount > 0 ? `(${wishlistCount})` : ''}</span>
+                </Link>
+
+                <Link
+                  to="/rooms/compare"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full py-2 px-3 rounded-lg bg-white border border-[#dedad0] text-[#203044] text-xs font-bold text-center flex items-center justify-center gap-2 mt-1"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-[#b9a277]">compare_arrows</span>
+                  <span>So Sánh Phòng</span>
                 </Link>
 
                 {([1, 2, 3, 4].includes(user.roleId) || ['Admin', 'Receptionist', 'Kitchen', 'Housekeeping'].includes(user.roleName)) && (
