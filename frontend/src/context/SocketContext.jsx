@@ -10,13 +10,21 @@ export const SocketProvider = ({ children, url = DEFAULT_WS_URL }) => {
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const listenersRef = useRef(new Map()); // Map<eventType, Set<callback>>
+  const isUnmountedRef = useRef(false);
 
   const connect = useCallback(() => {
-    // Dọn dẹp kết nối cũ nếu có
+    if (isUnmountedRef.current) return;
+
+    // Dọn dẹp kết nối cũ nếu có (gỡ onclose để tránh kích hoạt sự kiện lặp)
     if (socketRef.current) {
       try {
-        socketRef.current.close();
+        socketRef.current.onclose = null;
+        socketRef.current.onerror = null;
+        socketRef.current.onmessage = null;
+        socketRef.current.onopen = null;
+        socketRef.current.close(1000, 'Reconnecting');
       } catch (_) {}
+      socketRef.current = null;
     }
 
     try {
@@ -24,11 +32,16 @@ export const SocketProvider = ({ children, url = DEFAULT_WS_URL }) => {
       socketRef.current = ws;
 
       ws.onopen = () => {
+        if (isUnmountedRef.current) {
+          ws.close(1000, 'Unmounted');
+          return;
+        }
         console.log(`⚡ [SocketContext] Đã kết nối WebSocket tới: ${url}`);
         setIsConnected(true);
       };
 
       ws.onmessage = (event) => {
+        if (isUnmountedRef.current) return;
         try {
           const payload = JSON.parse(event.data);
           setLastEvent(payload);
@@ -56,34 +69,54 @@ export const SocketProvider = ({ children, url = DEFAULT_WS_URL }) => {
       };
 
       ws.onerror = (err) => {
-        console.warn('⚠️ [SocketContext] Lỗi kết nối WebSocket:', err);
+        if (!isUnmountedRef.current) {
+          console.warn('⚠️ [SocketContext] Lỗi kết nối WebSocket:', err);
+        }
       };
 
-      ws.onclose = () => {
-        console.log('🔌 [SocketContext] WebSocket đóng kết nối. Sẽ thử kết nối lại sau 3s...');
+      ws.onclose = (event) => {
         setIsConnected(false);
+        if (isUnmountedRef.current) return;
+
+        // Nếu đóng có chủ ý (1000) thì không reconnect tự động
+        if (event && event.code === 1000) return;
+
+        console.log('🔌 [SocketContext] WebSocket đóng kết nối. Sẽ thử kết nối lại sau 3s...');
         // Tự động thử kết nối lại sau 3 giây
         reconnectTimeoutRef.current = setTimeout(() => {
-          connect();
+          if (!isUnmountedRef.current) {
+            connect();
+          }
         }, 3000);
       };
     } catch (err) {
-      console.warn('⚠️ [SocketContext] Không thể tạo WebSocket:', err.message);
-      reconnectTimeoutRef.current = setTimeout(() => {
-        connect();
-      }, 5000);
+      if (!isUnmountedRef.current) {
+        console.warn('⚠️ [SocketContext] Không thể tạo WebSocket:', err.message);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (!isUnmountedRef.current) {
+            connect();
+          }
+        }, 5000);
+      }
     }
   }, [url]);
 
   useEffect(() => {
+    isUnmountedRef.current = false;
     connect();
 
     return () => {
+      isUnmountedRef.current = true;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (socketRef.current) {
-        socketRef.current.close();
+        socketRef.current.onclose = null;
+        socketRef.current.onerror = null;
+        socketRef.current.onmessage = null;
+        socketRef.current.onopen = null;
+        socketRef.current.close(1000, 'Component unmounted');
+        socketRef.current = null;
       }
     };
   }, [connect]);

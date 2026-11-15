@@ -6,7 +6,8 @@ import QuickBookingModal from "../../components/modals/QuickBookingModal";
 import AmenityPerspectiveCarousel from "../../components/client/AmenityPerspectiveCarousel";
 import ScrollIcon from "../../components/common/ScrollIcon";
 import MorphDropdown from "../../components/common/MorphDropdown";
-import { fetchHomeData } from "../../api/hotelApi";
+import { useWishlist } from "../../context/WishlistContext";
+import { fetchHomeData, subscribeNewsletterApi } from "../../api/hotelApi";
 import {
   mockBranches,
   mockRoomTypes,
@@ -111,13 +112,15 @@ function Home() {
   const [guestOption, setGuestOption] = useState("2-0-1");
   const [searchNotification, setSearchNotification] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [wishlist, setWishlist] = useState([]);
+  const { wishlist, wishlistCount, toggleWishlist } = useWishlist();
   const [selectedRoomForDetail, setSelectedRoomForDetail] = useState(null);
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState(null);
   const [openFaqId, setOpenFaqId] = useState(1);
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [newsletterName, setNewsletterName] = useState("");
   const [newsletterSuccess, setNewsletterSuccess] = useState(false);
+  const [newsletterError, setNewsletterError] = useState("");
+  const [newsletterMessage, setNewsletterMessage] = useState("");
   const [selectedHotelRegion, setSelectedHotelRegion] = useState("all");
   const [showAllHotels, setShowAllHotels] = useState(false);
   const [hotelDisplayLimit, setHotelDisplayLimit] = useState(3);
@@ -214,12 +217,20 @@ function Home() {
               ? liveData.featuredRoomTypes.map((rt, idx) => {
                   const fallback =
                     mockRoomTypes[idx % mockRoomTypes.length] || {};
+                  const parsedBase = Number(
+                    rt.BasePrice || fallback.BasePrice || 1850000,
+                  );
+                  const parsedOrig = Number(
+                    rt.OriginalPrice || fallback.OriginalPrice || 0,
+                  );
                   return {
                     ...fallback,
                     ...rt,
-                    BasePrice: Number(
-                      rt.BasePrice || fallback.BasePrice || 1850000,
-                    ),
+                    BasePrice: parsedBase,
+                    OriginalPrice:
+                      parsedOrig > parsedBase
+                        ? parsedOrig
+                        : Math.round(parsedBase * 1.2),
                     Category: rt.Category || fallback.Category || "deluxe",
                     Gallery: rt.Gallery?.length
                       ? rt.Gallery
@@ -257,7 +268,26 @@ function Home() {
               ? liveData.offers
               : mockSpecialOffers,
             experiences: mockExperiences,
-            reviews: liveData.reviews?.length ? liveData.reviews : mockReviews,
+            reviews: (() => {
+              const sourceReviews = liveData.reviews?.length
+                ? [...liveData.reviews, ...mockReviews]
+                : mockReviews;
+              const seenBodies = new Set();
+              const seenTitles = new Set();
+              const deduped = [];
+              for (const r of sourceReviews) {
+                const titleKey = String(r.ReviewTitle || "").replace(/\s*#\d+$/, "").trim().toLowerCase();
+                const bodyKey = String(r.ReviewBody || "").trim().toLowerCase();
+                if ((bodyKey && seenBodies.has(bodyKey)) || (titleKey && seenTitles.has(titleKey))) {
+                  continue;
+                }
+                if (bodyKey) seenBodies.add(bodyKey);
+                if (titleKey) seenTitles.add(titleKey);
+                deduped.push(r);
+                if (deduped.length >= 4) break;
+              }
+              return deduped;
+            })(),
             stats: liveData.stats || mockStats,
           }));
         }
@@ -309,15 +339,6 @@ function Home() {
     );
   };
 
-  // Toggle Wishlist
-  const toggleWishlist = (roomId) => {
-    setWishlist((prev) =>
-      prev.includes(roomId)
-        ? prev.filter((id) => id !== roomId)
-        : [...prev, roomId],
-    );
-  };
-
   // Chuyển hướng trực tiếp tới màn hình Đặt Phòng (Booking Engine)
   const handleBookNow = (rt) => {
     const guests = guestOption ? guestOption.split("-") : ["2", "0", "1"];
@@ -348,11 +369,8 @@ function Home() {
 
   return (
     <MainLayout
-      wishlistCount={wishlist.length}
-      onWishlistClick={() => {
-        const el = document.getElementById("room-collection");
-        if (el) el.scrollIntoView({ behavior: "smooth" });
-      }}
+      wishlistCount={wishlistCount}
+      onWishlistClick={() => navigate("/wishlist")}
     >
       <div className="flex flex-col w-full">
         {/* ================= 1. HERO BANNER SECTION ================= */}
@@ -1004,7 +1022,7 @@ function Home() {
                             <span className="text-[10px] text-[#8a8782] font-semibold uppercase">
                               Giá từ
                             </span>
-                            {rt.OriginalPrice && (
+                            {Number(rt.OriginalPrice) > Number(rt.BasePrice) && (
                               <span className="text-[11px] text-[#8a8782] line-through">
                                 {Number(rt.OriginalPrice).toLocaleString(
                                   "vi-VN",
@@ -1311,20 +1329,40 @@ function Home() {
                             check_circle
                           </span>
                           <span>
-                            Đăng ký thành công! Mã ưu đãi ELITE10 đã được gửi
-                            đến email của bạn.
+                            {newsletterMessage || "Đăng ký nhận bản tin ưu đãi độc quyền thành công!"} Mã ưu đãi ELITE10 đã được gửi đến email của bạn.
                           </span>
                         </div>
                       ) : (
                         <form
+                          noValidate
                           className="flex flex-col gap-3"
-                          onSubmit={(e) => {
+                          onSubmit={async (e) => {
                             e.preventDefault();
-                            if (newsletterEmail) {
+                            setNewsletterError("");
+                            const cleanEmail = newsletterEmail.trim();
+                            const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+                            if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+                              setNewsletterError("Email nhận bản tin không đúng định dạng");
+                              return;
+                            }
+                            const res = await subscribeNewsletterApi({
+                              fullName: newsletterName.trim(),
+                              email: cleanEmail,
+                            });
+                            if (res?.success) {
+                              setNewsletterMessage(res.message || "Đăng ký nhận bản tin ưu đãi độc quyền thành công!");
                               setNewsletterSuccess(true);
+                            } else {
+                              setNewsletterError(res?.message || "Email nhận bản tin không đúng định dạng");
                             }
                           }}
                         >
+                          {newsletterError && (
+                            <div className="p-2.5 rounded-lg bg-rose-500/20 border border-rose-400/60 text-rose-100 text-[12px] flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[16px]">error</span>
+                              <span>{newsletterError}</span>
+                            </div>
+                          )}
                           <div>
                             <input
                               className="w-full h-11 px-3.5 rounded-xl bg-white/10 text-white placeholder-white/50 text-[13px] focus:outline-none focus:bg-white/20 transition-all border border-white/15"
@@ -1334,7 +1372,6 @@ function Home() {
                               onChange={(e) =>
                                 setNewsletterName(e.target.value)
                               }
-                              required
                             />
                           </div>
                           <div>
@@ -1343,10 +1380,10 @@ function Home() {
                               placeholder="Địa chỉ email cá nhân"
                               type="email"
                               value={newsletterEmail}
-                              onChange={(e) =>
-                                setNewsletterEmail(e.target.value)
-                              }
-                              required
+                              onChange={(e) => {
+                                setNewsletterEmail(e.target.value);
+                                if (newsletterError) setNewsletterError("");
+                              }}
                             />
                           </div>
                           <button

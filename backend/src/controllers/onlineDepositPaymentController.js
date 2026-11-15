@@ -289,12 +289,25 @@ exports.processDepositPayment = async (req, res) => {
       })
     }, { transaction });
 
-    // Cập nhật booking sang trạng thái Confirmed và cập nhật số tiền cọc đã trả
+    // Cập nhật booking sang trạng thái Confirmed và sinh mã QR chuẩn Contactless Pass
     const updatedDeposit = parseFloat(booking.DepositAmount || 0) + payableAmount;
+    let generatedQr = booking.BookingQrCode;
+    try {
+      const { generateBookingQRCode } = require('../services/qrEmailService');
+      generatedQr = await generateBookingQRCode({
+        bookingId: booking.BookingId,
+        confirmationCode: booking.ConfirmationCode,
+        checkInDate: booking.CheckInDate,
+        checkOutDate: booking.CheckOutDate
+      });
+    } catch (_) {
+      generatedQr = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${booking.ConfirmationCode}`;
+    }
+
     await booking.update({
       Status: 'Confirmed',
       DepositAmount: updatedDeposit,
-      BookingQrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${booking.ConfirmationCode}`,
+      BookingQrCode: generatedQr,
       ConfirmationSentAt: new Date()
     }, { transaction });
 
@@ -349,6 +362,13 @@ exports.processDepositPayment = async (req, res) => {
       } catch (rbErr) {
         console.error('Rollback error:', rbErr.message);
       }
+    }
+    if (error?.name === 'SequelizeOptimisticLockError') {
+      return res.status(409).json({
+        success: false,
+        code: 'ERROR_CONCURRENT_MODIFICATION',
+        message: 'Đơn đặt phòng vừa được cập nhật ở phiên khác (xung đột dữ liệu). Vui lòng tải lại trang và thử lại.'
+      });
     }
     console.error('Error in processDepositPayment:', error);
     return res.status(500).json({

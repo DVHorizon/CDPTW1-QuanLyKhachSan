@@ -139,3 +139,58 @@ exports.getRoomTypes = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+const NEWSLETTER_EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+
+/**
+ * Controller: Đăng ký nhận bản tin / Hội viên Elite trên Trang Chủ
+ * POST /api/newsletter/subscribe
+ */
+exports.subscribeNewsletter = async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const fullName = String(req.body?.fullName || req.body?.name || '').trim().slice(0, 120);
+
+    if (!email || !NEWSLETTER_EMAIL_REGEX.test(email) || email.length > 255) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0004_INVALID_FORMAT',
+        message: 'Email nhận bản tin không đúng định dạng'
+      });
+    }
+
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS NewsletterSubscribers (
+        SubscriberId INT AUTO_INCREMENT PRIMARY KEY,
+        Email VARCHAR(255) NOT NULL UNIQUE,
+        IsActive TINYINT(1) DEFAULT 1,
+        SubscribedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    await sequelize.query(
+      `INSERT INTO NewsletterSubscribers (Email, IsActive, SubscribedAt)
+       VALUES (:email, 1, NOW())
+       ON DUPLICATE KEY UPDATE IsActive = 1, SubscribedAt = NOW()`,
+      { replacements: { email } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      code: 'SUCCESS_0011_SUBSCRIBED',
+      message: 'Đăng ký nhận bản tin ưu đãi độc quyền thành công!',
+      data: {
+        email,
+        fullName: fullName || null,
+        promoCode: 'ELITE10'
+      }
+    });
+  } catch (error) {
+    console.error('Lỗi subscribeNewsletter:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_SERVER',
+      message: 'Lỗi máy chủ khi đăng ký nhận bản tin'
+    });
+  }
+};

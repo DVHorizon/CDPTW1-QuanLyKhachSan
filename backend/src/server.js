@@ -57,9 +57,13 @@ app.get('/', (req, res) => res.send('Grand Horizon Hotel Management Backend API 
 app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'Backend is healthy', timestamp: new Date().toISOString() }));
 
 // ─── Trang chủ & Auth (dùng chung) ────────────────────────────────────────
+app.use('/api/v1',       require('./routes/homeRoutes'));
 app.use('/api',          require('./routes/homeRoutes'));
+app.get('/homepage',     require('./controllers/homeController').getHomeData);
+app.post('/newsletter/subscribe', require('./controllers/homeController').subscribeNewsletter);
 app.use('/api/v1/auth',  require('./routes/authRoutes'));
 app.use('/api/auth',     require('./routes/authRoutes'));   // backward compat
+app.use('/auth',         require('./routes/authRoutes'));   // spec alias /auth/*
 
 // ─── LEGACY routes (backward compat — giữ để frontend cũ không bị break) ──
 // Admin Room & RoomType pages vẫn dùng /api/phong và /api/loai-phong
@@ -254,6 +258,10 @@ app.use('/api/v1/operations', require('./modules/operations'));
 // Guest search (backward compat — cũng hoạt động qua /api/v1/guest/rooms/search)
 app.use('/api/v1/rooms', require('./routes/roomSearchRoutes'));
 app.use('/api/rooms',    require('./routes/roomSearchRoutes'));
+// FEAT-GUEST-13B: Direct room comparison endpoint GET /rooms/compare
+app.get('/rooms/compare', require('./controllers/roomCompareController').compareRooms);
+app.get('/api/rooms/compare', require('./controllers/roomCompareController').compareRooms);
+
 // FEAT-GUEST-05: Direct booking endpoint
 app.post('/bookings', require('./middlewares/authMiddleware').verifyToken, require('./controllers/bookingEngineController').createOnlineBooking);
 
@@ -283,10 +291,23 @@ app.use('/api/v1/me', require('./routes/bookingHistoryRoutes'));
 app.use('/api/me',    require('./routes/bookingHistoryRoutes'));
 app.use('/me',        require('./routes/bookingHistoryRoutes'));
 
+// FEAT-GUEST-13C: Danh sách phòng yêu thích (Wishlist & Saved Suites - Mã truy vết: A13 / Màn hình 59)
+app.use('/api/v1/me/wishlist', require('./routes/wishlistRoutes'));
+app.use('/api/me/wishlist',    require('./routes/wishlistRoutes'));
+app.use('/me/wishlist',        require('./routes/wishlistRoutes'));
 // FEAT-GUEST-10: Cổng gửi Email xác nhận & Thông báo
 const bookingQrNotificationController = require('./controllers/bookingQrNotificationController');
 app.post('/api/v1/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
 app.post('/api/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
+
+// FEAT-GUEST-11: Room Review & Rating (Mã truy vết: A11)
+const roomReviewController = require('./controllers/roomReviewController');
+app.post('/rooms/:roomId/reviews', roomReviewController.createRoomReview);
+app.get('/rooms/:roomId/reviews', roomReviewController.getRoomReviews);
+app.post('/api/v1/rooms/:roomId/reviews', roomReviewController.createRoomReview);
+app.get('/api/v1/rooms/:roomId/reviews', roomReviewController.getRoomReviews);
+app.post('/api/rooms/:roomId/reviews', roomReviewController.createRoomReview);
+app.get('/api/rooms/:roomId/reviews', roomReviewController.getRoomReviews);
 
 // ─── Catch-all 404 Handler for API Routes (Guarantees JSON) ────────────────
 app.all(['/api', '/api/*'], (req, res) => {

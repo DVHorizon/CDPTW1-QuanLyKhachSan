@@ -122,31 +122,49 @@ export default function GuestSidebar({ isOpen, onClose }) {
 
         {/* Cổng khách hàng & Dịch vụ */}
         <div className="px-3 pt-3 pb-1">
-          <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider px-2">Dịch Vụ Khách Hàng</span>
+          <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider px-2">
+            Dịch Vụ Khách Hàng
+          </span>
         </div>
         <nav className="px-3 flex flex-col gap-1" onClick={() => { if (onClose) onClose(); }}>
           <NavLink to="/fnb/dat-ban" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">restaurant</span>
+            <span className="material-symbols-outlined text-[20px]">
+              restaurant
+            </span>
             <span className="text-sm">Đặt Bàn Thưởng Vị</span>
           </NavLink>
           <NavLink to="/fnb/history" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+            <span className="material-symbols-outlined text-[20px]">
+              receipt_long
+            </span>
             <span className="text-sm">Lịch Sử Gọi Món</span>
           </NavLink>
           <NavLink to="/room-service" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">room_service</span>
+            <span className="material-symbols-outlined text-[20px]">
+              room_service
+            </span>
             <span className="text-sm">Đặt Món Tại Phòng</span>
           </NavLink>
-          <NavLink to="/rooms" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">compare</span>
+          <NavLink to="/rooms" end className={navItemClass}>
+            <span className="material-symbols-outlined text-[20px]">bed</span>
             <span className="text-sm">Khám Phá Phòng Nghỉ</span>
           </NavLink>
+          <NavLink to="/rooms/compare" className={navItemClass}>
+            <span className="material-symbols-outlined text-[20px]">
+              compare
+            </span>
+            <span className="text-sm">So Sánh Phòng Nghỉ</span>
+          </NavLink>
           <NavLink to="/fnb/danh-gia" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">reviews</span>
+            <span className="material-symbols-outlined text-[20px]">
+              reviews
+            </span>
             <span className="text-sm">Đánh Giá Món Ăn</span>
           </NavLink>
           <NavLink to="/wishlist" className={navItemClass}>
-            <span className="material-symbols-outlined text-[20px]">bookmark_heart</span>
+            <span className="material-symbols-outlined text-[20px]">
+              bookmark_heart
+            </span>
             <span className="text-sm">Danh Sách Yêu Thích</span>
           </NavLink>
         </nav>
@@ -156,14 +174,22 @@ export default function GuestSidebar({ isOpen, onClose }) {
       <div className="p-3 m-3 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0 font-bold">
-            {user?.fullName ? user.fullName.charAt(0).toUpperCase() : <span className="material-symbols-outlined text-[20px]">person</span>}
+            {user?.fullName ? (
+              user.fullName.charAt(0).toUpperCase()
+            ) : (
+              <span className="material-symbols-outlined text-[20px]">
+                person
+              </span>
+            )}
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <span className="text-sm text-slate-800 font-semibold truncate">
               {user?.fullName || user?.name || "Khách Lưu Trú"}
             </span>
             <span className="text-[11px] text-emerald-700 font-medium truncate">
-              {user?.tierName ? `Hạng ${user.tierName}` : "Thành Viên Thượng Lưu"}
+              {user?.tierName
+                ? `Hạng ${user.tierName}`
+                : "Thành Viên Thượng Lưu"}
             </span>
           </div>
         </div>
@@ -176,7 +202,9 @@ export default function GuestSidebar({ isOpen, onClose }) {
             title="Đăng xuất"
             className="text-rose-600 hover:text-rose-700 transition-colors flex items-center shrink-0"
           >
-            <span className="material-symbols-outlined text-[18px]">logout</span>
+            <span className="material-symbols-outlined text-[18px]">
+              logout
+            </span>
           </button>
         </div>
       </div>

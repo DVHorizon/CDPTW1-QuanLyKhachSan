@@ -2,10 +2,12 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { WishlistProvider } from './context/WishlistContext';
 import Home from './pages/client/Home';
 import HotelsExplorer from './pages/client/HotelsExplorer';
 import SearchRooms from './pages/SearchRooms';
 import RoomDetail from './pages/client/RoomDetail';
+import Wishlist from './pages/client/Wishlist';
 import BookingEngine from './pages/client/BookingEngine';
 import DepositPayment from './pages/client/DepositPayment';
 import BookingConfirmation from './pages/client/BookingConfirmation';
@@ -18,6 +20,7 @@ import StaffManagement from './pages/StaffManagement';
 import RoomService from './pages/client/RoomService';
 import Profile from './pages/client/Profile';
 import MyBookings from './pages/client/MyBookings';
+import GuestBookingLookup from './pages/client/GuestBookingLookup';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import KitchenInventory from './pages/admin/fnb/KitchenInventory';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
@@ -35,6 +38,7 @@ import RoomAssignment from './pages/admin/RoomAssignment';
 import CheckInDesk from './pages/admin/CheckInDesk';
 import CheckOutDesk from './pages/admin/CheckOutDesk';
 import FnbReview from './pages/client/FnbReview';
+import RoomReview from './pages/client/RoomReview';
 import MockPaymentGateway from './pages/client/MockPaymentGateway';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ExtendStayAndMove from './pages/admin/ExtendStayAndMove';
@@ -46,6 +50,7 @@ import AiConciergeManagement from './pages/admin/ai/AiConciergeManagement';
 import FloatingAiConcierge from './components/client/FloatingAiConcierge';
 import FloatingAcademicBadge from './components/common/FloatingAcademicBadge';
 import ClientConcierge from './pages/client/ClientConcierge';
+import RoomComparisonMatrix from './pages/client/RoomComparisonMatrix';
 
 // tuyen/7 imports:
 import MarketingDashboard from './pages/admin/marketing/MarketingDashboard';
@@ -68,18 +73,26 @@ function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/hotels" element={<HotelsExplorer />} />
-            <Route path="/khach-san" element={<HotelsExplorer />} />
-            <Route path="/rooms" element={<SearchRooms />} />
-            <Route path="/services" element={<ServiceManagement />} />
-            <Route path="/rooms/search" element={<SearchRooms />} />
-            <Route path="/tim-kiem" element={<SearchRooms />} />
-            <Route path="/rooms/:id" element={<RoomDetail />} />
-            <Route path="/room/:id" element={<RoomDetail />} />
-            <Route path="/dat-phong" element={<BookingEngine />} />
+        <WishlistProvider>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/hotels" element={<HotelsExplorer />} />
+              <Route path="/khach-san" element={<HotelsExplorer />} />
+              <Route path="/rooms" element={<SearchRooms />} />
+              <Route path="/services" element={<ServiceManagement />} />
+              <Route path="/rooms/search" element={<SearchRooms />} />
+              <Route path="/tim-kiem" element={<SearchRooms />} />
+              <Route path="/rooms/compare" element={<RoomComparisonMatrix />} />
+              <Route path="/compare" element={<RoomComparisonMatrix />} />
+              <Route path="/so-sanh" element={<RoomComparisonMatrix />} />
+              <Route path="/so-sanh-phong" element={<RoomComparisonMatrix />} />
+              <Route path="/rooms/:id" element={<RoomDetail />} />
+              <Route path="/room/:id" element={<RoomDetail />} />
+              <Route path="/wishlist" element={<Wishlist />} />
+              <Route path="/me/wishlist" element={<Wishlist />} />
+              <Route path="/danh-sach-yeu-thich" element={<Wishlist />} />
+              <Route path="/dat-phong" element={<BookingEngine />} />
             <Route path="/booking" element={<BookingEngine />} />
             <Route path="/checkout" element={<BookingEngine />} />
             <Route path="/checkout/step-1" element={<BookingEngine />} />
@@ -95,12 +108,21 @@ function App() {
             <Route path="/lich-su-dat-mon" element={<GuestOrderHistory />} />
             <Route path="/fnb/danh-gia" element={<FnbReview />} />
             <Route path="/danh-gia" element={<FnbReview />} />
+            {/* FEAT-GUEST-11: Room Review & Rating (Màn hình 10 - Post-Stay Evaluation & Verified Guest Review) */}
+            <Route path="/rooms/:roomId/reviews/new" element={<RoomReview />} />
+            <Route path="/rooms/:roomId/review" element={<RoomReview />} />
+            <Route path="/reviews/new" element={<RoomReview />} />
+            <Route path="/danh-gia-phong" element={<RoomReview />} />
+            <Route path="/danh-gia-phong/:roomId" element={<RoomReview />} />
+            <Route path="/danh-gia-ky-nghi" element={<RoomReview />} />
             <Route path="/fnb/dat-ban" element={<TableReservation />} />
             <Route path="/dat-ban" element={<TableReservation />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/my-bookings" element={<MyBookings />} />
             <Route path="/me/bookings" element={<MyBookings />} />
             <Route path="/lich-su-dat-phong" element={<MyBookings />} />
+            <Route path="/lookup" element={<GuestBookingLookup />} />
+            <Route path="/tra-cuu-dat-phong" element={<GuestBookingLookup />} />
             <Route path="/client/concierge" element={<ClientConcierge />} />
             <Route path="/concierge" element={<ClientConcierge />} />
             <Route path="/auth" element={<Auth />} />
@@ -256,6 +278,7 @@ function App() {
           <FloatingAiConcierge />
           <FloatingAcademicBadge />
         </Router>
+        </WishlistProvider>
       </SocketProvider>
     </AuthProvider>
   );

@@ -91,12 +91,18 @@ module.exports = (sequelize) => {
     ConfirmationSentAt: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+    Version: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
     }
   }, {
     tableName: 'Bookings',
     timestamps: true,
     createdAt: 'CreatedAt',
-    updatedAt: 'UpdatedAt'
+    updatedAt: 'UpdatedAt',
+    version: 'Version'
   });
 
   return Booking;

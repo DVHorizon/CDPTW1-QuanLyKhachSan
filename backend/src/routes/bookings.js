@@ -19,6 +19,12 @@ router.post('/calculate-pricing', bookingEngineController.calculatePricing);
 router.post('/apply-voucher', voucherController.validateVoucher);
 router.post('/:bookingId/apply-voucher', voucherController.applyVoucherToBooking);
 
+// ─── TRA CỨU & HỦY ĐƠN CHO KHÁCH VÃNG LAI (GUEST LOOKUP - Group 2) ───
+const bookingHistoryController = require('../controllers/bookingHistoryController');
+router.get('/lookup', bookingHistoryController.lookupGuestBooking);
+router.post('/lookup', bookingHistoryController.lookupGuestBooking);
+router.patch('/lookup/cancel', bookingHistoryController.cancelGuestBookingLookup);
+
 // ─── Hằng số trạng thái nghiệp vụ đặt phòng ─────────────────────────────────
 const BOOKING_STATUS = {
   PENDING: 'Pending',
