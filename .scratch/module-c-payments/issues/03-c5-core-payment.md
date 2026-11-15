@@ -13,4 +13,4 @@ Làm theo checklist C5 (5.2 → 5.7), có các điều chỉnh sau:
 - Gỡ `app.post('/payments', ...processDepositPayment)` trong `server.js`. Giữ `/bookings/:id/deposit`.
 
 ## Comments
-- 2026-10-26 (Hà): Đã hoàn thiện toàn bộ Core Payment Module C5, đối chiếu spec và test suite pass 11/11 TC. Đã cập nhật 3 điểm nghiệp vụ chốt (D5, D6, D7), áp dụng `PAID_STATUSES`, tính số dư theo `TotalAmount - Σ đã thu`, tách biệt vòng đời booking cho A8.
+- Đã hoàn thiện toàn bộ Core Payment Module C5, đối chiếu spec và test suite pass 11/11 TC. Áp dụng `PAID_STATUSES`, tính số dư theo `TotalAmount - Σ đã thu`, tách biệt vòng đời booking cho A8.
