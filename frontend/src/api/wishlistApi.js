@@ -7,13 +7,15 @@
  * Mã tính năng: FEAT-GUEST-13C  |  Mã truy vết: A13 (Wishlist)  |  Màn hình 59 (WSH-059)
  */
 
+import { getAccessToken } from '../utils/tokenStore';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 /**
  * Helper: Tạo headers kèm Authorization token nếu có
  */
 const getAuthHeaders = (token = null) => {
-  const authToken = token || localStorage.getItem('hotel_token');
+  const authToken = token || getAccessToken() || localStorage.getItem('hotel_token');
   const headers = { 'Content-Type': 'application/json' };
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;

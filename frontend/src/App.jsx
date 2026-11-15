@@ -20,6 +20,7 @@ import StaffManagement from './pages/StaffManagement';
 import RoomService from './pages/client/RoomService';
 import Profile from './pages/client/Profile';
 import MyBookings from './pages/client/MyBookings';
+import GuestBookingLookup from './pages/client/GuestBookingLookup';
 import KitchenDisplay from './pages/admin/fnb/KitchenDisplay';
 import KitchenInventory from './pages/admin/fnb/KitchenInventory';
 import OrderDispatchHub from './pages/admin/fnb/OrderDispatchHub';
@@ -120,6 +121,8 @@ function App() {
             <Route path="/my-bookings" element={<MyBookings />} />
             <Route path="/me/bookings" element={<MyBookings />} />
             <Route path="/lich-su-dat-phong" element={<MyBookings />} />
+            <Route path="/lookup" element={<GuestBookingLookup />} />
+            <Route path="/tra-cuu-dat-phong" element={<GuestBookingLookup />} />
             <Route path="/client/concierge" element={<ClientConcierge />} />
             <Route path="/concierge" element={<ClientConcierge />} />
             <Route path="/auth" element={<Auth />} />

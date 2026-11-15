@@ -9,6 +9,12 @@ router.post('/register', authController.register);
 // POST /api/v1/auth/login - Đăng nhập hệ thống, trả về JWT token
 router.post('/login', authController.login);
 
+// POST /api/v1/auth/refresh - Cấp lại accessToken từ HttpOnly refresh cookie
+router.post('/refresh', authController.refreshAccessToken);
+
+// POST /api/v1/auth/logout - Xóa HttpOnly refresh cookie
+router.post('/logout', authController.logout);
+
 // POST /api/v1/auth/forgot-password - Yêu cầu mã OTP 6 số khôi phục mật khẩu
 router.post('/forgot-password', authController.forgotPassword);
 

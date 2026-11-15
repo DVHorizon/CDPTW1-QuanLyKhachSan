@@ -69,13 +69,58 @@ export default function BookingEngine() {
   const [noSmoking, setNoSmoking] = useState(true);
   const [highFloorPanorama, setHighFloorPanorama] = useState(true);
 
-  // Guest details form state
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [specialRequests, setSpecialRequests] = useState('');
+  // Guest details form state (khôi phục từ sessionStorage nếu F5)
+  const savedDraft = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem('gh_booking_draft');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const [firstName, setFirstName] = useState(savedDraft?.firstName || '');
+  const [lastName, setLastName] = useState(savedDraft?.lastName || '');
+  const [email, setEmail] = useState(savedDraft?.email || '');
+  const [phoneNumber, setPhoneNumber] = useState(savedDraft?.phoneNumber || '');
+  const [specialRequests, setSpecialRequests] = useState(savedDraft?.specialRequests || '');
   const [isPolicyAccepted, setIsPolicyAccepted] = useState(false);
+
+  // Đồng bộ phiên giữ phòng 15 phút từ RoomDetail (sessionStorage 'gh_room_lock')
+  const [lockSecondsLeft, setLockSecondsLeft] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('gh_room_lock');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.expiresAt) return null;
+      if (paramLockSessionId && parsed.lockSessionId && parsed.lockSessionId !== paramLockSessionId) return null;
+      return Math.max(0, Math.floor((parsed.expiresAt - Date.now()) / 1000));
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (lockSecondsLeft === null || lockSecondsLeft <= 0) return;
+    const timer = setInterval(() => {
+      setLockSecondsLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockSecondsLeft]);
+
+  // Lưu nháp thông tin khách vào sessionStorage để tránh mất dữ liệu khi F5
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('gh_booking_draft', JSON.stringify({
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        specialRequests,
+        unitsAllocated
+      }));
+    } catch (_) {}
+  }, [firstName, lastName, email, phoneNumber, specialRequests, unitsAllocated]);
 
   // Sync user details when authenticated user changes
   useEffect(() => {
@@ -402,6 +447,7 @@ export default function BookingEngine() {
       const res = await createBookingApi(payload);
 
       if (res && res.success) {
+        try { sessionStorage.removeItem('gh_booking_draft'); } catch (_) {}
         setSuccessBooking(res.data);
       } else {
         setErrorCode(res?.code || 'ERROR_FAILED');
@@ -425,6 +471,24 @@ export default function BookingEngine() {
       <Header />
 
       <main className="w-full pt-24 bg-[#f8f9ff] flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        {lockSecondsLeft !== null && (
+          <div className={`mb-4 px-4 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between ${
+            lockSecondsLeft > 0
+              ? 'bg-amber-50 border-amber-200 text-amber-900'
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}>
+            <span>
+              {lockSecondsLeft > 0
+                ? `Đang giữ phòng tạm thời chống trùng lịch (${unitsAllocated} phòng) — Vui lòng hoàn tất trong:`
+                : 'Phiên giữ phòng đã hết thời gian 15 phút (ERROR_0033_SESSION_EXPIRED). Vui lòng kiểm tra lại tình trạng phòng trống.'}
+            </span>
+            {lockSecondsLeft > 0 && (
+              <span className="font-mono font-bold text-sm">
+                {String(Math.floor(lockSecondsLeft / 60)).padStart(2, '0')}:{String(lockSecondsLeft % 60).padStart(2, '0')}
+              </span>
+            )}
+          </div>
+        )}
         {/* Thanh tiêu đề phòng & Quy trình đặt phòng thu nhỏ ở góc phải (Style Traveloka) */}
         <div className="flex flex-wrap items-center justify-between gap-4 py-3 mb-6 bg-white px-5 rounded-2xl border border-slate-200/80 shadow-xs">
           {/* Thông tin phòng đặt & Khách sạn */}

@@ -298,6 +298,15 @@ const Header = ({ wishlistCount: propWishlistCount, onWishlistClick, lang: propL
                   </Link>
 
                   <Link
+                    to="/lookup"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-base text-[#b9a277]">qr_code_scanner</span>
+                    <span>Tra Cứu Đơn Đặt Phòng</span>
+                  </Link>
+
+                  <Link
                     to="/rooms/compare"
                     onClick={() => setIsUserMenuOpen(false)}
                     className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#203044] hover:bg-[#fbf8f2] hover:text-[#b9a277] transition-colors"
@@ -342,6 +351,13 @@ const Header = ({ wishlistCount: propWishlistCount, onWishlistClick, lang: propL
             </div>
           ) : (
             <div className="flex items-center gap-1.5 pl-2 border-l border-[#dedad0] shrink-0">
+              <Link
+                to="/lookup"
+                className="hidden sm:flex items-center gap-1 h-8.5 px-2.5 rounded-lg bg-white hover:bg-[#fbf8f2] text-[#203044] text-[12px] font-semibold transition-all border border-[#dedad0] shrink-0"
+              >
+                <span className="material-symbols-outlined text-[15px] text-[#b9a277]">qr_code_scanner</span>
+                <span>Tra cứu</span>
+              </Link>
               <Link
                 to="/auth"
                 className="flex items-center gap-1.5 h-8.5 px-3 rounded-lg bg-[#203044] hover:bg-[#131b2e] text-[#fedeb2] text-[12px] font-bold transition-all shadow-xs shrink-0 border border-[#b9a277]/40 hover:border-[#b9a277]"

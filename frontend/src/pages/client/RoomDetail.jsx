@@ -310,8 +310,19 @@ export default function RoomDetail() {
       setIsLocking(false);
 
       if (res.success && res.data) {
+        const timeoutSec = res.data.timeoutSeconds || 900;
         setLockSession(res.data);
-        setLockTimeRemaining(res.data.timeoutSeconds || 900);
+        setLockTimeRemaining(timeoutSec);
+        try {
+          sessionStorage.setItem('gh_room_lock', JSON.stringify({
+            lockSessionId: res.data.lockSessionId,
+            expiresAt: Date.now() + timeoutSec * 1000,
+            roomTypeId: activeRoomTypeId,
+            checkInDate,
+            checkOutDate,
+            units: quantity
+          }));
+        } catch (_) {}
       } else {
         setErrorCode(res.code || 'ERROR_0024_CONCURRENT_LOCK_FAILED');
         setErrorMessage(res.message || 'Rất tiếc, phòng vừa được khách hàng khác giữ chỗ. Vui lòng chọn khoảng ngày hoặc hạng phòng khác');

@@ -1,3 +1,5 @@
+import { getAccessToken } from '../utils/tokenStore';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 /**
@@ -429,7 +431,7 @@ export const applyVoucherToBookingApi = async (bookingId, voucherCode) => {
  */
 export const getMyBookingsApi = async (params = {}, token = null) => {
   try {
-    const authToken = token || localStorage.getItem('hotel_token');
+    const authToken = token || getAccessToken() || localStorage.getItem('hotel_token');
     const query = new URLSearchParams();
     if (params.statusFilter) query.append('statusFilter', params.statusFilter);
     if (params.dateWindow) query.append('dateWindow', params.dateWindow);
@@ -465,7 +467,7 @@ export const getMyBookingsApi = async (params = {}, token = null) => {
  */
 export const cancelMyBookingApi = async (bookingId, body = {}, token = null) => {
   try {
-    const authToken = token || localStorage.getItem('hotel_token');
+    const authToken = token || getAccessToken() || localStorage.getItem('hotel_token');
     const headers = { 'Content-Type': 'application/json' };
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
@@ -529,7 +531,7 @@ export const getDynamicPricingApi = async (roomId, { checkInDate, checkOutDate }
  */
 export const submitRoomReviewApi = async (roomId, payload, token = null) => {
   try {
-    const authToken = token || localStorage.getItem('hotel_token');
+    const authToken = token || getAccessToken() || localStorage.getItem('hotel_token');
     const res = await fetch(`${API_BASE_URL}/v1/rooms/${roomId}/reviews`, {
       method: 'POST',
       headers: {
@@ -631,5 +633,41 @@ export {
   clearWishlistApi,
   syncWishlistApi
 } from './wishlistApi';
+
+/**
+ * Tra cứu đặt phòng cho khách vãng lai (Guest Lookup - Group 2)
+ * POST /api/v1/bookings/lookup
+ */
+export const lookupGuestBookingApi = async ({ confirmationCode, email }) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/bookings/lookup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmationCode, email })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi lookupGuestBookingApi:', err);
+    return { success: false, message: 'Không thể kết nối đến máy chủ tra cứu.' };
+  }
+};
+
+/**
+ * Hủy đặt phòng cho khách vãng lai (Guest Lookup Cancel - Group 2)
+ * PATCH /api/v1/bookings/lookup/cancel
+ */
+export const cancelGuestBookingLookupApi = async ({ confirmationCode, email, cancellationReason }) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/bookings/lookup/cancel`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmationCode, email, cancellationReason })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi cancelGuestBookingLookupApi:', err);
+    return { success: false, message: 'Không thể kết nối đến máy chủ hủy đặt phòng.' };
+  }
+};
 
 

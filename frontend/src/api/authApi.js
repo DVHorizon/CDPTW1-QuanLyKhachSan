@@ -33,6 +33,7 @@ export const loginUser = async ({ identifier, password, expectedRole }) => {
   try {
     const res = await safeFetch('/v1/auth/login', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -77,6 +78,7 @@ export const registerUser = async ({
   try {
     const res = await safeFetch('/v1/auth/register', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -113,6 +115,7 @@ export const fetchCurrentUser = async (token) => {
     if (!token) return null;
     const res = await safeFetch('/v1/auth/me', {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -269,6 +272,41 @@ export const changePasswordApi = async (token, { currentPassword, newPassword, c
   } catch (error) {
     console.error('Lỗi API changePasswordApi:', error);
     return { success: false, message: 'Không thể kết nối đến máy chủ.' };
+  }
+};
+
+/**
+ * Cấp lại accessToken từ HttpOnly refresh cookie
+ * POST /api/v1/auth/refresh
+ */
+export const refreshAuthToken = async () => {
+  try {
+    const res = await safeFetch('/v1/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) return { success: false };
+    return await res.json();
+  } catch {
+    return { success: false };
+  }
+};
+
+/**
+ * Đăng xuất và xóa HttpOnly refresh cookie
+ * POST /api/v1/auth/logout
+ */
+export const logoutUserSession = async () => {
+  try {
+    const res = await safeFetch('/v1/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return await res.json();
+  } catch {
+    return { success: false };
   }
 };
 

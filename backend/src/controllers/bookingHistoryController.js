@@ -102,6 +102,24 @@ exports.getMyBookings = async (req, res) => {
       limit = 20
     } = req.query;
 
+    // Tự động liên kết các đơn khách vãng lai (UserId IS NULL) trùng Email với tài khoản hiện tại
+    const userEmail = req.user?.email ? String(req.user.email).trim().toLowerCase() : null;
+    if (userEmail) {
+      try {
+        const guestMatches = await BookingGuest.findAll({
+          where: sequelize.where(sequelize.fn('LOWER', sequelize.fn('TRIM', sequelize.col('Email'))), userEmail),
+          attributes: ['BookingId']
+        });
+        const matchIds = guestMatches.map((g) => g.BookingId).filter(Boolean);
+        if (matchIds.length > 0) {
+          await Booking.update(
+            { UserId: userId },
+            { where: { BookingId: { [Op.in]: matchIds }, UserId: null } }
+          );
+        }
+      } catch (_) {}
+    }
+
     const whereConditions = {
       UserId: userId
     };
@@ -673,6 +691,237 @@ exports.cancelMyBooking = async (req, res) => {
       code: 'ERROR_SERVER',
       message: 'Lỗi hệ thống khi thực hiện hủy đặt phòng',
       error: error.message
+    });
+  }
+};
+
+/**
+ * Tra cứu đơn đặt phòng cho khách vãng lai (Guest Lookup - Group 2)
+ * GET/POST /api/v1/bookings/lookup
+ */
+exports.lookupGuestBooking = async (req, res) => {
+  try {
+    const rawCode = req.body?.confirmationCode || req.query?.confirmationCode || '';
+    const rawEmail = req.body?.email || req.query?.email || '';
+    const confirmationCode = String(rawCode).trim().toUpperCase().replace(/^#/, '');
+    const email = String(rawEmail).trim().toLowerCase();
+
+    if (!confirmationCode || !email) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        message: 'Vui lòng nhập đầy đủ Mã đặt phòng (VD: GH-366599) và Email xác nhận.'
+      });
+    }
+
+    const booking = await Booking.findOne({
+      where: { ConfirmationCode: confirmationCode },
+      include: [
+        { model: RoomType, as: 'roomType' },
+        { model: BookingGuest, as: 'guests' },
+        { model: User, as: 'user', attributes: ['UserId', 'FullName', 'Email', 'Phone'] },
+        { model: Voucher, as: 'voucher' },
+        { model: Payment, as: 'payments' },
+        { model: Invoice, as: 'Invoices' }
+      ]
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_BOOKING_NOT_FOUND',
+        message: 'Không tìm thấy đơn đặt phòng khớp với mã xác nhận này.'
+      });
+    }
+
+    const bJson = booking.toJSON();
+    const matchedGuest = (bJson.guests || []).some(
+      (g) => String(g.Email || '').trim().toLowerCase() === email
+    );
+    const matchedUser = String(bJson.user?.Email || '').trim().toLowerCase() === email;
+
+    if (!matchedGuest && !matchedUser) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_LOOKUP_EMAIL_MISMATCH',
+        message: 'Email không khớp với thông tin đặt phòng. Vui lòng kiểm tra lại.'
+      });
+    }
+
+    const now = new Date();
+    const checkInDateObj = new Date(bJson.CheckInDate);
+    if (bJson.CheckInDate && String(bJson.CheckInDate).length === 10) {
+      checkInDateObj.setHours(15, 0, 0, 0);
+    }
+    const hoursUntilCheckIn = (checkInDateObj.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const primaryGuest = (bJson.guests || []).find((g) => g.IsPrimaryGuest) || (bJson.guests || [])[0] || null;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        bookingId: bJson.BookingId,
+        confirmationCode: bJson.ConfirmationCode,
+        status: bJson.Status,
+        checkInDate: bJson.CheckInDate,
+        checkOutDate: bJson.CheckOutDate,
+        numberOfNights: bJson.NumberOfNights,
+        roomQuantity: bJson.RoomQuantity || 1,
+        adultsCount: bJson.AdultsCount || 2,
+        childrenCount: bJson.ChildrenCount || 0,
+        totalAmount: Number(bJson.TotalAmount || 0),
+        depositAmount: Number(bJson.DepositAmount || 0),
+        discountAmount: Number(bJson.DiscountAmount || 0),
+        surchargeAmount: Number(bJson.SurchargeAmount || 0),
+        specialRequests: bJson.SpecialRequests || '',
+        bookingQrCode: bJson.BookingQrCode || null,
+        isEligibleForFullRefund: hoursUntilCheckIn >= 72,
+        hoursUntilCheckIn: Math.round(hoursUntilCheckIn),
+        roomType: bJson.roomType || null,
+        primaryGuest,
+        payments: bJson.payments || [],
+        invoice: (bJson.Invoices && bJson.Invoices[0]) || null
+      }
+    });
+  } catch (error) {
+    console.error('Error in lookupGuestBooking:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_SERVER',
+      message: 'Lỗi hệ thống khi tra cứu đơn đặt phòng.'
+    });
+  }
+};
+
+/**
+ * Hủy đơn đặt phòng cho khách vãng lai qua ConfirmationCode + Email (Group 2)
+ * PATCH /api/v1/bookings/lookup/cancel
+ */
+exports.cancelGuestBookingLookup = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const rawCode = req.body?.confirmationCode || '';
+    const rawEmail = req.body?.email || '';
+    const cancellationReason = req.body?.cancellationReason || 'Khách vãng lai tự hủy trực tuyến';
+    const confirmationCode = String(rawCode).trim().toUpperCase().replace(/^#/, '');
+    const email = String(rawEmail).trim().toLowerCase();
+
+    if (!confirmationCode || !email) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        message: 'Vui lòng cung cấp Mã đặt phòng và Email xác nhận.'
+      });
+    }
+
+    const booking = await Booking.findOne({
+      where: { ConfirmationCode: confirmationCode },
+      include: [
+        { model: BookingGuest, as: 'guests' },
+        { model: User, as: 'user', attributes: ['UserId', 'Email'] },
+        { model: Payment, as: 'payments' }
+      ],
+      transaction
+    });
+
+    if (!booking) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_BOOKING_NOT_FOUND',
+        message: 'Không tìm thấy đơn đặt phòng.'
+      });
+    }
+
+    const matchedGuest = (booking.guests || []).some(
+      (g) => String(g.Email || '').trim().toLowerCase() === email
+    );
+    const matchedUser = String(booking.user?.Email || '').trim().toLowerCase() === email;
+    if (!matchedGuest && !matchedUser) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_LOOKUP_EMAIL_MISMATCH',
+        message: 'Email không khớp với thông tin đặt phòng.'
+      });
+    }
+
+    if (booking.Status === 'Cancelled') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0037_BOOKING_ALREADY_CANCELLED',
+        message: 'Đơn đặt phòng này đã được hủy trước đó'
+      });
+    }
+
+    if (booking.Status === 'CheckedIn' || booking.Status === 'InHouse' || booking.Status === 'Completed' || booking.Status === 'CheckedOut') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0036_CANNOT_CANCEL_IN_HOUSE',
+        message: 'Không thể hủy đơn đặt phòng khi khách đang trong thời gian lưu trú'
+      });
+    }
+
+    const nowTime = new Date();
+    const checkInTime = new Date(booking.CheckInDate);
+    if (booking.CheckInDate && String(booking.CheckInDate).length === 10) {
+      checkInTime.setHours(15, 0, 0, 0);
+    }
+    const hoursRemaining = (checkInTime.getTime() - nowTime.getTime()) / (1000 * 60 * 60);
+    const depositAmount = Number(booking.DepositAmount || 0);
+    const refundAmount = hoursRemaining >= 72 ? depositAmount : 0;
+    const penaltyAmount = hoursRemaining >= 72 ? 0 : depositAmount;
+    const refundPolicyNote = hoursRemaining >= 72
+      ? `Hủy trước giờ nhận phòng ${Math.round(hoursRemaining)} giờ (>= 72h). Đủ điều kiện hoàn cọc 100%.`
+      : `Hủy cận giờ (${Math.round(hoursRemaining)} giờ < 72h). Áp dụng phạt 100% tiền đặt cọc theo chính sách hủy phòng.`;
+
+    booking.Status = 'Cancelled';
+    booking.SpecialRequests = [booking.SpecialRequests, `[HỦY PHÒNG]: ${cancellationReason}. ${refundPolicyNote}`]
+      .filter(Boolean)
+      .join(' | ');
+    await booking.save({ transaction });
+
+    if (depositAmount > 0 && refundAmount > 0) {
+      await Payment.create(
+        {
+          BookingId: booking.BookingId,
+          UserId: booking.UserId || null,
+          Amount: refundAmount,
+          PaymentMethod: 'BankTransfer',
+          PaymentDate: nowTime,
+          TransactionCode: `REFUND-${booking.BookingId}-${Date.now().toString().slice(-6)}`,
+          Status: 'Refunded',
+          RefundAmount: refundAmount,
+          RefundReason: refundPolicyNote
+        },
+        { transaction }
+      );
+    }
+
+    await transaction.commit();
+    return res.status(200).json({
+      success: true,
+      code: 'SUCCESS_0005_BOOKING_CANCELLED',
+      message: 'Hủy đặt phòng thành công! Tiền cọc sẽ được hoàn lại theo quy định',
+      data: {
+        bookingId: booking.BookingId,
+        confirmationCode: booking.ConfirmationCode,
+        status: 'Cancelled',
+        depositAmount,
+        refundAmount,
+        penaltyAmount,
+        refundPolicyNote
+      }
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error in cancelGuestBookingLookup:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'ERROR_SERVER',
+      message: 'Lỗi hệ thống khi hủy đặt phòng.'
     });
   }
 };

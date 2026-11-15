@@ -3,7 +3,64 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { JWT_SECRET } = require('../middlewares/authMiddleware');
 
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
+const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || `${JWT_SECRET}_REFRESH`;
+const REFRESH_TOKEN_EXPIRES_IN = '7d';
+const REFRESH_COOKIE_NAME = 'hotel_refresh_token';
+
+const parseCookies = (req) => {
+  const header = req.headers?.cookie || '';
+  const result = {};
+  header.split(';').forEach((part) => {
+    const idx = part.indexOf('=');
+    if (idx > 0) {
+      const k = part.slice(0, idx).trim();
+      const v = part.slice(idx + 1).trim();
+      if (k) result[k] = decodeURIComponent(v);
+    }
+  });
+  return result;
+};
+
+const signAccessToken = (user) =>
+  jwt.sign(
+    {
+      userId: user.UserId,
+      roleId: user.RoleId,
+      roleName: user.RoleName || 'Guest',
+      email: user.Email,
+      fullName: user.FullName
+    },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+
+const setRefreshCookie = (res, user, req) => {
+  const refreshToken = jwt.sign(
+    {
+      userId: user.UserId,
+      roleName: user.RoleName || 'Guest',
+      type: 'refresh'
+    },
+    REFRESH_TOKEN_SECRET,
+    { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
+  );
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production' && Boolean(req?.secure),
+    path: '/api',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  });
+};
+
+const clearRefreshCookie = (res) => {
+  res.clearCookie(REFRESH_COOKIE_NAME, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/api'
+  });
+};
 
 // Validation helpers dùng chung cho FEAT-GUEST-01 (Register, Reset Password, Profile)
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
@@ -339,18 +396,27 @@ const register = async (req, res) => {
     );
     const newUserId = insertResult.insertId;
 
-    // 12. Tạo JWT Token
-    const token = jwt.sign(
-      {
-        userId: newUserId,
-        roleId: assignedRoleId,
-        roleName: assignedRoleName,
-        email: cleanEmail,
-        fullName: cleanFullName
-      },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    // Tự động liên kết các đơn đặt phòng khách vãng lai trùng Email (Group 2)
+    try {
+      await pool.query(
+        `UPDATE Bookings b
+         INNER JOIN BookingGuests bg ON b.BookingId = bg.BookingId
+         SET b.UserId = ?
+         WHERE b.UserId IS NULL AND LOWER(TRIM(bg.Email)) = ?`,
+        [newUserId, cleanEmail]
+      );
+    } catch (_) {}
+
+    // 12. Tạo JWT Token & Refresh Cookie
+    const userPayload = {
+      UserId: newUserId,
+      RoleId: assignedRoleId,
+      RoleName: assignedRoleName,
+      Email: cleanEmail,
+      FullName: cleanFullName
+    };
+    const token = signAccessToken(userPayload);
+    setRefreshCookie(res, userPayload, req);
 
     return res.status(201).json({
       success: true,
@@ -485,17 +551,8 @@ const login = async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      {
-        userId: user.UserId,
-        roleId: user.RoleId,
-        roleName: user.RoleName || 'Guest',
-        email: user.Email,
-        fullName: user.FullName
-      },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    const token = signAccessToken(user);
+    setRefreshCookie(res, user, req);
 
     return res.status(200).json({
       success: true,
@@ -1282,9 +1339,69 @@ const facebookLogin = async (req, res) => {
   }
 };
 
+const refreshAccessToken = async (req, res) => {
+  try {
+    const cookies = parseCookies(req);
+    const refreshToken = cookies[REFRESH_COOKIE_NAME];
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        code: 'ERROR_0011_INVALID_CREDENTIALS',
+        message: 'Phiên đăng nhập đã hết hạn.'
+      });
+    }
+
+    const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+    const [users] = await pool.query(
+      `SELECT u.*, r.RoleName, mt.TierName
+       FROM Users u
+       LEFT JOIN Roles r ON u.RoleId = r.RoleId
+       LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
+       WHERE u.UserId = ? AND u.Status = 'Active'
+       LIMIT 1`,
+      [decoded.userId]
+    );
+    if (users.length === 0) {
+      clearRefreshCookie(res);
+      return res.status(401).json({
+        success: false,
+        code: 'ERROR_0011_INVALID_CREDENTIALS',
+        message: 'Tài khoản không tồn tại hoặc đã bị khóa.'
+      });
+    }
+
+    const user = users[0];
+    const token = signAccessToken(user);
+    return res.status(200).json({
+      success: true,
+      code: 'SUCCESS_0001_AUTH',
+      token,
+      user: serializeUser(user)
+    });
+  } catch (err) {
+    clearRefreshCookie(res);
+    return res.status(401).json({
+      success: false,
+      code: 'ERROR_0011_INVALID_CREDENTIALS',
+      message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn.'
+    });
+  }
+};
+
+const logout = async (req, res) => {
+  clearRefreshCookie(res);
+  return res.status(200).json({
+    success: true,
+    code: 'SUCCESS_0001_AUTH',
+    message: 'Đăng xuất thành công'
+  });
+};
+
 module.exports = {
   register,
   login,
+  refreshAccessToken,
+  logout,
   forgotPassword,
   resetPassword,
   getMe,
