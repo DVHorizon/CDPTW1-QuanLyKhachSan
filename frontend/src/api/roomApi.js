@@ -2,6 +2,15 @@ import { getAccessToken } from '../utils/tokenStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+const getAuthHeaders = (extra = {}) => {
+  const authToken = getAccessToken() || localStorage.getItem('hotel_token') || localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    ...extra
+  };
+};
+
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * ROOM AVAILABILITY & BOOKING LOCK API (FEAT-GUEST-04 / A4)
@@ -204,31 +213,26 @@ export const suggestRoomsApi = async (q) => {
  */
 export const createBookingApi = async (payload) => {
   try {
+    const headers = getAuthHeaders();
     let res = await fetch(`${API_BASE_URL}/v1/guest/bookings`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-      },
+      credentials: 'include',
+      headers,
       body: JSON.stringify(payload)
     });
     if (res.status === 404) {
       res = await fetch(`${API_BASE_URL}/v1/rooms/book`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify(payload)
       });
     }
     if (res.status === 404) {
       res = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify(payload)
       });
     }
@@ -258,9 +262,16 @@ export const createOnlineBookingEngineApi = createBookingApi;
  */
 export const getBookingDetailsApi = async (id) => {
   try {
-    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings/${id}`);
+    const headers = getAuthHeaders();
+    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings/${id}`, {
+      credentials: 'include',
+      headers
+    });
     if (res.status === 404) {
-      res = await fetch(`${API_BASE_URL}/bookings/${id}`);
+      res = await fetch(`${API_BASE_URL}/bookings/${id}`, {
+        credentials: 'include',
+        headers
+      });
     }
     const data = await res.json();
     return data;
@@ -280,22 +291,19 @@ export const getBookingDetailsApi = async (id) => {
  */
 export const processDepositPaymentApi = async (bookingId, payload) => {
   try {
+    const headers = getAuthHeaders();
     let res = await fetch(`${API_BASE_URL}/v1/guest/bookings/${bookingId}/deposit`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-      },
+      credentials: 'include',
+      headers,
       body: JSON.stringify(payload)
     });
 
     if (res.status === 404) {
       res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/deposit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify(payload)
       });
     }
@@ -303,10 +311,8 @@ export const processDepositPaymentApi = async (bookingId, payload) => {
     if (res.status === 404) {
       res = await fetch(`${API_BASE_URL}/payments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({ ...payload, bookingId })
       });
     }
@@ -565,9 +571,7 @@ export const getRoomReviewsApi = async (roomId, params = {}) => {
  */
 export const getAiRoomRecommendationsApi = async ({ maxBudget, travelStyle, guests = 2, customPrompt = '' }) => {
   try {
-    const token = localStorage.getItem('hotel_token') || localStorage.getItem('token') || '';
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const headers = getAuthHeaders();
 
     let res = await fetch(`${API_BASE_URL}/v1/guest/rooms/ai-recommend`, {
       method: 'POST',
