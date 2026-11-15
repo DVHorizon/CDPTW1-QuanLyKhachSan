@@ -1130,7 +1130,7 @@ export default function RoomDetail() {
                 <h2 className="text-2xl lg:text-3xl font-serif font-bold text-[#0b1c30]">Đánh Giá Từ Những Vị Khách Quý</h2>
                 <p className="text-xs text-gray-500 mt-1">100% đánh giá từ khách hàng đã hoàn thành kỳ nghỉ tại Oceanfront Sunset Pool Villa.</p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <div className="text-right">
                   <p className="text-3xl font-serif text-[#725b38] font-bold leading-none">
                     {reviewSummary?.totalReviews > 0 ? reviewSummary.avgOverall : '4.96'}
@@ -1143,6 +1143,13 @@ export default function RoomDetail() {
                     {reviewSummary?.totalReviews > 0 ? `${reviewSummary.totalReviews} đánh giá đã xác thực` : 'Xuất sắc vượt mong đợi'}
                   </p>
                 </div>
+                <Link
+                  to={`/rooms/${activeRoomTypeId}/reviews/new`}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white text-xs font-bold transition-colors shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-[16px]">rate_review</span>
+                  <span>Viết Đánh Giá</span>
+                </Link>
               </div>
             </div>
 

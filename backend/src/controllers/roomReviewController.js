@@ -16,6 +16,8 @@
  * - ERROR_0042_FILE_TOO_LARGE:   "Mỗi ảnh tải lên không được vượt quá dung lượng 15MB"
  */
 
+const fs = require('fs');
+const path = require('path');
 const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middlewares/authMiddleware');
@@ -74,6 +76,23 @@ function resolveUserId(req) {
     return Number(req.body.userId);
   }
   return null;
+}
+
+/**
+ * Helper: Lưu ảnh Base64 (Data URL) ra file /uploads/reviews để tránh tràn VARCHAR(1000)
+ */
+function persistReviewPhotoUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const match = rawUrl.match(/^data:image\/(png|jpe?g|webp);base64,(.+)$/i);
+  if (!match) return rawUrl.slice(0, 1000);
+
+  const ext = match[1].toLowerCase() === 'jpeg' ? 'jpg' : match[1].toLowerCase();
+  const buffer = Buffer.from(match[2], 'base64');
+  const uploadDir = path.join(__dirname, '../../uploads/reviews');
+  fs.mkdirSync(uploadDir, { recursive: true });
+  const fileName = `review-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  fs.writeFileSync(path.join(uploadDir, fileName), buffer);
+  return `/uploads/reviews/${fileName}`;
 }
 
 /**
@@ -222,6 +241,33 @@ exports.createRoomReview = async (req, res) => {
         include: [{ model: Booking }],
         transaction
       });
+
+      // Fallback nếu Booking đã Completed/CheckedOut nhưng chưa có bản ghi Stay tương ứng
+      if (!targetStay) {
+        const completedBooking = await Booking.findOne({
+          where: {
+            BookingId: bookingId,
+            Status: { [Op.in]: ['Completed', 'CheckedOut'] }
+          },
+          transaction
+        });
+        if (completedBooking) {
+          const fallbackRoom = await Room.findOne({
+            where: { RoomTypeId: completedBooking.RoomTypeId },
+            transaction
+          });
+          if (fallbackRoom) {
+            targetStay = await Stay.create({
+              BookingId: completedBooking.BookingId,
+              RoomId: fallbackRoom.RoomId,
+              ActualCheckIn: completedBooking.CheckInDate || new Date(),
+              ActualCheckOut: completedBooking.CheckOutDate || new Date(),
+              Status: 'CheckedOut'
+            }, { transaction });
+            targetStay.Booking = completedBooking;
+          }
+        }
+      }
     }
 
     // Nếu không truyền cụ thể, tìm lượt lưu trú completed gần nhất của User cho phòng / loại phòng này
@@ -297,7 +343,10 @@ exports.createRoomReview = async (req, res) => {
 
     // 4. Kiểm tra điều kiện tiên quyết: Mỗi lượt lưu trú chỉ được đánh giá duy nhất 1 lần (ERROR_0041 - TC02)
     const existingReview = await Review.findOne({
-      where: { StayId: targetStay.StayId },
+      where: {
+        StayId: targetStay.StayId,
+        IsDeleted: { [Op.or]: [0, false, null] }
+      },
       transaction
     });
 
@@ -349,12 +398,14 @@ exports.createRoomReview = async (req, res) => {
       IsAnonymous: Boolean(isAnonymous)
     }, { transaction });
 
-    // 7. Lưu ReviewPhotos
+    // 7. Lưu ReviewPhotos (chuyển Base64 data URL thành file tĩnh dưới /uploads/reviews)
     const savedPhotos = [];
     for (const pUrl of photosToSave) {
+      const persistedUrl = persistReviewPhotoUrl(pUrl);
+      if (!persistedUrl) continue;
       const p = await ReviewPhoto.create({
         ReviewId: newReview.ReviewId,
-        PhotoUrl: pUrl
+        PhotoUrl: persistedUrl
       }, { transaction });
       savedPhotos.push({
         photoId: p.PhotoId,
