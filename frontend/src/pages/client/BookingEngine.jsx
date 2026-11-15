@@ -481,7 +481,7 @@ export default function BookingEngine() {
       {/* Thanh Header chính */}
       <Header />
 
-      <main className="w-full pt-24 bg-[#f8f9ff] flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+      <main className="w-full pt-24 bg-[#f8f9ff] flex-1 px-4 sm:px-8 lg:px-12 pb-16">
         {lockSecondsLeft !== null && (
           <div className={`mb-4 px-4 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between ${
             lockSecondsLeft > 0
