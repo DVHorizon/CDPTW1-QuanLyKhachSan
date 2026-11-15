@@ -24,7 +24,25 @@ const NAME_REGEX = /^[\p{L}\s'-]{2,50}$/u;
  * Khởi tạo đơn đặt phòng trực tuyến (Checkout Step 1)
  * POST /api/v1/guest/bookings or POST /api/v1/rooms/book or POST /api/bookings
  */
+// Idempotency cache chống double-submit khi tạo booking (TTL 2 phút)
+const idempotencyBookingCache = new Map();
+
 exports.createOnlineBooking = async (req, res) => {
+  const idemKeyRaw = req.headers['idempotency-key'] || req.body?.idempotencyKey || (req.body?.lockSessionId ? `lock:${req.body.lockSessionId}` : null);
+  const idemKey = idemKeyRaw ? String(idemKeyRaw).trim() : null;
+  if (idemKey && idempotencyBookingCache.has(idemKey)) {
+    const cached = idempotencyBookingCache.get(idemKey);
+    if (Date.now() - cached.createdAt < 120000) {
+      return res.status(200).json({
+        success: true,
+        idempotentReplay: true,
+        message: 'Đơn đặt phòng đã được ghi nhận trước đó.',
+        data: cached.data
+      });
+    }
+    idempotencyBookingCache.delete(idemKey);
+  }
+
   const transaction = await sequelize.transaction();
 
   try {
@@ -229,7 +247,33 @@ exports.createOnlineBooking = async (req, res) => {
     const numberOfNights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     const basePrice = parseFloat(roomType.BasePrice || 0);
     const effectiveBaseRate = basePrice;
-    const roomSubtotal = numberOfNights * basePrice * effectiveUnits;
+    let roomSubtotal = numberOfNights * basePrice * effectiveUnits;
+
+    try {
+      const dpRes = await dynamicPricingService.calculateDynamicPricing({
+        roomId: parseInt(roomTypeId, 10),
+        checkInDate,
+        checkOutDate
+      });
+      if (dpRes && dpRes.totalRoomPrice && dpRes.nights > 0) {
+        roomSubtotal = Math.round(dpRes.totalRoomPrice * effectiveUnits * 100) / 100;
+      }
+    } catch (dpErr) {
+      console.warn('Dynamic pricing skipped in createOnlineBooking:', dpErr.message);
+    }
+
+    const isVNDPrice = effectiveBaseRate >= 100000;
+    const stdAdults = parseInt(roomType.AdultCapacity, 10) || 2;
+    const stdChildren = parseInt(roomType.ChildCapacity, 10) || 0;
+    const extraAdultsCnt = Math.max(0, effectiveAdults - stdAdults * effectiveUnits);
+    const extraChildrenCnt = Math.max(0, effectiveChildren - stdChildren * effectiveUnits);
+    const extraGuestSurcharge = Math.round(
+      (extraAdultsCnt * (isVNDPrice ? 500000 : 30) * numberOfNights +
+        extraChildrenCnt * (isVNDPrice ? 250000 : 15) * numberOfNights) *
+        100
+    ) / 100;
+
+    await require('./voucherController').ensureDefaultVouchers();
 
     // Gold discount 10% if applicable
     let discountAmount = 0;
@@ -265,21 +309,35 @@ exports.createOnlineBooking = async (req, res) => {
           }
           voucherDiscount = effectiveBaseRate >= 100000 ? Math.round(voucherDiscount) : Math.round(voucherDiscount * 100) / 100;
           
-          // Concurrency: Atomic update UsedCount
+          // Concurrency: Optimistic Locking + Atomic update UsedCount (Version + UsageLimit)
           const [updated] = await Voucher.update(
-            { UsedCount: sequelize.literal('UsedCount + 1') },
+            {
+              UsedCount: sequelize.literal('UsedCount + 1'),
+              Version: sequelize.literal('Version + 1')
+            },
             {
               where: {
                 VoucherId: voucher.VoucherId,
-                UsedCount: { [Op.lt]: voucher.UsageLimit }
+                Version: voucher.Version ?? 0,
+                [Op.or]: [
+                  { UsageLimit: null },
+                  { UsageLimit: 0 },
+                  { UsedCount: { [Op.lt]: voucher.UsageLimit } }
+                ]
               },
               transaction
             }
           );
-          if (updated > 0) {
-            appliedVoucherId = voucher.VoucherId;
-            discountAmount = Math.round((discountAmount + voucherDiscount) * 100) / 100;
+          if (updated === 0) {
+            await transaction.rollback();
+            return res.status(409).json({
+              success: false,
+              code: 'ERROR_0028_VOUCHER_LIMIT_REACHED',
+              message: 'Mã khuyến mãi vừa hết lượt sử dụng hoặc đã thay đổi. Vui lòng thử lại.'
+            });
           }
+          appliedVoucherId = voucher.VoucherId;
+          discountAmount = Math.round((discountAmount + voucherDiscount) * 100) / 100;
         }
       }
     }
@@ -343,7 +401,11 @@ exports.createOnlineBooking = async (req, res) => {
       }
     }
 
-    const finalTotal = Math.max(0, roomSubtotal - discountAmount + addonsTotal);
+    const totalSurcharge = Math.round((extraGuestSurcharge + addonsTotal) * 100) / 100;
+    const subtotalBeforeTax = Math.max(0, roomSubtotal - discountAmount + totalSurcharge);
+    const taxRate = req.body.taxesAndFeesRate !== undefined ? parseFloat(req.body.taxesAndFeesRate) : 0.12;
+    const taxesAndFees = Math.round(subtotalBeforeTax * (taxRate >= 0 ? taxRate : 0.12) * 100) / 100;
+    const finalTotal = Math.round((subtotalBeforeTax + taxesAndFees) * 100) / 100;
     const depRate = req.body.depositRate ? parseFloat(req.body.depositRate) : 0.20;
     const depositAmount = Math.round(finalTotal * depRate);
     const confirmationCode = 'GH-' + Math.floor(100000 + Math.random() * 900000);
@@ -369,7 +431,7 @@ exports.createOnlineBooking = async (req, res) => {
       RoomQuantity: effectiveUnits,
       RoomSubtotal: roomSubtotal,
       DiscountAmount: discountAmount,
-      SurchargeAmount: addonsTotal,
+      SurchargeAmount: totalSurcharge,
       TotalAmount: finalTotal,
       DepositAmount: depositAmount,
       Status: 'Pending', // Initial status PENDING_PAYMENT / Pending
@@ -416,10 +478,7 @@ exports.createOnlineBooking = async (req, res) => {
       console.warn('Warning: Broadcast failed:', bcErr.message);
     }
 
-    return res.status(201).json({
-      success: true,
-      message: 'Khởi tạo đơn đặt phòng trực tuyến thành công.',
-      data: {
+    const responseData = {
         bookingId: booking.BookingId,
         confirmationCode: booking.ConfirmationCode,
         status: booking.Status,
@@ -438,7 +497,15 @@ exports.createOnlineBooking = async (req, res) => {
           email: bookingGuest.Email,
           phone: bookingGuest.Phone
         }
-      }
+    };
+    if (idemKey) {
+      idempotencyBookingCache.set(idemKey, { createdAt: Date.now(), data: responseData });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Khởi tạo đơn đặt phòng trực tuyến thành công.',
+      data: responseData
     });
   } catch (error) {
     if (transaction) {
@@ -712,6 +779,7 @@ exports.calculatePricing = async (req, res) => {
     let voucherData = null;
     let voucherDiscount = 0;
     if (voucherCode) {
+      await require('./voucherController').ensureDefaultVouchers();
       const cleanVoucherCode = String(voucherCode).trim().toUpperCase();
       const voucher = await Voucher.findOne({
         where: { Code: cleanVoucherCode, IsDeleted: false }

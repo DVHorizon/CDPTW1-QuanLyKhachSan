@@ -1,4 +1,15 @@
+import { getAccessToken } from '../utils/tokenStore';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+const getAuthHeaders = (extra = {}) => {
+  const authToken = getAccessToken() || localStorage.getItem('hotel_token') || localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    ...extra
+  };
+};
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -202,31 +213,26 @@ export const suggestRoomsApi = async (q) => {
  */
 export const createBookingApi = async (payload) => {
   try {
+    const headers = getAuthHeaders();
     let res = await fetch(`${API_BASE_URL}/v1/guest/bookings`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-      },
+      credentials: 'include',
+      headers,
       body: JSON.stringify(payload)
     });
     if (res.status === 404) {
       res = await fetch(`${API_BASE_URL}/v1/rooms/book`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify(payload)
       });
     }
     if (res.status === 404) {
       res = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify(payload)
       });
     }
@@ -256,9 +262,16 @@ export const createOnlineBookingEngineApi = createBookingApi;
  */
 export const getBookingDetailsApi = async (id) => {
   try {
-    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings/${id}`);
+    const headers = getAuthHeaders();
+    let res = await fetch(`${API_BASE_URL}/v1/guest/bookings/${id}`, {
+      credentials: 'include',
+      headers
+    });
     if (res.status === 404) {
-      res = await fetch(`${API_BASE_URL}/bookings/${id}`);
+      res = await fetch(`${API_BASE_URL}/bookings/${id}`, {
+        credentials: 'include',
+        headers
+      });
     }
     const data = await res.json();
     return data;
@@ -278,22 +291,19 @@ export const getBookingDetailsApi = async (id) => {
  */
 export const processDepositPaymentApi = async (bookingId, payload) => {
   try {
+    const headers = getAuthHeaders();
     let res = await fetch(`${API_BASE_URL}/v1/guest/bookings/${bookingId}/deposit`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-      },
+      credentials: 'include',
+      headers,
       body: JSON.stringify(payload)
     });
 
     if (res.status === 404) {
       res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/deposit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify(payload)
       });
     }
@@ -301,10 +311,8 @@ export const processDepositPaymentApi = async (bookingId, payload) => {
     if (res.status === 404) {
       res = await fetch(`${API_BASE_URL}/payments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('hotel_token') ? { 'Authorization': `Bearer ${localStorage.getItem('hotel_token')}` } : {})
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({ ...payload, bookingId })
       });
     }
@@ -429,7 +437,7 @@ export const applyVoucherToBookingApi = async (bookingId, voucherCode) => {
  */
 export const getMyBookingsApi = async (params = {}, token = null) => {
   try {
-    const authToken = token || localStorage.getItem('hotel_token');
+    const authToken = token || getAccessToken() || localStorage.getItem('hotel_token');
     const query = new URLSearchParams();
     if (params.statusFilter) query.append('statusFilter', params.statusFilter);
     if (params.dateWindow) query.append('dateWindow', params.dateWindow);
@@ -465,7 +473,7 @@ export const getMyBookingsApi = async (params = {}, token = null) => {
  */
 export const cancelMyBookingApi = async (bookingId, body = {}, token = null) => {
   try {
-    const authToken = token || localStorage.getItem('hotel_token');
+    const authToken = token || getAccessToken() || localStorage.getItem('hotel_token');
     const headers = { 'Content-Type': 'application/json' };
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
@@ -529,7 +537,7 @@ export const getDynamicPricingApi = async (roomId, { checkInDate, checkOutDate }
  */
 export const submitRoomReviewApi = async (roomId, payload, token = null) => {
   try {
-    const authToken = token || localStorage.getItem('hotel_token');
+    const authToken = token || getAccessToken() || localStorage.getItem('hotel_token');
     const res = await fetch(`${API_BASE_URL}/v1/rooms/${roomId}/reviews`, {
       method: 'POST',
       headers: {
@@ -555,4 +563,115 @@ export const getRoomReviewsApi = async (roomId, params = {}) => {
     return { success: false, message: 'Không thể tải danh sách đánh giá' };
   }
 };
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AI GỢI Ý PHÒNG THÔNG MINH THEO LỊCH SỬ / NGÂN SÁCH (RAG + GEMINI API)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const getAiRoomRecommendationsApi = async ({ maxBudget, travelStyle, guests = 2, customPrompt = '' }) => {
+  try {
+    const headers = getAuthHeaders();
+
+    let res = await fetch(`${API_BASE_URL}/v1/guest/rooms/ai-recommend`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ maxBudget, travelStyle, guests, customPrompt })
+    });
+
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/ai-recommend`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ maxBudget, travelStyle, guests, customPrompt })
+      });
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi getAiRoomRecommendationsApi:', err);
+    return {
+      success: false,
+      message: 'Không thể kết nối đến hệ thống AI gợi ý phòng.',
+      data: null
+    };
+  }
+};
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * FEAT-GUEST-13B: SO SÁNH PHÒNG TRỰC QUAN (ROOM COMPARISON MATRIX - A13)
+ * GET /rooms/compare?ids=101,304,501&filterView=ALL_ATTRIBUTES
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const compareRoomsApi = async ({ ids, filterView = 'ALL_ATTRIBUTES' }) => {
+  try {
+    const idParam = Array.isArray(ids) ? ids.join(',') : ids;
+    const query = new URLSearchParams({
+      ids: idParam,
+      filterView
+    }).toString();
+
+    let res = await fetch(`${API_BASE_URL}/v1/rooms/compare?${query}`);
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE_URL}/rooms/compare?${query}`);
+    }
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Lỗi compareRoomsApi:', err);
+    return {
+      success: false,
+      code: 'ERROR_NETWORK',
+      message: 'Không thể kết nối đến máy chủ so sánh phòng.'
+    };
+  }
+};
+
+// FEAT-GUEST-13C: Re-export Wishlist API
+export {
+  getWishlistApi,
+  addToWishlistApi,
+  removeFromWishlistApi,
+  clearWishlistApi,
+  syncWishlistApi
+} from './wishlistApi';
+
+/**
+ * Tra cứu đặt phòng cho khách vãng lai (Guest Lookup - Group 2)
+ * POST /api/v1/bookings/lookup
+ */
+export const lookupGuestBookingApi = async ({ confirmationCode, email }) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/bookings/lookup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmationCode, email })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi lookupGuestBookingApi:', err);
+    return { success: false, message: 'Không thể kết nối đến máy chủ tra cứu.' };
+  }
+};
+
+/**
+ * Hủy đặt phòng cho khách vãng lai (Guest Lookup Cancel - Group 2)
+ * PATCH /api/v1/bookings/lookup/cancel
+ */
+export const cancelGuestBookingLookupApi = async ({ confirmationCode, email, cancellationReason }) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/bookings/lookup/cancel`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmationCode, email, cancellationReason })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Lỗi cancelGuestBookingLookupApi:', err);
+    return { success: false, message: 'Không thể kết nối đến máy chủ hủy đặt phòng.' };
+  }
+};
+
 

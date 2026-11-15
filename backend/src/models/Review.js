@@ -70,6 +70,15 @@ module.exports = (sequelize) => {
     Comment: {
       type: DataTypes.STRING(2000),
       allowNull: true
+    },
+    IsDeleted: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    DeletedAt: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     tableName: 'Reviews',

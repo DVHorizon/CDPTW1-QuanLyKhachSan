@@ -84,3 +84,20 @@
   font-feature-settings: 'liga';
 }
 
+/* Framer-inspired Luxury Scroll Cue Keyframe */
+@keyframes luxuryScrollCue {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateY(6px);
+    opacity: 1;
+  }
+}
+
+.animate-scroll-cue {
+  animation: luxuryScrollCue 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+

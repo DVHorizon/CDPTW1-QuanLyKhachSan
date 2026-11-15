@@ -1,9 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const RoomDetailModal = ({ room, isOpen, onClose, onBookNow }) => {
+const RoomDetailModal = ({ room, isOpen = true, onClose, onBookNow }) => {
+  const [selectedImage, setSelectedImage] = useState(room?.ImageUrl || null);
+
+  useEffect(() => {
+    setSelectedImage(room?.ImageUrl || null);
+  }, [room]);
+
   if (!isOpen || !room) return null;
 
-  const [selectedImage, setSelectedImage] = useState(room.ImageUrl);
+  const gallery = Array.isArray(room.Gallery) ? room.Gallery : [];
+  const rawAmenities = room.Amenities || room.amenities;
+  let normalizedAmenities = [];
+  if (Array.isArray(rawAmenities)) {
+    normalizedAmenities = rawAmenities;
+  } else if (typeof rawAmenities === 'string' && rawAmenities.trim()) {
+    try {
+      const parsed = JSON.parse(rawAmenities);
+      normalizedAmenities = Array.isArray(parsed)
+        ? parsed
+        : rawAmenities.split(',').map((s) => s.trim()).filter(Boolean);
+    } catch {
+      normalizedAmenities = rawAmenities.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  const displayAmenities = (normalizedAmenities.length > 0
+    ? normalizedAmenities
+    : [
+        { name: 'Bữa sáng buffet 5 sao', icon: 'restaurant' },
+        { name: 'Wifi tốc độ cao', icon: 'wifi' },
+        { name: 'Ban công view biển', icon: 'deck' },
+        { name: 'Bồn tắm thư giãn', icon: 'bathtub' }
+      ]
+  ).map((am) => (typeof am === 'string' ? { name: am, icon: 'check_circle' } : am));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -50,9 +79,9 @@ const RoomDetailModal = ({ room, isOpen, onClose, onBookNow }) => {
         </div>
 
         {/* Thumbnail Selector */}
-        {room.Gallery && room.Gallery.length > 1 && (
+        {gallery.length > 1 && (
           <div className="flex gap-2.5 px-6 py-3 bg-[#fbf8f2] border-b border-[#dedad0] overflow-x-auto">
-            {room.Gallery.map((img, i) => (
+            {gallery.map((img, i) => (
               <button
                 key={i}
                 onClick={() => setSelectedImage(img)}
@@ -124,15 +153,10 @@ const RoomDetailModal = ({ room, isOpen, onClose, onBookNow }) => {
               Tiện Nghi &amp; Dịch Vụ Đi Kèm
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {(room.Amenities || [
-                { name: 'Bữa sáng buffet 5 sao', icon: 'restaurant' },
-                { name: 'Wifi tốc độ cao', icon: 'wifi' },
-                { name: 'Ban công view biển', icon: 'deck' },
-                { name: 'Bồn tắm thư giãn', icon: 'bathtub' }
-              ]).map((am, idx) => (
+              {displayAmenities.map((am, idx) => (
                 <div key={idx} className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-[#dedad0] hover:border-[#b9a277] transition-colors">
-                  <span className="material-symbols-outlined text-[#b9a277] text-[18px]">{am.icon || 'check_circle'}</span>
-                  <span className="text-[12.5px] font-medium text-[#203044]">{am.name}</span>
+                  <span className="material-symbols-outlined text-[#b9a277] text-[18px]">{am?.icon || 'check_circle'}</span>
+                  <span className="text-[12.5px] font-medium text-[#203044]">{am?.name || 'Tiện nghi cao cấp'}</span>
                 </div>
               ))}
             </div>
@@ -155,7 +179,7 @@ const RoomDetailModal = ({ room, isOpen, onClose, onBookNow }) => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-[#8a8782] font-semibold uppercase">Giá ưu đãi</span>
-              {room.OriginalPrice && (
+              {Number(room.OriginalPrice) > Number(room.BasePrice) && (
                 <span className="text-[12px] text-[#8a8782] line-through">
                   {Number(room.OriginalPrice).toLocaleString('vi-VN')}₫
                 </span>
