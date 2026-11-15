@@ -136,8 +136,13 @@ export default function RoomReview() {
       return;
     }
 
-    // Kiểm tra dung lượng từng ảnh <= 15MB
+    // Kiểm tra định dạng & dung lượng từng ảnh (JPG/PNG/WEBP, <= 15MB)
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     for (const file of files) {
+      if (file.type && !allowedTypes.includes(file.type.toLowerCase())) {
+        setErrorMessage('Chỉ hỗ trợ định dạng ảnh JPG, PNG hoặc WEBP.');
+        return;
+      }
       if (file.size > MAX_FILE_SIZE) {
         setErrorCode(ERROR_CODES.FILE_TOO_LARGE);
         setErrorMessage(ERROR_MESSAGES.FILE_TOO_LARGE);
@@ -213,6 +218,14 @@ export default function RoomReview() {
     if (e) e.preventDefault();
     setErrorMessage('');
     setErrorCode('');
+
+    if (!isAuthenticated) {
+      const redirectUrl = window.location.pathname + window.location.search;
+      setErrorCode('ERROR_0009_UNAUTHENTICATED');
+      setErrorMessage('Vui lòng đăng nhập tài khoản khách hàng đã hoàn tất lưu trú để gửi đánh giá.');
+      setTimeout(() => navigate(`/login?redirect=${encodeURIComponent(redirectUrl)}`), 1200);
+      return;
+    }
 
     // Ràng buộc TC01: reviewBody >= 50 ký tự
     const trimmedBody = reviewBody ? reviewBody.trim() : '';
@@ -499,29 +512,41 @@ export default function RoomReview() {
                       Hãy chấm điểm trải nghiệm tổng thể từ không gian, phong cảnh đến dịch vụ cá nhân hóa.
                     </p>
 
-                    {/* Interactive 5-Star Component */}
+                    {/* Interactive 5-Star Component (Bước 0.5 từ 1.0 - 5.0 theo đặc tả) */}
                     <div className="flex items-center justify-center gap-2 md:gap-3 my-2">
                       {[1, 2, 3, 4, 5].map((starVal) => {
-                        const isActive = (hoverRating || overallRating) >= starVal;
+                        const displayRating = hoverRating || overallRating;
+                        const isFull = displayRating >= starVal;
+                        const isHalf = !isFull && displayRating >= starVal - 0.5;
+                        const iconName = isHalf ? 'star_half' : 'star';
+                        const isLit = isFull || isHalf;
                         return (
-                          <button
-                            key={starVal}
-                            type="button"
-                            aria-label={`${starVal} sao`}
-                            onMouseEnter={() => setHoverRating(starVal)}
-                            onMouseLeave={() => setHoverRating(0)}
-                            onClick={() => setOverallRating(starVal)}
-                            className="star-btn p-1 transition-transform hover:scale-125 focus:outline-none"
-                          >
+                          <div key={starVal} className="relative p-1 transition-transform hover:scale-125">
                             <span
-                              className={`material-symbols-outlined text-[44px] md:text-[52px] transition-colors ${
-                                isActive ? 'text-[#725b38]' : 'text-gray-300'
+                              className={`material-symbols-outlined text-[44px] md:text-[52px] transition-colors pointer-events-none select-none ${
+                                isLit ? 'text-[#725b38]' : 'text-gray-300'
                               }`}
-                              style={{ fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0" }}
+                              style={{ fontVariationSettings: isLit ? "'FILL' 1" : "'FILL' 0" }}
                             >
-                              star
+                              {iconName}
                             </span>
-                          </button>
+                            <button
+                              type="button"
+                              aria-label={`${starVal - 0.5} sao`}
+                              onMouseEnter={() => setHoverRating(starVal - 0.5)}
+                              onMouseLeave={() => setHoverRating(0)}
+                              onClick={() => setOverallRating(starVal - 0.5)}
+                              className="absolute inset-y-0 left-0 w-1/2 focus:outline-none cursor-pointer"
+                            />
+                            <button
+                              type="button"
+                              aria-label={`${starVal} sao`}
+                              onMouseEnter={() => setHoverRating(starVal)}
+                              onMouseLeave={() => setHoverRating(0)}
+                              onClick={() => setOverallRating(starVal)}
+                              className="absolute inset-y-0 right-0 w-1/2 focus:outline-none cursor-pointer"
+                            />
+                          </div>
                         );
                       })}
                     </div>
