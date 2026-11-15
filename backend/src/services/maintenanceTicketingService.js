@@ -138,7 +138,8 @@ async function initEngineeringDatabase() {
 
     console.log('[Engineering DB] Đã đồng bộ bảng MaintenanceTickets thành công.');
   } catch (error) {
-    console.error('[Engineering DB] Lỗi khởi tạo bảng:', error.message);
+    const detail = error.errors ? error.errors.map(e => e.message).join(', ') : error.message;
+    console.error('[Engineering DB] Lỗi khởi tạo bảng:', detail);
   }
 }
 

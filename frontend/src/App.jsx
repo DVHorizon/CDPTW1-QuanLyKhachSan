@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import Home from './pages/client/Home';
+import HotelsExplorer from './pages/client/HotelsExplorer';
 import SearchRooms from './pages/SearchRooms';
 import RoomDetail from './pages/client/RoomDetail';
 import BookingEngine from './pages/client/BookingEngine';
@@ -43,6 +44,7 @@ import InvoiceLedger from './pages/admin/finance/InvoiceLedger';
 import MasterRevenueDashboard from './pages/admin/statistics/MasterRevenueDashboard';
 import AiConciergeManagement from './pages/admin/ai/AiConciergeManagement';
 import FloatingAiConcierge from './components/client/FloatingAiConcierge';
+import FloatingAcademicBadge from './components/common/FloatingAcademicBadge';
 import ClientConcierge from './pages/client/ClientConcierge';
 
 // tuyen/7 imports:
@@ -60,6 +62,7 @@ import AirportTransferManagement from './pages/admin/transportation/AirportTrans
 import NightAuditManagement from './pages/admin/finance/NightAuditManagement';
 import PoliceDeclarationExport from './pages/admin/security/PoliceDeclarationExport';
 import ChannelManagerSync from './pages/admin/operations/ChannelManagerSync';
+import BanquetMiceBooking from './pages/admin/operations/BanquetMiceBooking';
 
 function App() {
   return (
@@ -68,6 +71,8 @@ function App() {
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/hotels" element={<HotelsExplorer />} />
+            <Route path="/khach-san" element={<HotelsExplorer />} />
             <Route path="/rooms" element={<SearchRooms />} />
             <Route path="/services" element={<ServiceManagement />} />
             <Route path="/rooms/search" element={<SearchRooms />} />
@@ -240,9 +245,16 @@ function App() {
             <Route path="/admin/ota-sync" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
             <Route path="/admin/kenh-ban-phong" element={<ProtectedRoute><ChannelManagerSync /></ProtectedRoute>} />
 
+            {/* tuyen/11 Banquet & MICE Event Booking Routes (Phân hệ 53) */}
+            <Route path="/admin/banquet-mice" element={<ProtectedRoute><BanquetMiceBooking /></ProtectedRoute>} />
+            <Route path="/admin/datsanhtiec" element={<ProtectedRoute><BanquetMiceBooking /></ProtectedRoute>} />
+            <Route path="/admin/mice" element={<ProtectedRoute><BanquetMiceBooking /></ProtectedRoute>} />
+            <Route path="/admin/banquet" element={<ProtectedRoute><BanquetMiceBooking /></ProtectedRoute>} />
+
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
           <FloatingAiConcierge />
+          <FloatingAcademicBadge />
         </Router>
       </SocketProvider>
     </AuthProvider>

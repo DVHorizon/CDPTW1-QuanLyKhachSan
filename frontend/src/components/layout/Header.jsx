@@ -8,19 +8,21 @@ import { useAuth } from '../../context/AuthContext';
 const I18N = {
   vi: {
     home: 'Trang Chủ',
+    hotels: 'Khách Sạn & Resort',
     rooms: 'Bộ Sưu Tập Phòng',
     offers: 'Gói Ưu Đãi',
     amenities: 'Dịch Vụ & Tiện Ích',
     dining: 'Ẩm Thực',
     elite: 'Hội Viên Elite',
     faq: 'FAQ',
-    bookNow: 'Đặt Phòng Ngay',
+    bookNow: 'Đặt phòng',
     memberTitle: 'Hội viên Elite',
     hotline: 'Hotline: 1900 6868',
     wishlistTitle: 'Danh sách phòng yêu thích'
   },
   en: {
     home: 'Home',
+    hotels: 'Hotels & Resorts',
     rooms: 'Rooms & Suites',
     offers: 'Special Offers',
     amenities: 'Amenities',
@@ -134,7 +136,7 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${isVisible ? 'translate-y-0' : '-translate-y-full'} ${isTop ? 'bg-[#fafaf8]/95 backdrop-blur-md shadow-none border-b border-[#dedad0]/60' : 'bg-[#fafaf8]/98 backdrop-blur-xl shadow-[0_2px_15px_rgba(32,48,68,0.08)] border-b border-[#dedad0]'}`}>
-      <div className="h-20 w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between max-w-[1440px] mx-auto gap-2 lg:gap-4">
+      <div className="h-20 w-full px-4 sm:px-8 lg:px-12 flex items-center justify-between gap-3 lg:gap-6">
 
         {/* Brand Logo & Tagline */}
         <Link to="/" className="flex items-center gap-2.5 sm:gap-3 shrink-0 group">
@@ -152,27 +154,24 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
         </Link>
 
         {/* Navigation Menu for Desktop */}
-        <nav className="hidden xl:flex items-center gap-3.5 2xl:gap-5 shrink-0">
-          <Link className="text-[13px] font-semibold text-[#203044] hover:text-[#b9a277] transition-colors whitespace-nowrap" to="/">
+        <nav className="hidden xl:flex items-center gap-2.5 2xl:gap-5">
+          <Link className="text-[13px] font-semibold text-[#203044] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" to="/">
             {t.home}
           </Link>
-          <Link className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" to="/rooms">
-            {t.rooms}
+          <Link className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" to="/hotels">
+            {t.hotels}
           </Link>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#uu-dai">
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#uu-dai">
             {t.offers}
           </a>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#trai-nghiem">
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#trai-nghiem">
             {t.amenities}
           </a>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#am-thuc">
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#am-thuc">
             {t.dining}
           </a>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#hoi-vien">
+          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap px-1" href="#hoi-vien">
             {t.elite}
-          </a>
-          <a className="text-[13px] font-medium text-[#373435] hover:text-[#b9a277] transition-colors whitespace-nowrap" href="#faq">
-            {t.faq}
           </a>
         </nav>
 
@@ -204,58 +203,9 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
             )}
           </a>
 
-          {/* Language Selector (VN / ENG) */}
-          <div className="relative shrink-0" ref={langDropdownRef}>
-            <button
-              onClick={() => setIsLangOpen(!isLangOpen)}
-              className="flex items-center gap-1.5 h-8.5 px-2 rounded-lg bg-white border border-[#dedad0] hover:border-[#b9a277] text-[#203044] text-[12px] font-bold transition-all shadow-xs cursor-pointer select-none"
-              title="Chọn ngôn ngữ / Select Language"
-              type="button"
-            >
-              {currentLang === 'vi' ? <FlagVN /> : <FlagEN />}
-              <span>{currentLang === 'vi' ? 'VN' : 'ENG'}</span>
-              <span className={`material-symbols-outlined text-[15px] text-[#8a8782] transition-transform duration-200 ${isLangOpen ? 'rotate-180 text-[#b9a277]' : ''}`}>
-                expand_more
-              </span>
-            </button>
-
-            {isLangOpen && (
-              <div className="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)] border border-[#dedad0] py-1.5 z-50 animate-fade-in">
-                <button
-                  type="button"
-                  onClick={() => handleSelectLang('vi')}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${currentLang === 'vi' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
-                    }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <FlagVN className="w-4 h-2.5" />
-                    <span>Tiếng Việt</span>
-                  </span>
-                  {currentLang === 'vi' && (
-                    <span className="material-symbols-outlined text-[15px] text-[#b9a277]">check</span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectLang('en')}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-left transition-colors cursor-pointer ${currentLang === 'en' ? 'bg-[#fbf8f2] text-[#b9a277] font-bold' : 'text-[#203044] hover:bg-[#fafaf8]'
-                    }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <FlagEN className="w-4 h-2.5" />
-                    <span>English</span>
-                  </span>
-                  {currentLang === 'en' && (
-                    <span className="material-symbols-outlined text-[15px] text-[#b9a277]">check</span>
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Đặt Phòng Button */}
           <Link
-            className="hidden sm:inline-flex items-center justify-center h-8.5 px-3.5 bg-[#b9a277] text-white rounded-lg text-[12.5px] font-bold hover:bg-[#a68e64] transition-all shadow-[0_4px_12px_rgba(185,162,119,0.3)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
+            className="hidden sm:inline-flex items-center justify-center h-11 px-7 mx-2 sm:mx-3 bg-[#b9a277] text-[#203044] rounded-xl text-[14.5px] font-bold hover:bg-[#a68e64] hover:text-white transition-all shadow-[0_4px_14px_rgba(185,162,119,0.25)] hover:-translate-y-0.5 whitespace-nowrap shrink-0"
             to="/rooms"
           >
             {t.bookNow}
@@ -263,18 +213,18 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
 
           {/* User Profile / Login Button */}
           {isAuthenticated && user ? (
-            <div className="relative pl-2 border-l border-[#dedad0] shrink-0" ref={userMenuRef}>
+            <div className="relative pl-3 sm:pl-4 border-l border-[#dedad0] shrink-0" ref={userMenuRef}>
               <button
                 type="button"
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 className="flex items-center gap-2 cursor-pointer select-none group"
                 title={`${user.fullName} (${user.tierName || 'Elite'})`}
               >
-                <div className="hidden 2xl:flex flex-col text-right shrink-0">
-                  <span className="text-[11.5px] text-[#203044] font-bold leading-tight whitespace-nowrap group-hover:text-[#b9a277] transition-colors">
+                <div className="hidden 2xl:flex flex-col text-right shrink-0 max-w-[140px]">
+                  <span className="text-[11.5px] text-[#203044] font-bold leading-tight truncate group-hover:text-[#b9a277] transition-colors">
                     {user.fullName}
                   </span>
-                  <span className="text-[9.5px] text-[#b9a277] font-bold uppercase tracking-wider whitespace-nowrap">
+                  <span className="text-[9.5px] text-[#b9a277] font-bold uppercase tracking-wider truncate">
                     Hạng {user.tierName || t.memberTitle}
                   </span>
                 </div>
@@ -389,9 +339,9 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">home</span>
               <span>{t.home}</span>
             </Link>
-            <Link onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" to="/rooms">
-              <span className="material-symbols-outlined text-[#b9a277] text-[20px]">meeting_room</span>
-              <span>{t.rooms}</span>
+            <Link onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" to="/hotels">
+              <span className="material-symbols-outlined text-[#b9a277] text-[20px]">apartment</span>
+              <span>{t.hotels}</span>
             </Link>
             <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#uu-dai">
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">loyalty</span>
@@ -409,10 +359,6 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
               <span className="material-symbols-outlined text-[#b9a277] text-[20px]">stars</span>
               <span>{t.elite}</span>
             </a>
-            <a onClick={() => setIsMobileMenuOpen(false)} className="text-[14px] font-medium text-[#373435] hover:text-[#b9a277] py-2 flex items-center gap-2.5 transition-colors" href="#faq">
-              <span className="material-symbols-outlined text-[#b9a277] text-[20px]">help_outline</span>
-              <span>{t.faq}</span>
-            </a>
           </div>
 
           <div className="flex items-center justify-between pt-2">
@@ -420,28 +366,6 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
               <span className="material-symbols-outlined text-[#b9a277] text-[18px]">support_agent</span>
               <span>1900 6868</span>
             </a>
-
-            {/* Mobile Language Switcher */}
-            <div className="flex items-center p-0.5 rounded-lg bg-[#f5f4ef] border border-[#dedad0]">
-              <button
-                type="button"
-                onClick={() => handleSelectLang('vi')}
-                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${currentLang === 'vi' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
-                  }`}
-              >
-                <FlagVN className="w-3.5 h-2.5" />
-                <span>VN</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectLang('en')}
-                className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${currentLang === 'en' ? 'bg-white text-[#203044] shadow-xs' : 'text-[#8a8782] hover:text-[#203044]'
-                  }`}
-              >
-                <FlagEN className="w-3.5 h-2.5" />
-                <span>ENG</span>
-              </button>
-            </div>
           </div>
 
           {/* Mobile Auth Button */}
@@ -509,14 +433,14 @@ const Header = ({ wishlistCount = 0, onWishlistClick, lang: propLang, onLanguage
           </div>
 
           <div className="pt-2 sm:hidden">
-            <a
+            <Link
               onClick={() => setIsMobileMenuOpen(false)}
-              className="w-full h-11 bg-[#b9a277] hover:bg-[#a68e64] text-white rounded-xl text-[14px] font-bold flex items-center justify-center gap-2 shadow-md transition-all"
-              href="#room-collection"
+              className="w-full h-11 bg-[#b9a277] hover:bg-[#a68e64] text-[#203044] hover:text-white rounded-xl text-[14px] font-semibold flex items-center justify-center gap-2 shadow-md transition-all"
+              to="/rooms"
             >
               <span className="material-symbols-outlined text-[18px]">calendar_month</span>
               <span>{t.bookNow}</span>
-            </a>
+            </Link>
           </div>
         </div>
       )}

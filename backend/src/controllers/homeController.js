@@ -1,4 +1,5 @@
 const { Branch, RoomType, Room, Amenity, User, Booking, Review, sequelize } = require('../models');
+const { BRANCH_METADATA } = require('./roomSearchController');
 
 /**
  * Controller: Xử lý nghiệp vụ cho Trang chủ theo chuẩn kiến trúc MVC
@@ -6,11 +7,30 @@ const { Branch, RoomType, Room, Amenity, User, Booking, Review, sequelize } = re
 exports.getHomeData = async (req, res) => {
   try {
     // 1. Model: Lấy danh sách Chi Nhánh hoạt động
-    const branches = await Branch.findAll({
+    const rawBranches = await Branch.findAll({
       where: { Status: 'Active' },
       attributes: ['BranchId', 'BranchName', 'Address', 'Phone', 'Status'],
       order: [['BranchId', 'ASC']],
-      limit: 10
+      limit: 50
+    });
+
+    const branches = rawBranches.map(b => {
+      const meta = (BRANCH_METADATA && BRANCH_METADATA[b.BranchId]) || {};
+      return {
+        BranchId: b.BranchId,
+        BranchName: b.BranchName,
+        Address: b.Address,
+        Phone: b.Phone,
+        Status: b.Status,
+        City: meta.City || (b.Address ? b.Address.split(',').pop()?.trim() : 'Việt Nam'),
+        ImageUrl: meta.ImageUrl || 'https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=1200&auto=format&fit=crop',
+        Gallery: meta.Gallery || [],
+        Rating: meta.Rating || 4.9,
+        TotalReviews: meta.TotalReviews || 180,
+        Highlight: meta.Highlight || 'Khu nghỉ dưỡng 5 sao thượng lưu tiêu chuẩn quốc tế',
+        Tag: meta.Tag || 'Nghỉ dưỡng 5 sao',
+        MinPrice: 1850000
+      };
     });
 
     // 2. Model: Lấy danh sách Hạng Phòng nổi bật (RoomTypes)

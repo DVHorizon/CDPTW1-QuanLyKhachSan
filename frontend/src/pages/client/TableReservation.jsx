@@ -113,6 +113,7 @@ export default function TableReservation() {
     tables: []
   });
   const [isFetchingAvailability, setIsFetchingAvailability] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Khởi tạo thông tin người dùng từ localStorage
   useEffect(() => {
@@ -229,6 +230,56 @@ export default function TableReservation() {
     target.setHours(parseInt(hh, 10) || 19, parseInt(mm, 10) || 0, 0, 0);
     return target.toISOString();
   };
+
+  // Kiểm tra một mốc giờ cụ thể đã trôi qua so với hiện tại chưa
+  const isTimeSlotPassed = (timeStr, dateStr = selectedDate) => {
+    const matchedOption = dynamicDateOptions.find(o => o.date === String(dateStr));
+    if (!matchedOption) return false;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const targetDay = new Date(matchedOption.fullDate.getFullYear(), matchedOption.fullDate.getMonth(), matchedOption.fullDate.getDate());
+
+    // Nếu là ngày trong tương lai (ngày mai trở đi), chưa bao giờ bị quá hạn
+    if (targetDay.getTime() > today.getTime()) return false;
+    // Nếu là ngày trong quá khứ
+    if (targetDay.getTime() < today.getTime()) return true;
+
+    // Nếu là chính ngày "Hôm nay", so sánh giờ và phút (cho phép đệm 5 phút)
+    const [hh, mm] = timeStr.split(":").map(Number);
+    const slotDate = new Date(today);
+    slotDate.setHours(hh, mm, 0, 0);
+
+    return slotDate.getTime() < (now.getTime() - 5 * 60 * 1000);
+  };
+
+  // Lấy danh sách khung giờ còn khả dụng cho 1 buổi ẩm thực (loại bỏ giờ đã qua nếu là hôm nay)
+  const getAvailableSlotsForPeriod = (period, dateStr = selectedDate) => {
+    const slots = MEAL_PERIOD_TIME_SLOTS[period] || [];
+    return slots.filter(s => !isTimeSlotPassed(s.time, dateStr));
+  };
+
+  // Tự động kiểm tra và cập nhật selectedTime / mealPeriod hợp lệ nếu khung giờ đang chọn bị quá hạn
+  useEffect(() => {
+    // Nếu khung giờ hiện tại bị quá hạn
+    if (isTimeSlotPassed(selectedTime, selectedDate)) {
+      const currentPeriodSlots = getAvailableSlotsForPeriod(mealPeriod, selectedDate);
+      if (currentPeriodSlots.length > 0) {
+        setSelectedTime(currentPeriodSlots[0].time);
+      } else {
+        // Nếu toàn bộ buổi ẩm thực hiện tại đã kết thúc, tự động tìm buổi ẩm thực tiếp theo còn khung giờ khả dụng
+        const periods = ["breakfast", "lunch", "dinner"];
+        for (const p of periods) {
+          const avail = getAvailableSlotsForPeriod(p, selectedDate);
+          if (avail.length > 0) {
+            setMealPeriod(p);
+            setSelectedTime(avail[0].time);
+            break;
+          }
+        }
+      }
+    }
+  }, [selectedDate, mealPeriod, selectedTime]);
 
   // Lấy số lượng bàn khả dụng từ Database theo ngày, giờ và số người
   const fetchTableAvailability = async () => {
@@ -360,6 +411,12 @@ export default function TableReservation() {
   };
 
   const handleConfirmReservation = async () => {
+    // Chặn nếu khung giờ đã trôi qua
+    if (isTimeSlotPassed(selectedTime, selectedDate)) {
+      setErrorMsg("Khung giờ đặt bàn đã trôi qua. Vui lòng chọn khung giờ khác từ hiện tại trở đi.");
+      return;
+    }
+
     setLoading(true);
     setErrorMsg("");
     try {
@@ -436,34 +493,34 @@ export default function TableReservation() {
   return (
     <div className="bg-[#f4fbf4] min-h-screen text-slate-800 font-sans antialiased">
       {/* Sidebar của khách hàng theo đúng ảnh */}
-      <GuestSidebar />
+      <GuestSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       {/* Main Content Area */}
-      <div className="pl-72">
+      <div className="lg:pl-72 transition-all">
         {/* Header trên cùng theo đúng ảnh */}
-        <GuestHeader />
+        <GuestHeader onToggleSidebar={() => setIsSidebarOpen(prev => !prev)} />
 
-        <main className="relative pt-24 px-8 pb-12 w-full max-w-[1600px] mx-auto">
+        <main className="relative pt-20 sm:pt-24 px-3 sm:px-8 pb-12 w-full max-w-[1600px] mx-auto">
           {/* Immersive Dining Hero Section */}
           <div className="relative w-full rounded-2xl overflow-hidden shadow-xl mb-6 bg-white">
             <div
-              className="relative h-[360px] md:h-[400px] w-full bg-cover bg-center"
+              className="relative h-[300px] sm:h-[360px] md:h-[400px] w-full bg-cover bg-center"
               style={{
                 backgroundImage:
                   "url('https://lh3.googleusercontent.com/aida-public/AB6AXuAroyeoZvBCTRIC_emwzZZ8Lq_lEkUmnuQrYKtkZdqQnAjOOn7p8G3Ohrdqz0hkjjTox9oAyrOE6yMWIxZIPuSNCMxO8aRcP7SB2ky0ij-7ux4qX46fwlQXU8e7-oleTq-vMmBhnzYiqd_vLYO8uLHkUZM_4vvvoz_-vQfgwaeidlHpmQcigz1PWuz4tyYWWfjhit2RBndwKuR9_o-6HN_Ur03NCYwtkKFv5I1EEhL2twAFYd3pbAvP')",
               }}
             >
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent flex flex-col justify-end p-8">
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent flex flex-col justify-end p-4 sm:p-8">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <span className="px-3 py-0.5 rounded-full bg-emerald-500 text-white text-xs font-bold tracking-widest uppercase shadow-[0_0_12px_rgba(16,185,129,0.35)]">
+                  <span className="px-2.5 sm:px-3 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] sm:text-xs font-bold tracking-widest uppercase shadow-[0_0_12px_rgba(16,185,129,0.35)]">
                     Ẩm Thực Đẳng Cấp 5 Sao
                   </span>
                   <span className="text-emerald-100 text-xs flex items-center gap-1">
                     <span className="material-symbols-outlined text-[16px] text-cyan-300">water_lux</span>
                     Bãi Trường, Phú Quốc
                   </span>
-                  <span className="text-white/60 text-xs">•</span>
-                  <span className="text-white/90 text-xs flex items-center gap-1 font-medium">
+                  <span className="text-white/60 text-xs hidden sm:inline">•</span>
+                  <span className="text-white/90 text-xs hidden sm:flex items-center gap-1 font-medium">
                     <span className="material-symbols-outlined text-[16px] text-amber-300">star</span>
                     4.9/5.0 (Hơn 580 thực khách đánh giá cao)
                   </span>
@@ -471,12 +528,11 @@ export default function TableReservation() {
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                   <div>
                     <h1
-                      className="text-3xl sm:text-4xl text-white font-bold tracking-tight mb-2 drop-shadow-md"
-                      style={{ fontFamily: "'Playfair Display', serif" }}
+                      className="text-2xl sm:text-3xl md:text-4xl text-white font-bold tracking-tight mb-2 drop-shadow-md font-sans"
                     >
                       Nhà Hàng Biển Horizon Dining & Grill
                     </h1>
-                    <p className="text-white/90 text-sm sm:text-base max-w-3xl drop-shadow">
+                    <p className="text-white/90 text-xs sm:text-sm md:text-base max-w-3xl drop-shadow line-clamp-2 sm:line-clamp-none">
                       Thưởng vị ẩm thực bờ biển nguyên bản hòa quyện cùng mỹ vị Á - Âu đỉnh cao. Tận hưởng khoảnh khắc hoàng hôn tráng lệ trong không gian ngập tràn thanh âm của sóng biển ngọc lục bảo.
                     </p>
                   </div>
@@ -487,7 +543,7 @@ export default function TableReservation() {
                       fetchMyReservations();
                       setShowHistoryDrawer(true);
                     }}
-                    className="cursor-pointer px-4 py-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-md font-semibold text-xs flex items-center gap-2 shadow-lg transition-all active:scale-95 shrink-0"
+                    className="cursor-pointer px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-md font-semibold text-xs flex items-center gap-2 shadow-lg transition-all active:scale-95 shrink-0"
                   >
                     <span className="material-symbols-outlined text-[18px] text-emerald-300">bookmark_added</span>
                     <span>Lịch Sử Đặt Bàn Của Quý Khách</span>
@@ -613,75 +669,117 @@ export default function TableReservation() {
                     Chọn Buổi Ẩm Thực
                   </label>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <label
-                      onClick={() => {
-                        setMealPeriod("breakfast");
-                        const firstSlot = MEAL_PERIOD_TIME_SLOTS.breakfast[0]?.time;
-                        if (firstSlot) setSelectedTime(firstSlot);
-                      }}
-                      className={`cursor-pointer p-4 rounded-xl border transition-all flex flex-col ${
-                        mealPeriod === "breakfast"
-                          ? "border-emerald-600 bg-emerald-50/20 shadow-sm"
-                          : "border-slate-100 bg-slate-50/60 hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-sm font-bold ${mealPeriod === "breakfast" ? "text-emerald-700" : "text-slate-800"}`}>
-                          Bữa Sáng Buffet
-                        </span>
-                        <span className="material-symbols-outlined text-slate-400">bakery_dining</span>
-                      </div>
-                      <span className="text-[11px] text-slate-400 mb-1">06:30 - 10:30 • Grand Horizon Lounge</span>
-                      <p className="text-xs text-slate-500 mb-3">Ẩm thực quốc tế không giới hạn, quầy bánh thủ công Pháp và đặc sản Phú Quốc.</p>
-                      <span className="text-xs text-emerald-700 font-semibold mt-auto">Bao gồm trong gói lưu trú</span>
-                    </label>
+                    {(() => {
+                      const bfAvailableSlots = getAvailableSlotsForPeriod("breakfast");
+                      const isBfPassed = bfAvailableSlots.length === 0;
 
-                    <label
-                      onClick={() => {
-                        setMealPeriod("lunch");
-                        const firstSlot = MEAL_PERIOD_TIME_SLOTS.lunch[0]?.time;
-                        if (firstSlot) setSelectedTime(firstSlot);
-                      }}
-                      className={`cursor-pointer p-4 rounded-xl border transition-all flex flex-col ${
-                        mealPeriod === "lunch"
-                          ? "border-emerald-600 bg-emerald-50/20 shadow-sm"
-                          : "border-slate-100 bg-slate-50/60 hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-sm font-bold ${mealPeriod === "lunch" ? "text-emerald-700" : "text-slate-800"}`}>
-                          Bữa Trưa Hải Sản
-                        </span>
-                        <span className="material-symbols-outlined text-slate-400">set_meal</span>
-                      </div>
-                      <span className="text-[11px] text-slate-400 mb-1">11:30 - 15:00 • Nướng Than Bờ Biển</span>
-                      <p className="text-xs text-slate-500 mb-3">Hải sản tươi sống đánh bắt trong ngày nướng bơ tỏi, sò điệp nướng mỡ hành.</p>
-                      <span className="text-xs text-slate-700 font-semibold mt-auto">À la carte / Set Menu</span>
-                    </label>
+                      return (
+                        <label
+                          onClick={() => {
+                            if (isBfPassed) return;
+                            setMealPeriod("breakfast");
+                            const firstSlot = bfAvailableSlots[0]?.time;
+                            if (firstSlot) setSelectedTime(firstSlot);
+                          }}
+                          className={`p-4 rounded-xl border transition-all flex flex-col ${
+                            isBfPassed
+                              ? "border-slate-200 bg-slate-100/60 opacity-60 cursor-not-allowed select-none"
+                              : mealPeriod === "breakfast"
+                              ? "border-emerald-600 bg-emerald-50/20 shadow-sm cursor-pointer"
+                              : "border-slate-100 bg-slate-50/60 hover:bg-slate-50 cursor-pointer"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-sm font-bold ${isBfPassed ? "text-slate-400 line-through" : mealPeriod === "breakfast" ? "text-emerald-700" : "text-slate-800"}`}>
+                              Bữa Sáng Buffet
+                            </span>
+                            <span className="material-symbols-outlined text-slate-400">bakery_dining</span>
+                          </div>
+                          <span className="text-[11px] text-slate-400 mb-1">06:30 - 10:30 • Grand Horizon Lounge</span>
+                          <p className="text-xs text-slate-500 mb-3">Ẩm thực quốc tế không giới hạn, quầy bánh thủ công Pháp và đặc sản Phú Quốc.</p>
+                          <span className={`text-xs font-semibold mt-auto ${isBfPassed ? "text-rose-500 font-bold" : "text-emerald-700"}`}>
+                            {isBfPassed ? "Đã kết thúc phục vụ hôm nay" : "Bao gồm trong gói lưu trú"}
+                          </span>
+                        </label>
+                      );
+                    })()}
 
-                    <label
-                      onClick={() => {
-                        setMealPeriod("dinner");
-                        const firstSlot = MEAL_PERIOD_TIME_SLOTS.dinner[3]?.time || MEAL_PERIOD_TIME_SLOTS.dinner[0]?.time;
-                        if (firstSlot) setSelectedTime(firstSlot);
-                      }}
-                      className={`cursor-pointer p-4 rounded-xl border transition-all flex flex-col ${
-                        mealPeriod === "dinner"
-                          ? "border-emerald-600 bg-emerald-50/30 shadow-sm"
-                          : "border-slate-100 bg-slate-50/60 hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-bold text-emerald-800">Bữa Tối Thượng Hạng</span>
-                        <span className="material-symbols-outlined text-emerald-700">candle</span>
-                      </div>
-                      <span className="text-[11px] text-emerald-700 font-medium mb-1">17:30 - 22:30 • Ngắm Hoàng Hôn Lãng Mạn</span>
-                      <p className="text-xs text-slate-500 mb-3">Bò Wagyu thượng hạng, tôm hùm sốt nấm truffle, rượu vang hảo hạng tinh tế.</p>
-                      <span className="text-xs text-emerald-700 font-bold mt-auto flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">local_fire_department</span>
-                        Trải nghiệm được yêu thích nhất
-                      </span>
-                    </label>
+                    {(() => {
+                      const lunchAvailableSlots = getAvailableSlotsForPeriod("lunch");
+                      const isLunchPassed = lunchAvailableSlots.length === 0;
+
+                      return (
+                        <label
+                          onClick={() => {
+                            if (isLunchPassed) return;
+                            setMealPeriod("lunch");
+                            const firstSlot = lunchAvailableSlots[0]?.time;
+                            if (firstSlot) setSelectedTime(firstSlot);
+                          }}
+                          className={`p-4 rounded-xl border transition-all flex flex-col ${
+                            isLunchPassed
+                              ? "border-slate-200 bg-slate-100/60 opacity-60 cursor-not-allowed select-none"
+                              : mealPeriod === "lunch"
+                              ? "border-emerald-600 bg-emerald-50/20 shadow-sm cursor-pointer"
+                              : "border-slate-100 bg-slate-50/60 hover:bg-slate-50 cursor-pointer"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-sm font-bold ${isLunchPassed ? "text-slate-400 line-through" : mealPeriod === "lunch" ? "text-emerald-700" : "text-slate-800"}`}>
+                              Bữa Trưa Hải Sản
+                            </span>
+                            <span className="material-symbols-outlined text-slate-400">set_meal</span>
+                          </div>
+                          <span className="text-[11px] text-slate-400 mb-1">11:30 - 15:00 • Nướng Than Bờ Biển</span>
+                          <p className="text-xs text-slate-500 mb-3">Hải sản tươi sống đánh bắt trong ngày nướng bơ tỏi, sò điệp nướng mỡ hành.</p>
+                          <span className={`text-xs font-semibold mt-auto ${isLunchPassed ? "text-rose-500 font-bold" : "text-slate-700"}`}>
+                            {isLunchPassed ? "Đã kết thúc phục vụ hôm nay" : "À la carte / Set Menu"}
+                          </span>
+                        </label>
+                      );
+                    })()}
+
+                    {(() => {
+                      const dinnerAvailableSlots = getAvailableSlotsForPeriod("dinner");
+                      const isDinnerPassed = dinnerAvailableSlots.length === 0;
+
+                      return (
+                        <label
+                          onClick={() => {
+                            if (isDinnerPassed) return;
+                            setMealPeriod("dinner");
+                            const firstSlot = dinnerAvailableSlots[3]?.time || dinnerAvailableSlots[0]?.time;
+                            if (firstSlot) setSelectedTime(firstSlot);
+                          }}
+                          className={`p-4 rounded-xl border transition-all flex flex-col ${
+                            isDinnerPassed
+                              ? "border-slate-200 bg-slate-100/60 opacity-60 cursor-not-allowed select-none"
+                              : mealPeriod === "dinner"
+                              ? "border-emerald-600 bg-emerald-50/30 shadow-sm cursor-pointer"
+                              : "border-slate-100 bg-slate-50/60 hover:bg-slate-50 cursor-pointer"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-sm font-bold ${isDinnerPassed ? "text-slate-400 line-through" : "text-emerald-800"}`}>
+                              Bữa Tối Thượng Hạng
+                            </span>
+                            <span className="material-symbols-outlined text-emerald-700">candle</span>
+                          </div>
+                          <span className="text-[11px] text-emerald-700 font-medium mb-1">17:30 - 22:30 • Ngắm Hoàng Hôn Lãng Mạn</span>
+                          <p className="text-xs text-slate-500 mb-3">Bò Wagyu thượng hạng, tôm hùm sốt nấm truffle, rượu vang hảo hạng tinh tế.</p>
+                          <span className={`text-xs mt-auto flex items-center gap-1 ${isDinnerPassed ? "text-rose-500 font-bold" : "text-emerald-700 font-bold"}`}>
+                            {isDinnerPassed ? (
+                              "Đã kết thúc phục vụ hôm nay"
+                            ) : (
+                              <>
+                                <span className="material-symbols-outlined text-[14px]">local_fire_department</span>
+                                Trải nghiệm được yêu thích nhất
+                              </>
+                            )}
+                          </span>
+                        </label>
+                      );
+                    })()}
                   </div>
                 </div>
               </section>
@@ -712,36 +810,55 @@ export default function TableReservation() {
                   {(MEAL_PERIOD_TIME_SLOTS[mealPeriod] || MEAL_PERIOD_TIME_SLOTS.dinner).map((ts) => {
                     const isSelected = selectedTime === ts.time;
                     const isAvailable = availableData.availableCount > 0;
+                    const isPassed = isTimeSlotPassed(ts.time, selectedDate);
+
                     return (
                       <button
                         key={ts.time}
                         type="button"
-                        onClick={() => setSelectedTime(ts.time)}
+                        disabled={isPassed}
+                        onClick={() => {
+                          if (!isPassed) setSelectedTime(ts.time);
+                        }}
+                        title={isPassed ? "Khung giờ này đã trôi qua trong ngày hôm nay" : undefined}
                         className={`p-3.5 rounded-xl transition-all flex flex-col items-center gap-0.5 relative ${
-                          isSelected
-                            ? "bg-emerald-600 text-white shadow-[0_0_12px_rgba(16,185,129,0.3)] scale-[1.02]"
-                            : "bg-slate-50 text-slate-800 hover:bg-slate-100"
+                          isPassed
+                            ? "bg-slate-100/70 text-slate-300 border border-slate-200/50 cursor-not-allowed opacity-50 select-none shadow-none"
+                            : isSelected
+                            ? "bg-emerald-600 text-white shadow-[0_0_12px_rgba(16,185,129,0.3)] scale-[1.02] cursor-pointer"
+                            : "bg-slate-50 text-slate-800 hover:bg-slate-100 cursor-pointer"
                         }`}
                       >
-                        <span className="text-base font-bold">{ts.time}</span>
+                        <span className={`text-base font-bold ${isPassed ? "line-through text-slate-400" : ""}`}>
+                          {ts.time}
+                        </span>
                         <span
                           className={`text-[10px] ${
-                            isSelected
+                            isPassed
+                              ? "text-slate-400 font-normal"
+                              : isSelected
                               ? "text-white/90 font-medium"
                               : isAvailable
                               ? "text-emerald-700 font-semibold"
                               : "text-rose-600 font-medium"
                           }`}
                         >
-                          {isSelected
+                          {isPassed
+                            ? "Đã qua giờ"
+                            : isSelected
                             ? "Đang chọn"
                             : isAvailable
                             ? `Còn ${availableData.availableCount} bàn`
                             : "Hết bàn"}
                         </span>
-                        {isSelected && (
+                        {isSelected && !isPassed && (
                           <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center text-white text-[10px]">
                             ✓
+                          </span>
+                        )}
+                        {isPassed && (
+                          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-300 flex items-center justify-center text-slate-600 text-[10px]">
+                            ✕
                           </span>
                         )}
                       </button>

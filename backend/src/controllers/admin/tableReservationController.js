@@ -182,14 +182,14 @@ exports.createReservation = async (req, res) => {
       });
     }
 
-    // Thời gian không được ở quá khứ (cho phép dung sai 24h hoặc trong ngày hôm nay để khách đặt bàn trong ngày thuận tiện)
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    if (resTime.getTime() < todayStart.getTime()) {
+    // Thời gian không được ở quá khứ (cho phép đặt trước ít nhất thời điểm hiện tại)
+    const nowTimestamp = Date.now();
+    // Cho phép trễ tối đa 5 phút để tránh lệch đồng hồ client-server
+    if (resTime.getTime() < nowTimestamp - 5 * 60 * 1000) {
       await transaction.rollback();
       return res.status(400).json({
         code: 'ERROR_0005_INVALID_VALUE',
-        message: 'Không thể đặt bàn cho ngày trong quá khứ.'
+        message: 'Khung giờ đặt bàn đã trôi qua. Vui lòng chọn khung giờ từ hiện tại trở đi.'
       });
     }
 
@@ -479,6 +479,53 @@ exports.checkInReservation = async (req, res) => {
       await reservation.table.update({ Status: 'Occupied' }, { transaction });
     }
 
+    // [OPTION 3: HOLDING POLICY]
+    // Khi khách check-in nhận bàn: Tự động kích hoạt các đơn món đang Pending (Holding) sang 'Preparing' để Bếp bắt đầu nấu
+    const { FoodOrder, FoodOrderDetail, MenuItem } = require('../../models');
+    const { broadcastNewKitchenOrder, broadcastOrderStatus } = require('../../services/websocketService');
+    const holdingOrders = await FoodOrder.findAll({
+      where: {
+        TableId: reservation.TableId,
+        OrderType: 'Restaurant',
+        Status: 'Pending',
+        IsDeleted: false
+      },
+      include: [
+        { model: FoodOrderDetail, as: 'details', include: [{ model: MenuItem }] }
+      ],
+      transaction
+    });
+
+    for (const order of holdingOrders) {
+      order.Status = 'Preparing';
+      await order.save({ transaction });
+
+      // Phát thông báo âm thanh và phiếu gọi món sang Màn hình Bếp (KDS)
+      try {
+        const itemsList = (order.details || []).map(d => ({
+          orderDetailId: d.FoodOrderDetailId,
+          menuItemId: d.MenuItemId,
+          itemName: d.MenuItem?.ItemName || 'Món ăn',
+          quantity: d.Quantity,
+          note: (d.Note || '').replace(/__COOKED__/g, '').trim()
+        }));
+
+        broadcastNewKitchenOrder({
+          foodOrderId: order.FoodOrderId,
+          orderType: 'Restaurant',
+          location: `Bàn #${reservation.table?.TableNumber || reservation.TableId}`,
+          tableNumber: reservation.table?.TableNumber || ('Bàn #' + reservation.TableId),
+          orderTime: order.OrderTime || order.createdAt || new Date().toISOString(),
+          totalAmount: order.TotalAmount,
+          note: order.Note || '',
+          items: itemsList
+        });
+        broadcastOrderStatus(order);
+      } catch (kdsErr) {
+        console.warn('Lỗi broadcast KDS khi Check-in bàn:', kdsErr.message);
+      }
+    }
+
     await transaction.commit();
 
     broadcastTableReservation(reservation, 'CHECK_IN');
@@ -526,6 +573,32 @@ exports.noShowReservation = async (req, res) => {
     await reservation.update({ Status: 'NoShow' }, { transaction });
     if (reservation.table) {
       await reservation.table.update({ Status: 'Available' }, { transaction });
+    }
+
+    // [OPTION 3: HOLDING POLICY - NO-SHOW HANDLING]
+    // Khi khách No-Show: Tự động huỷ bỏ toàn bộ các đơn món gọi trước của bàn đang ở trạng thái 'Pending' (Holding)
+    const { FoodOrder } = require('../../models');
+    const { broadcastOrderStatus } = require('../../services/websocketService');
+    const pendingOrders = await FoodOrder.findAll({
+      where: {
+        TableId: reservation.TableId,
+        OrderType: 'Restaurant',
+        Status: 'Pending',
+        IsDeleted: false
+      },
+      transaction
+    });
+
+    for (const order of pendingOrders) {
+      order.Status = 'Cancelled';
+      order.Note = (order.Note ? order.Note + ' | ' : '') + 'Tự động huỷ đơn do khách không đến nhận bàn (No-Show)';
+      await order.save({ transaction });
+
+      try {
+        broadcastOrderStatus(order);
+      } catch (wsErr) {
+        console.warn('Lỗi broadcast huỷ đơn do No-Show:', wsErr.message);
+      }
     }
 
     await transaction.commit();

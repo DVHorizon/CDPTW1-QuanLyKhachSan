@@ -15,7 +15,12 @@ const roomSearchController = require('../../controllers/roomSearchController');
 const roomAvailabilityController = require('../../controllers/roomAvailabilityController');
 const bookingEngineController = require('../../controllers/bookingEngineController');
 const onlineDepositPaymentController = require('../../controllers/onlineDepositPaymentController');
-const { verifyToken } = require('../../middlewares/authMiddleware');
+const aiRoomRecommendationController = require('../../controllers/aiRoomRecommendationController');
+const { verifyToken, optionalVerifyToken } = require('../../middlewares/authMiddleware');
+
+// ─── AI GỢI Ý PHÒNG THÔNG MINH (RAG + GEMINI API) ───────────────────────────
+router.post('/rooms/ai-recommend',    optionalVerifyToken, aiRoomRecommendationController.getAiRoomRecommendations);
+router.get('/rooms/ai-recommend',     optionalVerifyToken, aiRoomRecommendationController.getAiRoomRecommendations);
 
 // ─── TÍNH NĂNG 4: REAL-TIME AVAILABILITY & LOCK (FEAT-GUEST-04) ─────────────
 router.get('/rooms/availability',    roomAvailabilityController.checkRoomAvailability);
