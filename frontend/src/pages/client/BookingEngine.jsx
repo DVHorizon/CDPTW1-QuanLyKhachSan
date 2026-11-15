@@ -93,8 +93,16 @@ export default function BookingEngine() {
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (!parsed?.expiresAt) return null;
-      if (paramLockSessionId && parsed.lockSessionId && parsed.lockSessionId !== paramLockSessionId) return null;
-      return Math.max(0, Math.floor((parsed.expiresAt - Date.now()) / 1000));
+      // Chỉ áp dụng lock khi khớp lockSessionId trên URL hoặc còn hạn và đúng roomTypeId
+      if (paramLockSessionId) {
+        if (parsed.lockSessionId && parsed.lockSessionId !== paramLockSessionId) return null;
+        return Math.max(0, Math.floor((parsed.expiresAt - Date.now()) / 1000));
+      }
+      if (String(parsed.roomTypeId) !== String(paramRoomTypeId) || parsed.expiresAt <= Date.now()) {
+        sessionStorage.removeItem('gh_room_lock');
+        return null;
+      }
+      return Math.floor((parsed.expiresAt - Date.now()) / 1000);
     } catch {
       return null;
     }
@@ -447,7 +455,10 @@ export default function BookingEngine() {
       const res = await createBookingApi(payload);
 
       if (res && res.success) {
-        try { sessionStorage.removeItem('gh_booking_draft'); } catch (_) {}
+        try {
+          sessionStorage.removeItem('gh_booking_draft');
+          sessionStorage.removeItem('gh_room_lock');
+        } catch (_) {}
         setSuccessBooking(res.data);
       } else {
         setErrorCode(res?.code || 'ERROR_FAILED');
@@ -482,10 +493,21 @@ export default function BookingEngine() {
                 ? `Đang giữ phòng tạm thời chống trùng lịch (${unitsAllocated} phòng) — Vui lòng hoàn tất trong:`
                 : 'Phiên giữ phòng đã hết thời gian 15 phút (ERROR_0033_SESSION_EXPIRED). Vui lòng kiểm tra lại tình trạng phòng trống.'}
             </span>
-            {lockSecondsLeft > 0 && (
+            {lockSecondsLeft > 0 ? (
               <span className="font-mono font-bold text-sm">
                 {String(Math.floor(lockSecondsLeft / 60)).padStart(2, '0')}:{String(lockSecondsLeft % 60).padStart(2, '0')}
               </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  try { sessionStorage.removeItem('gh_room_lock'); } catch (_) {}
+                  navigate(`/rooms/${roomTypeId}`);
+                }}
+                className="px-3 py-1 rounded-lg bg-red-600 text-white text-[11px] font-bold hover:bg-red-700 transition shrink-0"
+              >
+                Kiểm tra lại phòng trống →
+              </button>
             )}
           </div>
         )}
