@@ -78,6 +78,7 @@ const LUXURY_AMENITIES = [
 
 export default function AmenityPerspectiveCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const totalItems = LUXURY_AMENITIES.length;
   const containerRef = useRef(null);
 
@@ -88,6 +89,15 @@ export default function AmenityPerspectiveCarousel() {
   const handleNext = () => {
     setCurrentIndex((prev) => (prev === totalItems - 1 ? 0 : prev + 1));
   };
+
+  // Auto-play carousel every 3.5s (tạm dừng khi rê chuột vào)
+  useEffect(() => {
+    if (isPaused) return;
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev === totalItems - 1 ? 0 : prev + 1));
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [isPaused, totalItems]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -100,7 +110,11 @@ export default function AmenityPerspectiveCarousel() {
   }, []);
 
   return (
-    <div className="relative w-full py-4 sm:py-6 select-none overflow-hidden">
+    <div
+      className="relative w-full py-4 sm:py-6 select-none overflow-hidden"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
       {/* 3D Perspective Coverflow Stage */}
       <div 
         ref={containerRef}
