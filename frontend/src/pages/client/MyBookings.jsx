@@ -4,6 +4,8 @@ import Header from '../../components/layout/Header';
 import Footer from '../../components/layout/Footer';
 import { useAuth } from '../../context/AuthContext';
 import { getMyBookingsApi, cancelMyBookingApi } from '../../api/roomApi';
+import ConfirmCancelBookingModal from '../../components/modals/ConfirmCancelBookingModal';
+import CancelBookingSuccessModal from '../../components/modals/CancelBookingSuccessModal';
 
 // Format tiền tệ Việt Nam
 const formatVND = (amount) => {
@@ -45,6 +47,7 @@ export default function MyBookings() {
   const [cancellationReason, setCancellationReason] = useState('Thay đổi kế hoạch nghỉ dưỡng');
   const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
   const [cancelFeedback, setCancelFeedback] = useState(null); // { type: 'success' | 'error', message: '' }
+  const [cancelSuccessData, setCancelSuccessData] = useState(null);
 
   // State hóa đơn VAT Folio
   const [isVatModalOpen, setIsVatModalOpen] = useState(false);
@@ -142,28 +145,25 @@ export default function MyBookings() {
     setIsCancelModalOpen(true);
   };
 
-  const handleConfirmCancel = async () => {
+  const handleConfirmCancel = async (reasonOverride = null) => {
     if (!cancellingBooking) return;
     setIsSubmittingCancel(true);
     setCancelFeedback(null);
 
     try {
       const res = await cancelMyBookingApi(cancellingBooking.bookingId, {
-        cancellationReason
+        cancellationReason: reasonOverride || cancellationReason
       });
 
       if (res.success) {
-        setCancelFeedback({
-          type: 'success',
-          code: res.code,
-          message: res.message || 'Hủy đặt phòng thành công! Tiền cọc sẽ được hoàn lại theo quy định'
+        setIsCancelModalOpen(false);
+        setCancellingBooking(null);
+        setCancelSuccessData(res.data || {
+          bookingId: cancellingBooking.bookingId,
+          confirmationCode: cancellingBooking.confirmationCode,
+          refundAmount: cancellingBooking.isEligibleForFullRefund ? cancellingBooking.depositAmount : 0,
+          refundPolicyNote: res.message
         });
-        // Tải lại danh sách sau 1.5s
-        setTimeout(() => {
-          setIsCancelModalOpen(false);
-          setCancellingBooking(null);
-          loadBookings();
-        }, 1800);
       } else {
         setCancelFeedback({
           type: 'error',
@@ -990,125 +990,27 @@ export default function MyBookings() {
       )}
 
       {/* ─── MODAL 2: HỦY ĐẶT PHÒNG THEO QUY ĐỊNH (CANCELLATION POLICY) ─── */}
-      {isCancelModalOpen && cancellingBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-[#ffdad6] overflow-hidden">
-            <div className="p-5 bg-[#ffdad6]/30 border-b border-[#ffdad6] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#ba1a1a] text-[24px]">warning</span>
-                <h3 className="font-serif text-lg font-bold text-[#ba1a1a]">Xác Nhận Hủy Đặt Phòng</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => !isSubmittingCancel && setIsCancelModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-white text-[#45464d] hover:text-[#0b1c30] flex items-center justify-center"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
+      <ConfirmCancelBookingModal
+        isOpen={isCancelModalOpen}
+        booking={cancellingBooking}
+        cancellationReason={cancellationReason}
+        onChangeReason={setCancellationReason}
+        isSubmitting={isSubmittingCancel}
+        cancelFeedback={cancelFeedback}
+        onClose={() => !isSubmittingCancel && setIsCancelModalOpen(false)}
+        onConfirm={handleConfirmCancel}
+      />
 
-            <div className="p-6 space-y-4 text-xs">
-              <div>
-                <p className="font-bold text-sm text-[#0b1c30]">
-                  Mã đơn: {cancellingBooking.confirmationCode} ({cancellingBooking.roomType?.TypeName})
-                </p>
-                <p className="text-[#45464d] mt-0.5">
-                  Ngày nhận phòng: {formatDate(cancellingBooking.checkInDate)} (14:00)
-                </p>
-              </div>
-
-              {/* Chính sách hoàn tiền theo mốc 72h */}
-              <div className="p-4 rounded-xl bg-[#eff4ff] border border-[#d3e4fe] space-y-2">
-                <span className="font-bold text-[#725b38] block uppercase text-[11px]">
-                  Chính sách hủy &amp; hoàn tiền cọc
-                </span>
-                <ul className="space-y-1 text-[#45464d] list-disc list-inside">
-                  <li>
-                    <strong>Trước 72 giờ:</strong> Hoàn lại <strong>100%</strong> tiền cọc đã thanh toán.
-                  </li>
-                  <li>
-                    <strong>Trong vòng 72 giờ (cận giờ):</strong> Phạt <strong>100%</strong> tiền cọc theo quy định hủy cận giờ.
-                  </li>
-                </ul>
-
-                <div className="mt-3 pt-2 border-t border-[#d3e4fe] flex items-center justify-between text-xs">
-                  <span className="font-semibold text-[#0b1c30]">Tiền cọc đã đóng:</span>
-                  <span className="font-bold text-[#0b1c30]">{formatVND(cancellingBooking.depositAmount)}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-[#0b1c30]">Dự kiến hoàn trả:</span>
-                  <span className="font-bold text-[#069669]">
-                    {cancellingBooking.isEligibleForFullRefund
-                      ? `${formatVND(cancellingBooking.depositAmount)} (100% hoàn cọc)`
-                      : '0 ₫ (Phạt 100% tiền cọc)'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Lý do hủy */}
-              <div className="space-y-1">
-                <label className="font-bold text-[#0b1c30] block">Lý do hủy phòng:</label>
-                <select
-                  value={cancellationReason}
-                  onChange={(e) => setCancellationReason(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-[#c6c6cd] bg-white text-xs focus:ring-2 focus:ring-[#ba1a1a]/20 focus:outline-none"
-                >
-                  <option value="Thay đổi kế hoạch nghỉ dưỡng cá nhân">Thay đổi kế hoạch nghỉ dưỡng cá nhân</option>
-                  <option value="Đặt nhầm ngày lưu trú hoặc loại phòng">Đặt nhầm ngày lưu trú hoặc loại phòng</option>
-                  <option value="Có việc gia đình đột xuất">Có việc gia đình đột xuất</option>
-                  <option value="Lý do chuyến bay / phương tiện di chuyển">Lý do chuyến bay / phương tiện di chuyển</option>
-                  <option value="Khác">Lý do khác</option>
-                </select>
-              </div>
-
-              {/* Thông báo kết quả sau khi bấm */}
-              {cancelFeedback && (
-                <div
-                  className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
-                    cancelFeedback.type === 'success'
-                      ? 'bg-green-50 border-green-200 text-green-800'
-                      : 'bg-red-50 border-red-200 text-red-800'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {cancelFeedback.type === 'success' ? 'check_circle' : 'error'}
-                  </span>
-                  <div>
-                    <p>{cancelFeedback.message}</p>
-                    {cancelFeedback.code && <p className="text-[10px] opacity-75">Mã phản hồi: {cancelFeedback.code}</p>}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 bg-gray-50 border-t border-[#c6c6cd]/30 flex justify-end gap-2.5">
-              <button
-                type="button"
-                disabled={isSubmittingCancel}
-                onClick={() => setIsCancelModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-white border border-[#c6c6cd] text-[#45464d] text-xs font-bold hover:bg-gray-100 transition-colors"
-              >
-                Hủy Bỏ
-              </button>
-              <button
-                type="button"
-                disabled={isSubmittingCancel}
-                onClick={handleConfirmCancel}
-                className="px-5 py-2 rounded-xl bg-[#ba1a1a] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#93000a] transition-all shadow-xs flex items-center gap-1.5"
-              >
-                {isSubmittingCancel ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                    <span>Đang Xử Lý...</span>
-                  </>
-                ) : (
-                  <span>Xác Nhận Hủy Phòng</span>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ─── MODAL 2B: THÔNG BÁO HỦY ĐẶT PHÒNG THÀNH CÔNG (EMERALD ROSETTE) ─── */}
+      <CancelBookingSuccessModal
+        isOpen={Boolean(cancelSuccessData)}
+        cancelResult={cancelSuccessData}
+        guestEmail={user?.email || user?.Email}
+        onClose={() => {
+          setCancelSuccessData(null);
+          loadBookings();
+        }}
+      />
 
       {/* ─── MODAL 3: XEM HÓA ĐƠN VAT & FOLIO ĐIỆN TỬ ─── */}
       {isVatModalOpen && selectedInvoice && (
