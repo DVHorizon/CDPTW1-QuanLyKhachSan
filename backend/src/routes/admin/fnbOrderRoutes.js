@@ -49,8 +49,9 @@ router.post('/ai/combo-suggestion', fnbOrderController.getAiComboSuggestion);
 
 
 
-// Cập nhật đơn hàng (Update)
+// Cập nhật đơn hàng (Update - hỗ trợ cả PUT và PATCH)
 router.put('/:orderId', fnbOrderController.updateOrder);
+router.patch('/:orderId', fnbOrderController.updateOrder);
 
 // Xóa đơn hàng (Soft Delete)
 router.delete('/:orderId', fnbOrderController.deleteOrder);
