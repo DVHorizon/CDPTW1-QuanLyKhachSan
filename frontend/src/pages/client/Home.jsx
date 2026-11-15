@@ -272,14 +272,18 @@ function Home() {
               const sourceReviews = liveData.reviews?.length
                 ? [...liveData.reviews, ...mockReviews]
                 : mockReviews;
-              const seen = new Set();
+              const seenBodies = new Set();
+              const seenTitles = new Set();
               const deduped = [];
               for (const r of sourceReviews) {
-                const key = `${String(r.ReviewTitle || "").replace(/\s*#\d+$/, "").trim().toLowerCase()}|${String(r.ReviewBody || "").trim().toLowerCase()}`;
-                if (!seen.has(key)) {
-                  seen.add(key);
-                  deduped.push(r);
+                const titleKey = String(r.ReviewTitle || "").replace(/\s*#\d+$/, "").trim().toLowerCase();
+                const bodyKey = String(r.ReviewBody || "").trim().toLowerCase();
+                if ((bodyKey && seenBodies.has(bodyKey)) || (titleKey && seenTitles.has(titleKey))) {
+                  continue;
                 }
+                if (bodyKey) seenBodies.add(bodyKey);
+                if (titleKey) seenTitles.add(titleKey);
+                deduped.push(r);
                 if (deduped.length >= 4) break;
               }
               return deduped;
