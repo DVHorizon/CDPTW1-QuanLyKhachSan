@@ -149,6 +149,10 @@ export default function BookingEngine() {
   // Auth requirement modal state
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  // Policy confirmation modal state (friendly prompt when user forgets to tick policy checkbox)
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [highlightPolicyBox, setHighlightPolicyBox] = useState(false);
+
   // Add-on experiences (FEAT-GUEST-06: 4 gói tiện ích cốt lõi khách sạn)
   const [addonBuffet, setAddonBuffet] = useState(false);
   const [addonLimo, setAddonLimo] = useState(false);
@@ -360,8 +364,8 @@ export default function BookingEngine() {
   }, [pricingData, finalTotalAmount]);
 
   // Handle Form Submission (Checkout Step 1 -> Booking Creation)
-  const handleSubmitBooking = async (e) => {
-    if (e) e.preventDefault();
+  const handleSubmitBooking = async (e, policyConfirmedOverride = false) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     setErrorMessage('');
     setErrorCode('');
 
@@ -409,9 +413,8 @@ export default function BookingEngine() {
       return;
     }
 
-    if (!isPolicyAccepted) {
-      setErrorCode('ERROR_0025_POLICY_NOT_ACCEPTED');
-      setErrorMessage('Quý khách vui lòng xác nhận đồng ý với Điều khoản và Quy định lưu trú');
+    if (!isPolicyAccepted && policyConfirmedOverride !== true) {
+      setShowPolicyModal(true);
       return;
     }
 
@@ -1017,7 +1020,14 @@ export default function BookingEngine() {
               </div>
 
               {/* Policy Acceptance Checkbox (TC02) */}
-              <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200">
+              <div
+                id="policy-box"
+                className={`p-4 rounded-xl border transition-all duration-300 ${
+                  highlightPolicyBox && !isPolicyAccepted
+                    ? 'bg-amber-50 border-red-400 ring-2 ring-red-300/70 shadow-md'
+                    : 'bg-amber-50/70 border-amber-200'
+                }`}
+              >
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input 
                     type="checkbox"
@@ -1025,9 +1035,12 @@ export default function BookingEngine() {
                     checked={isPolicyAccepted}
                     onChange={(e) => {
                       setIsPolicyAccepted(e.target.checked);
-                      if (e.target.checked && errorCode === 'ERROR_0025_POLICY_NOT_ACCEPTED') {
-                        setErrorMessage('');
-                        setErrorCode('');
+                      if (e.target.checked) {
+                        setHighlightPolicyBox(false);
+                        if (errorCode === 'ERROR_0025_POLICY_NOT_ACCEPTED') {
+                          setErrorMessage('');
+                          setErrorCode('');
+                        }
                       }
                     }}
                     className="w-5 h-5 accent-[#725b38] rounded mt-0.5 cursor-pointer shrink-0"
@@ -1644,6 +1657,128 @@ export default function BookingEngine() {
                     Đóng
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Xác Nhận Điều Khoản & Quy Định Lưu Trú (thân thiện khi chưa tick) */}
+        {showPolicyModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+            onClick={() => {
+              setShowPolicyModal(false);
+              setErrorCode('ERROR_0025_POLICY_NOT_ACCEPTED');
+              setErrorMessage('Quý khách vui lòng xác nhận đồng ý với Điều khoản và Quy định lưu trú');
+              setHighlightPolicyBox(true);
+              setTimeout(() => {
+                document.getElementById('policy-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, 80);
+            }}
+          >
+            <div
+              className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-100 space-y-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                aria-label="Đóng"
+                onClick={() => {
+                  setShowPolicyModal(false);
+                  setErrorCode('ERROR_0025_POLICY_NOT_ACCEPTED');
+                  setErrorMessage('Quý khách vui lòng xác nhận đồng ý với Điều khoản và Quy định lưu trú');
+                  setHighlightPolicyBox(true);
+                  setTimeout(() => {
+                    document.getElementById('policy-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 80);
+                }}
+                className="absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+
+              <div className="flex items-center gap-4 pr-8">
+                <div className="w-13 h-13 rounded-2xl bg-amber-50 text-[#725b38] flex items-center justify-center shadow-inner shrink-0 border border-amber-100">
+                  <span className="material-symbols-outlined text-[28px]">verified_user</span>
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#725b38]">
+                    Grand Horizon Resort &amp; Suites
+                  </div>
+                  <h3 className="text-xl font-serif font-bold text-slate-900 mt-0.5">
+                    Xác Nhận Điều Khoản Lưu Trú
+                  </h3>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Quý khách chưa đánh dấu đồng ý quy định lưu trú ở cuối trang. Vui lòng xác nhận nhanh các thông tin dưới đây để tiếp tục thanh toán:
+              </p>
+
+              <div className="space-y-2.5 text-xs sm:text-sm">
+                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#f8f9fc] border border-slate-100">
+                  <span className="material-symbols-outlined text-[#725b38] text-[20px] shrink-0 mt-0.5">schedule</span>
+                  <div>
+                    <div className="font-bold text-slate-900">Thời gian Nhận / Trả phòng</div>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Nhận phòng từ <strong>14:00</strong> • Trả phòng trước <strong>12:00</strong>. Hội viên Gold được ưu tiên nhận phòng sớm từ 12:00.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#eff4ff]/80 border border-blue-100">
+                  <span className="material-symbols-outlined text-[#725b38] text-[20px] shrink-0 mt-0.5">event_available</span>
+                  <div>
+                    <div className="font-bold text-slate-900">Chính sách hủy phòng linh hoạt</div>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      <span className="text-emerald-700 font-semibold">Miễn phí 100%</span> khi hủy trước 48 giờ. Hoàn tiền cọc trong 24 giờ.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/70">
+                  <span className="material-symbols-outlined text-[#725b38] text-[20px] shrink-0 mt-0.5">shield_lock</span>
+                  <div>
+                    <div className="font-bold text-slate-900">Bảo mật thông tin &amp; Nội quy khu nghỉ dưỡng</div>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Thông tin cá nhân và giao dịch đặt cọc của quý khách được bảo mật theo chính sách của Grand Horizon.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPolicyModal(false);
+                    setErrorCode('ERROR_0025_POLICY_NOT_ACCEPTED');
+                    setErrorMessage('Quý khách vui lòng xác nhận đồng ý với Điều khoản và Quy định lưu trú');
+                    setHighlightPolicyBox(true);
+                    setTimeout(() => {
+                      document.getElementById('policy-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 80);
+                  }}
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-semibold text-sm transition-colors cursor-pointer"
+                >
+                  Để sau, xem lại
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={async () => {
+                    setIsPolicyAccepted(true);
+                    setHighlightPolicyBox(false);
+                    setShowPolicyModal(false);
+                    setErrorMessage('');
+                    setErrorCode('');
+                    await handleSubmitBooking(null, true);
+                  }}
+                  className="w-full sm:flex-1 py-3 px-6 rounded-xl bg-[#725b38] hover:bg-[#584323] disabled:opacity-60 text-white font-bold text-sm tracking-wide shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[19px]">check_circle</span>
+                  <span>Tôi Đồng Ý &amp; Tiếp Tục Thanh Toán</span>
+                </button>
               </div>
             </div>
           </div>
