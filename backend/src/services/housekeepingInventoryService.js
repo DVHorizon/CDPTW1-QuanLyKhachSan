@@ -229,7 +229,8 @@ async function initHousekeepingDatabase() {
 
     console.log('[Housekeeping DB] Đã đồng bộ bảng Kho đồ tiêu hao & Luân chuyển đồ vải thành công.');
   } catch (err) {
-    console.error('[Housekeeping DB] Lỗi khởi tạo cơ sở dữ liệu:', err.message);
+    const detail = err.errors ? err.errors.map(e => e.message).join(', ') : err.message;
+    console.error('[Housekeeping DB] Lỗi khởi tạo cơ sở dữ liệu:', detail);
   }
 }
 

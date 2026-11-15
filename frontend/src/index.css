@@ -5,7 +5,7 @@
 @layer base {
   :root {
     --font-family-primary: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    --font-family-serif: 'Playfair Display', Georgia, serif;
+    --font-family-serif: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     --font-size-base: 16px;
     --font-line-height-base: 1.5;
     --font-weight-base: 400;
@@ -83,4 +83,21 @@
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'liga';
 }
+
+/* Framer-inspired Luxury Scroll Cue Keyframe */
+@keyframes luxuryScrollCue {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateY(6px);
+    opacity: 1;
+  }
+}
+
+.animate-scroll-cue {
+  animation: luxuryScrollCue 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
 

@@ -279,13 +279,10 @@
   box-sizing: border-box;
 }
 
-/* 2. LAPTOP & MÀN HÌNH TẦM TRUNG (Viewport 992px -> 1535px, hoặc Container 760px -> 1179px):
-   BỐ CỤC 2 CỘT THÔNG MINH - KHÔNG BAO GIỜ BỊ ĐẨY VỠ MÀN HÌNH:
-   - Cột Trái (services): minmax(0, 1fr) - không gian rộng rãi để duyệt món & danh mục
-   - Cột Phải (guest ở trên, cart ở dưới): minmax(290px, 330px) - khách & giỏ hàng gọn gàng */
-@media (min-width: 992px) and (max-width: 1535px) {
+/* 2. TABLET (768px -> 1023px): BỐ CỤC 2 CỘT CÂN ĐỐI 50% - 50% */
+@media (min-width: 768px) and (max-width: 1023px) {
   .terminalGrid {
-    grid-template-columns: minmax(0, 1fr) minmax(290px, 330px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:
       "services guest"
       "services cart";
@@ -293,33 +290,31 @@
   }
 }
 
-/* 3. DESKTOP MÀN RỘNG (Viewport >= 1536px, hoặc Container >= 1180px):
-   ĐẦY ĐỦ KHÔNG GIAN ĐỂ MỞ 3 CỘT SONG SONG:
-   - Cột 1 (Guest): minmax(260px, 290px)
-   - Cột 2 (Services): minmax(360px, 1fr)
-   - Cột 3 (Cart): minmax(280px, 320px)
-   -> Tổng min-width chỉ ~900px, đảm bảo luôn vừa khít trong không gian >= 1180px,
-      100% KHÔNG BAO GIỜ BỊ ĐẨY NHAU RA KHỎI MÀN HÌNH! */
-@media (min-width: 1536px) {
+/* 3. DESKTOP & LAPTOP (>= 1024px): 3 CỘT ĐỘ RỘNG TƯƠNG ĐƯƠNG NHAU (1fr - 1fr - 1fr)
+   - Cột 1 (Guest / Khách): 1fr (~33.3%)
+   - Cột 2 (Services / Dịch vụ): 1fr (~33.3%)
+   - Cột 3 (Cart / Giỏ hàng): 1fr (~33.3%)
+   -> Cân đối hoàn hảo, hiển thị đầy đủ thông tin, không bị co ép cũng không bị khoảng trống thừa! */
+@media (min-width: 1024px) {
   .terminalGrid {
-    grid-template-columns: minmax(260px, 290px) minmax(360px, 1fr) minmax(280px, 320px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas: "guest services cart";
     gap: 1rem;
   }
 }
 
-/* 4. CONTAINER QUERIES NÂNG CAO (Ưu tiên theo kích thước thực tế của vùng làm việc): */
-@container terminal (min-width: 1180px) {
+/* 4. CONTAINER QUERIES NÂNG CAO (Thích ứng chính xác theo vùng làm việc thực tế của Terminal) */
+@container terminal (min-width: 960px) {
   .terminalGrid {
-    grid-template-columns: minmax(260px, 290px) minmax(360px, 1fr) minmax(280px, 320px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas: "guest services cart";
     gap: 1rem;
   }
 }
 
-@container terminal (max-width: 1179px) and (min-width: 760px) {
+@container terminal (max-width: 959px) and (min-width: 640px) {
   .terminalGrid {
-    grid-template-columns: minmax(0, 1fr) minmax(290px, 330px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:
       "services guest"
       "services cart";
@@ -327,7 +322,7 @@
   }
 }
 
-@container terminal (max-width: 759px) {
+@container terminal (max-width: 639px) {
   .terminalGrid {
     grid-template-columns: 100%;
     grid-template-areas:
@@ -357,8 +352,8 @@
   max-width: 100%;
 }
 
-/* Sticky cố định chỉ khi container >= 1180px hoặc viewport >= 1536px */
-@media (min-width: 1536px) {
+/* Sticky cố định hai bên khi ở chế độ 3 cột (>= 1024px hoặc container >= 960px) */
+@media (min-width: 1024px) {
   .guestCol,
   .cartCol {
     position: sticky;

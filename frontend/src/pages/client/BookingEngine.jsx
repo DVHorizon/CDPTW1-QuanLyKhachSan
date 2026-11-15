@@ -69,29 +69,89 @@ export default function BookingEngine() {
   const [noSmoking, setNoSmoking] = useState(true);
   const [highFloorPanorama, setHighFloorPanorama] = useState(true);
 
-  // Guest details form state
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [specialRequests, setSpecialRequests] = useState('');
+  // Guest details form state (khôi phục từ sessionStorage nếu F5)
+  const savedDraft = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem('gh_booking_draft');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const [firstName, setFirstName] = useState(savedDraft?.firstName || '');
+  const [lastName, setLastName] = useState(savedDraft?.lastName || '');
+  const [email, setEmail] = useState(savedDraft?.email || '');
+  const [phoneNumber, setPhoneNumber] = useState(savedDraft?.phoneNumber || '');
+  const [specialRequests, setSpecialRequests] = useState(savedDraft?.specialRequests || '');
   const [isPolicyAccepted, setIsPolicyAccepted] = useState(false);
+
+  // Đồng bộ phiên giữ phòng 15 phút từ RoomDetail (sessionStorage 'gh_room_lock')
+  const [lockSecondsLeft, setLockSecondsLeft] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('gh_room_lock');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.expiresAt) return null;
+      // Chỉ áp dụng lock khi khớp lockSessionId trên URL hoặc còn hạn và đúng roomTypeId
+      if (paramLockSessionId) {
+        if (parsed.lockSessionId && parsed.lockSessionId !== paramLockSessionId) return null;
+        return Math.max(0, Math.floor((parsed.expiresAt - Date.now()) / 1000));
+      }
+      if (String(parsed.roomTypeId) !== String(paramRoomTypeId) || parsed.expiresAt <= Date.now()) {
+        sessionStorage.removeItem('gh_room_lock');
+        return null;
+      }
+      return Math.floor((parsed.expiresAt - Date.now()) / 1000);
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (lockSecondsLeft === null || lockSecondsLeft <= 0) return;
+    const timer = setInterval(() => {
+      setLockSecondsLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockSecondsLeft]);
+
+  // Lưu nháp thông tin khách vào sessionStorage để tránh mất dữ liệu khi F5
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('gh_booking_draft', JSON.stringify({
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        specialRequests,
+        unitsAllocated
+      }));
+    } catch (_) {}
+  }, [firstName, lastName, email, phoneNumber, specialRequests, unitsAllocated]);
 
   // Sync user details when authenticated user changes
   useEffect(() => {
     if (user) {
-      if (user.FullName) {
-        const parts = user.FullName.trim().split(' ');
+      const fullName = user.fullName || user.FullName;
+      if (fullName) {
+        const parts = fullName.trim().split(/\s+/);
         setFirstName(parts.length > 1 ? parts[parts.length - 1] : parts[0]);
         setLastName(parts.length > 1 ? parts.slice(0, -1).join(' ') : '');
       }
-      if (user.Email) setEmail(user.Email);
-      if (user.Phone) setPhoneNumber(user.Phone);
+      const emailVal = user.email || user.Email;
+      if (emailVal) setEmail(emailVal);
+      const phoneVal = user.phoneNumber || user.phone || user.Phone;
+      if (phoneVal) setPhoneNumber(phoneVal);
     }
   }, [user]);
 
   // Auth requirement modal state
   const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Policy confirmation modal state (friendly prompt when user forgets to tick policy checkbox)
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [highlightPolicyBox, setHighlightPolicyBox] = useState(false);
 
   // Add-on experiences (FEAT-GUEST-06: 4 gói tiện ích cốt lõi khách sạn)
   const [addonBuffet, setAddonBuffet] = useState(false);
@@ -233,7 +293,7 @@ export default function BookingEngine() {
         const res = await calculatePricingApi({
           checkInDate,
           checkOutDate,
-          baseRate: currentBaseRate,
+          baseRate: roomTypeId ? undefined : currentBaseRate,
           roomTypeId: parseInt(roomTypeId, 10),
           adults: adultsCount,
           children: childrenCount,
@@ -243,7 +303,11 @@ export default function BookingEngine() {
           voucherCode: appliedVoucher ? appliedVoucher.voucherCode : undefined,
           taxesAndFeesRate: 0.12,
           depositRate: 0.20,
-          isGoldMember: user?.MembershipTier?.TierName === 'Gold' || user?.TierId === 3
+          isGoldMember:
+            user?.MembershipTier?.TierName === 'Gold' ||
+            user?.tierName === 'Gold' ||
+            user?.TierId === 3 ||
+            user?.tierId === 3
         });
 
         if (isMounted) {
@@ -300,8 +364,8 @@ export default function BookingEngine() {
   }, [pricingData, finalTotalAmount]);
 
   // Handle Form Submission (Checkout Step 1 -> Booking Creation)
-  const handleSubmitBooking = async (e) => {
-    if (e) e.preventDefault();
+  const handleSubmitBooking = async (e, policyConfirmedOverride = false) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     setErrorMessage('');
     setErrorCode('');
 
@@ -349,9 +413,8 @@ export default function BookingEngine() {
       return;
     }
 
-    if (!isPolicyAccepted) {
-      setErrorCode('ERROR_0025_POLICY_NOT_ACCEPTED');
-      setErrorMessage('Quý khách vui lòng xác nhận đồng ý với Điều khoản và Quy định lưu trú');
+    if (!isPolicyAccepted && policyConfirmedOverride !== true) {
+      setShowPolicyModal(true);
       return;
     }
 
@@ -382,7 +445,11 @@ export default function BookingEngine() {
         selectedAddons: selectedAddonsList,
         lateCheckOutMinutes: addonLateCO ? lateCheckOutMinutes : undefined,
         voucherCode: appliedVoucher ? appliedVoucher.voucherCode : undefined,
-        isGoldMember: user?.MembershipTier?.TierName === 'Gold' || user?.TierId === 3,
+        isGoldMember:
+          user?.MembershipTier?.TierName === 'Gold' ||
+          user?.tierName === 'Gold' ||
+          user?.TierId === 3 ||
+          user?.tierId === 3,
         totalAmount: pricingData?.totalAmount || finalTotalAmount,
         depositAmount: pricingData?.depositAmount || depositRequired,
         lockSessionId: paramLockSessionId || undefined
@@ -391,6 +458,10 @@ export default function BookingEngine() {
       const res = await createBookingApi(payload);
 
       if (res && res.success) {
+        try {
+          sessionStorage.removeItem('gh_booking_draft');
+          sessionStorage.removeItem('gh_room_lock');
+        } catch (_) {}
         setSuccessBooking(res.data);
       } else {
         setErrorCode(res?.code || 'ERROR_FAILED');
@@ -410,73 +481,68 @@ export default function BookingEngine() {
 
   return (
     <div className="bg-[#f8f9ff] min-h-screen flex flex-col font-sans text-[#0b1c30]">
-      {/* Universal Luxury Navigation */}
+      {/* Thanh Header chính */}
       <Header />
 
-      <main className="w-full pt-24 bg-[#f8f9ff] flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        {/* Banner editorial context */}
-        <div className="relative w-full rounded-2xl overflow-hidden shadow-xl mb-8 bg-[#131b2e] text-white">
-          <div 
-            className="absolute inset-0 opacity-30 bg-cover bg-center mix-blend-luminosity" 
-            style={{ backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuBpNvT_tiMvztgtaSSXZSbJZeHcO4CmTIga0KvWFTw2qD-CStV5suuUS4Z2BWH-3jkJTnxwXJWeg2Rl-Nfq9_tTtZTp3Qy0ydhGI93HgyaNXRsIhp07rRsE9NeNUx9pj-cOPVbD-f5JqzJt8dnrur5ybGlqT3uJJHlj4yPwLqOHcouLTBMDTG6-Iff-r8JvaXCDjhtgFS3t3v_6ze3zdog3V1Qcw5WFHdUb80txiDk7BOINf_NvKDBq')` }}
-          />
-          <div className="relative z-10 p-6 sm:p-8 md:p-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#fedeb2] text-[#78603e] text-xs font-bold uppercase tracking-wider">
-                <span className="material-symbols-outlined text-[16px]">stars</span>
-                <span>ĐẶC QUYỀN HỘI VIÊN GOLD</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight">
-                Hoàn Tất Yêu Cầu Đặt Phòng
-              </h1>
-              <p className="text-sm sm:text-base text-[#bec6e0] max-w-xl">
-                Trải nghiệm kỳ nghỉ dưỡng an nhiên tại bán đảo riêng tư với những dịch vụ cá nhân hóa chuẩn mực 5 sao quốc tế.
-              </p>
+      <main className="w-full pt-24 bg-[#f8f9ff] flex-1 px-4 sm:px-8 lg:px-12 pb-16">
+        {lockSecondsLeft !== null && (
+          <div className={`mb-4 px-4 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between ${
+            lockSecondsLeft > 0
+              ? 'bg-amber-50 border-amber-200 text-amber-900'
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}>
+            <span>
+              {lockSecondsLeft > 0
+                ? `Đang giữ phòng tạm thời chống trùng lịch (${unitsAllocated} phòng) — Vui lòng hoàn tất trong:`
+                : 'Phiên giữ phòng đã hết thời gian 15 phút (ERROR_0033_SESSION_EXPIRED). Vui lòng kiểm tra lại tình trạng phòng trống.'}
+            </span>
+            {lockSecondsLeft > 0 ? (
+              <span className="font-mono font-bold text-sm">
+                {String(Math.floor(lockSecondsLeft / 60)).padStart(2, '0')}:{String(lockSecondsLeft % 60).padStart(2, '0')}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  try { sessionStorage.removeItem('gh_room_lock'); } catch (_) {}
+                  navigate(`/rooms/${roomTypeId}`);
+                }}
+                className="px-3 py-1 rounded-lg bg-red-600 text-white text-[11px] font-bold hover:bg-red-700 transition shrink-0"
+              >
+                Kiểm tra lại phòng trống →
+              </button>
+            )}
+          </div>
+        )}
+        {/* Thanh tiêu đề phòng & Quy trình đặt phòng thu nhỏ ở góc phải (Style Traveloka) */}
+        <div className="flex flex-wrap items-center justify-between gap-4 py-3 mb-6 bg-white px-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          {/* Thông tin phòng đặt & Khách sạn */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs text-[#b9a277] font-semibold">
+              <span className="material-symbols-outlined text-sm">apartment</span>
+              <span>Khách sạn: <strong>{roomType?.Branch?.BranchName || roomType?.BranchName || 'Grand Horizon Phú Quốc Luxury Resort'}</strong></span>
+              <span className="text-slate-400 font-normal">({roomType?.Branch?.Address || 'Bãi Khem, Phú Quốc'})</span>
             </div>
-            <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md px-5 py-3.5 rounded-xl text-white shrink-0 border border-white/15">
-              <span className="material-symbols-outlined text-[#fedeb2] text-[32px]">verified_user</span>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-[#fedeb2]">Giá Đảm Bảo Tốt Nhất</div>
-                <div className="text-xs text-[#cbdbf5]">Xác nhận trực tiếp từ khu nghỉ dưỡng</div>
-              </div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">
+              {roomDisplayName}
+            </h1>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <span className="flex text-amber-500 text-[13px]">⭐⭐⭐⭐⭐</span>
+              <span className="font-bold text-[#0064d2] bg-blue-50 px-1.5 py-0.5 rounded text-[11px]">9.4/10</span>
+              <span className="text-slate-400 text-[11px]">(355 đánh giá thực tế)</span>
             </div>
           </div>
-        </div>
 
-        {/* Stepper Progress Bar (Chuẩn 3 Bước: 1. Chọn ngày & phòng -> 2. Thanh toán cọc -> 3. Hoàn tất) */}
-        <div className="mb-8 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative">
-            {/* Step 1 - Active */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-[#eff4ff] text-[#0b1c30] border border-blue-100">
-              <div className="w-8 h-8 rounded-full bg-[#725b38] text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
-                1
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase text-[#725b38]">Bước 1</div>
-                <div className="text-sm truncate font-bold text-[#0b1c30]">Chọn ngày &amp; phòng</div>
-              </div>
+          {/* Quy trình đặt phòng thu nhỏ ở góc phải chuẩn hình Traveloka: 1 Xem lại ── 2 Thanh toán */}
+          <div className="flex items-center gap-2.5 text-xs sm:text-sm font-medium">
+            <div className="flex items-center gap-1.5 text-[#0064d2] font-bold">
+              <span className="w-6 h-6 rounded-full bg-[#0064d2] text-white flex items-center justify-center text-xs font-bold shadow-xs">1</span>
+              <span>Xem lại</span>
             </div>
-
-            {/* Step 2 */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-500 opacity-80 border border-transparent">
-              <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm shrink-0">
-                2
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase text-slate-400">Bước 2</div>
-                <div className="text-sm truncate font-medium text-slate-600">Thanh toán cọc</div>
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-slate-400 opacity-60 border border-transparent">
-              <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm shrink-0">
-                3
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase text-slate-400">Bước 3</div>
-                <div className="text-sm truncate font-medium">Hoàn tất kỳ nghỉ</div>
-              </div>
+            <span className="text-slate-400 w-4 border-t border-slate-400"></span>
+            <div className="flex items-center gap-1.5 text-slate-600 font-semibold">
+              <span className="w-6 h-6 rounded-full bg-slate-600 text-white flex items-center justify-center text-xs font-bold">2</span>
+              <span>Thanh toán</span>
             </div>
           </div>
         </div>
@@ -624,140 +690,100 @@ export default function BookingEngine() {
               )}
             </section>
 
-            {/* Section 1: Guest Information */}
-            <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-6 bg-[#725b38] rounded-full inline-block"></span>
-                  <h2 className="font-serif text-xl font-bold text-slate-900">Thông Tin Khách Lưu Trú Chính</h2>
+            {/* Section 1: Thông tin Khách hàng & Liên hệ đặt chỗ (Chuẩn tối giản theo yêu cầu) */}
+            <div className="space-y-5">
+              {/* Khối 1: Thông tin Khách hàng */}
+              <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="material-symbols-outlined text-slate-800 text-[22px]">person</span>
+                  <h2 className="text-lg font-bold text-slate-900">Thông tin Khách hàng</h2>
                 </div>
-                <span className="inline-flex items-center gap-1 text-xs text-[#725b38] bg-[#eff4ff] px-3 py-1 rounded-full font-medium">
-                  <span className="material-symbols-outlined text-[16px]">lock</span>
-                  Bảo mật SSL 256-bit
-                </span>
-              </div>
+                <p className="text-xs text-slate-500 mb-4">Vui lòng điền đầy đủ các thông tin để nhận xác nhận đơn hàng</p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="last-name">
-                    Họ đệm *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">person</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="last-name">
+                      Họ (vd: NGUYEN)<span className="text-rose-500">*</span>
+                    </label>
                     <input 
                       id="last-name"
                       type="text"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Nguyễn Văn"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
+                      placeholder=""
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:border-transparent transition-all"
                       required
                     />
+                    <p className="text-[11px] text-slate-400 mt-1">như trên CMND (không dấu)</p>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="first-name">
-                    Tên chính *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">person</span>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="first-name">
+                      Chữ đệm và tên (vd: VAN ANH)<span className="text-rose-500">*</span>
+                    </label>
                     <input 
                       id="first-name"
                       type="text"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="An"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
+                      placeholder=""
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:border-transparent transition-all"
                       required
                     />
+                    <p className="text-[11px] text-slate-400 mt-1">như trên CMND (không dấu)</p>
                   </div>
                 </div>
+              </section>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="email">
-                    Địa chỉ Email nhận thư xác nhận *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">mail</span>
+              {/* Khối 2: Liên hệ đặt chỗ */}
+              <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="material-symbols-outlined text-slate-800 text-[20px]">mail</span>
+                  <h2 className="text-lg font-bold text-slate-900">Liên hệ đặt chỗ</h2>
+                </div>
+                <p className="text-xs text-slate-500 mb-4">Thêm liên hệ để nhận xác nhận đặt chỗ.</p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="email">
+                      Email<span className="text-rose-500">*</span>
+                    </label>
                     <input 
                       id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="an.nguyen@grandhorizon.vn"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
+                      placeholder="email_cua_ban@gmail.com"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:border-transparent transition-all"
                       required
                     />
+                    <p className="text-[11px] text-slate-400 mt-1">VD: email@example.com</p>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="phone">
-                    Số điện thoại liên lạc *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">call</span>
-                    <input 
-                      id="phone"
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="+84 908 123 456"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
-                      required
-                    />
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="phone">
+                      Điện thoại di động<span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between px-3 py-2.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-700 text-sm shrink-0 min-w-[76px]">
+                        <span>+84</span>
+                        <span className="material-symbols-outlined text-[16px] text-slate-400">expand_more</span>
+                      </div>
+                      <input 
+                        id="phone"
+                        type="tel"
+                        value={phoneNumber.replace(/^\+84\s?/, '')}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        placeholder=""
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:border-transparent transition-all"
+                        required
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">Nhập số điện thoại không bao gồm mã điện thoại quốc gia/khu vực đã chọn</p>
                   </div>
                 </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="arrival-time">
-                    Khung giờ dự kiến đến khách sạn
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">schedule</span>
-                    <select
-                      id="arrival-time"
-                      value={estimatedArrivalTime}
-                      onChange={(e) => setEstimatedArrivalTime(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all"
-                    >
-                      <option value="14:00 - Tiêu chuẩn nhận phòng">14:00 - Tiêu chuẩn nhận phòng</option>
-                      <option value="15:00 - 17:00 - Khung giờ chiều">15:00 - 17:00 - Khung giờ chiều</option>
-                      <option value="18:00 - Early Evening Reception">18:00 - Early Evening Reception (Khuyên dùng)</option>
-                      <option value="Sau 20:00 - Nhận phòng muộn">Sau 20:00 - Nhận phòng đêm / Đón muộn</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="special-requests">
-                    Ghi chú đặc biệt cho Quản Gia &amp; Lễ Tân
-                  </label>
-                  <textarea 
-                    id="special-requests"
-                    rows="3"
-                    value={specialRequests}
-                    onChange={(e) => setSpecialRequests(e.target.value)}
-                    placeholder="Ví dụ: Giờ bay dự kiến, yêu cầu nôi em bé, chế độ ăn kiêng hoặc trang trí phòng kỷ niệm ngày cưới..."
-                    className="w-full p-3 rounded-lg bg-[#eff4ff] text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:bg-white transition-all resize-none"
-                    maxLength={500}
-                  />
-                  <div className="text-right text-[11px] text-slate-400 mt-1">
-                    {specialRequests.length}/500 ký tự
-                  </div>
-                </div>
-
-                {/* Default Bed & Room Configuration Info */}
-                <div className="sm:col-span-2 p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between text-xs text-slate-700">
-                  <div className="flex items-center gap-2.5">
-                    <span className="material-symbols-outlined text-[#725b38] text-[20px]">king_bed</span>
-                    <span>Quy cách giường mặc định: <strong className="text-slate-900 font-semibold">1 Giường King Lớn</strong> (Đệm lông vũ cao cấp 2m0 × 2m2) • <strong className="text-slate-900 font-semibold">Khu vực không hút thuốc</strong></span>
-                  </div>
-                  <span className="text-slate-400 text-[11px] hidden md:inline">Nếu cần 2 giường đơn (Twin), quý khách vui lòng ghi chú bên trên</span>
-                </div>
-              </div>
-            </section>
+              </section>
+            </div>
 
             {/* Section 3: Add-on Experiences (Enhance Your Stay) */}
             <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
@@ -994,7 +1020,14 @@ export default function BookingEngine() {
               </div>
 
               {/* Policy Acceptance Checkbox (TC02) */}
-              <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200">
+              <div
+                id="policy-box"
+                className={`p-4 rounded-xl border transition-all duration-300 ${
+                  highlightPolicyBox && !isPolicyAccepted
+                    ? 'bg-amber-50 border-red-400 ring-2 ring-red-300/70 shadow-md'
+                    : 'bg-amber-50/70 border-amber-200'
+                }`}
+              >
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input 
                     type="checkbox"
@@ -1002,9 +1035,12 @@ export default function BookingEngine() {
                     checked={isPolicyAccepted}
                     onChange={(e) => {
                       setIsPolicyAccepted(e.target.checked);
-                      if (e.target.checked && errorCode === 'ERROR_0025_POLICY_NOT_ACCEPTED') {
-                        setErrorMessage('');
-                        setErrorCode('');
+                      if (e.target.checked) {
+                        setHighlightPolicyBox(false);
+                        if (errorCode === 'ERROR_0025_POLICY_NOT_ACCEPTED') {
+                          setErrorMessage('');
+                          setErrorCode('');
+                        }
                       }
                     }}
                     className="w-5 h-5 accent-[#725b38] rounded mt-0.5 cursor-pointer shrink-0"
@@ -1020,8 +1056,8 @@ export default function BookingEngine() {
             </section>
           </div>
 
-          {/* RIGHT COLUMN: Sticky Summary & Breakdown Card (4-5 cols) */}
-          <div className="lg:col-span-5 xl:col-span-4 sticky top-28">
+          {/* RIGHT COLUMN: Summary & Breakdown Card (4-5 cols) */}
+          <div className="lg:col-span-5 xl:col-span-4">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
               
               {/* Room Card Image */}
@@ -1047,6 +1083,32 @@ export default function BookingEngine() {
 
               {/* Details & Pricing Breakdown */}
               <div className="p-5 sm:p-6 space-y-4">
+
+                {/* Hotel Information Box */}
+                <div className="p-3.5 bg-gradient-to-r from-amber-50 to-[#fdf9f0] rounded-xl border border-amber-200/80 text-xs shadow-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-[#131b2e]">
+                    <span className="material-symbols-outlined text-sm text-[#b9a277]">apartment</span>
+                    <span>{roomType?.Branch?.BranchName || roomType?.BranchName || 'Grand Horizon Phú Quốc Luxury Resort'}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1 truncate">
+                    {roomType?.Branch?.Address || 'Bãi Khem, Phú Quốc, Kiên Giang'}
+                  </p>
+                  <div className="mt-2.5 pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
+                    <span
+                      onClick={() => navigate(`/rooms?branchId=${roomType?.Branch?.BranchId || searchParams.get('branchId') || 1}`)}
+                      className="text-blue-600 font-semibold hover:underline cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span>← Đổi loại phòng</span>
+                    </span>
+                    <span
+                      onClick={() => navigate('/hotels')}
+                      className="text-slate-600 hover:text-[#b9a277] hover:underline cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span>Đổi khách sạn</span>
+                      <span className="material-symbols-outlined text-[13px]">swap_horiz</span>
+                    </span>
+                  </div>
+                </div>
                 
                 {/* Reservation Schedule Tag */}
                 <div className="p-3 bg-[#eff4ff] rounded-xl flex items-center justify-between text-slate-900 border border-blue-100/60">
@@ -1079,17 +1141,62 @@ export default function BookingEngine() {
 
                 {/* Calculation List */}
                 <div className="space-y-2.5 text-xs sm:text-sm text-slate-600 border-b border-slate-100 pb-4">
-                  {/* Tiền phòng gốc */}
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-medium text-slate-800">Tiền phòng gốc</div>
-                      <div className="text-[11px] text-slate-400">
-                        {pricingData?.numberOfNights || numberOfNights} đêm × {formatMoney(pricingData?.baseRate || basePricePerNight, pricingData?.currency)} × {unitsAllocated} phòng
+                  {/* FEAT-GUEST-12 (A12) / Hình 12: Tiền phòng linh hoạt theo thời điểm */}
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-medium text-slate-800">
+                          <div className="leading-snug">{pricingData?.appliedRule ? "Tiền phòng theo thời điểm" : "Tiền phòng gốc"}</div>
+                          {pricingData?.appliedRule && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                                ⚡ {pricingData.appliedRule.RuleName || "Giá linh hoạt"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                          <span>
+                            {pricingData?.numberOfNights || numberOfNights} đêm × {formatMoney(pricingData?.baseRate || basePricePerNight, pricingData?.currency)} {unitsAllocated > 1 ? `× ${unitsAllocated} phòng` : ""}
+                          </span>
+                          {pricingData?.originalBaseRate && Math.round(pricingData.baseRate) !== Math.round(pricingData.originalBaseRate) && (
+                            <span className="line-through text-slate-400 text-[10px]">
+                              {formatMoney(pricingData.originalBaseRate, pricingData?.currency)}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <span className="font-semibold text-slate-900">
+                        {formatMoney(pricingData?.roomSubtotal || roomSubtotal, pricingData?.currency)}
+                      </span>
                     </div>
-                    <span className="font-semibold text-slate-900">
-                      {formatMoney(pricingData?.roomSubtotal || roomSubtotal, pricingData?.currency)}
-                    </span>
+
+                    {/* Breakdown từng đêm theo ngày thường, cuối tuần (+15%), ngày lễ */}
+                    {pricingData?.dailyBreakdown && pricingData.dailyBreakdown.length > 0 && (
+                      <div className="mt-2 bg-slate-50/90 rounded-lg p-2 border border-slate-200/60 space-y-1">
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          <span>Lịch giá từng đêm</span>
+                          <span>Đơn giá/đêm</span>
+                        </div>
+                        {pricingData.dailyBreakdown.map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600">
+                            <span className="flex items-center gap-1">
+                              <span className="font-mono text-slate-500">{item.date}</span>
+                              {item.isHoliday ? (
+                                <span className="px-1 py-0.2 bg-rose-100 text-rose-700 text-[9px] rounded font-bold">Lễ/Tết</span>
+                              ) : item.isWeekend ? (
+                                <span className="px-1 py-0.2 bg-amber-100 text-amber-800 text-[9px] rounded font-bold">Cuối tuần +15%</span>
+                              ) : (
+                                <span className="text-slate-400 text-[10px]">(Thường)</span>
+                              )}
+                            </span>
+                            <span className="font-medium text-slate-800">
+                              {formatMoney(item.rate, pricingData?.currency)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Phụ thu khách phát sinh vượt chuẩn */}
@@ -1131,15 +1238,21 @@ export default function BookingEngine() {
                   )}
 
                   {/* Ưu đãi hội viên Gold */}
-                  {pricingData && pricingData.discountAmount > 0 && !appliedVoucher && (
-                    <div className="flex justify-between items-center text-emerald-700">
-                      <span className="flex items-center gap-1 font-medium">
-                        <span className="material-symbols-outlined text-[16px]">stars</span>
-                        Ưu đãi Hội viên Gold (-10%)
-                      </span>
-                      <span className="font-bold">-{formatMoney(pricingData.discountAmount, pricingData.currency)}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const goldDisc = pricingData
+                      ? Math.max(0, Math.round((Number(pricingData.discountAmount || 0) - Number(pricingData.voucher?.discountAmount || 0)) * 100) / 100)
+                      : goldDiscount;
+                    if (!goldDisc || goldDisc <= 0) return null;
+                    return (
+                      <div className="flex justify-between items-center text-emerald-700">
+                        <span className="flex items-center gap-1 font-medium">
+                          <span className="material-symbols-outlined text-[16px]">stars</span>
+                          Ưu đãi Hội viên Gold (-10%)
+                        </span>
+                        <span className="font-bold">-{formatMoney(goldDisc, pricingData?.currency)}</span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Chiết khấu Voucher Khuyến Mãi (FEAT-GUEST-07) */}
                   {appliedVoucher && (
@@ -1441,7 +1554,7 @@ export default function BookingEngine() {
                   }}
                   className="w-full py-3.5 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white font-bold text-sm uppercase tracking-wide transition-all shadow-md flex items-center justify-center gap-2 group"
                 >
-                  <span>Thanh Toán Cọc Ngay (Bước 2)</span>
+                  <span>Thanh Toán Đặt Cọc Ngay</span>
                   <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
                 </button>
                 <div className="flex gap-2">
@@ -1544,6 +1657,128 @@ export default function BookingEngine() {
                     Đóng
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Xác Nhận Điều Khoản & Quy Định Lưu Trú (thân thiện khi chưa tick) */}
+        {showPolicyModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+            onClick={() => {
+              setShowPolicyModal(false);
+              setErrorCode('ERROR_0025_POLICY_NOT_ACCEPTED');
+              setErrorMessage('Quý khách vui lòng xác nhận đồng ý với Điều khoản và Quy định lưu trú');
+              setHighlightPolicyBox(true);
+              setTimeout(() => {
+                document.getElementById('policy-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, 80);
+            }}
+          >
+            <div
+              className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-100 space-y-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                aria-label="Đóng"
+                onClick={() => {
+                  setShowPolicyModal(false);
+                  setErrorCode('ERROR_0025_POLICY_NOT_ACCEPTED');
+                  setErrorMessage('Quý khách vui lòng xác nhận đồng ý với Điều khoản và Quy định lưu trú');
+                  setHighlightPolicyBox(true);
+                  setTimeout(() => {
+                    document.getElementById('policy-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 80);
+                }}
+                className="absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+
+              <div className="flex items-center gap-4 pr-8">
+                <div className="w-13 h-13 rounded-2xl bg-amber-50 text-[#725b38] flex items-center justify-center shadow-inner shrink-0 border border-amber-100">
+                  <span className="material-symbols-outlined text-[28px]">verified_user</span>
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#725b38]">
+                    Grand Horizon Resort &amp; Suites
+                  </div>
+                  <h3 className="text-xl font-serif font-bold text-slate-900 mt-0.5">
+                    Xác Nhận Điều Khoản Lưu Trú
+                  </h3>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Quý khách chưa đánh dấu đồng ý quy định lưu trú ở cuối trang. Vui lòng xác nhận nhanh các thông tin dưới đây để tiếp tục thanh toán:
+              </p>
+
+              <div className="space-y-2.5 text-xs sm:text-sm">
+                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#f8f9fc] border border-slate-100">
+                  <span className="material-symbols-outlined text-[#725b38] text-[20px] shrink-0 mt-0.5">schedule</span>
+                  <div>
+                    <div className="font-bold text-slate-900">Thời gian Nhận / Trả phòng</div>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Nhận phòng từ <strong>14:00</strong> • Trả phòng trước <strong>12:00</strong>. Hội viên Gold được ưu tiên nhận phòng sớm từ 12:00.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#eff4ff]/80 border border-blue-100">
+                  <span className="material-symbols-outlined text-[#725b38] text-[20px] shrink-0 mt-0.5">event_available</span>
+                  <div>
+                    <div className="font-bold text-slate-900">Chính sách hủy phòng linh hoạt</div>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      <span className="text-emerald-700 font-semibold">Miễn phí 100%</span> khi hủy trước 48 giờ. Hoàn tiền cọc trong 24 giờ.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/70">
+                  <span className="material-symbols-outlined text-[#725b38] text-[20px] shrink-0 mt-0.5">shield_lock</span>
+                  <div>
+                    <div className="font-bold text-slate-900">Bảo mật thông tin &amp; Nội quy khu nghỉ dưỡng</div>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Thông tin cá nhân và giao dịch đặt cọc của quý khách được bảo mật theo chính sách của Grand Horizon.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPolicyModal(false);
+                    setErrorCode('ERROR_0025_POLICY_NOT_ACCEPTED');
+                    setErrorMessage('Quý khách vui lòng xác nhận đồng ý với Điều khoản và Quy định lưu trú');
+                    setHighlightPolicyBox(true);
+                    setTimeout(() => {
+                      document.getElementById('policy-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 80);
+                  }}
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-semibold text-sm transition-colors cursor-pointer"
+                >
+                  Để sau, xem lại
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={async () => {
+                    setIsPolicyAccepted(true);
+                    setHighlightPolicyBox(false);
+                    setShowPolicyModal(false);
+                    setErrorMessage('');
+                    setErrorCode('');
+                    await handleSubmitBooking(null, true);
+                  }}
+                  className="w-full sm:flex-1 py-3 px-6 rounded-xl bg-[#725b38] hover:bg-[#584323] disabled:opacity-60 text-white font-bold text-sm tracking-wide shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[19px]">check_circle</span>
+                  <span>Tôi Đồng Ý &amp; Tiếp Tục Thanh Toán</span>
+                </button>
               </div>
             </div>
           </div>

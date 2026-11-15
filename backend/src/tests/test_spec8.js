@@ -56,11 +56,28 @@ async function runTests() {
   let cancelledBookingId = null;
   let checkedInBookingId = null;
   let validBookingCode = null;
+  let targetRoomTypeId = 1;
+  let tempResetRoomId = null;
 
   try {
+    const [availRooms] = await conn.query(
+      "SELECT RoomId, RoomTypeId FROM Rooms WHERE Status IN ('CleanAvailable', 'Available', 'Inspected') AND IsDeleted = 0 LIMIT 1"
+    );
+    if (availRooms.length > 0) {
+      targetRoomTypeId = availRooms[0].RoomTypeId;
+    } else {
+      const [anyRoom] = await conn.query('SELECT RoomId, RoomTypeId FROM Rooms WHERE IsDeleted = 0 LIMIT 1');
+      if (anyRoom.length > 0) {
+        tempResetRoomId = anyRoom[0].RoomId;
+        targetRoomTypeId = anyRoom[0].RoomTypeId;
+        await conn.query("UPDATE Rooms SET Status = 'CleanAvailable' WHERE RoomId = ?", [tempResetRoomId]);
+      }
+    }
+
     const [b1] = await conn.query(
       `INSERT INTO Bookings (UserId, RoomTypeId, CheckInDate, CheckOutDate, NumberOfNights, Adults, Children, TotalAmount, DepositAmount, Status, ConfirmationCode, CreatedAt)
-       VALUES (1, 1, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 2 DAY), 2, 2, 0, 2400000, 500000, 'Confirmed', CONCAT('BKTEST-', FLOOR(RAND()*100000)), NOW())`
+       VALUES (1, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 2 DAY), 2, 2, 0, 2400000, 500000, 'Confirmed', CONCAT('BKTEST-', FLOOR(RAND()*100000)), NOW())`,
+      [targetRoomTypeId]
     );
     confirmedBookingId = b1.insertId;
     const [[b1Row]] = await conn.query('SELECT ConfirmationCode FROM Bookings WHERE BookingId = ?', [confirmedBookingId]);
@@ -68,13 +85,15 @@ async function runTests() {
 
     const [b2] = await conn.query(
       `INSERT INTO Bookings (UserId, RoomTypeId, CheckInDate, CheckOutDate, NumberOfNights, Adults, Children, TotalAmount, DepositAmount, Status, ConfirmationCode, CreatedAt)
-       VALUES (1, 1, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 2 DAY), 2, 2, 0, 2400000, 500000, 'Cancelled', CONCAT('BKCANC-', FLOOR(RAND()*100000)), NOW())`
+       VALUES (1, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 2 DAY), 2, 2, 0, 2400000, 500000, 'Cancelled', CONCAT('BKCANC-', FLOOR(RAND()*100000)), NOW())`,
+      [targetRoomTypeId]
     );
     cancelledBookingId = b2.insertId;
 
     const [b3] = await conn.query(
       `INSERT INTO Bookings (UserId, RoomTypeId, CheckInDate, CheckOutDate, NumberOfNights, Adults, Children, TotalAmount, DepositAmount, Status, ConfirmationCode, CreatedAt)
-       VALUES (1, 1, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 2 DAY), 2, 2, 0, 2400000, 500000, 'CheckedIn', CONCAT('BKCHIN-', FLOOR(RAND()*100000)), NOW())`
+       VALUES (1, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 2 DAY), 2, 2, 0, 2400000, 500000, 'CheckedIn', CONCAT('BKCHIN-', FLOOR(RAND()*100000)), NOW())`,
+      [targetRoomTypeId]
     );
     checkedInBookingId = b3.insertId;
 
@@ -378,12 +397,30 @@ async function runTests() {
   console.log(`🎉 KẾT QUẢ KIỂM THỬ SPEC 8: ${passed} PASSED, ${failed} FAILED`);
   console.log('================================================================');
 
+  // Dọn dẹp dữ liệu test tạm thời để không làm bẩn DB
+  try {
+    const testIds = [confirmedBookingId, cancelledBookingId, checkedInBookingId, anotherBookingId].filter(Boolean);
+    if (testIds.length > 0) {
+      const [stays] = await pool.query('SELECT StayId, RoomId FROM Stays WHERE BookingId IN (?)', [testIds]);
+      for (const st of stays) {
+        await pool.query('DELETE FROM PoliceDeclarations WHERE StayId = ?', [st.StayId]).catch(() => {});
+        if (st.RoomId) {
+          await pool.query("UPDATE Rooms SET Status = 'CleanAvailable' WHERE RoomId = ?", [st.RoomId]).catch(() => {});
+        }
+      }
+      await pool.query('DELETE FROM GuestIdentityDocuments WHERE BookingId IN (?)', [testIds]).catch(() => {});
+      await pool.query('DELETE FROM BookingGuests WHERE BookingId IN (?)', [testIds]).catch(() => {});
+      await pool.query('DELETE FROM Stays WHERE BookingId IN (?)', [testIds]).catch(() => {});
+      await pool.query('DELETE FROM Bookings WHERE BookingId IN (?)', [testIds]).catch(() => {});
+    }
+  } catch (_) {}
+
   await pool.end();
-  process.exit(failed > 0 ? 1 : 0);
+  process.exitCode = failed > 0 ? 1 : 0;
 }
 
 runTests().catch((err) => {
   console.error('Fatal test error:', err);
   pool.end();
-  process.exit(1);
+  process.exitCode = 1;
 });

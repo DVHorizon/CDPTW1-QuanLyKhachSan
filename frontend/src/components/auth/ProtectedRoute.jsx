@@ -95,6 +95,16 @@ const ProtectedRoute = ({ children, requiredRole, requiredPermission }) => {
     const role = (user.roleName || '').toLowerCase();
     const isAllowed = user.roleId === 1 || user.roleId === 2 || role === 'admin' || role === 'receptionist' || role === 'lễ tân';
     if (!isAllowed) {
+      // Ghi mã lỗi kỹ thuật ra Console phục vụ kiểm thử và giám sát phân quyền
+      console.warn('[Phân quyền] Từ chối truy cập:', {
+        code: 'ERROR_0010_FORBIDDEN',
+        requiredPermission,
+        userRole: user.roleName,
+        userId: user.userId || user.id,
+        path: location.pathname,
+        timestamp: new Date().toISOString()
+      });
+
       return (
         <div className="min-h-screen bg-[#07131e] flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-[#0d2135] border border-red-500/30 rounded-2xl p-8 text-center shadow-2xl">
@@ -103,7 +113,7 @@ const ProtectedRoute = ({ children, requiredRole, requiredPermission }) => {
             </div>
             <h2 className="text-xl font-bold text-white mb-2">TRUY CẬP BỊ TỪ CHỐI</h2>
             <p className="text-slate-300 text-sm mb-6 leading-relaxed">
-              Bạn không có quyền thực hiện chức năng này (<span className="text-red-400 font-mono">ERROR_0010_FORBIDDEN</span>). Chức năng Quản lý danh sách booking chỉ dành cho Quản trị viên và Lễ tân.
+              Bạn không có quyền thực hiện chức năng này. Chức năng Quản lý danh sách booking chỉ dành riêng cho Quản trị viên và Lễ tân.
             </p>
             <button
               onClick={() => window.location.href = '/admin'}

@@ -9,7 +9,7 @@ module.exports = (sequelize) => {
     },
     StayId: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true
     },
     BookingId: {
       type: DataTypes.INTEGER,

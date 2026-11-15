@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../../components/layout/Header';
-import { checkRoomAvailabilityApi, lockRoomSessionApi, releaseRoomLockApi, getRoomDetailApi, createBookingApi } from '../../api/roomApi';
+import { checkRoomAvailabilityApi, lockRoomSessionApi, releaseRoomLockApi, getRoomDetailApi, createBookingApi, getDynamicPricingApi, getRoomReviewsApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
+import { useWishlist } from '../../context/WishlistContext';
 
 // Helper format VND
 const formatVND = (num) => {
@@ -25,6 +26,7 @@ export default function RoomDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { isWishlisted, toggleWishlist } = useWishlist();
 
   // Dữ liệu loại phòng
   const [roomType, setRoomType] = useState(null);
@@ -55,6 +57,14 @@ export default function RoomDetail() {
   const [availabilityData, setAvailabilityData] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorCode, setErrorCode] = useState('');
+  // TÍNH NĂNG 12: ĐIỀU CHỈNH GIÁ PHÒNG LINH HOẠT THEO THỜI ĐIỂM (DYNAMIC PRICING ENGINE - FEAT-GUEST-12 / A12)
+  const [dynamicPricingData, setDynamicPricingData] = useState(null);
+  const [isDynamicPricingLoading, setIsDynamicPricingLoading] = useState(false);
+  const [dynamicPricingError, setDynamicPricingError] = useState('');
+  const [pricingSuccessMsg, setPricingSuccessMsg] = useState('');
+  const [roomReviews, setRoomReviews] = useState([]);
+  const [reviewSummary, setReviewSummary] = useState(null);
+
 
   // Phiên khóa phòng tạm thời 15 phút (Anti-Overbooking Lock)
   const [lockSession, setLockSession] = useState(null);
@@ -154,6 +164,56 @@ export default function RoomDetail() {
     };
   }, [roomType?.RoomTypeId, id, checkInDate, checkOutDate, quantity, lockSession?.lockSessionId]);
 
+  
+  // FEAT-GUEST-12: Gọi GET /api/v1/rooms/{roomId}/pricing để lấy giá linh hoạt theo thời điểm
+  useEffect(() => {
+    let isMounted = true;
+    const activeRoomTypeId = roomType?.RoomTypeId || id || 1;
+    if (!activeRoomTypeId || !checkInDate || !checkOutDate) return;
+
+    async function fetchDynamicPricing() {
+      setIsDynamicPricingLoading(true);
+      setDynamicPricingError('');
+      setPricingSuccessMsg('');
+      try {
+        const res = await getDynamicPricingApi(activeRoomTypeId, { checkInDate, checkOutDate });
+        if (!isMounted) return;
+        if (res && res.success && res.data) {
+          setDynamicPricingData(res.data);
+          setPricingSuccessMsg(res.message || 'Tính toán giá phòng theo thời điểm thành công');
+        } else if (res && res.code === 'ERROR_0043_PRICING_RULE_ERROR') {
+          setDynamicPricingError(res.message || 'Không thể áp dụng bảng giá động cho khoảng thời gian này');
+        }
+      } catch (err) {
+        if (isMounted) {
+          setDynamicPricingError('Không thể áp dụng bảng giá động cho khoảng thời gian này');
+        }
+      } finally {
+        if (isMounted) setIsDynamicPricingLoading(false);
+      }
+    }
+
+    const t = setTimeout(fetchDynamicPricing, 350);
+    return () => {
+      isMounted = false;
+      clearTimeout(t);
+    };
+  }, [roomType?.RoomTypeId, id, checkInDate, checkOutDate]);
+
+  // FEAT-GUEST-11: Tải danh sách đánh giá thật từ database theo hạng phòng
+  useEffect(() => {
+    let isMounted = true;
+    const activeRoomTypeId = roomType?.RoomTypeId || id || 1;
+    getRoomReviewsApi(activeRoomTypeId, { limit: 6 })
+      .then((res) => {
+        if (!isMounted || !res?.success) return;
+        if (Array.isArray(res.data)) setRoomReviews(res.data);
+        if (res.summary) setReviewSummary(res.summary);
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [roomType?.RoomTypeId, id]);
+
   // Lắng nghe WebSocket Realtime: tự động gọi lại checkRealtime() khi có người đặt phòng, khóa phòng hoặc đổi trạng thái
   useEffect(() => {
     const activeRoomTypeId = Number(roomType?.RoomTypeId || id || 1);
@@ -250,8 +310,19 @@ export default function RoomDetail() {
       setIsLocking(false);
 
       if (res.success && res.data) {
+        const timeoutSec = res.data.timeoutSeconds || 900;
         setLockSession(res.data);
-        setLockTimeRemaining(res.data.timeoutSeconds || 900);
+        setLockTimeRemaining(timeoutSec);
+        try {
+          sessionStorage.setItem('gh_room_lock', JSON.stringify({
+            lockSessionId: res.data.lockSessionId,
+            expiresAt: Date.now() + timeoutSec * 1000,
+            roomTypeId: activeRoomTypeId,
+            checkInDate,
+            checkOutDate,
+            units: quantity
+          }));
+        } catch (_) {}
       } else {
         setErrorCode(res.code || 'ERROR_0024_CONCURRENT_LOCK_FAILED');
         setErrorMessage(res.message || 'Rất tiếc, phòng vừa được khách hàng khác giữ chỗ. Vui lòng chọn khoảng ngày hoặc hạng phòng khác');
@@ -329,15 +400,25 @@ export default function RoomDetail() {
     return diff > 0 ? diff : 1;
   }, [checkInDate, checkOutDate]);
 
-  const pricing = availabilityData?.pricingSummary || {
-    basePricePerNight: roomType?.BasePrice || 8500000,
-    numberOfNights,
+  // FEAT-GUEST-12: Ưu tiên dữ liệu tính toán từ Dynamic Pricing Engine API nếu có
+  const effectiveBaseRate = dynamicPricingData?.baseRate || roomType?.BasePrice || 8500000;
+  const effectiveCalculatedTotal = dynamicPricingData?.totalRoomPrice
+    ? (dynamicPricingData.totalRoomPrice * quantity)
+    : ((dynamicPricingData?.averageDailyRate ? dynamicPricingData.averageDailyRate * numberOfNights : effectiveBaseRate * numberOfNights) * quantity);
+
+  const pricing = {
+    basePricePerNight: dynamicPricingData?.averageDailyRate || effectiveBaseRate,
+    originalBaseRate: effectiveBaseRate,
+    numberOfNights: dynamicPricingData?.numberOfNights || numberOfNights,
     roomQuantity: quantity,
-    roomSubtotal: (roomType?.BasePrice || 8500000) * numberOfNights * quantity,
-    discountAmount: Math.round((roomType?.BasePrice || 8500000) * numberOfNights * quantity * 0.1),
-    vatTaxAmount: Math.round(((roomType?.BasePrice || 8500000) * numberOfNights * quantity * 0.9) * 0.08),
-    serviceFeeAmount: Math.round(((roomType?.BasePrice || 8500000) * numberOfNights * quantity * 0.9) * 0.05),
-    totalAmount: Math.round(((roomType?.BasePrice || 8500000) * numberOfNights * quantity * 0.9) * 1.13),
+    roomSubtotal: effectiveCalculatedTotal,
+    discountAmount: Math.round(effectiveCalculatedTotal * 0.1),
+    vatTaxAmount: Math.round((effectiveCalculatedTotal * 0.9) * 0.08),
+    serviceFeeAmount: Math.round((effectiveCalculatedTotal * 0.9) * 0.05),
+    totalAmount: Math.round((effectiveCalculatedTotal * 0.9) * 1.13),
+    appliedRule: dynamicPricingData?.appliedRule || null,
+    dailyBreakdown: dynamicPricingData?.dailyBreakdown || [],
+    pricingSummary: dynamicPricingData
   };
 
   const isSoldOut = availabilityData && !availabilityData.isAvailable && availabilityData.availableRoomsCount === 0;
@@ -374,10 +455,11 @@ export default function RoomDetail() {
                 🔗 Chia sẻ
               </button>
               <button
-                onClick={() => setIsSaved(!isSaved)}
-                className={`inline-flex items-center gap-1 transition-colors ${isSaved ? 'text-rose-500 font-semibold' : 'text-gray-600 hover:text-[#725b38]'}`}
+                type="button"
+                onClick={() => toggleWishlist(id)}
+                className={`inline-flex items-center gap-1 transition-colors cursor-pointer ${isWishlisted(id) ? 'text-rose-500 font-semibold' : 'text-gray-600 hover:text-[#725b38]'}`}
               >
-                {isSaved ? '❤️ Đã lưu' : '🤍 Lưu lại'}
+                {isWishlisted(id) ? '❤️ Đã lưu' : '🤍 Lưu lại'}
               </button>
             </div>
           </div>
@@ -399,8 +481,12 @@ export default function RoomDetail() {
                     🏆 Lựa chọn hàng đầu của du khách 2024
                   </span>
                   <span className="text-sm font-semibold text-[#0b1c30]">
-                    <span className="text-[#725b38] font-bold">4.96/5</span>{' '}
-                    <span className="text-gray-500 font-normal">(184 lượt đánh giá được xác thực)</span>
+                    <span className="text-[#725b38] font-bold">
+                      {reviewSummary?.totalReviews > 0 ? reviewSummary.avgOverall : '4.96'}/5
+                    </span>{' '}
+                    <span className="text-gray-500 font-normal">
+                      ({reviewSummary?.totalReviews > 0 ? reviewSummary.totalReviews : 184} lượt đánh giá được xác thực)
+                    </span>
                   </span>
                 </div>
                 <h1 className="text-3xl lg:text-4xl font-serif font-bold text-[#0b1c30] tracking-tight">
@@ -795,15 +881,48 @@ export default function RoomDetail() {
                   )}
                 </div>
 
-                {/* Nightly Rate */}
-                <div className="space-y-0.5">
-                  <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Giá mỗi đêm tiêu chuẩn</p>
-                  <div className="flex items-baseline gap-1.5">
+                {/* FEAT-GUEST-12 (A12) / Hình 12: Nightly Dynamic Rate Display */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">
+                      {dynamicPricingData?.appliedRule ? 'Giá linh hoạt theo thời điểm' : 'Giá mỗi đêm tiêu chuẩn'}
+                    </p>
+                    {dynamicPricingData?.appliedRule && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                        ⚡ {dynamicPricingData.appliedRule.RuleName || 'Dynamic Pricing'}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-baseline gap-2">
                     <span className="text-3xl font-serif font-bold text-[#0b1c30]">
-                      {formatVND(roomType?.BasePrice || 8500000)}
+                      {formatVND(pricing.basePricePerNight)}
                     </span>
                     <span className="text-xs text-gray-500">/ đêm</span>
+
+                    {/* Hiển thị giá gạch ngang nếu có điều chỉnh tăng/giảm theo Dynamic Pricing */}
+                    {dynamicPricingData && dynamicPricingData.baseRate && Math.round(pricing.basePricePerNight) !== Math.round(dynamicPricingData.baseRate) && (
+                      <span className="text-xs text-gray-400 line-through">
+                        {formatVND(dynamicPricingData.baseRate)}
+                      </span>
+                    )}
                   </div>
+
+                  {/* Thông báo chi tiết quy tắc định giá động */}
+                  {pricingSuccessMsg && (
+                    <div className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200/70 flex items-center gap-1">
+                      <span>✓</span>
+                      <span>{pricingSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  {dynamicPricingError && (
+                    <div className="text-[11px] text-rose-600 bg-rose-50 px-2 py-1 rounded-md border border-rose-200 flex items-center gap-1">
+                      <span>⚠️</span>
+                      <span>{dynamicPricingError}</span>
+                    </div>
+                  )}
+
                   <p className="text-[11px] text-gray-400">Đã bao gồm 8% thuế VAT & 5% phí phục vụ cao cấp</p>
                 </div>
 
@@ -878,12 +997,37 @@ export default function RoomDetail() {
                   </div>
                 )}
 
-                {/* Price Breakdown */}
+                {/* FEAT-GUEST-12: Wireframe Hình 12 - Hiển thị giá phòng linh hoạt tự động theo số đêm lưu trú */}
                 <div className="space-y-2 pt-1 text-xs">
                   <div className="flex items-center justify-between text-gray-600">
                     <span>{formatVND(pricing.basePricePerNight)} × {pricing.numberOfNights} đêm {quantity > 1 ? `× ${quantity} phòng` : ''}</span>
                     <span className="text-[#0b1c30] font-semibold">{formatVND(pricing.roomSubtotal)}</span>
                   </div>
+
+                  {/* Chi tiết từng đêm lưu trú (Cuối tuần / Lễ / Ngày thường) nếu có breakdown */}
+                  {pricing.dailyBreakdown && pricing.dailyBreakdown.length > 0 && (
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 space-y-1.5 my-1">
+                      <div className="flex items-center justify-between font-bold text-[10px] text-slate-500 uppercase tracking-wider">
+                        <span>Chi tiết giá từng đêm lưu trú</span>
+                        <span>Đơn giá</span>
+                      </div>
+                      {pricing.dailyBreakdown.map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-[11px] text-slate-700">
+                          <span className="flex items-center gap-1">
+                            <span className="font-mono text-slate-500">{item.date}</span>
+                            {item.isHoliday ? (
+                              <span className="px-1 py-0.2 bg-rose-100 text-rose-700 text-[9px] rounded font-bold">Lễ/Tết</span>
+                            ) : item.isWeekend ? (
+                              <span className="px-1 py-0.2 bg-amber-100 text-amber-800 text-[9px] rounded font-bold">Cuối tuần +15%</span>
+                            ) : (
+                              <span className="text-slate-400 text-[10px]">(Thường)</span>
+                            )}
+                          </span>
+                          <span className="font-semibold text-slate-900">{formatVND(item.rate)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Gold Member Discount */}
                   <div className="flex items-center justify-between text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg font-medium">
@@ -988,17 +1132,65 @@ export default function RoomDetail() {
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-3xl font-serif text-[#725b38] font-bold leading-none">4.96</p>
+                  <p className="text-3xl font-serif text-[#725b38] font-bold leading-none">
+                    {reviewSummary?.totalReviews > 0 ? reviewSummary.avgOverall : '4.96'}
+                  </p>
                   <p className="text-xs text-gray-400">trên thang điểm 5.0</p>
                 </div>
                 <div>
                   <div className="text-[#725b38] text-base">★★★★★</div>
-                  <p className="text-xs text-[#0b1c30] font-bold">Xuất sắc vượt mong đợi</p>
+                  <p className="text-xs text-[#0b1c30] font-bold">
+                    {reviewSummary?.totalReviews > 0 ? `${reviewSummary.totalReviews} đánh giá đã xác thực` : 'Xuất sắc vượt mong đợi'}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Testimonials */}
+            {/* Testimonials / Verified Guest Reviews (FEAT-GUEST-11) */}
+            {roomReviews.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {roomReviews.map((rev) => {
+                  const initials = String(rev.author || 'KH')
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(-2)
+                    .map((w) => w[0])
+                    .join('')
+                    .toUpperCase() || 'KH';
+                  const stars = '★'.repeat(Math.max(1, Math.min(5, Math.round(Number(rev.overallRating || 5)))));
+                  const dateLabel = rev.createdAt
+                    ? new Date(rev.createdAt).toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' })
+                    : 'Gần đây';
+                  return (
+                    <div key={rev.reviewId} className="bg-white p-6 rounded-2xl shadow-sm space-y-3 flex flex-col justify-between border border-gray-100">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-[#725b38]">{stars}</span>
+                          <span className="font-bold text-[#725b38]">{rev.overallRating}/5.0</span>
+                        </div>
+                        <h4 className="font-bold text-[#0b1c30] text-sm">
+                          “{rev.reviewTitle || 'Trải nghiệm lưu trú đẳng cấp'}”
+                        </h4>
+                        <p className="text-xs text-gray-600 italic leading-relaxed">
+                          {rev.reviewBody}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-50">
+                        <div className="w-7 h-7 rounded-full bg-[#fedeb2]/60 flex items-center justify-center text-xs text-[#725b38] font-bold">
+                          {initials}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-[#0b1c30]">{rev.author}</p>
+                          <p className="text-[10px] text-gray-400">
+                            {rev.tripClassification || 'Khách lưu trú'} • {dateLabel}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-2xl shadow-sm space-y-3 flex flex-col justify-between border border-gray-100">
                 <div className="space-y-2">
@@ -1051,6 +1243,7 @@ export default function RoomDetail() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </section>
 

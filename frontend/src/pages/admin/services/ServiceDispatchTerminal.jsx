@@ -9,6 +9,7 @@ import {
   createServiceOrderApi,
   fetchServiceOrdersApi,
 } from "../../../api/serviceApi";
+import { cleanMessage, logSystemEvent } from "../../../utils/toastSanitizer";
 
 const ServiceDispatchTerminal = () => {
   // ─── DỮ LIỆU ĐỘNG TỪ DATABASE ───
@@ -30,7 +31,9 @@ const ServiceDispatchTerminal = () => {
 
   // Tùy chọn thực hiện dịch vụ
   const [serviceLocation, setServiceLocation] = useState("room"); // "room" | "counter"
-  const [scheduleDate, setScheduleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [scheduleDate, setScheduleDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [scheduleTime, setScheduleTime] = useState("16:30 - 17:30");
   const [dispatchNote, setDispatchNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("charge_room"); // "charge_room" | "pos" | "comp_gm"
@@ -56,13 +59,28 @@ const ServiceDispatchTerminal = () => {
             StayId: st.StayId,
             roomNumber: roomObj?.RoomNumber || `P-${st.RoomId}`,
             floor: roomObj?.Floor || "1",
-            roomType: roomObj?.roomType?.TypeName || roomObj?.RoomType?.TypeName || "Phòng Tiêu Chuẩn",
+            roomType:
+              roomObj?.roomType?.TypeName ||
+              roomObj?.RoomType?.TypeName ||
+              "Phòng Tiêu Chuẩn",
             fullName: userObj?.FullName || "Khách Hàng Lưu Trú",
             vipTier: userObj?.membershipTier?.TierName || "Hội Viên",
-            folioCode: bookingObj?.ConfirmationCode || bookingObj?.BookingCode || `#FL-${st.StayId}-C`,
-            checkInDate: st.ActualCheckIn || st.CheckInTime || st.CheckInDate || bookingObj?.CheckInDate,
-            checkOutDate: st.ExpectedCheckOut || st.ActualCheckOut || st.CheckOutDate || bookingObj?.CheckOutDate,
-            phoneNumber: userObj?.Phone || userObj?.PhoneNumber || "Chưa cập nhật",
+            folioCode:
+              bookingObj?.ConfirmationCode ||
+              bookingObj?.BookingCode ||
+              `#FL-${st.StayId}-C`,
+            checkInDate:
+              st.ActualCheckIn ||
+              st.CheckInTime ||
+              st.CheckInDate ||
+              bookingObj?.CheckInDate,
+            checkOutDate:
+              st.ExpectedCheckOut ||
+              st.ActualCheckOut ||
+              st.CheckOutDate ||
+              bookingObj?.CheckOutDate,
+            phoneNumber:
+              userObj?.Phone || userObj?.PhoneNumber || "Chưa cập nhật",
             email: userObj?.Email || "Chưa cập nhật",
           };
         });
@@ -89,11 +107,17 @@ const ServiceDispatchTerminal = () => {
     try {
       const [catRes, svcRes] = await Promise.all([
         fetchCategoriesApi().catch(() => ({ data: [] })),
-        fetchServicesApi({ status: "Active" }).catch(() => ({ data: [] })),
+        fetchServicesApi({
+          status: "Active",
+          pageSize: 500,
+          all: "true",
+        }).catch(() => ({ data: [] })),
       ]);
 
       if (catRes && catRes.data) {
-        setCategories(catRes.data.filter((c) => !c.IsDeleted && c.Status !== "Inactive"));
+        setCategories(
+          catRes.data.filter((c) => !c.IsDeleted && c.Status !== "Inactive"),
+        );
       }
 
       if (svcRes && svcRes.data) {
@@ -113,14 +137,25 @@ const ServiceDispatchTerminal = () => {
 
   // Show Toast Helper
   const showToast = (message, type = "success") => {
-    setToast({ message, type });
+    const cleaned = cleanMessage(message) || "Thao tác đã được xử lý.";
+    if (type === "error") {
+      logSystemEvent({
+        code: "DISPATCH_TERMINAL_ERROR",
+        message: cleaned,
+        rawMessage: typeof message === "string" ? message : message?.message,
+        type: "error",
+      });
+    }
+    setToast({ message: cleaned, type });
     setTimeout(() => setToast(null), 4000);
   };
 
   // 3. Quản lý giỏ hàng (Thêm / Tăng / Giảm / Xóa)
   const handleAddToCart = (service) => {
     setCart((prev) => {
-      const existing = prev.find((item) => item.ServiceId === service.ServiceId);
+      const existing = prev.find(
+        (item) => item.ServiceId === service.ServiceId,
+      );
       if (existing) {
         if (existing.quantity >= 50) {
           showToast("Số lượng tối đa cho mỗi dịch vụ là 50", "error");
@@ -129,7 +164,7 @@ const ServiceDispatchTerminal = () => {
         return prev.map((item) =>
           item.ServiceId === service.ServiceId
             ? { ...item, quantity: item.quantity + 1 }
-            : item
+            : item,
         );
       }
       return [
@@ -162,7 +197,7 @@ const ServiceDispatchTerminal = () => {
           }
           return item;
         })
-        .filter(Boolean)
+        .filter(Boolean),
     );
   };
 
@@ -174,14 +209,16 @@ const ServiceDispatchTerminal = () => {
   const filteredServices = useMemo(() => {
     let list = allServices;
     if (activeCategoryId !== "all") {
-      list = list.filter((s) => String(s.CategoryId) === String(activeCategoryId));
+      list = list.filter(
+        (s) => String(s.CategoryId) === String(activeCategoryId),
+      );
     }
     if (searchServiceTerm.trim()) {
       const term = searchServiceTerm.toLowerCase();
       list = list.filter(
         (s) =>
           (s.ServiceName && s.ServiceName.toLowerCase().includes(term)) ||
-          (s.ServiceCode && s.ServiceCode.toLowerCase().includes(term))
+          (s.ServiceCode && s.ServiceCode.toLowerCase().includes(term)),
       );
     }
     return list;
@@ -196,7 +233,7 @@ const ServiceDispatchTerminal = () => {
         s.roomNumber.toLowerCase().includes(term) ||
         s.fullName.toLowerCase().includes(term) ||
         s.folioCode.toLowerCase().includes(term) ||
-        (s.phoneNumber && s.phoneNumber.toLowerCase().includes(term))
+        (s.phoneNumber && s.phoneNumber.toLowerCase().includes(term)),
     );
   }, [activeStays, searchStayTerm]);
 
@@ -260,7 +297,7 @@ const ServiceDispatchTerminal = () => {
       const res = await createServiceOrderApi(payload);
       if (res.success) {
         showToast(
-          `✓ Đã đặt thành công ${cart.length} dịch vụ cho phòng ${selectedStay.roomNumber}! Đã lưu snapshot giá.`
+          `✓ Đã đặt thành công ${cart.length} dịch vụ cho phòng ${selectedStay.roomNumber}! Đã lưu snapshot giá.`,
         );
         setCart([]);
         setDispatchNote("");
@@ -268,7 +305,10 @@ const ServiceDispatchTerminal = () => {
         showToast(res.message || "Không thể tạo đơn đặt dịch vụ", "error");
       }
     } catch (err) {
-      showToast(err.message || "Lỗi hệ thống khi gửi lệnh đặt dịch vụ", "error");
+      showToast(
+        err.message || "Lỗi hệ thống khi gửi lệnh đặt dịch vụ",
+        "error",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -308,7 +348,8 @@ const ServiceDispatchTerminal = () => {
                 TIẾP NHẬN ĐẶT DỊCH VỤ &amp; ĐIỀU PHỐI LỊCH TRÌNH
               </h1>
               <div className={styles.headerSubtitle}>
-                SERVICE DISPATCH &amp; SCHEDULING TERMINAL • PMS CORE LUXURY CONCIERGE
+                SERVICE DISPATCH &amp; SCHEDULING TERMINAL • PMS CORE LUXURY
+                CONCIERGE
               </div>
             </div>
           </div>
@@ -332,7 +373,9 @@ const ServiceDispatchTerminal = () => {
               className={styles.actionBtnPrimary}
               title="Xem bảng Kanban tiến độ đơn dịch vụ"
             >
-              <span className="material-symbols-outlined text-[16px]">pending_actions</span>
+              <span className="material-symbols-outlined text-[16px]">
+                pending_actions
+              </span>
               <span>Tiến Độ Đơn Dịch Vụ</span>
             </Link>
 
@@ -342,7 +385,9 @@ const ServiceDispatchTerminal = () => {
               className={styles.actionBtnOutline}
               title="Xem danh sách các lệnh điều phối dịch vụ đã tạo"
             >
-              <span className="material-symbols-outlined text-[16px]">history</span>
+              <span className="material-symbols-outlined text-[16px]">
+                history
+              </span>
               <span>Lịch Sử Lệnh</span>
             </button>
 
@@ -352,7 +397,9 @@ const ServiceDispatchTerminal = () => {
               className={styles.actionBtnOutline}
               title="In phiếu yêu cầu dịch vụ"
             >
-              <span className="material-symbols-outlined text-[16px]">print</span>
+              <span className="material-symbols-outlined text-[16px]">
+                print
+              </span>
               <span>In Phiếu Yêu Cầu</span>
             </button>
           </div>
@@ -371,21 +418,23 @@ const ServiceDispatchTerminal = () => {
                 </span>
                 <span>TRA CỨU KHÁCH IN-HOUSE / PHÒNG</span>
               </h2>
-              <span className="text-[11px] font-mono font-bold text-slate-400">⌘K</span>
             </div>
 
             {/* Trạng thái chưa có phòng lưu trú */}
             {activeStays.length === 0 && !isLoadingStays ? (
               <div className={styles.emptyInHouseBox}>
-                <span className={`material-symbols-outlined ${styles.emptyInHouseIcon}`}>
+                <span
+                  className={`material-symbols-outlined ${styles.emptyInHouseIcon}`}
+                >
                   hotel
                 </span>
                 <h3 className={styles.emptyInHouseTitle}>
                   Hiện chưa có phòng nào đang lưu trú
                 </h3>
                 <p className={styles.emptyInHouseSub}>
-                  Hệ thống yêu cầu phòng phải ở trạng thái <strong>CheckedIn</strong> hoặc{" "}
-                  <strong>Extended</strong> để có thể đặt dịch vụ.
+                  Hệ thống yêu cầu phòng phải ở trạng thái{" "}
+                  <strong>CheckedIn</strong> hoặc <strong>Extended</strong> để
+                  có thể đặt dịch vụ.
                 </p>
                 <Link to="/admin/check-in" className={styles.emptyInHouseBtn}>
                   <span className="material-symbols-outlined text-[16px]">
@@ -416,7 +465,9 @@ const ServiceDispatchTerminal = () => {
                         className={styles.clearBtn}
                         title="Xoá tìm kiếm"
                       >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
+                        <span className="material-symbols-outlined text-[16px]">
+                          close
+                        </span>
                       </button>
                     )}
                   </div>
@@ -427,7 +478,9 @@ const ServiceDispatchTerminal = () => {
                   <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                     Danh Sách Khách Lưu Trú ({filteredStays.length})
                   </span>
-                  <span className="text-[10px] text-slate-400 italic">Click để chọn</span>
+                  <span className="text-[10px] text-slate-400 italic">
+                    Click để chọn
+                  </span>
                 </div>
 
                 <div className={styles.stayListContainer}>
@@ -447,11 +500,15 @@ const ServiceDispatchTerminal = () => {
                           onClick={() => setSelectedStay(st)}
                         >
                           <div className={styles.stayCardHeader}>
-                            <span className={styles.roomBadge}>P.{st.roomNumber}</span>
+                            <span className={styles.roomBadge}>
+                              P.{st.roomNumber}
+                            </span>
                             <span className={styles.vipTag}>{st.vipTier}</span>
                           </div>
                           <div className={styles.stayCardBody}>
-                            <div className={styles.guestName}>{st.fullName}</div>
+                            <div className={styles.guestName}>
+                              {st.fullName}
+                            </div>
                             <div className={styles.guestSub}>
                               {st.roomType} • {st.folioCode}
                             </div>
@@ -480,29 +537,43 @@ const ServiceDispatchTerminal = () => {
                           .toUpperCase() || "KH"}
                       </div>
                       <div className={styles.guestNameCol}>
-                        <h3 className={styles.guestName}>{selectedStay.fullName}</h3>
+                        <h3 className={styles.guestName}>
+                          {selectedStay.fullName}
+                        </h3>
                         <div className={styles.guestBadges}>
                           <span className={styles.vipBadge}>
-                            <span className="material-symbols-outlined text-[12px]">star</span>
+                            <span className="material-symbols-outlined text-[12px]">
+                              star
+                            </span>
                             <span>{selectedStay.vipTier}</span>
                           </span>
-                          <span className={styles.folioBadge}>{selectedStay.folioCode}</span>
+                          <span className={styles.folioBadge}>
+                            {selectedStay.folioCode}
+                          </span>
                         </div>
                       </div>
                       <div className={styles.roomBadgeBox}>
-                        <div className="text-[10px] opacity-80 uppercase tracking-wider">Phòng</div>
-                        <div className="font-mono text-sm font-black">{selectedStay.roomNumber}</div>
+                        <div className="text-[10px] opacity-80 uppercase tracking-wider">
+                          Phòng
+                        </div>
+                        <div className="font-mono text-sm font-black">
+                          {selectedStay.roomNumber}
+                        </div>
                       </div>
                     </div>
 
                     <div className={styles.guestMetaGrid}>
                       <div>
                         <div className={styles.metaLabel}>Hạng Phòng:</div>
-                        <div className={styles.metaVal}>{selectedStay.roomType}</div>
+                        <div className={styles.metaVal}>
+                          {selectedStay.roomType}
+                        </div>
                       </div>
                       <div>
                         <div className={styles.metaLabel}>Tầng:</div>
-                        <div className={styles.metaVal}>{selectedStay.floor || "1"}</div>
+                        <div className={styles.metaVal}>
+                          {selectedStay.floor || "1"}
+                        </div>
                       </div>
                     </div>
 
@@ -511,15 +582,21 @@ const ServiceDispatchTerminal = () => {
                         <span className="text-slate-500">Ngày Nhận Phòng:</span>
                         <span className="font-semibold text-slate-800">
                           {selectedStay.checkInDate
-                            ? new Date(selectedStay.checkInDate).toLocaleDateString("vi-VN")
+                            ? new Date(
+                                selectedStay.checkInDate,
+                              ).toLocaleDateString("vi-VN")
                             : "—"}
                         </span>
                       </div>
                       <div className={styles.stayDetailRow}>
-                        <span className="text-slate-500">Ngày Dự Kiến Trả:</span>
+                        <span className="text-slate-500">
+                          Ngày Dự Kiến Trả:
+                        </span>
                         <span className="font-semibold text-slate-800">
                           {selectedStay.checkOutDate
-                            ? new Date(selectedStay.checkOutDate).toLocaleDateString("vi-VN")
+                            ? new Date(
+                                selectedStay.checkOutDate,
+                              ).toLocaleDateString("vi-VN")
                             : "—"}
                         </span>
                       </div>
@@ -531,7 +608,7 @@ const ServiceDispatchTerminal = () => {
                       </div>
                       <div className={styles.stayDetailRow}>
                         <span className="text-slate-500">Email:</span>
-                        <span className="font-semibold text-slate-800 truncate max-w-[150px]">
+                        <span className="font-semibold text-slate-800 truncate" title={selectedStay.email}>
                           {selectedStay.email}
                         </span>
                       </div>
@@ -577,7 +654,9 @@ const ServiceDispatchTerminal = () => {
                   className={styles.clearBtn}
                   title="Xoá tìm kiếm"
                 >
-                  <span className="material-symbols-outlined text-[16px]">close</span>
+                  <span className="material-symbols-outlined text-[16px]">
+                    close
+                  </span>
                 </button>
               )}
             </div>
@@ -591,7 +670,9 @@ const ServiceDispatchTerminal = () => {
                   activeCategoryId === "all" ? styles.categoryPillBtnActive : ""
                 }`}
               >
-                <span className="material-symbols-outlined text-[16px]">apps</span>
+                <span className="material-symbols-outlined text-[16px]">
+                  apps
+                </span>
                 <span>Tất Cả ({allServices.length})</span>
               </button>
 
@@ -606,7 +687,9 @@ const ServiceDispatchTerminal = () => {
                       : ""
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[16px]">spa</span>
+                  <span className="material-symbols-outlined text-[16px]">
+                    spa
+                  </span>
                   <span>{cat.CategoryName}</span>
                 </button>
               ))}
@@ -627,8 +710,12 @@ const ServiceDispatchTerminal = () => {
                   <div key={svc.ServiceId} className={styles.serviceItemCard}>
                     <div className={styles.serviceItemHeader}>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={styles.codeBadge}>{svc.ServiceCode}</span>
-                        <span className={styles.unitBadge}>{svc.Unit || "Lượt"}</span>
+                        <span className={styles.codeBadge}>
+                          {svc.ServiceCode}
+                        </span>
+                        <span className={styles.unitBadge}>
+                          {svc.Unit || "Lượt"}
+                        </span>
                       </div>
                       <div className={styles.servicePrice}>
                         {Number(svc.Price).toLocaleString("vi-VN")} đ
@@ -657,11 +744,15 @@ const ServiceDispatchTerminal = () => {
 
             {/* Địa điểm triển khai phục vụ */}
             <div>
-              <div className={styles.sectionTitleSmall}>ĐỊA ĐIỂM TRIỂN KHAI PHỤC VỤ</div>
+              <div className={styles.sectionTitleSmall}>
+                ĐỊA ĐIỂM TRIỂN KHAI PHỤC VỤ
+              </div>
               <div className={styles.locationRadios}>
                 <div
                   className={`${styles.locationOption} ${
-                    serviceLocation === "room" ? styles.locationOptionSelected : ""
+                    serviceLocation === "room"
+                      ? styles.locationOptionSelected
+                      : ""
                   }`}
                   onClick={() => setServiceLocation("room")}
                 >
@@ -682,7 +773,9 @@ const ServiceDispatchTerminal = () => {
 
                 <div
                   className={`${styles.locationOption} ${
-                    serviceLocation === "counter" ? styles.locationOptionSelected : ""
+                    serviceLocation === "counter"
+                      ? styles.locationOptionSelected
+                      : ""
                   }`}
                   onClick={() => setServiceLocation("counter")}
                 >
@@ -694,7 +787,9 @@ const ServiceDispatchTerminal = () => {
                     className="mt-0.5 accent-emerald-600"
                   />
                   <div>
-                    <div className={styles.locLabel}>Tại Quầy Dịch Vụ / Spa</div>
+                    <div className={styles.locLabel}>
+                      Tại Quầy Dịch Vụ / Spa
+                    </div>
                     <div className="text-[10px] text-slate-500 font-medium">
                       Khách đến sử dụng trực tiếp
                     </div>
@@ -716,7 +811,9 @@ const ServiceDispatchTerminal = () => {
               </div>
 
               <div className={styles.scheduleCol}>
-                <div className={styles.sectionTitleSmall}>KHUNG GIỜ PHỤC VỤ</div>
+                <div className={styles.sectionTitleSmall}>
+                  KHUNG GIỜ PHỤC VỤ
+                </div>
                 <select
                   value={scheduleTime}
                   onChange={(e) => setScheduleTime(e.target.value)}
@@ -725,7 +822,9 @@ const ServiceDispatchTerminal = () => {
                   <option value="16:30 - 17:30">16:30 - 17:30 (Chiều)</option>
                   <option value="09:00 - 10:00">09:00 - 10:00 (Sáng)</option>
                   <option value="11:00 - 12:00">11:00 - 12:00 (Trưa)</option>
-                  <option value="14:00 - 15:00">14:00 - 15:00 (Đầu chiều)</option>
+                  <option value="14:00 - 15:00">
+                    14:00 - 15:00 (Đầu chiều)
+                  </option>
                   <option value="19:00 - 20:00">19:00 - 20:00 (Tối)</option>
                   <option value="Phục vụ ngay">Phục vụ ngay (Express)</option>
                 </select>
@@ -752,7 +851,10 @@ const ServiceDispatchTerminal = () => {
           {/* ═══════════════════════════════════════════════════════════════════
               CỘT 3: PHÂN RÃ QUYẾT TOÁN & BATCH ORDER CART
              ═══════════════════════════════════════════════════════════════════ */}
-          <div id="cart-section" className={`${styles.columnCard} ${styles.cartCol}`}>
+          <div
+            id="cart-section"
+            className={`${styles.columnCard} ${styles.cartCol}`}
+          >
             <div className={styles.breakdownHeader}>
               <h2 className={styles.columnTitle}>
                 <span className="material-symbols-outlined text-[18px] text-emerald-700">
@@ -760,7 +862,9 @@ const ServiceDispatchTerminal = () => {
                 </span>
                 <span>GIỎ HÀNG DỊCH VỤ</span>
               </h2>
-              <span className={styles.cartCountBadge}>{cart.length} Dịch vụ</span>
+              <span className={styles.cartCountBadge}>
+                {cart.length} Dịch vụ
+              </span>
             </div>
 
             {/* Danh sách các dịch vụ trong đơn */}
@@ -779,7 +883,9 @@ const ServiceDispatchTerminal = () => {
                 cart.map((item) => (
                   <div key={item.ServiceId} className={styles.cartItem}>
                     <div className={styles.cartItemTop}>
-                      <span className={styles.cartItemName}>{item.ServiceName}</span>
+                      <span className={styles.cartItemName}>
+                        {item.ServiceName}
+                      </span>
                       <button
                         type="button"
                         onClick={() => handleRemoveFromCart(item.ServiceId)}
@@ -797,7 +903,9 @@ const ServiceDispatchTerminal = () => {
                       <div className={styles.qtyControl}>
                         <button
                           type="button"
-                          onClick={() => handleUpdateQuantity(item.ServiceId, -1)}
+                          onClick={() =>
+                            handleUpdateQuantity(item.ServiceId, -1)
+                          }
                           className={styles.qtyBtn}
                         >
                           -
@@ -805,7 +913,9 @@ const ServiceDispatchTerminal = () => {
                         <span className={styles.qtyValue}>{item.quantity}</span>
                         <button
                           type="button"
-                          onClick={() => handleUpdateQuantity(item.ServiceId, 1)}
+                          onClick={() =>
+                            handleUpdateQuantity(item.ServiceId, 1)
+                          }
                           className={styles.qtyBtn}
                         >
                           +
@@ -836,7 +946,9 @@ const ServiceDispatchTerminal = () => {
 
             {/* Phương thức thanh toán */}
             <div>
-              <div className={styles.sectionTitleSmall}>PHƯƠNG THỨC THANH TOÁN</div>
+              <div className={styles.sectionTitleSmall}>
+                PHƯƠNG THỨC THANH TOÁN
+              </div>
               <div className={styles.paymentRadios}>
                 <div
                   className={`${styles.paymentOption} ${
@@ -888,7 +1000,9 @@ const ServiceDispatchTerminal = () => {
 
                 <div
                   className={`${styles.paymentOption} ${
-                    paymentMethod === "comp_gm" ? styles.paymentOptionSelected : ""
+                    paymentMethod === "comp_gm"
+                      ? styles.paymentOptionSelected
+                      : ""
                   }`}
                   onClick={() => setPaymentMethod("comp_gm")}
                 >
@@ -900,7 +1014,9 @@ const ServiceDispatchTerminal = () => {
                     className="mt-0.5 accent-emerald-600"
                   />
                   <div>
-                    <div className={styles.payTitle}>Miễn trừ chi phí (Comp GM)</div>
+                    <div className={styles.payTitle}>
+                      Miễn trừ chi phí (Comp GM)
+                    </div>
                     <div className={styles.paySub}>
                       Đặc quyền phê duyệt của Ban Giám Đốc
                     </div>
@@ -932,14 +1048,19 @@ const ServiceDispatchTerminal = () => {
                   type="button"
                   onClick={() => {
                     if (cart.length === 0) {
-                      showToast("Chưa có dịch vụ nào trong đơn để lưu", "error");
+                      showToast(
+                        "Chưa có dịch vụ nào trong đơn để lưu",
+                        "error",
+                      );
                       return;
                     }
                     showToast("Đã lưu nháp giỏ dịch vụ của phòng!");
                   }}
                   className={styles.draftBtn}
                 >
-                  <span className="material-symbols-outlined text-[16px]">bookmark</span>
+                  <span className="material-symbols-outlined text-[16px]">
+                    bookmark
+                  </span>
                   <span>Lưu Nháp</span>
                 </button>
 
@@ -952,7 +1073,9 @@ const ServiceDispatchTerminal = () => {
                   }}
                   className={styles.cancelBtn}
                 >
-                  <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
+                  <span className="material-symbols-outlined text-[16px]">
+                    delete_sweep
+                  </span>
                   <span>Xóa Trắng</span>
                 </button>
               </div>
@@ -978,7 +1101,9 @@ const ServiceDispatchTerminal = () => {
         {cart.length > 0 && (
           <div className={styles.mobileCartBar}>
             <div className={styles.mobileCartBarLeft}>
-              <span className={styles.mobileCartBarBadge}>{cart.length} dịch vụ</span>
+              <span className={styles.mobileCartBarBadge}>
+                {cart.length} dịch vụ
+              </span>
               <span className={styles.mobileCartBarTotal}>
                 {totalAmount.toLocaleString("vi-VN")} đ
               </span>
@@ -1019,7 +1144,9 @@ const ServiceDispatchTerminal = () => {
                   onClick={() => setShowHistoryDrawer(false)}
                   className={styles.closeDrawerBtn}
                 >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
+                  <span className="material-symbols-outlined text-[20px]">
+                    close
+                  </span>
                 </button>
               </div>
 
@@ -1036,21 +1163,23 @@ const ServiceDispatchTerminal = () => {
                   historyOrders.map((ord) => (
                     <div key={ord.OrderId} className={styles.historyOrderCard}>
                       <div className={styles.historyOrderHeader}>
-                        <span className={styles.orderIdBadge}>#ORD-{ord.OrderId}</span>
+                        <span className={styles.orderIdBadge}>
+                          #ORD-{ord.OrderId}
+                        </span>
                         <span
                           className={`${styles.orderStatusBadge} ${
                             ord.Status === "Completed"
                               ? styles.statusCompleted
                               : ord.Status === "Processing"
-                              ? styles.statusProcessing
-                              : styles.statusReceived
+                                ? styles.statusProcessing
+                                : styles.statusReceived
                           }`}
                         >
                           {ord.Status === "Received"
                             ? "✓ Đã tiếp nhận"
                             : ord.Status === "Processing"
-                            ? "Đang phục vụ"
-                            : ord.Status}
+                              ? "Đang phục vụ"
+                              : ord.Status}
                         </span>
                       </div>
                       <div className={styles.orderServiceTitle}>
@@ -1058,7 +1187,10 @@ const ServiceDispatchTerminal = () => {
                       </div>
                       <div className={styles.orderRoomMeta}>
                         <span>
-                          Phòng: {ord.stay?.Room?.RoomNumber || ord.stay?.room?.RoomNumber || "—"}
+                          Phòng:{" "}
+                          {ord.stay?.Room?.RoomNumber ||
+                            ord.stay?.room?.RoomNumber ||
+                            "—"}
                         </span>
                         <span>•</span>
                         <span>
@@ -1083,7 +1215,8 @@ const ServiceDispatchTerminal = () => {
                           {Number(ord.UnitPrice || 0).toLocaleString("vi-VN")} đ
                         </span>
                         <span className={styles.orderTotalAmount}>
-                          {Number(ord.TotalPrice || 0).toLocaleString("vi-VN")} đ
+                          {Number(ord.TotalPrice || 0).toLocaleString("vi-VN")}{" "}
+                          đ
                         </span>
                       </div>
                     </div>
