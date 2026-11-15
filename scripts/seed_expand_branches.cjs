@@ -1,4 +1,4 @@
-const { Branch, Room, RoomType, sequelize } = require('./backend/src/models');
+const { Branch, Room, RoomType, sequelize } = require('../backend/src/models');
 
 const NEW_BRANCHES = [
   {

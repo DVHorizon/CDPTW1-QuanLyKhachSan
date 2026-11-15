@@ -32,6 +32,7 @@ pnpm-debug.log*
 # 6. Các tệp rác do Hệ điều hành tự động sinh ra (Windows / macOS)
 .DS_Store
 Thumbs.db
+*.lnk
 
 # 7. Các tệp cấu hình của Code Editor/IDE cá nhân (VSCode, WebStorm, Visual Studio...)
 .vscode/
