@@ -363,6 +363,13 @@ exports.processDepositPayment = async (req, res) => {
         console.error('Rollback error:', rbErr.message);
       }
     }
+    if (error?.name === 'SequelizeOptimisticLockError') {
+      return res.status(409).json({
+        success: false,
+        code: 'ERROR_CONCURRENT_MODIFICATION',
+        message: 'Đơn đặt phòng vừa được cập nhật ở phiên khác (xung đột dữ liệu). Vui lòng tải lại trang và thử lại.'
+      });
+    }
     console.error('Error in processDepositPayment:', error);
     return res.status(500).json({
       success: false,

@@ -26,6 +26,8 @@ router.put('/profile', verifyToken, authController.updateProfile);
 router.get('/bookings', verifyToken, bookingHistoryController.getMyBookings);
 router.get('/bookings/:bookingId', verifyToken, bookingHistoryController.getMyBookingDetail);
 router.patch('/bookings/:bookingId/cancel', verifyToken, bookingHistoryController.cancelMyBooking);
+router.delete('/bookings/:bookingId', verifyToken, bookingHistoryController.softDeleteMyBooking);
+router.patch('/bookings/:bookingId/restore', verifyToken, bookingHistoryController.restoreMyBooking);
 
 // FEAT-GUEST-13C: Wishlist sub-route
 router.use('/wishlist', require('./wishlistRoutes'));

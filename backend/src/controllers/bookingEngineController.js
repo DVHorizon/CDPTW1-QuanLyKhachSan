@@ -24,7 +24,25 @@ const NAME_REGEX = /^[\p{L}\s'-]{2,50}$/u;
  * Khởi tạo đơn đặt phòng trực tuyến (Checkout Step 1)
  * POST /api/v1/guest/bookings or POST /api/v1/rooms/book or POST /api/bookings
  */
+// Idempotency cache chống double-submit khi tạo booking (TTL 2 phút)
+const idempotencyBookingCache = new Map();
+
 exports.createOnlineBooking = async (req, res) => {
+  const idemKeyRaw = req.headers['idempotency-key'] || req.body?.idempotencyKey || (req.body?.lockSessionId ? `lock:${req.body.lockSessionId}` : null);
+  const idemKey = idemKeyRaw ? String(idemKeyRaw).trim() : null;
+  if (idemKey && idempotencyBookingCache.has(idemKey)) {
+    const cached = idempotencyBookingCache.get(idemKey);
+    if (Date.now() - cached.createdAt < 120000) {
+      return res.status(200).json({
+        success: true,
+        idempotentReplay: true,
+        message: 'Đơn đặt phòng đã được ghi nhận trước đó.',
+        data: cached.data
+      });
+    }
+    idempotencyBookingCache.delete(idemKey);
+  }
+
   const transaction = await sequelize.transaction();
 
   try {
@@ -291,12 +309,16 @@ exports.createOnlineBooking = async (req, res) => {
           }
           voucherDiscount = effectiveBaseRate >= 100000 ? Math.round(voucherDiscount) : Math.round(voucherDiscount * 100) / 100;
           
-          // Concurrency: Atomic update UsedCount
+          // Concurrency: Optimistic Locking + Atomic update UsedCount (Version + UsageLimit)
           const [updated] = await Voucher.update(
-            { UsedCount: sequelize.literal('UsedCount + 1') },
+            {
+              UsedCount: sequelize.literal('UsedCount + 1'),
+              Version: sequelize.literal('Version + 1')
+            },
             {
               where: {
                 VoucherId: voucher.VoucherId,
+                Version: voucher.Version ?? 0,
                 [Op.or]: [
                   { UsageLimit: null },
                   { UsageLimit: 0 },
@@ -306,10 +328,16 @@ exports.createOnlineBooking = async (req, res) => {
               transaction
             }
           );
-          if (updated > 0) {
-            appliedVoucherId = voucher.VoucherId;
-            discountAmount = Math.round((discountAmount + voucherDiscount) * 100) / 100;
+          if (updated === 0) {
+            await transaction.rollback();
+            return res.status(409).json({
+              success: false,
+              code: 'ERROR_0028_VOUCHER_LIMIT_REACHED',
+              message: 'Mã khuyến mãi vừa hết lượt sử dụng hoặc đã thay đổi. Vui lòng thử lại.'
+            });
           }
+          appliedVoucherId = voucher.VoucherId;
+          discountAmount = Math.round((discountAmount + voucherDiscount) * 100) / 100;
         }
       }
     }
@@ -450,10 +478,7 @@ exports.createOnlineBooking = async (req, res) => {
       console.warn('Warning: Broadcast failed:', bcErr.message);
     }
 
-    return res.status(201).json({
-      success: true,
-      message: 'Khởi tạo đơn đặt phòng trực tuyến thành công.',
-      data: {
+    const responseData = {
         bookingId: booking.BookingId,
         confirmationCode: booking.ConfirmationCode,
         status: booking.Status,
@@ -472,7 +497,15 @@ exports.createOnlineBooking = async (req, res) => {
           email: bookingGuest.Email,
           phone: bookingGuest.Phone
         }
-      }
+    };
+    if (idemKey) {
+      idempotencyBookingCache.set(idemKey, { createdAt: Date.now(), data: responseData });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Khởi tạo đơn đặt phòng trực tuyến thành công.',
+      data: responseData
     });
   } catch (error) {
     if (transaction) {

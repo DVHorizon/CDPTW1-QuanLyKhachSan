@@ -121,7 +121,8 @@ exports.getMyBookings = async (req, res) => {
     }
 
     const whereConditions = {
-      UserId: userId
+      UserId: userId,
+      IsDeleted: false
     };
 
     // Filter theo statusFilter
@@ -685,6 +686,13 @@ exports.cancelMyBooking = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
+    if (error?.name === 'SequelizeOptimisticLockError') {
+      return res.status(409).json({
+        success: false,
+        code: 'ERROR_CONCURRENT_MODIFICATION',
+        message: 'Đơn đặt phòng vừa được cập nhật ở phiên khác (Optimistic Lock). Vui lòng tải lại.'
+      });
+    }
     console.error('Error in cancelMyBooking:', error);
     return res.status(500).json({
       success: false,
@@ -715,7 +723,7 @@ exports.lookupGuestBooking = async (req, res) => {
     }
 
     const booking = await Booking.findOne({
-      where: { ConfirmationCode: confirmationCode },
+      where: { ConfirmationCode: confirmationCode, IsDeleted: false },
       include: [
         { model: RoomType, as: 'roomType' },
         { model: BookingGuest, as: 'guests' },
@@ -815,7 +823,7 @@ exports.cancelGuestBookingLookup = async (req, res) => {
     }
 
     const booking = await Booking.findOne({
-      where: { ConfirmationCode: confirmationCode },
+      where: { ConfirmationCode: confirmationCode, IsDeleted: false },
       include: [
         { model: BookingGuest, as: 'guests' },
         { model: User, as: 'user', attributes: ['UserId', 'Email'] },
@@ -917,11 +925,79 @@ exports.cancelGuestBookingLookup = async (req, res) => {
     });
   } catch (error) {
     await transaction.rollback();
+    if (error?.name === 'SequelizeOptimisticLockError') {
+      return res.status(409).json({
+        success: false,
+        code: 'ERROR_CONCURRENT_MODIFICATION',
+        message: 'Đơn đặt phòng vừa được cập nhật ở phiên khác (Optimistic Lock). Vui lòng thử lại.'
+      });
+    }
     console.error('Error in cancelGuestBookingLookup:', error);
     return res.status(500).json({
       success: false,
       code: 'ERROR_SERVER',
       message: 'Lỗi hệ thống khi hủy đặt phòng.'
     });
+  }
+};
+
+/**
+ * Xóa mềm đơn đặt phòng (Soft Delete: IsDeleted 0 -> 1, không xóa vật lý)
+ * DELETE /api/v1/me/bookings/:bookingId
+ */
+exports.softDeleteMyBooking = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.UserId;
+    const { bookingId } = req.params;
+    const booking = await Booking.findOne({ where: { BookingId: bookingId, UserId: userId, IsDeleted: false } });
+    if (!booking) {
+      return res.status(404).json({ success: false, code: 'ERROR_BOOKING_NOT_FOUND', message: 'Không tìm thấy đơn đặt phòng.' });
+    }
+    if (!['Cancelled', 'Completed', 'CheckedOut'].includes(booking.Status)) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_CANNOT_DELETE_ACTIVE_BOOKING',
+        message: 'Chỉ có thể đưa vào thùng rác các đơn đã hủy hoặc đã hoàn thành.'
+      });
+    }
+    booking.IsDeleted = true;
+    await booking.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Đã chuyển đơn đặt phòng vào thùng rác (Soft Delete: IsDeleted = 1).',
+      data: { bookingId: booking.BookingId, isDeleted: true, version: booking.Version }
+    });
+  } catch (error) {
+    if (error?.name === 'SequelizeOptimisticLockError') {
+      return res.status(409).json({ success: false, code: 'ERROR_CONCURRENT_MODIFICATION', message: 'Xung đột phiên bản dữ liệu.' });
+    }
+    return res.status(500).json({ success: false, message: 'Lỗi xóa mềm đơn đặt phòng.' });
+  }
+};
+
+/**
+ * Khôi phục đơn đặt phòng từ thùng rác (Soft Delete: IsDeleted 1 -> 0)
+ * PATCH /api/v1/me/bookings/:bookingId/restore
+ */
+exports.restoreMyBooking = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.UserId;
+    const { bookingId } = req.params;
+    const booking = await Booking.findOne({ where: { BookingId: bookingId, UserId: userId, IsDeleted: true } });
+    if (!booking) {
+      return res.status(404).json({ success: false, code: 'ERROR_BOOKING_NOT_FOUND', message: 'Không tìm thấy đơn trong thùng rác.' });
+    }
+    booking.IsDeleted = false;
+    await booking.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Đã khôi phục đơn đặt phòng từ thùng rác (IsDeleted = 0).',
+      data: { bookingId: booking.BookingId, isDeleted: false, version: booking.Version }
+    });
+  } catch (error) {
+    if (error?.name === 'SequelizeOptimisticLockError') {
+      return res.status(409).json({ success: false, code: 'ERROR_CONCURRENT_MODIFICATION', message: 'Xung đột phiên bản dữ liệu.' });
+    }
+    return res.status(500).json({ success: false, message: 'Lỗi khôi phục đơn đặt phòng.' });
   }
 };

@@ -38,6 +38,8 @@ router.get('/:roomId/pricing', dynamicPricingController.getRoomDynamicPricing);
 const roomReviewController = require('../controllers/roomReviewController');
 router.post('/:roomId/reviews', roomReviewController.createRoomReview);
 router.get('/:roomId/reviews', roomReviewController.getRoomReviews);
+router.delete('/reviews/:reviewId', verifyToken, roomReviewController.softDeleteReview);
+router.patch('/reviews/:reviewId/restore', verifyToken, roomReviewController.restoreReview);
 
 // GET /api/v1/rooms/:id
 router.get('/:id', roomSearchController.getRoomDetail);

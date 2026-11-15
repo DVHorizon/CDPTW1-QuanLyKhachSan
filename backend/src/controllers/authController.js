@@ -924,9 +924,25 @@ const updateProfile = async (req, res) => {
     }
 
     if (updates.length > 0) {
-      updates.push('UpdatedAt = NOW()');
-      params.push(userId);
-      await pool.query(`UPDATE Users SET ${updates.join(', ')} WHERE UserId = ?`, params);
+      updates.push('Version = COALESCE(Version, 0) + 1', 'UpdatedAt = NOW()');
+      if (req.body.version !== undefined && req.body.version !== null) {
+        const expectedVersion = parseInt(req.body.version, 10);
+        params.push(userId, Number.isNaN(expectedVersion) ? -1 : expectedVersion);
+        const [updateResult] = await pool.query(
+          `UPDATE Users SET ${updates.join(', ')} WHERE UserId = ? AND COALESCE(Version, 0) = ?`,
+          params
+        );
+        if (updateResult.affectedRows === 0) {
+          return res.status(409).json({
+            success: false,
+            code: 'ERROR_CONCURRENT_MODIFICATION',
+            message: 'Hồ sơ vừa được cập nhật ở phiên khác (Optimistic Lock). Vui lòng tải lại trang.'
+          });
+        }
+      } else {
+        params.push(userId);
+        await pool.query(`UPDATE Users SET ${updates.join(', ')} WHERE UserId = ?`, params);
+      }
     }
 
     const [users] = await pool.query(
