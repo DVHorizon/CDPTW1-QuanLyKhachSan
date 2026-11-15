@@ -11,7 +11,7 @@ const paymentController = require('../controllers/paymentController');
 const { verifyToken, optionalVerifyToken } = require('../../../middlewares/authMiddleware');
 
 // 1. Tạo yêu cầu thanh toán (POST /api/v1/payments)
-router.post('/', verifyToken, paymentController.createPayment);
+router.post('/', optionalVerifyToken, paymentController.createPayment);
 
 // Health check ping
 router.get('/ping', (req, res) =>

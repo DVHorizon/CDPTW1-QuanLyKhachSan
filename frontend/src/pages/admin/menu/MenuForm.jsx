@@ -4,6 +4,7 @@ const MenuForm = ({
   isEditing, 
   formData, 
   setFormData, 
+  categoriesList = [],
   handleSave, 
   onCancel,
   onDelete
@@ -21,7 +22,11 @@ const MenuForm = ({
               <span className="font-label-sm text-label-sm font-mono text-admin-primary font-bold uppercase tracking-wider whitespace-nowrap">
                 HỒ SƠ ĐỊNH LƯỢNG KỸ THUẬT // 
               </span>
-              
+              {isEditing && (
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/30 font-bold">
+                  🔒 Optimistic Lock v{formData.Version || 1}
+                </span>
+              )}
             </div>
             
             <input 
@@ -106,15 +111,22 @@ const MenuForm = ({
                 onChange={e => setFormData({...formData, CategoryId: Number(e.target.value)})}
                 className="font-bold text-body-sm text-on-surface bg-surface border border-outline-variant rounded-lg px-3 py-2.5 focus:border-admin-primary outline-none w-full shadow-inner cursor-pointer"
               >
-                <option value={1}>Khai Vị Nóng</option>
-                <option value={2}>Khai Vị Lạnh</option>
-                <option value={5}>Bếp Nóng (Món Chính)</option>
-                <option value={6}>Bếp Lạnh</option>
-                <option value={7}>Tráng Miệng</option>
-                <option value={8}>Đồ Uống / Bar</option>
-                <option value={14}>Bánh Mì Artisan</option>
-                <option value={19}>Trà & Cà Phê</option>
-                <option value={20}>Rượu Vang & Cocktail</option>
+                {categoriesList && categoriesList.length > 0 ? (
+                  categoriesList.map(cat => (
+                    <option key={cat.CategoryId} value={cat.CategoryId}>
+                      {cat.CategoryName}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value={1}>Khai Vị Nóng</option>
+                    <option value={2}>Khai Vị Lạnh</option>
+                    <option value={5}>Khai Vị Hải Sản</option>
+                    <option value={6}>Bếp Nóng</option>
+                    <option value={7}>Bếp Lạnh</option>
+                    <option value={8}>Tráng Miệng</option>
+                  </>
+                )}
               </select>
             </div>
           </div>

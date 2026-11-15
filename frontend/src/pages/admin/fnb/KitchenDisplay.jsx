@@ -377,9 +377,10 @@ const KitchenDisplay = () => {
           try {
             const message = JSON.parse(event.data);
 
-            // Sự kiện new_fnb_order theo chuẩn SPEC FEAT-FNB-12
-            if (message.event === 'new_fnb_order' || message.type === 'new_fnb_order') {
-              const payload = message.data || message;
+            // Sự kiện new_fnb_order theo chuẩn SPEC FEAT-FNB-12 hoặc NEW_KITCHEN_ORDER
+            if (message.event === 'new_fnb_order' || message.type === 'new_fnb_order' || message.type === 'NEW_KITCHEN_ORDER') {
+              const rawData = message.data || message;
+              const payload = (rawData && rawData.order) ? rawData.order : rawData;
               triggerNewOrderNotification(payload);
               // Tự động làm mới danh sách đơn trên giao diện KDS
               fetchOrders();
@@ -437,21 +438,63 @@ const KitchenDisplay = () => {
   }, []);
 
   const handleItemCheck = async (orderId, detailId, currentStatus) => {
+    const nextStatus = !currentStatus;
+
+    // Cập nhật Optimistic tức thời trên giao diện KDS
+    setOrders(prevOrders => prevOrders.map(ord => {
+      if (ord.foodOrderId !== orderId) return ord;
+      return {
+        ...ord,
+        items: (ord.items || []).map(it => {
+          if (it.orderDetailId === detailId) {
+            return { ...it, isCompleted: nextStatus };
+          }
+          return it;
+        })
+      };
+    }));
+
     try {
       const res = await fetch(`http://localhost:5000/api/v1/fnb-orders/kitchen/${orderId}/items/${detailId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isCompleted: !currentStatus })
+        body: JSON.stringify({ isCompleted: nextStatus })
       });
       const data = await res.json();
       if (!data.success) {
+        // Rollback lại nếu server thất bại
+        setOrders(prevOrders => prevOrders.map(ord => {
+          if (ord.foodOrderId !== orderId) return ord;
+          return {
+            ...ord,
+            items: (ord.items || []).map(it => {
+              if (it.orderDetailId === detailId) {
+                return { ...it, isCompleted: currentStatus };
+              }
+              return it;
+            })
+          };
+        }));
         showMessageModal('error', 'LỖI', data.message || 'Không thể cập nhật món.');
       } else {
-        fetchOrders();
+        await fetchOrders();
         fetchExpediterMetrics();
-        showMessageModal('success', 'THÀNH CÔNG', !currentStatus ? 'Đã hoàn thành món!' : 'Đã bỏ đánh dấu món');
+        showMessageModal('success', 'THÀNH CÔNG', nextStatus ? 'Đã hoàn thành món!' : 'Đã bỏ đánh dấu món');
       }
     } catch (error) {
+      // Rollback lại nếu lỗi kết nối
+      setOrders(prevOrders => prevOrders.map(ord => {
+        if (ord.foodOrderId !== orderId) return ord;
+        return {
+          ...ord,
+          items: (ord.items || []).map(it => {
+            if (it.orderDetailId === detailId) {
+              return { ...it, isCompleted: currentStatus };
+            }
+            return it;
+          })
+        };
+      }));
       showMessageModal('error', 'LỖI HỆ THỐNG', 'Lỗi kết nối khi cập nhật món.');
     }
   };
@@ -1003,7 +1046,7 @@ const KitchenDisplay = () => {
 
               <div className="flex items-center justify-between text-xs py-1 text-on-surface-variant font-medium">
                 <span>Loại đơn: <strong>{newOrderPopup.orderType === 'DineIn' ? 'Tại bàn (Dine-In)' : 'Dịch vụ phòng (Room Service)'}</strong></span>
-                <span>Giờ đặt: <strong>{new Date(newOrderPopup.orderTime).toLocaleTimeString('vi-VN')}</strong></span>
+                <span>Giờ đặt: <strong>{newOrderPopup.orderTime && !isNaN(new Date(newOrderPopup.orderTime).getTime()) ? new Date(newOrderPopup.orderTime).toLocaleTimeString('vi-VN') : new Date().toLocaleTimeString('vi-VN')}</strong></span>
               </div>
 
               {newOrderPopup.note && (

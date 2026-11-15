@@ -7,6 +7,14 @@ const safeFetch = async (endpoint, options = {}) => {
   const primaryUrl = `${API_BASE_URL}${endpoint}`;
   try {
     const res = await fetch(primaryUrl, options);
+    // Nếu Vite proxy trả lỗi 500/502/504 rỗng (do chưa cấu hình proxy target), tự động fallback sang cổng 5000
+    if (res.status >= 500 && API_BASE_URL.startsWith('/')) {
+      const cloned = res.clone();
+      const bodyText = await cloned.text().catch(() => '');
+      if (!bodyText || bodyText.trim() === '') {
+        return await fetch(`http://localhost:5000${API_BASE_URL}${endpoint}`, options);
+      }
+    }
     return res;
   } catch (primaryErr) {
     console.warn(`Primary fetch tới ${primaryUrl} gặp lỗi mạng, đang thử fallback:`, primaryErr);
@@ -21,14 +29,15 @@ const safeFetch = async (endpoint, options = {}) => {
  * Đăng nhập hệ thống
  * POST /api/v1/auth/login
  */
-export const loginUser = async ({ identifier, password }) => {
+export const loginUser = async ({ identifier, password, expectedRole }) => {
   try {
     const res = await safeFetch('/v1/auth/login', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ identifier, password })
+      body: JSON.stringify({ identifier, password, expectedRole })
     });
 
     const text = await res.text();
@@ -55,19 +64,34 @@ export const loginUser = async ({ identifier, password }) => {
  * Đăng ký tài khoản khách hàng mới
  * POST /api/v1/auth/register
  */
-export const registerUser = async ({ fullName, email, phone, password, enrollClub = true }) => {
+export const registerUser = async ({
+  fullName,
+  email,
+  phone,
+  phoneNumber,
+  password,
+  confirmPassword,
+  enrollClub = true,
+  roleId,
+  roleName
+}) => {
   try {
     const res = await safeFetch('/v1/auth/register', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         fullName,
         email,
-        phone,
+        phone: phone || phoneNumber,
+        phoneNumber: phoneNumber || phone,
         password,
-        enrollClub
+        confirmPassword,
+        enrollClub,
+        roleId,
+        roleName
       })
     });
 
@@ -91,6 +115,7 @@ export const fetchCurrentUser = async (token) => {
     if (!token) return null;
     const res = await safeFetch('/v1/auth/me', {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -159,12 +184,12 @@ export const loginWithFacebook = async (payload) => {
 
 /**
  * Cập nhật thông tin tài khoản hiện tại
- * PUT /api/v1/auth/me
+ * PUT /api/v1/auth/me (fallback PUT /api/v1/me/profile)
  */
 export const updateCurrentUser = async (token, userData) => {
   try {
     if (!token) return { success: false, message: 'Chưa xác thực' };
-    const res = await safeFetch('/v1/auth/me', {
+    let res = await safeFetch('/v1/auth/me', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -173,11 +198,115 @@ export const updateCurrentUser = async (token, userData) => {
       body: JSON.stringify(userData)
     });
 
+    if (res.status === 404) {
+      res = await safeFetch('/v1/me/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(userData)
+      });
+    }
+
     const data = await res.json();
     return data;
   } catch (error) {
     console.error('Lỗi API updateCurrentUser:', error);
     return { success: false, message: 'Lỗi mạng khi cập nhật hồ sơ' };
+  }
+};
+
+/**
+ * Yêu cầu gửi mã OTP 6 số khôi phục mật khẩu
+ * POST /api/v1/auth/forgot-password
+ */
+export const forgotPasswordApi = async (email) => {
+  try {
+    const res = await safeFetch('/v1/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Lỗi API forgotPasswordApi:', error);
+    return { success: false, message: 'Không thể kết nối đến máy chủ.' };
+  }
+};
+
+/**
+ * Xác thực OTP 6 số và đặt lại mật khẩu mới
+ * POST /api/v1/auth/reset-password
+ */
+export const resetPasswordApi = async ({ email, otpCode, newPassword, confirmPassword }) => {
+  try {
+    const res = await safeFetch('/v1/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otpCode, newPassword, confirmPassword })
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Lỗi API resetPasswordApi:', error);
+    return { success: false, message: 'Không thể kết nối đến máy chủ.' };
+  }
+};
+
+/**
+ * Đổi mật khẩu khi đang đăng nhập
+ * PUT /api/v1/auth/change-password
+ */
+export const changePasswordApi = async (token, { currentPassword, newPassword, confirmPassword }) => {
+  try {
+    if (!token) return { success: false, message: 'Chưa xác thực' };
+    const res = await safeFetch('/v1/auth/change-password', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Lỗi API changePasswordApi:', error);
+    return { success: false, message: 'Không thể kết nối đến máy chủ.' };
+  }
+};
+
+/**
+ * Cấp lại accessToken từ HttpOnly refresh cookie
+ * POST /api/v1/auth/refresh
+ */
+export const refreshAuthToken = async () => {
+  try {
+    const res = await safeFetch('/v1/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) return { success: false };
+    return await res.json();
+  } catch {
+    return { success: false };
+  }
+};
+
+/**
+ * Đăng xuất và xóa HttpOnly refresh cookie
+ * POST /api/v1/auth/logout
+ */
+export const logoutUserSession = async () => {
+  try {
+    const res = await safeFetch('/v1/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return await res.json();
+  } catch {
+    return { success: false };
   }
 };
 

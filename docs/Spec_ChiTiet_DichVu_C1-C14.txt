@@ -173,7 +173,7 @@ Hệ thống hỗ trợ 2 hình thức gửi dữ liệu:
 Trường	Tên hiển thị	Kiểu	Bắt buộc	Ràng buộc chính
 stayId	Lượt lưu trú	int (FK, hoặc tra theo số phòng/mã booking)	Có	Phải tồn tại; Stay.Status ∈ {CheckedIn, Extended} (mục 3.3.b)
 serviceId	Dịch vụ	int (FK)	Có	Phải tồn tại và Services.Status = Active
-quantity	Số lượng	decimal	Có	> 0 và ≤ 50 (giới hạn hợp lý 1 lần đặt, tránh nhập nhầm)
+quantity	Số lượng	decimal	Có	> 0 và ≤ 100; Đối với đơn vị rời rạc (Lượt, Phần, Chai, Vé) bắt buộc là số nguyên dương; Đối với đơn vị thời gian (Giờ) cho phép số thập phân bước nhảy 0.5 (R2 điều chỉnh)
 note	Ghi chú	string	Không	Tối đa 500 ký tự
 
 2. Đặt nhiều dịch vụ cùng lúc (Batch Order — đồng bộ theo UI ServiceDispatchTerminal):
@@ -193,9 +193,10 @@ b) Trạng thái Stay
 c) Dịch vụ (serviceId)
     • Service phải Status = Active tại thời điểm đặt; nếu Inactive → ERROR_0014_INACTIVE_REFERENCE.
     • Giá áp dụng (unitPrice) LUÔN lấy snapshot từ Services.Price ngay tại thời điểm tạo đơn và lưu cố định vào ServiceOrders.UnitPrice — nếu sau này Admin đổi giá catalog, các đơn cũ KHÔNG bị ảnh hưởng (đảm bảo tính đúng của lịch sử/hoá đơn).
-d) quantity
+d) quantity (R2 điều chỉnh quy tắc dữ liệu)
     • Phải > 0 → nếu ≤ 0: ERROR_0012_OUT_OF_RANGE.
-    • Giới hạn tối đa 50/lần đặt (giá trị nghiệp vụ tự chọn để tránh nhầm lẫn thao tác) — vượt quá cũng trả ERROR_0012_OUT_OF_RANGE với message riêng.
+    • Giới hạn tối đa 100/lần đặt cho mỗi mục dịch vụ (giá trị nới rộng theo R2 để phục vụ khách đoàn/giặt ủi) — vượt quá trả ERROR_0012_OUT_OF_RANGE.
+    • Ràng buộc bước nhảy: Các dịch vụ có đơn vị tính rời rạc (Lượt, Suất, Phần, Chai, Vé...) bắt buộc là số nguyên dương >= 1; Các dịch vụ có đơn vị thời gian (Giờ) cho phép số thập phân làm tròn 1 chữ số (bước nhảy 0.5).
 3.4. Luồng xử lý
     8. Actor mở màn Đặt dịch vụ, hệ thống xác thực token (401 nếu thiếu/hết hạn, dừng xử lý).
     9. Nếu là Guest: hệ thống tự xác định Stay hiện tại của Guest (đang CheckedIn/Extended); nếu không có Stay hợp lệ → không hiển thị chức năng đặt dịch vụ (ẩn hẳn màn hình, không phải lỗi hiển thị).
@@ -213,7 +214,7 @@ stayId	Stay chưa CheckedIn / đã CheckedOut / Cancelled	ERROR_0015_PRECONDITIO
 serviceId	Không tồn tại	ERROR_0011_NOT_FOUND	Dịch vụ không tồn tại hoặc đã bị xoá
 serviceId	Service Status = Inactive	ERROR_0014_INACTIVE_REFERENCE	Dịch vụ hiện không còn hoạt động
 quantity	≤ 0	ERROR_0012_OUT_OF_RANGE	Số lượng phải lớn hơn 0
-quantity	> 50	ERROR_0012_OUT_OF_RANGE	Số lượng vượt quá giới hạn cho phép (tối đa 50)
+quantity	> 100 hoặc sai bước nhảy	ERROR_0012_OUT_OF_RANGE	Số lượng vượt quá giới hạn cho phép (tối đa 100) hoặc không đúng bước nhảy quy định
 note	> 500 ký tự	ERROR_0003_MAX_LENGTH	Ghi chú không được vượt quá 500 ký tự
 Chung	Tạo đơn thành công	SUCCESS_0001_CREATED	Thêm mới đơn dịch vụ thành công
 3.6. Test case mẫu
@@ -252,9 +253,11 @@ Cancelled	bất kỳ	✘ Không	Trạng thái cuối (final) — khoá vĩnh vi�
 Bất kỳ	Received	✘ Không	Không có transition nào quay lại Received
 Mọi transition không nằm trong bảng trên → trả ERROR_0013_INVALID_STATE_TRANSITION.
 4.4. Quy tắc nghiệp vụ chi tiết
-    • Quyền cập nhật: mặc định áp dụng cho mọi tài khoản nội bộ (role ≠ Guest), vì bảng ServiceOrders hiện KHÔNG có cột AssignedTo/HandledBy để ràng buộc đúng nhân viên được giao. Đề xuất bổ sung cột ServiceOrders.AssignedTo (nullable, FK → Users) nếu về sau cần kiểm soát chặt "chỉ nhân viên được giao mới được cập nhật" — cần Trang xác nhận trước khi migrate; trong phạm vi hiện tại, mọi nhân viên nội bộ có quyền cập nhật bất kỳ đơn nào.
+    • Bổ sung trường người phụ trách (R2 điều chỉnh): Bảng ServiceOrders được bổ sung cột `AssignedTo` (INT, FK → Users, NULLABLE). Khi nhân viên kéo đơn từ Received sang InProgress trên bảng Kanban màn 24, nếu đơn chưa có người phụ trách thì hệ thống tự động gán `AssignedTo` bằng chính UserId của nhân viên thao tác.
+    • Quyền cập nhật: Áp dụng cho tài khoản nội bộ (role ≠ Guest); riêng thao tác huỷ khi đơn đã InProgress chỉ nhân viên nội bộ mới được thực hiện.
     • Riêng trường hợp Guest tự huỷ đơn của chính mình: chỉ được phép khi đơn đang ở Received (chưa ai xử lý) và đơn đó gắn với Stay của chính Guest đó; nếu đơn đã InProgress → Guest bị từ chối với ERROR_0010_FORBIDDEN ("Đơn đang được xử lý, vui lòng liên hệ lễ tân để huỷ").
-    • Khi newStatus = Cancelled: cancelReason bắt buộc, không được để trống (ERROR_0001_REQUIRED nếu thiếu); nội dung được lưu vào ServiceOrders.Note (ghi đè Note cũ nếu có, có thể nối thêm log lịch sử nếu cần — ngoài phạm vi spec DB hiện tại vì Note chỉ là 1 trường text, không phải bảng log riêng).
+    • Khi newStatus = Cancelled: cancelReason bắt buộc, không được để trống (ERROR_0001_REQUIRED nếu thiếu); nội dung được lưu vào ServiceOrders.Note.
+    • Xử lý chi phí khi huỷ đơn InProgress (R2 điều chỉnh): Đơn Cancelled mặc định KHÔNG cộng vào hoá đơn phòng (C6 bỏ qua); nếu phát sinh phí tổn thực tế (nguyên vật liệu đã chế biến), nhân viên lễ tân/thu ngân sẽ ghi nhận khoản phí đền bù huỷ ngang thông qua cơ chế `manualAdjustments` (loại Surcharge) tại bước tạo Master Invoice (C7).
     • TotalPrice là cột Computed (Quantity × UnitPrice) — không bị ảnh hưởng bởi việc đổi Status, giữ nguyên trong mọi trường hợp kể cả Cancelled (để vẫn tra cứu được giá trị đơn đã huỷ khi cần đối soát).
 4.5. Luồng xử lý
     15. Actor bấm nút chuyển trạng thái (Start/Complete/Cancel) trên 1 đơn dịch vụ cụ thể (orderId).
@@ -345,13 +348,13 @@ Spec này vì vậy có thêm mục 1.6 "Chế độ Mock Gateway" — cho phép
 0.1. Mã lỗi mới bổ sung
 Kế thừa toàn bộ ERROR_0001–ERROR_0015 và SUCCESS_0001 từ Spec mẫu và Spec C1–C4. Bổ sung 1 mã mới dùng riêng cho tổ hợp tham chiếu loại trừ lẫn nhau (mutually exclusive):
 Mã lỗi	Ý nghĩa	Message mẫu (template)	Áp dụng khi
-ERROR_0016_INVALID_COMBINATION	Tổ hợp trường không hợp lệ (loại trừ lẫn nhau)	Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}	Client gửi cả bookingId & invoiceId, hoặc gửi thiếu cả hai, trong khi API yêu cầu đúng 1 trong 2
+ERROR_0016_INVALID_COMBINATION	Tổ hợp trường không hợp lệ (loại trừ lẫn nhau)	Chỉ được cung cấp đúng 1 trong 2: {A} hoặc {B}	Client gửi cả bookingId & invoiceId, hoặc gửi thiếu cả hai, trong khi API POST /payments yêu cầu đúng 1 trong 2 (Lưu ý: Ràng buộc này chỉ áp dụng cho payload gọi API, KHÔNG áp dụng cho bảng Payments trong DB sau khi liên kết cọc ở C7 — R2 điều chỉnh)
 0.2. Quy ước riêng cho module Thanh toán
     • Toàn bộ tiền vào Payments.Amount là số tiền GUEST/NHÂN VIÊN thực trả trong 1 lần giao dịch — không phải tổng công nợ; 1 booking hoặc 1 invoice có thể có NHIỀU dòng Payments (trả nhiều lần / cọc rồi trả nốt).
     • PaymentDate được set NGAY khi tạo bản ghi (= thời điểm khởi tạo giao dịch, không phải thời điểm hoàn tất) — vì cột này NOT NULL trong khi thanh toán online có thể ở trạng thái Pending một khoảng thời gian trước khi có kết quả. Thời điểm hoàn tất thực tế (nếu cần đối soát chi tiết) được đọc từ GatewayResponse (JSON gateway trả về có timestamp riêng).
     • 6 giá trị PaymentMethod chia 3 nhóm hành vi khác nhau (mục 1.4.c): Cash / Card / BankTransfer = xử lý tại quầy (staff-only, Paid ngay); VNPay / MoMo = cổng redirect (Pending → chờ callback); VietQR = mã QR động (Pending → chờ callback hoặc xác nhận thủ công).
 
-1. FEAT-PAYMENT-01 — Core Payment Module
+5. FEAT-PAYMENT-01 — Core Payment Module
 Tương ứng: C5 trong Bảng truy vết  |  Màn hình 7 (Thanh toán tiền cọc), 26 (Thanh toán hoá đơn & Mã QR)  |  Bảng DB: Payments
 1.1. Tổng quan tính năng
 	
@@ -383,8 +386,9 @@ a) Quyền thực hiện
     • Lễ tân/Thu ngân: được tạo payment hộ cho bất kỳ booking/invoice hợp lệ nào, với BẤT KỲ method nào trong 6 giá trị.
     • method ∈ {Cash, Card, BankTransfer} do Guest gửi lên → 403 (ERROR_0010_FORBIDDEN, message: "Hình thức thanh toán này chỉ áp dụng tại quầy").
     • Không có token / hết hạn → 401 (ERROR_0009_UNAUTHENTICATED).
-b) Context (bookingId XOR invoiceId) & số tiền hợp lệ
-    • Phải có ĐÚNG 1 trong 2 trường bookingId/invoiceId; có cả hai hoặc không có cái nào → ERROR_0016_INVALID_COMBINATION.
+b) Context (bookingId XOR invoiceId) & số tiền hợp lệ (R2 điều chỉnh)
+    • Phải có ĐÚNG 1 trong 2 trường bookingId/invoiceId khi gọi POST /payments; có cả hai hoặc không có cái nào → ERROR_0016_INVALID_COMBINATION.
+    • Phân định kiến trúc: Quy tắc XOR này chỉ áp dụng duy nhất cho Payload đầu vào khi tạo thanh toán mới. Trong cơ sở dữ liệu bảng Payments, một bản ghi thanh toán tiền cọc SAU KHI được liên kết ở C7 sẽ có ĐỒNG THỜI cả BookingId (gốc) và InvoiceId (tất toán) — đây là trạng thái hợp lệ của hệ thống.
     • Nếu bookingId: Booking phải tồn tại (nếu không → ERROR_0011_NOT_FOUND) và Booking.Status ∈ {Pending, Confirmed} (không cho thanh toán cọc cho booking đã Cancelled/NoShow/Completed → ERROR_0015_PRECONDITION_FAILED, message "Booking không ở trạng thái chờ thanh toán"). amount không được vượt quá (Booking.DepositAmount − tổng Payments.Amount đã Paid trước đó cho booking này) → vượt quá trả ERROR_0012_OUT_OF_RANGE ("Số tiền vượt quá số cọc còn phải thanh toán").
     • Nếu invoiceId: Invoice phải tồn tại (ERROR_0011_NOT_FOUND nếu không) và Invoice.Status ∈ {Unpaid, PartiallyPaid} (Invoice đã Paid/Cancelled → ERROR_0015_PRECONDITION_FAILED, message "Hoá đơn không ở trạng thái chờ thanh toán"). amount không được vượt quá (Invoice.TotalAmount − tổng Payments.Amount đã Paid trước đó cho invoice này) → vượt quá trả ERROR_0012_OUT_OF_RANGE ("Số tiền vượt quá số dư hoá đơn còn lại").
 c) Hành vi theo từng method
@@ -438,7 +442,7 @@ Trường	Tên hiển thị	Kiểu	Bắt buộc	Ràng buộc chính
 refundReason	Lý do hoàn tiền	string	Có	2–500 ký tự sau trim
 refundAmount	Số tiền hoàn	decimal	Không (mặc định = Amount gốc)	Nếu có: > 0 và ≤ Amount gốc của Payment
     • Chỉ áp dụng khi Payment.Status = 'Paid' hiện tại → khác 'Paid' → ERROR_0013_INVALID_STATE_TRANSITION.
-    • Sau khi hoàn tiền: Status = 'Refunded'; refundReason và refundAmount được ghi bổ sung vào GatewayResponse (dạng JSON) vì bảng Payments hiện KHÔNG có cột RefundReason/RefundAmount riêng — đề xuất bổ sung 2 cột này (nullable) nếu về sau cần báo cáo/lọc riêng theo hoàn tiền, cần Trang xác nhận trước khi migrate.
+    • Sau khi hoàn tiền: Status = 'Refunded'; refundReason và refundAmount được ghi trực tiếp vào các cột Payments.RefundReason, Payments.RefundAmount đã có sẵn trong model Payment.js. Đồng thời hệ thống tự động gọi hàm đối soát để cập nhật lại Invoices.Status tương ứng (PartiallyPaid nếu hoàn 1 phần, Cancelled/Refunded nếu hoàn toàn bộ — xem C10 mục 1.4.e, R2 điều chỉnh).
     • Việc hoàn tiền thật ra ngân hàng/ví điện tử (gọi API refund của VNPay/MoMo) nằm NGOÀI phạm vi tối thiểu của spec này — trong phạm vi đồ án, coi hoàn tiền là thao tác ghi nhận nghiệp vụ (kế toán chuyển khoản thủ công), Refund tại đây chỉ cập nhật đúng trạng thái & lịch sử trong hệ thống.
 1.10. Bảng lỗi áp dụng
 Trường	Điều kiện lỗi	Mã lỗi	Message cụ thể
@@ -518,7 +522,7 @@ Ghi nhận gốc: "Invoices gắn theo StayId — 1 booking nhiều phòng sẽ 
 CÁCH C6 TRÁNH XUNG ĐỘT NÀY: C6 (GET /bookings/{bookingId}/charges) KHÔNG đọc và KHÔNG ghi bảng Invoices/InvoiceDetails. Nó tính trực tiếp từ dữ liệu vận hành gốc (Bookings, Stays, ServiceOrders, MinibarUsages, FoodOrders) theo PHẠM VI BOOKING (gộp tất cả Stay/phòng thuộc booking đó trong 1 lần gọi) — nhờ vậy không bị giới hạn bởi quan hệ 1 Invoice : 1 Stay hiện có trong DB.
 Việc GHI dữ liệu này thành 1 bản ghi Invoices chính thức (và quyết định schema Invoices.BookingId/StayId cần đổi thế nào để hết mâu thuẫn khi PERSIST) thuộc phạm vi FEAT-INVOICE-02 (C7 — POST /invoices/master), sẽ đặc tả trong tài liệu kế tiếp. Mục 4 của tài liệu này nêu trước hướng giải quyết để nhóm hình dung, nhưng chưa phải spec đầy đủ cho C7.
 
-1. FEAT-INVOICE-01 — Tự động gom chi phí lưu trú (Booking Charges Aggregation)
+6. FEAT-INVOICE-01 — Tự động gom chi phí lưu trú (Booking Charges Aggregation)
 Tương ứng: C6 trong Bảng truy vết  |  Màn hình 20 (Check-out), 25 (Hoá đơn tổng hợp)  |  Endpoint: GET /api/v1/bookings/{bookingId}/charges (alias: GET /bookings/{bookingId}/charges)
 1.1. Tổng quan tính năng
 	
@@ -533,47 +537,68 @@ Tham số	Kiểu	Bắt buộc	Mô tả / Ràng buộc
 bookingId	int (path param)	Có	Phải tồn tại trong bảng Bookings; không tồn tại → ERROR_0011_NOT_FOUND
 1.3. Cấu trúc dữ liệu trả về (Response)
 Trường	Kiểu	Ý nghĩa
-bookingId	int	Booking đang được tổng hợp
+bookingId	int	Booking đang được tổng hợp (hỗ trợ truyền cả BookingId số hoặc ConfirmationCode)
+confirmationCode	string	Mã xác nhận đặt phòng
+guestName	string	Họ tên khách đại diện của Booking
+roomNumber	string	Danh sách số phòng lưu trú thực tế (hoặc "Chưa gán phòng (Dự tính)")
+checkInDate, checkOutDate	date	Ngày nhận/trả phòng dự kiến của Booking
 estimated	boolean	true nếu booking CHƯA có Stay nào (chưa check-in) — số liệu chỉ là ước tính theo kế hoạch đặt phòng, xem mục 1.4.d
-hasPendingServices	boolean	true nếu còn ≥1 ServiceOrders chưa Completed thuộc booking này — cảnh báo nhân viên, KHÔNG chặn API (mục 1.4.c)
+hasPendingServices	boolean	true nếu còn ≥1 ServiceOrders, FoodOrders (RoomInvoice) hoặc biên bản DamageItems chưa hoàn tất/chờ duyệt thuộc booking này — cảnh báo nhân viên, KHÔNG chặn API (mục 1.4.c)
 stays[]	array	1 phần tử cho mỗi phòng/lượt lưu trú thuộc booking (rỗng nếu estimated=true)
-stays[].stayId, roomId, roomNumber	int/string	Định danh lượt lưu trú và phòng thực tế
-stays[].room	object	{ nights, unitPrice, subtotal } — chi tiết tiền phòng của riêng Stay này (mục 1.4.b)
-stays[].services[]	array	Danh sách ServiceOrders Status=Completed của Stay này, kèm subtotal
-stays[].minibar[]	array	Danh sách MinibarUsages của Stay này, kèm subtotal
-stays[].food[]	array	Danh sách FoodOrders PaymentMode=RoomInvoice & Status=Served của Stay này, kèm subtotal
-stays[].staySubtotal	decimal	= room.subtotal + services subtotal + minibar subtotal + food subtotal
-surchargeAmount	decimal	= Bookings.SurchargeAmount hiện tại (lấy nguyên, không tính lại — mục 1.4.e)
+stays[].stayId, roomId, roomNumber, roomTypeName	int/string	Định danh lượt lưu trú, phòng thực tế và tên hạng phòng
+stays[].room	object	{ nights, unitPrice, subtotal } — chi tiết tiền phòng cơ sở của riêng Stay này (mục 1.4.b)
+stays[].extensions[]	array	Danh sách phí gia hạn lưu trú (StayExtensions CONFIRMED) & phụ thu đổi/nâng hạng phòng (RoomMoveRequests COMPLETED) của Stay này
+stays[].services[]	array	Danh sách ServiceOrders Status=Completed của Stay này (kèm tên dịch vụ và phân loại ServiceCategories), kèm subtotal
+stays[].minibar[]	array	Danh sách MinibarUsages (tra tên từ InventoryItems & MinibarProducts; fallback MinibarInspectionLines CONFIRMED) của Stay này, kèm subtotal
+stays[].food[]	array	Danh sách FoodOrders PaymentMode=RoomInvoice & Status ∈ {Served, Delivered, Completed} của Stay này, kèm subtotal
+stays[].damages[]	array	Danh sách bồi thường hư hỏng & phạt (DamageItems APPROVED/CONFIRMED/CHARGED + RoomInspectionReports LinenDamageFee/KeycardLossPenalty) của Stay này
+stays[].staySubtotal	decimal	= room.subtotal + services subtotal + minibar subtotal + food subtotal + extensions subtotal + damages subtotal
+extensions[]	array	Mảng phẳng gộp toàn bộ khoản gia hạn lưu trú & phụ thu nâng hạng phòng của mọi Stay để hiển thị trực tiếp trên Bảng 1 (Master Folio)
+minibar[]	array	Mảng phẳng gộp toàn bộ tiêu dùng Minibar của mọi Stay để hiển thị trên Bảng 2 (Master Folio)
+services[]	array	Mảng phẳng gộp toàn bộ dịch vụ khách sạn (Giặt ủi, Spa, Tour...) đã hoàn thành để hiển thị trên Bảng 3 (Master Folio)
+foodAndBeverage[]	array	Mảng phẳng gộp toàn bộ đơn F&B ghi nợ phòng (RoomInvoice) để hiển thị trên Bảng 4 (Master Folio)
+damages[]	array	Mảng phẳng gộp toàn bộ khoản bồi thường thiệt hại buồng phòng & phạt kiểm phòng để hiển thị trên Bảng 5 (Master Folio)
+summary	object	{ roomSubtotal, extensionSubtotal, minibarSubtotal, serviceSubtotal, foodSubtotal, damageSubtotal, surcharge, discount, grandTotal, totalPaid, remainingBalance } — khối tổng hợp tài chính hiển thị trên Bảng Kê
+surchargeAmount	decimal	= MAX(0, Bookings.SurchargeAmount − extensionSubtotal − damageSubtotal) để tránh tính trùng các khoản gia hạn/đền bù đã bóc tách riêng (mục 1.4.e)
 discountAmount	decimal	= Bookings.DiscountAmount hiện tại (lấy nguyên, không tính lại — mục 1.4.e)
 grandTotal	decimal	= tổng staySubtotal của mọi Stay + surchargeAmount − discountAmount
+totalPaid	decimal	= MAX(tổng Payments hợp lệ thuộc PAID_STATUSES trừ RefundAmount, Bookings.DepositAmount)
+remainingBalance	decimal	= MAX(0, grandTotal − totalPaid) — số tiền còn phải thu tại quầy
 1.4. Quy tắc nghiệp vụ chi tiết
 a) Quyền truy cập
-    • Chỉ tài khoản nội bộ (role ≠ Guest: Lễ tân, Thu ngân, Admin...) được gọi endpoint này → Guest gọi trực tiếp → 403 (ERROR_0010_FORBIDDEN). Guest chỉ xem được hoá đơn CHÍNH THỨC sau khi đã phát hành (thuộc tính năng khác, C10).
+    • Chỉ tài khoản nội bộ (role ≠ Guest: Lễ tân, Thu ngân, Admin, Manager, Accountant...) được gọi endpoint này → Guest gọi trực tiếp → 403 (ERROR_0010_FORBIDDEN). Guest chỉ xem được hoá đơn CHÍNH THỨC sau khi đã phát hành (thuộc tính năng khác, C10).
     • Không có token / hết hạn → 401 (ERROR_0009_UNAUTHENTICATED).
-b) Tính tiền phòng (room) — theo TỪNG Stay
-    • unitNight (đơn giá phòng/đêm) = Bookings.RoomSubtotal ÷ Bookings.RoomQuantity ÷ Bookings.NumberOfNights — vì 1 Booking chỉ đặt 1 RoomTypeId duy nhất nên mọi phòng trong cùng booking có đơn giá/đêm bằng nhau theo hợp đồng ban đầu.
-    • Số đêm tính cho 1 Stay: nếu Stay.Status = 'CheckedOut' → dùng đúng (ActualCheckOut − ActualCheckIn), làm tròn LÊN theo ngày, tối thiểu 1 đêm. Nếu Stay đang CheckedIn/Extended (chưa trả phòng) → dùng (NOW() − ActualCheckIn) làm tròn lên, để nhân viên xem tạm tính nếu khách hỏi trước khi checkout.
-    • room.subtotal = unitNight × số đêm tính được ở trên (mục này CHƯA gồm phụ thu do gia hạn/trả trễ — phần đó đã được cộng dồn sẵn vào Bookings.SurchargeAmount bởi tính năng Gia hạn lưu trú/Check-out, C6 chỉ lấy lại ở mục e, KHÔNG tính lại).
-c) Dịch vụ (ServiceOrders)
-    • Chỉ cộng các ServiceOrders có Status = 'Completed' của đúng StayId đang xét; ServiceOrders Status = 'Cancelled' KHÔNG được cộng.
-    • Nếu Stay còn ServiceOrders ở Status ∈ {Received, InProgress}: KHÔNG chặn API, nhưng response set hasPendingServices = true ở cấp booking để FE hiển thị cảnh báo (VD: "Còn 2 dịch vụ chưa hoàn tất — kiểm tra trước khi Check-out").
+b) Tính tiền phòng cơ sở (room) & tách bạch Gia hạn lưu trú (extensions) — theo TỪNG Stay
+    • Khi luồng Gia hạn lưu trú (`stayExtensionRoutes.js`) xác nhận gia hạn, hệ thống cộng thêm `AdditionalNights` vào `Bookings.NumberOfNights` nhưng giữ nguyên `Bookings.RoomSubtotal` (phần tiền gia hạn được ghi vào `StayExtensions` và cộng vào `Bookings.SurchargeAmount`).
+    • Do đó, C6 truy vấn trước các bản ghi `StayExtensions` (`ExtensionStatus = 'CONFIRMED'`) để xác định `totalExtendedNights`. Số đêm hợp đồng gốc trước gia hạn là `baseContractNights = MAX(1, Bookings.NumberOfNights − totalExtendedNights)`.
+    • `unitNight` (đơn giá phòng hợp đồng/đêm) = `Bookings.RoomSubtotal ÷ (Bookings.RoomQuantity × baseContractNights)`.
+    • Tiền phòng cơ sở của mỗi Stay tính theo số đêm gốc (`nights = MAX(1, stayNights − stayExtendedNights)`), nhân với `unitNight`.
+    • Các đêm gia hạn (`StayExtensions` có `ExtensionStatus = 'CONFIRMED'`) và phụ thu nâng hạng đổi phòng (`RoomMoveRequests` có `MoveStatus = 'COMPLETED'`, `RateDifference > 0`) được tách thành mảng `extensions[]` hiển thị riêng dòng "Gia hạn lưu trú (+X đêm)" ngay trong Bảng 1 để minh bạch cho khách và thu ngân, tuyệt đối không nhân trùng hay làm loãng đơn giá đêm gốc.
+c) Dịch vụ khách sạn (ServiceOrders), Minibar, Ẩm thực F&B (FoodOrders) và Bồi thường kiểm phòng (Damages)
+    • Dịch vụ (`ServiceOrders`): Chỉ cộng các đơn có `Status = 'Completed'` của đúng `StayId` đang xét (kèm tên dịch vụ từ `Services` và phân loại từ `ServiceCategories`). Nếu còn đơn ở `Status ∈ {Received, InProgress, Processing, Pending, Confirmed}` → bật `hasPendingServices = true`.
+    • Minibar (`MinibarUsages` & `MinibarInspectionLines`): Ưu tiên lấy từ `MinibarUsages` của `StayId` (tra cứu tên sản phẩm từ cả `InventoryItems` và `MinibarProducts`). Nếu chưa có bản ghi trong `MinibarUsages`, fallback sang biên bản kiểm phòng `MinibarInspectionLines` (`MinibarInspections.Status = 'CONFIRMED'` và `BillableQty > 0`).
+    • Ẩm thực F&B (`FoodOrders`): Chỉ cộng các đơn có `PaymentMode = 'RoomInvoice'` và `Status ∈ {Served, Delivered, Completed}` (bỏ qua đơn `PayNow` đã thu tiền trực tiếp tại nhà hàng). Nếu còn đơn `RoomInvoice` ở `Status ∈ {Pending, Confirmed, Preparing, Cooking, Ready}` → bật `hasPendingServices = true`.
+    • Bồi thường & Phạt kiểm phòng (`DamageItems` & `RoomInspectionReports`): Cộng các khoản hư hỏng tài sản phòng trong `DamageItems` có `Status ∈ {APPROVED, CONFIRMED, CHARGED}` và các khoản phạt đồ vải bẩn (`LinenDamageFee > 0`), mất thẻ từ (`KeycardLossPenalty > 0`) trong `RoomInspectionReports` (`Status ∉ {REJECTED, WAIVED}`). Nếu còn khoản `DamageItems` đang ở `Status ∈ {SUBMITTED, DISPUTED, PENDING}` → bật `hasPendingServices = true`.
 d) Booking chưa check-in (chưa có Stay)
-    • Nếu Stays.BookingId không có bản ghi nào (booking đang Pending/Confirmed, khách chưa tới): trả estimated = true, stays = [] (mảng rỗng), và tính riêng 1 khối ước tính dựa trên Bookings.RoomSubtotal/SurchargeAmount/DiscountAmount hiện có — KHÔNG có services/minibar/food vì chưa phát sinh (không có Stay để gắn vào).
-    • grandTotal trong trường hợp này = Bookings.RoomSubtotal + SurchargeAmount − DiscountAmount (đúng bằng Bookings.TotalAmount đã lưu sẵn lúc đặt phòng).
-e) Phụ thu / giảm giá cấp Booking
-    • surchargeAmount và discountAmount lấy TRỰC TIẾP từ Bookings.SurchargeAmount / Bookings.DiscountAmount tại thời điểm gọi API — đây là 2 khoản được các tính năng khác (Gia hạn lưu trú, Áp voucher, Check-out ghi phụ thu hư hỏng...) MAINTAIN sẵn ở cấp Booking, C6 không tính lại và không tách theo từng Stay (do dữ liệu gốc không lưu chi tiết theo từng phòng).
-    • Nếu Booking có nhiều Stay: surchargeAmount/discountAmount chỉ xuất hiện 1 LẦN DUY NHẤT ở cấp response (ngoài mảng stays[]), không cộng lặp vào từng staySubtotal.
+    • Nếu `Stays.BookingId` không có bản ghi nào (booking đang Pending/Confirmed, khách chưa tới): trả `estimated = true`, `stays = []` (mảng rỗng), và tính riêng 1 khối ước tính dựa trên `Bookings.RoomSubtotal / SurchargeAmount / DiscountAmount` hiện có — các mảng `extensions`, `minibar`, `services`, `foodAndBeverage`, `damages` đều là `[]`.
+    • `grandTotal` trong trường hợp này = `Bookings.TotalAmount` (hoặc `Bookings.RoomSubtotal + SurchargeAmount − DiscountAmount`), đồng thời khấu trừ tiền cọc đã đóng (`totalPaid`) để trả về `remainingBalance`.
+e) Phụ thu / giảm giá cấp Booking & Khấu trừ tiền đã thanh toán (C5 Payments)
+    • `netSurcharge = MAX(0, Bookings.SurchargeAmount − extensionSubtotal − damageSubtotal)`: loại trừ phần tiền gia hạn lưu trú và bồi thường kiểm phòng nếu các luồng vận hành đã cộng dồn vào `Bookings.SurchargeAmount`, đảm bảo KHÔNG BAO GIỜ tính trùng 2 lần vào `grandTotal`.
+    • `discountAmount` lấy trực tiếp từ `Bookings.DiscountAmount`.
+    • `totalPaid`: tổng hợp từ bảng `Payments` (Module C5) của Booking với `Status ∈ {'Paid', 'Success', 'Completed'}` theo công thức `SUM(MAX(0, Amount − RefundAmount))`, đối chiếu với `Bookings.DepositAmount` (`effectivePaid = MAX(totalPaid, DepositAmount)`).
+    • `remainingBalance = MAX(0, grandTotal − totalPaid)`.
 f) Đây là số liệu tạm tính — không ghi DB
-    • GET /bookings/{bookingId}/charges là thao tác THUẦN ĐỌC (read-only): không tạo, không sửa bất kỳ bản ghi nào trong Invoices/InvoiceDetails hay bảng khác. Gọi lại nhiều lần cho cùng bookingId luôn an toàn (idempotent tự nhiên vì không ghi gì).
-    • Số liệu chính thức (có InvoiceNumber, VAT, PDF...) chỉ được CHỐT khi gọi FEAT-INVOICE-02 (C7 — POST /invoices/master, đặc tả riêng).
+    • `GET /bookings/{bookingId}/charges` là thao tác THUẦN ĐỌC (read-only): không tạo, không sửa bất kỳ bản ghi nào trong `Invoices/InvoiceDetails` hay bảng khác. Gọi lại nhiều lần cho cùng `bookingId` luôn an toàn (idempotent tự nhiên).
+    • Số liệu chính thức (có `InvoiceNumber`, `VAT`, `PDF`...) chỉ được CHỐT khi gọi FEAT-INVOICE-02 (C7 — `POST /invoices/master`).
 1.5. Luồng xử lý
-    1. Nhân viên mở màn 20/25 cho 1 booking → FE gọi GET /bookings/{bookingId}/charges; hệ thống xác thực token & quyền (401/403 nếu không đạt, dừng xử lý — mục 1.4.a).
-    2. Hệ thống tải Booking theo bookingId; không tồn tại → ERROR_0011_NOT_FOUND, dừng xử lý.
-    3. Hệ thống tải toàn bộ Stays có BookingId tương ứng. Nếu rỗng → trả ngay kết quả ước tính (mục 1.4.d), KẾT THÚC.
-    4. Với MỖI Stay tìm được: tính room (mục b), tải & lọc services Completed (mục c), tải toàn bộ minibar, tải & lọc food RoomInvoice+Served, tính staySubtotal.
-    5. Trong lúc duyệt qua các Stay, nếu phát hiện bất kỳ ServiceOrders nào Status ∈ {Received, InProgress} → đánh dấu hasPendingServices = true cho cả response.
-    6. Cộng surchargeAmount/discountAmount cấp Booking (mục e), tính grandTotal.
-    7. Trả về JSON tổng hợp theo cấu trúc mục 1.3 — HTTP 200, không có trường hợp "không tìm thấy chi phí" nào bị coi là lỗi (booking mới tạo, chưa phát sinh gì vẫn trả 200 với các subtotal = 0).
+    1. Nhân viên mở màn 20 (Check-out), popup Chi phí trong Quản lý đặt phòng, hoặc màn 25 (`/admin/charges`) → FE gọi `GET /api/v1/bookings/{bookingId}/charges`; hệ thống xác thực token & quyền (401/403 nếu không đạt — mục 1.4.a).
+    2. Hệ thống tải `Booking` theo `bookingId` (hoặc `ConfirmationCode`) kèm `User`, `RoomType` và danh sách `Payments` đã thu; không tồn tại → `ERROR_0011_NOT_FOUND`.
+    3. Hệ thống tải toàn bộ `Stays` có `BookingId` tương ứng. Nếu rỗng → trả ngay kết quả ước tính (`estimated = true`, mục 1.4.d), KẾT THÚC.
+    4. Tiền xử lý `StayExtensions` (`CONFIRMED`) để xác định số đêm gia hạn và số đêm hợp đồng gốc của từng Stay.
+    5. Với MỖI `Stay` tìm được: tính tiền phòng cơ sở (`room`), tải & lọc `ServiceOrders` (`services`), tải `MinibarUsages` / `MinibarInspectionLines` (`minibar`), tải & lọc `FoodOrders` ghi nợ phòng (`food`), tải `StayExtensions` + `RoomMoveRequests` (`extensions`), tải `DamageItems` + `RoomInspectionReports` (`damages`), tính `staySubtotal` và gom vào các mảng phẳng cấp Booking.
+    6. Trong lúc duyệt qua các Stay, nếu phát hiện bất kỳ `ServiceOrders`, `FoodOrders (RoomInvoice)` hoặc `DamageItems` nào đang dở dang/chờ duyệt → đánh dấu `hasPendingServices = true`.
+    7. Tính `netSurcharge`, `discountAmount`, `grandTotal`, `totalPaid`, `remainingBalance` và đối tượng `summary` (mục 1.4.e).
+    8. Trả về JSON tổng hợp theo cấu trúc mục 1.3 — HTTP 200.
 1.6. Bảng lỗi áp dụng
 Trường	Điều kiện lỗi	Mã lỗi	Message cụ thể
 Chung	Chưa đăng nhập / hết hạn	ERROR_0009_UNAUTHENTICATED	Bạn cần đăng nhập để thực hiện chức năng này
@@ -678,7 +703,7 @@ Trường hệ thống tự sinh, KHÔNG nhận từ client: invoiceId, invoiceN
 1.3. Cấu trúc dữ liệu trả về (Response)
 Trường	Kiểu	Ý nghĩa
 invoiceId, invoiceNumber, invoiceDate	int/string/datetime	Định danh hoá đơn vừa tạo
-stayId	int | null	null nếu booking nhiều phòng (Master Invoice thật sự); có giá trị nếu chỉ 1 Stay
+stayId	int | null	null nếu booking nhiều phòng (Master Invoice thật sự — yêu cầu migration `ALTER TABLE Invoices MODIFY COLUMN StayId INT NULL;` theo R2 điều chỉnh); có giá trị nếu chỉ 1 Stay
 bookingId	int	Booking gắn với Invoice
 subtotal	decimal	= grandTotal (từ C6) + tổng manualAdjustments
 vatRate, vatAmount	decimal	Tỷ lệ và số tiền VAT áp trên subtotal
@@ -716,7 +741,7 @@ d) Sinh Invoices + InvoiceDetails
     • 1 dòng cho mỗi phần tử trong manualAdjustments[], ItemType = giá trị client truyền (Surcharge/Other), ItemId=NULL, Description = client truyền, Quantity=1, UnitPrice=amount.
 e) Liên kết Payments đã thu trước đó (tiền cọc)
     • Tìm toàn bộ Payments có BookingId = bookingId AND InvoiceId IS NULL AND Status = 'Paid' (các khoản cọc đã thu qua C5 lúc đặt phòng/trước checkout).
-    • Set Payments.InvoiceId = Invoice vừa tạo cho toàn bộ các bản ghi tìm được — không tạo thêm Payment mới, không trừ tiền thủ công.
+    • Set Payments.InvoiceId = Invoice vừa tạo cho toàn bộ các bản ghi tìm được — bản ghi Payment lúc này có đồng thời BookingId và InvoiceId, hoàn toàn hợp lệ theo hợp đồng dữ liệu chuẩn của R2.
     • Tính Σ Payments.Amount (Status='Paid') đã liên kết vào Invoice này → nếu ≥ TotalAmount → Invoices.Status = 'Paid'; nếu > 0 (nhưng < TotalAmount) → 'PartiallyPaid'; nếu = 0 → 'Unpaid' — đúng logic đã định nghĩa ở C5 mục 1.7.b, tái sử dụng, không viết lại rule mới.
 f) Tính idempotent của thao tác ghi
     • Khác với C6 (thuần đọc), C7 có ghi DB nên KHÔNG tự nhiên idempotent — do đó bước kiểm tra "đã có Invoice chưa" ở mục b là bắt buộc để chặn tạo trùng khi Lễ tân double-click hoặc mất mạng bấm lại.
@@ -836,7 +861,7 @@ b) Cơ chế cache PDF — sinh 1 lần, tái sử dụng nhiều lần
    – Nếu PdfPath khác rỗng/NULL VÀ regenerate ≠ true VÀ file vật lý tại PdfPath còn tồn tại trên storage → đọc file có sẵn, trả về NGAY (không sinh lại, không tính toán lại).
    – Nếu PdfPath khác rỗng nhưng file vật lý KHÔNG còn tồn tại trên storage (bị xoá ngoài ý muốn, storage lỗi...) → ghi log cảnh báo, tự động chuyển sang nhánh "sinh mới" bên dưới như thể PdfPath đang rỗng (KHÔNG trả ERROR_0019 ngay ở bước đọc — tự phục hồi trước, chỉ trả lỗi nếu bước sinh mới cũng thất bại).
    – Nếu PdfPath rỗng/NULL, HOẶC regenerate = true (và actor đủ quyền theo mục a): tiến hành sinh PDF mới theo mục c.
-• Vì Invoice là bất biến sau khi tạo (theo C7), việc cache này an toàn tuyệt đối — không có khái niệm "PDF bị lỗi thời so với dữ liệu Invoice" trong điều kiện vận hành bình thường (ngoại trừ khi Admin chủ động regenerate do đổi template/logo khách sạn dùng chung cho toàn hệ thống).
+• Cơ chế vô hiệu hoá Cache PDF (R2 điều chỉnh): Khác với nhận định ban đầu, Invoice sau khi tạo ở C7 có thể chuyển đổi trạng thái thanh toán (từ Unpaid/PartiallyPaid sang Paid ở C9, hoặc sang Cancelled/Refunded ở C10). Do đó: Bất cứ khi nào Invoice có phát sinh thanh toán mới hoặc trạng thái Invoices.Status thay đổi, hệ thống BẮT BUỘC vô hiệu hoá cache cũ (đặt Invoices.PdfPath = NULL hoặc tự động render lại file PDF mới) để đảm bảo tệp PDF xuất ra phản ánh chính xác 100% tình trạng quyết toán tài chính hiện thời.
 
 c) Nội dung & cấu trúc file PDF khi sinh mới
 Template PDF gồm các khối theo đúng thứ tự sau, dữ liệu lấy 100% từ Invoices + InvoiceDetails đã có (KHÔNG truy vấn lại Bookings/Stays/ServiceOrders... để tính toán, chỉ dùng để hiển thị thông tin mô tả tĩnh như tên khách/số phòng nếu cần join hiển thị):
@@ -969,7 +994,8 @@ d) Chỉ tối đa 1 tender online trong 1 lần quyết toán
 
 e) Tổng tenders[] phải khớp số dư còn lại
 • Net Outstanding Balance = Invoices.TotalAmount − Σ (Payments.Amount có InvoiceId = invoiceId AND Status = 'Paid') tính tại thời điểm gọi API.
-• Σ tenders[].amount (giá trị amount, KHÔNG phải cashTendered) phải = Net Outstanding Balance CHÍNH XÁC — không cho phép trả thiếu (còn nợ lại sau khi bấm quyết toán, vì màn 26 là bước quyết toán TOÀN BỘ, không phải trả góp từng phần nhỏ lẻ qua C9). Sai lệch → ERROR_0020_SPLIT_SUM_MISMATCH.
+• Σ tenders[].amount (giá trị amount, KHÔNG phải cashTendered) phải = Net Outstanding Balance CHÍNH XÁC. Sai lệch → ERROR_0020_SPLIT_SUM_MISMATCH.
+• Xử lý khi tender online thất bại (R2 điều chỉnh): Nếu một tender online trong đợt quyết toán chuyển sang 'Failed' hoặc hết hạn 15 phút, hoá đơn đang ở PartiallyPaid sẽ được giải phóng số dư còn lại. Thu ngân được phép thực hiện tiếp một lượt quyết toán C9 bổ sung cho đúng số dư còn thiếu đó bằng tiền mặt hoặc thẻ tại quầy.
 • Việc thanh toán MỘT PHẦN số dư (PartiallyPaid, ví dụ khách chỉ trả trước 1 khoản rồi thôi) vẫn thực hiện được nhưng KHÔNG qua C9 — dùng thẳng C5 (POST /payments với amount nhỏ hơn số dư, method tại quầy) — C9 dành riêng cho thao tác "quyết toán dứt điểm" ở màn 26.
 
 f) Tiền mặt & tiền thối
@@ -988,8 +1014,7 @@ h) Tính nguyên tử (atomicity) của các tender tại quầy
 • Tender online (nếu có) được tạo SAU khi transaction tại quầy đã commit thành công — vì bản chất Pending/webhook không thể nằm chung 1 transaction đồng bộ với phần Paid ngay lập tức.
 
 i) Giải phóng khoản tạm giữ (Pre-authorization Hold Release)
-• Áp dụng khi: releaseHoldOnComplete = true (mặc định) VÀ sau khi xử lý xong các tender tại quầy, Σ Payments.Paid (cũ + mới) ≥ Invoices.TotalAmount (tức Invoice chuyển hẳn sang Status = 'Paid') VÀ Invoice có Booking liên kết đang giữ pre-auth hold trên thẻ (theo dữ liệu "Billing Guarantee Record" ở màn 25 — lưu ở tầng Gateway/GatewayResponse, KHÔNG có cột riêng trong schema Payments/Bookings hiện tại).
-• Gọi (Mock hoặc thật, theo đúng PAYMENT_GATEWAY_MODE của C5) API release-hold tương ứng; nếu thành công → holdReleased = true trong response. Nếu gọi release-hold thất bại (lỗi gateway) → KHÔNG chặn việc quyết toán đã hoàn tất (Invoice vẫn Paid, Payment vẫn hợp lệ), chỉ set holdReleased = false và ghi log cảnh báo để nhân viên giải phóng thủ công sau.
+• Kiểm tra điều kiện giải phóng tạm giữ thẻ (R2 điều chỉnh): Hệ thống chỉ gọi API giải phóng hold khi booking có dữ liệu pre-auth hold hợp lệ trong GatewayResponse. Nếu khách thanh toán cọc bằng tiền mặt hoặc chuyển khoản (không có hold thẻ), hệ thống tự động gán `holdReleased = false` (hoặc null) và hoàn tất quyết toán bình thường, tuyệt đối KHÔNG báo lỗi hay chặn giao dịch.
 • Nếu Invoice còn 1 tender online đang Pending (chưa Paid hẳn) → CHƯA giải phóng hold, đợi webhook C5 xác nhận Paid trước (việc release-hold khi đó thuộc trách nhiệm xử lý tiếp của webhook, ngoài phạm vi đồng bộ của request C9 hiện tại — xem mục 2).
 
 j) Cờ readyToCloseFolio
@@ -1122,7 +1147,10 @@ e) Hoàn tiền (Refund) — chỉ điều hướng, không định nghĩa lại
     • UI hiển thị nút "Hoàn tiền" trên 1 hoá đơn CHỈ KHI Invoices.Status = 'Paid' (khớp ma trận chuyển trạng thái Payment.Status ở C5 mục 1.8: chỉ Payment đang 'Paid' mới chuyển được sang 'Refunded').
     • Nếu Invoice có NHIỀU Payments Status='Paid' liên kết (VD: 1 lần cọc + 1 lần thanh toán số dư), FE hiển thị danh sách để Actor CHỌN đúng 1 Payment cần hoàn (không hoàn gộp nhiều dòng trong 1 lần gọi) — mỗi lần hoàn tiền gọi đúng 1 lệnh PATCH /payments/{paymentId}/refund như đã đặc tả ở C5 mục 1.9.
     • C10 KHÔNG tự phân biệt "thanh toán qua cổng điện tử" hay "tiền mặt" bằng logic riêng — việc này đã nằm sẵn trong Payments.PaymentMethod (Cash/Card/BankTransfer/VNPay/MoMo/VietQR) mà C5 đọc để quyết định có gọi API refund của gateway hay chỉ ghi nhận thủ công; C10 chỉ hiển thị đúng PaymentMethod trên UI để nhân viên biết kỳ vọng hành vi nào sẽ xảy ra trước khi bấm.
-    • Sau khi refund thành công (gọi qua C5), C10 KHÔNG cần tự cập nhật Invoices.Status — trạng thái hoá đơn (Paid/PartiallyPaid/Unpaid) không đổi khi 1 Payment chuyển Refunded theo thiết kế hiện tại của schema (đề xuất: nếu về sau cần phản ánh "đã hoàn tiền" lên chính Invoices.Status, cần bổ sung giá trị enum mới — nêu ở mục 2).
+    • Cập nhật trạng thái hoá đơn khi hoàn tiền (R2 điều chỉnh): Sau khi một Payment chuyển sang 'Refunded' qua C5, hệ thống tự động tính toán lại Số tiền thực thu ròng: Net Paid = Σ (Paid Payments) − Σ (Refunded Payments).
+       – Nếu Net Paid <= 0: Cập nhật Invoices.Status = 'Cancelled' (hoặc 'Refunded').
+       – Nếu 0 < Net Paid < TotalAmount: Cập nhật Invoices.Status = 'PartiallyPaid'.
+       – Đồng thời xoá cache PdfPath để lần xuất PDF tiếp theo phản ánh đúng trạng thái hoàn tiền.
 
 1.5. Luồng xử lý
 a) Xem danh sách & lọc
@@ -1231,10 +1259,10 @@ new_fnb_order	{ foodOrderId, orderTime, orderType, status, totalAmount }	Chèn v
 a) Quyền truy cập
     • Chỉ tài khoản nội bộ role ≠ Guest, có quyền "Xem báo cáo" (Permissions.Module = 'Statistics') → được gọi cả REST lẫn kết nối WebSocket.
     • Guest gọi trực tiếp → 403 (ERROR_0010_FORBIDDEN). Không có token/hết hạn → 401 (ERROR_0009_UNAUTHENTICATED) — áp dụng cho cả bước handshake WebSocket (từ chối connect nếu token không hợp lệ).
-b) Định nghĩa "Doanh thu" (revenueToday)
-    • revenueToday = Σ Payments.Amount với Payments.Status = 'Paid' VÀ Payments.PaymentDate nằm trong ngày đang xét (00:00–23:59 giờ VN).
-    • Dùng PaymentDate (thời điểm KHỞI TẠO giao dịch, đã quy ước NOT NULL ở C5 mục 0.2) chứ KHÔNG dùng thời điểm webhook xác nhận — chấp nhận sai số nhỏ nếu 1 giao dịch tạo lúc 23:58 nhưng khách thanh toán xong sau 00:00 hôm sau (vẫn tính vào ngày tạo). Quyết định này giữ nhất quán với toàn bộ cách C5/C9 đã dùng PaymentDate, không định nghĩa thêm cột thời gian nào khác.
-    • Không phân biệt PaymentMethod (Cash/Card/BankTransfer/VNPay/MoMo/VietQR) — mọi khoản Paid đều cộng vào doanh thu như nhau.
+b) Định nghĩa "Tổng thực thu trong ngày — Cash Inflow" (R2 điều chỉnh thuật ngữ & công thức)
+    • Định danh chuẩn: Nhãn giao diện và tài liệu chính thức ghi rõ là "Tổng thực thu trong ngày (Cash Inflow)" thay vì "Doanh thu hôm nay" để phân biệt với Doanh thu phòng dồn tích (Accrual Room Revenue) trong kế toán khách sạn.
+    • Công thức tính ròng: revenueToday = Σ (Payments.Amount có Status = 'Paid' và PaymentDate trong ngày) − Σ (Payments.RefundAmount có Status = 'Refunded' và updatedAt trong ngày).
+    • Dùng PaymentDate cho dòng tiền vào và updatedAt cho dòng tiền hoàn, giữ nguyên tắc phản ánh đúng dòng tiền thực tế trong ngày.
 c) Định nghĩa "Booking mới" (newBookingsToday)
     • Đếm số bản ghi Bookings có CreatedAt nằm trong ngày đang xét — không phân biệt BookingSource (Direct hay OTA), không phân biệt Status (kể cả booking sau đó bị Cancelled vẫn tính vì tại thời điểm tạo nó là 1 booking mới phát sinh).
 d) Định nghĩa "Occupancy hiện tại" (occupancyRate)
@@ -1307,7 +1335,10 @@ Module F — Báo Cáo & Thống Kê | C12 — Occupancy Report & RevPAR Report
 Phụ trách nghiệp vụ (báo cáo đồ án): Đặng Văn Hà
 Căn cứ: Spec mẫu FEAT-USER-01 + Spec C1–C11 (kế thừa danh mục mã lỗi ERROR_0001–0017 và quy ước kỹ thuật chung mục 0.2 của Spec C1–C4) + Flow nghiệp vụ Flow #12 (flow-nghiep-vu-hotel.md) + Báo cáo đồ án ver 1.4 (mục III.4, bảng Bookings/Stays/Rooms)
 Mục tiêu tài liệu: đặc tả báo cáo LỊCH SỬ theo khoảng thời gian (khác Dashboard real-time ở C11 vốn chỉ xem snapshot "hôm nay") — tính Occupancy % và RevPAR theo đúng công thức chuẩn ngành khách sạn, dựa trên dữ liệu Room-Nights thực tế từ bảng Stays, có so sánh cùng kỳ năm trước và xuất Excel/CSV.
-⚠ Hạn chế đã biết của schema hiện tại (ghi rõ để không gây tranh cãi khi nghiệm thu) — (1) Bảng Rooms chỉ lưu Status HIỆN TẠI, KHÔNG có lịch sử trạng thái theo ngày (không có RoomStatusHistory), nên "Room-Nights khả dụng" trong spec này tính trên TỔNG SỐ PHÒNG hiện có, KHÔNG trừ những ngày phòng từng ở trạng thái OutOfOrder trong quá khứ — điều này có thể làm Occupancy % tính ra THẤP hơn thực tế một chút nếu khách sạn từng có phòng bảo trì dài ngày. (2) Report này CHỈ tính occupancy trên các Stay đã THỰC SỰ chiếm dụng phòng (Status ∈ {CheckedIn, Extended, CheckedOut}); Stay đang Status='Reserved' (đã gán phòng nhưng khách chưa tới) KHÔNG được tính là "đã bán" — nên nếu dateTo nằm trong tương lai, số liệu những ngày chưa diễn ra sẽ bị UNDERCOUNT so với số phòng đã thật sự đặt trước. Cả 2 điểm này nên nêu rõ trong buổi bảo vệ nếu giảng viên hỏi về độ chính xác số liệu.
+⚠ Cơ sở dữ liệu và đính chính kỹ thuật (R2 điều chỉnh):
+(1) Khảo sát thực tế xác nhận bảng và model `RoomStatusHistory.js` ĐÃ CÓ trong hệ thống. Báo cáo C12 triển khai công thức tính Room-Nights khả dụng cơ bản trên tổng số phòng vật lý cho mức độ tối thiểu, đồng thời có thể tận dụng `RoomStatusHistory` để trừ số ngày phòng bị OutOfOrder nhằm đạt độ chính xác quốc tế.
+(2) Quy tắc an toàn: Với các bản ghi Stay cũ nếu ActualCheckIn bị null, hệ thống tự động fallback sử dụng Stay.CheckInDate hoặc Booking.CheckInDate.
+(3) Report này CHỈ tính occupancy trên các Stay đã THỰC SỰ chiếm dụng phòng (Status ∈ {CheckedIn, Extended, CheckedOut}); Stay đang Status='Reserved' KHÔNG được tính là "đã bán" — giúp phản ánh tỷ lệ lấp đầy thực tế thay vì dự kiến.
 
 1. FEAT-REPORT-02 — Occupancy Report & RevPAR Report
 Tương ứng: mục 12 trong Bảng phân chia chức năng  |  Flow #12 (flow-nghiep-vu-hotel.md)  |  Endpoint: GET /api/v1/statistics/occupancy, GET /api/v1/statistics/occupancy/export (alias không có /v1)  |  Bảng DB: Stays, Bookings, Rooms (chỉ đọc)
@@ -1451,10 +1482,10 @@ Chế độ real: nội dung Answer tìm được (nếu có) + N tin nhắn g�
     • Tạo FULLTEXT INDEX trên 2 cột (Question, Keywords) của bảng ChatbotKnowledgeBase — không cần vector DB, không cần thư viện embedding.
     • Câu truy vấn mẫu: SELECT *, MATCH(Question, Keywords) AGAINST (:userMessage IN NATURAL LANGUAGE MODE) AS relevanceScore FROM ChatbotKnowledgeBase WHERE Status='Active' HAVING relevanceScore > 0 ORDER BY relevanceScore DESC LIMIT 3.
     • relevanceThreshold (cấu hình hệ thống, mặc định đề xuất 0.1): nếu relevanceScore của kết quả cao nhất THẤP HƠN ngưỡng này → coi như KHÔNG tìm thấy kiến thức phù hợp (KnowledgeId=NULL, áp dụng câu fallback + cờ suggestedEscalation, mục 1.4.e).
-    • Lưu ý cấu hình MySQL: mặc định MySQL bỏ qua từ có độ dài < 4 ký tự khi đánh FULLTEXT index (innodb_ft_min_token_size=4) — tiếng Việt có nhiều từ khoá ngắn quan trọng (VD: "hồ bơi", "wifi", "ăn"), cần Trang (phụ trách DB) đổi cấu hình MySQL server xuống innodb_ft_min_token_size=2 và rebuild lại FULLTEXT index. Đây là thay đổi CẤU HÌNH SERVER, KHÔNG phải đổi schema bảng.
+    • Cơ chế tìm kiếm dự phòng ở tầng ứng dụng (Application LIKE Fallback — R2 điều chỉnh): Để đảm bảo hệ thống luôn demo thành công 100% trên mọi môi trường (Docker, máy chấm thi) mà không phụ thuộc vào quyền sửa cấu hình MySQL server (`innodb_ft_min_token_size`), hệ thống kết hợp truy vấn MATCH...AGAINST với tìm kiếm mờ theo từ khoá: `OR (Keywords LIKE :kw OR Question LIKE :kw)`. Nếu FULLTEXT trả về kết quả rỗng do từ khoá tiếng Việt ngắn (< 4 ký tự như "ăn", "spa", "gym"), cơ chế LIKE fallback sẽ tự động phát hiện và trả lời chính xác.
 0.3. Thay đổi schema bổ sung (cần Trang xác nhận trước khi migrate)
 Thay đổi	Chi tiết	Lý do
-Bổ sung cột mới	ChatbotConversations.HandledBy — INT, FK → Users, NULLABLE	Theo dõi hội thoại đang do AI xử lý (NULL) hay đã chuyển cho nhân viên nào (có giá trị) — cần thiết để vận hành nút "Tiếp nhận bởi nhân viên" ở màn 29
+Bổ sung cột mới & Sequelize Models	ChatbotConversations.HandledBy — INT, FK → Users, NULLABLE; Đồng thời tạo 3 Sequelize Model: ChatbotKnowledgeBase.js, ChatbotConversation.js, ChatbotMessage.js trong backend/src/models/ và khai báo associations trong index.js (R2 điều chỉnh).	Theo dõi hội thoại đang do AI xử lý (NULL) hay đã chuyển cho nhân viên nào (có giá trị) — cần thiết để vận hành nút "Tiếp nhận bởi nhân viên" ở màn 29
 Mở rộng quy ước giá trị (không đổi kiểu cột)	ChatbotMessages.SenderType — bổ sung thêm giá trị 'Staff' bên cạnh Guest/AI/System đã có	Cột đang là NVARCHAR(20) tự do (không phải kiểu ENUM cứng của DB), nên thêm giá trị mới chỉ là quy ước ở tầng ứng dụng, KHÔNG cần migration
 0.4. Mã lỗi mới bổ sung
 Kế thừa toàn bộ ERROR_0001–ERROR_0017 và SUCCESS_0001 từ các spec trước. Bổ sung 1 mã mới cho C13:
@@ -1639,8 +1670,11 @@ b) Chuẩn hoá trước khi lưu
     • question, answer, keywords đều được trim khoảng trắng đầu/cuối; nhiều khoảng trắng liên tiếp trong question/keywords gộp thành 1.
     • Không phân biệt hoa/thường khi kiểm tra trùng và khi tra cứu; giá trị LƯU giữ nguyên chữ hoa/thường người nhập (để câu trả lời hiển thị đẹp).
 c) Chống trùng câu hỏi
-    • So khớp question KHÔNG phân biệt hoa/thường và KHÔNG phân biệt dấu tiếng Việt (quy ước Spec C1–C4 mục 0.2) với TẤT CẢ bản ghi hiện có (cả Active và Inactive). Trùng → ERROR_0007_DUPLICATE.
-    • Nếu trùng với bản ghi đang Inactive: message vẫn là ERROR_0007, nhưng FE nên gợi ý "Đã có mục này ở trạng thái ngừng dùng — bạn có muốn kích hoạt lại?" (dẫn tới thao tác kích hoạt lại ở mục 2.3).
+    • Chống trùng câu hỏi & Luồng kích hoạt thông minh (R2 điều chỉnh):
+       – So khớp question không phân biệt hoa/thường và dấu tiếng Việt (Unicode NFD).
+       – Nếu trùng với bản ghi đang Active: trả lỗi 409 `ERROR_0007_DUPLICATE`.
+       – Nếu trùng với bản ghi đang Inactive: API trả về HTTP 409 kèm mã lỗi `ERROR_0007_DUPLICATE`, bổ sung payload `{ existingInactiveId: id, status: 'Inactive' }`.
+       – Trên giao diện Frontend hiển thị thông báo tương tác thông minh: "Câu hỏi này đã tồn tại trong danh mục ngừng dùng (#ID). Bạn có muốn kích hoạt lại và cập nhật câu trả lời mới?" cho phép người quản trị kích hoạt và cập nhật nội dung chỉ với 1 thao tác.
 d) Nội dung an toàn
     • answer và question chỉ lưu VĂN BẢN THUẦN: mọi thẻ HTML/script bị loại bỏ hoặc escape trước khi lưu, vì nội dung này hiển thị trong khung chat của khách và được đưa vào prompt của LLM (chống XSS và chèn lệnh).
     • KHÔNG nhập vào Knowledge Base: thông tin cá nhân của khách, mật khẩu, khoá API, số tài khoản nội bộ. Đây là quy ước nhập liệu (hệ thống không tự dò được) — cần nêu rõ trong hướng dẫn cho người quản trị.

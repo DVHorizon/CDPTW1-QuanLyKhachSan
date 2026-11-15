@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../config/db');
+const { generateTransactionCode } = require('../../modules/payments/services/paymentGatewayService');
 const {
   sequelize,
   Stay,
@@ -899,14 +900,27 @@ const handleCompleteCheckout = async (req, res) => {
       );
     }
 
-    // 8. Ghi nhận giao dịch thanh toán Payments
-    const txCode = `TX-${Date.now().toString().slice(-8)}`;
+    // 8. Ghi nhận giao dịch thanh toán Payments (Đồng bộ chuẩn C5 Core Payment)
+    const txCode = generateTransactionCode();
+    const c5MethodMap = {
+      CARD_ON_FILE: 'Card',
+      CASH: 'Cash',
+      BANK_TRANSFER: 'VietQR',
+      QR_TRANSFER: 'VietQR',
+      Cash: 'Cash',
+      Card: 'Card',
+      BankTransfer: 'BankTransfer',
+      VietQR: 'VietQR',
+      VNPay: 'VNPay',
+      MoMo: 'MoMo',
+    };
+    const normalizedCheckoutMethod = c5MethodMap[paymentMethod] || paymentMethod || 'Cash';
     await conn.query(
       `INSERT INTO Payments (
         InvoiceId, BookingId, UserId, Amount, PaymentMethod,
         PaymentDate, TransactionCode, Status
-      ) VALUES (?, ?, ?, ?, ?, NOW(), ?, 'Completed')`,
-      [invoiceId, stay.BookingId, stay.UserId, finalBalanceDue, paymentMethod, txCode]
+      ) VALUES (?, ?, ?, ?, ?, NOW(), ?, 'Paid')`,
+      [invoiceId, stay.BookingId, stay.UserId, finalBalanceDue, normalizedCheckoutMethod, txCode]
     );
 
     // 9. Cập nhật trạng thái Stay -> 'CheckedOut', ActualCheckOut = NOW()

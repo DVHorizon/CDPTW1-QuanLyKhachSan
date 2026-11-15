@@ -34,6 +34,9 @@ const defineMinibarProduct = require('./MinibarProduct');
 const defineMinibarInspection = require('./MinibarInspection');
 const defineMinibarInspectionLine = require('./MinibarInspectionLine');
 const defineMinibarInspectionEvent = require('./MinibarInspectionEvent');
+const defineChatbotKnowledgeBase = require('./ChatbotKnowledgeBase');
+const defineChatbotConversation = require('./ChatbotConversation');
+const defineChatbotMessage = require('./ChatbotMessage');
 
 // Operations & Smart Lock models (tuyen/7)
 const defineAuditLog = require('./AuditLog');
@@ -50,6 +53,7 @@ const defineLostAndFoundItem = require('./LostAndFoundItem');
 const defineSmartLockKey = require('./SmartLockKey');
 const defineMinibarUsage = require('./MinibarUsage');
 const definePricingRule = require('./PricingRule');
+const defineWishlist = require('./Wishlist');
 
 // Initialize models
 const Branch = defineBranch(sequelize);
@@ -85,6 +89,9 @@ const MinibarProduct = defineMinibarProduct(sequelize);
 const MinibarInspection = defineMinibarInspection(sequelize);
 const MinibarInspectionLine = defineMinibarInspectionLine(sequelize);
 const MinibarInspectionEvent = defineMinibarInspectionEvent(sequelize);
+const ChatbotKnowledgeBase = defineChatbotKnowledgeBase(sequelize);
+const ChatbotConversation = defineChatbotConversation(sequelize);
+const ChatbotMessage = defineChatbotMessage(sequelize);
 
 // Initialize Operations & Smart Lock models
 const AuditLog = defineAuditLog(sequelize);
@@ -101,6 +108,7 @@ const LostAndFoundItem = defineLostAndFoundItem(sequelize);
 const SmartLockKey = defineSmartLockKey(sequelize);
 const MinibarUsage = defineMinibarUsage(sequelize);
 const PricingRule = definePricingRule(sequelize);
+const Wishlist = defineWishlist(sequelize);
 
 
 // PricingRule Relationships (FEAT-GUEST-12)
@@ -259,10 +267,30 @@ Payment.belongsTo(Invoice, { foreignKey: 'InvoiceId', as: 'invoice' });
 Stay.hasMany(MinibarUsage, { foreignKey: 'StayId', as: 'minibarUsages' });
 MinibarUsage.belongsTo(Stay, { foreignKey: 'StayId', as: 'stay' });
 
+// 20. Chatbot AI Associations (FEAT-AI-01 & FEAT-AI-02 - Spec C13 & C14)
+User.hasMany(ChatbotConversation, { foreignKey: 'UserId', as: 'chatbotConversations' });
+ChatbotConversation.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+
+User.hasMany(ChatbotConversation, { foreignKey: 'HandledBy', as: 'handledConversations' });
+ChatbotConversation.belongsTo(User, { foreignKey: 'HandledBy', as: 'handledByStaff' });
+
+ChatbotConversation.hasMany(ChatbotMessage, { foreignKey: 'ConversationId', as: 'messages' });
+ChatbotMessage.belongsTo(ChatbotConversation, { foreignKey: 'ConversationId', as: 'conversation' });
+
+ChatbotKnowledgeBase.hasMany(ChatbotMessage, { foreignKey: 'KnowledgeId', as: 'messages' });
+ChatbotMessage.belongsTo(ChatbotKnowledgeBase, { foreignKey: 'KnowledgeId', as: 'knowledgeBase' });
+
+// 21. Wishlist Associations (FEAT-GUEST-13C / A13)
+User.hasMany(Wishlist, { foreignKey: 'UserId', as: 'wishlists' });
+Wishlist.belongsTo(User, { foreignKey: 'UserId', as: 'user' });
+RoomType.hasMany(Wishlist, { foreignKey: 'RoomTypeId', as: 'wishlists' });
+Wishlist.belongsTo(RoomType, { foreignKey: 'RoomTypeId', as: 'roomType' });
+
 module.exports = {
   sequelize,
   Branch,
   RoomType,
+  Wishlist,
   PricingRule,
   Room,
   RoomSearchIndex,
@@ -273,6 +301,7 @@ module.exports = {
   User,
   Booking,
   BookingGuest,
+  Voucher,
   Review,
   ReviewPhoto,
   MenuCategory,
@@ -291,6 +320,7 @@ module.exports = {
   LateFeePolicy,
   RoomInspectionReport,
   DamageItem,
+  Voucher,
   RoomStatusHistory,
   // Operations & Smart Lock models (tuyen/7)
   AuditLog,
@@ -311,4 +341,8 @@ module.exports = {
   MinibarInspection,
   MinibarInspectionLine,
   MinibarInspectionEvent,
+  // Chatbot AI models (C13 & C14)
+  ChatbotKnowledgeBase,
+  ChatbotConversation,
+  ChatbotMessage,
 };

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Header from '../../components/layout/Header';
-import { checkRoomAvailabilityApi, lockRoomSessionApi, releaseRoomLockApi, getRoomDetailApi, createBookingApi, getDynamicPricingApi } from '../../api/roomApi';
+import { checkRoomAvailabilityApi, lockRoomSessionApi, releaseRoomLockApi, getRoomDetailApi, createBookingApi, getDynamicPricingApi, getRoomReviewsApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
+import { useWishlist } from '../../context/WishlistContext';
 
 // Helper format VND
 const formatVND = (num) => {
@@ -25,6 +26,7 @@ export default function RoomDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { isWishlisted, toggleWishlist } = useWishlist();
 
   // Dữ liệu loại phòng
   const [roomType, setRoomType] = useState(null);
@@ -60,6 +62,8 @@ export default function RoomDetail() {
   const [isDynamicPricingLoading, setIsDynamicPricingLoading] = useState(false);
   const [dynamicPricingError, setDynamicPricingError] = useState('');
   const [pricingSuccessMsg, setPricingSuccessMsg] = useState('');
+  const [roomReviews, setRoomReviews] = useState([]);
+  const [reviewSummary, setReviewSummary] = useState(null);
 
 
   // Phiên khóa phòng tạm thời 15 phút (Anti-Overbooking Lock)
@@ -196,6 +200,20 @@ export default function RoomDetail() {
     };
   }, [roomType?.RoomTypeId, id, checkInDate, checkOutDate]);
 
+  // FEAT-GUEST-11: Tải danh sách đánh giá thật từ database theo hạng phòng
+  useEffect(() => {
+    let isMounted = true;
+    const activeRoomTypeId = roomType?.RoomTypeId || id || 1;
+    getRoomReviewsApi(activeRoomTypeId, { limit: 6 })
+      .then((res) => {
+        if (!isMounted || !res?.success) return;
+        if (Array.isArray(res.data)) setRoomReviews(res.data);
+        if (res.summary) setReviewSummary(res.summary);
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [roomType?.RoomTypeId, id]);
+
   // Lắng nghe WebSocket Realtime: tự động gọi lại checkRealtime() khi có người đặt phòng, khóa phòng hoặc đổi trạng thái
   useEffect(() => {
     const activeRoomTypeId = Number(roomType?.RoomTypeId || id || 1);
@@ -292,8 +310,19 @@ export default function RoomDetail() {
       setIsLocking(false);
 
       if (res.success && res.data) {
+        const timeoutSec = res.data.timeoutSeconds || 900;
         setLockSession(res.data);
-        setLockTimeRemaining(res.data.timeoutSeconds || 900);
+        setLockTimeRemaining(timeoutSec);
+        try {
+          sessionStorage.setItem('gh_room_lock', JSON.stringify({
+            lockSessionId: res.data.lockSessionId,
+            expiresAt: Date.now() + timeoutSec * 1000,
+            roomTypeId: activeRoomTypeId,
+            checkInDate,
+            checkOutDate,
+            units: quantity
+          }));
+        } catch (_) {}
       } else {
         setErrorCode(res.code || 'ERROR_0024_CONCURRENT_LOCK_FAILED');
         setErrorMessage(res.message || 'Rất tiếc, phòng vừa được khách hàng khác giữ chỗ. Vui lòng chọn khoảng ngày hoặc hạng phòng khác');
@@ -426,10 +455,11 @@ export default function RoomDetail() {
                 🔗 Chia sẻ
               </button>
               <button
-                onClick={() => setIsSaved(!isSaved)}
-                className={`inline-flex items-center gap-1 transition-colors ${isSaved ? 'text-rose-500 font-semibold' : 'text-gray-600 hover:text-[#725b38]'}`}
+                type="button"
+                onClick={() => toggleWishlist(id)}
+                className={`inline-flex items-center gap-1 transition-colors cursor-pointer ${isWishlisted(id) ? 'text-rose-500 font-semibold' : 'text-gray-600 hover:text-[#725b38]'}`}
               >
-                {isSaved ? '❤️ Đã lưu' : '🤍 Lưu lại'}
+                {isWishlisted(id) ? '❤️ Đã lưu' : '🤍 Lưu lại'}
               </button>
             </div>
           </div>
@@ -451,8 +481,12 @@ export default function RoomDetail() {
                     🏆 Lựa chọn hàng đầu của du khách 2024
                   </span>
                   <span className="text-sm font-semibold text-[#0b1c30]">
-                    <span className="text-[#725b38] font-bold">4.96/5</span>{' '}
-                    <span className="text-gray-500 font-normal">(184 lượt đánh giá được xác thực)</span>
+                    <span className="text-[#725b38] font-bold">
+                      {reviewSummary?.totalReviews > 0 ? reviewSummary.avgOverall : '4.96'}/5
+                    </span>{' '}
+                    <span className="text-gray-500 font-normal">
+                      ({reviewSummary?.totalReviews > 0 ? reviewSummary.totalReviews : 184} lượt đánh giá được xác thực)
+                    </span>
                   </span>
                 </div>
                 <h1 className="text-3xl lg:text-4xl font-serif font-bold text-[#0b1c30] tracking-tight">
@@ -1098,17 +1132,65 @@ export default function RoomDetail() {
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-3xl font-serif text-[#725b38] font-bold leading-none">4.96</p>
+                  <p className="text-3xl font-serif text-[#725b38] font-bold leading-none">
+                    {reviewSummary?.totalReviews > 0 ? reviewSummary.avgOverall : '4.96'}
+                  </p>
                   <p className="text-xs text-gray-400">trên thang điểm 5.0</p>
                 </div>
                 <div>
                   <div className="text-[#725b38] text-base">★★★★★</div>
-                  <p className="text-xs text-[#0b1c30] font-bold">Xuất sắc vượt mong đợi</p>
+                  <p className="text-xs text-[#0b1c30] font-bold">
+                    {reviewSummary?.totalReviews > 0 ? `${reviewSummary.totalReviews} đánh giá đã xác thực` : 'Xuất sắc vượt mong đợi'}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Testimonials */}
+            {/* Testimonials / Verified Guest Reviews (FEAT-GUEST-11) */}
+            {roomReviews.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {roomReviews.map((rev) => {
+                  const initials = String(rev.author || 'KH')
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(-2)
+                    .map((w) => w[0])
+                    .join('')
+                    .toUpperCase() || 'KH';
+                  const stars = '★'.repeat(Math.max(1, Math.min(5, Math.round(Number(rev.overallRating || 5)))));
+                  const dateLabel = rev.createdAt
+                    ? new Date(rev.createdAt).toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' })
+                    : 'Gần đây';
+                  return (
+                    <div key={rev.reviewId} className="bg-white p-6 rounded-2xl shadow-sm space-y-3 flex flex-col justify-between border border-gray-100">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-[#725b38]">{stars}</span>
+                          <span className="font-bold text-[#725b38]">{rev.overallRating}/5.0</span>
+                        </div>
+                        <h4 className="font-bold text-[#0b1c30] text-sm">
+                          “{rev.reviewTitle || 'Trải nghiệm lưu trú đẳng cấp'}”
+                        </h4>
+                        <p className="text-xs text-gray-600 italic leading-relaxed">
+                          {rev.reviewBody}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-50">
+                        <div className="w-7 h-7 rounded-full bg-[#fedeb2]/60 flex items-center justify-center text-xs text-[#725b38] font-bold">
+                          {initials}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-[#0b1c30]">{rev.author}</p>
+                          <p className="text-[10px] text-gray-400">
+                            {rev.tripClassification || 'Khách lưu trú'} • {dateLabel}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-2xl shadow-sm space-y-3 flex flex-col justify-between border border-gray-100">
                 <div className="space-y-2">
@@ -1161,6 +1243,7 @@ export default function RoomDetail() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </section>
 

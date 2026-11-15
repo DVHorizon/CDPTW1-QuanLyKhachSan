@@ -53,11 +53,17 @@ module.exports = (sequelize) => {
     Status: {
       type: DataTypes.STRING(30),
       defaultValue: 'Active'
+    },
+    Version: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
     }
   }, {
     tableName: 'Vouchers',
     timestamps: true,
     createdAt: 'CreatedAt',
-    updatedAt: false
+    updatedAt: false,
+    version: 'Version'
   });
 };

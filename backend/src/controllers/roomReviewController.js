@@ -438,7 +438,8 @@ exports.getRoomReviews = async (req, res) => {
     const stayIds = matchingStays.map(s => s.StayId);
 
     const reviewWhere = {
-      StayId: { [Op.in]: stayIds.length > 0 ? stayIds : [-1] }
+      StayId: { [Op.in]: stayIds.length > 0 ? stayIds : [-1] },
+      IsDeleted: false
     };
     if (tripType && tripType !== 'ALL') {
       reviewWhere.TripClassification = tripType.toUpperCase();
@@ -552,6 +553,56 @@ exports.getRoomReviews = async (req, res) => {
       success: false,
       message: 'Lỗi tải danh sách đánh giá phòng.'
     });
+  }
+};
+
+/**
+ * Xóa mềm đánh giá (Soft Delete: IsDeleted 0 -> 1)
+ * DELETE /api/v1/rooms/reviews/:reviewId
+ */
+exports.softDeleteReview = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.UserId;
+    const { reviewId } = req.params;
+    const review = await Review.findOne({ where: { ReviewId: reviewId, UserId: userId, IsDeleted: false } });
+    if (!review) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy đánh giá.' });
+    }
+    review.IsDeleted = true;
+    review.DeletedAt = new Date();
+    await review.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Đã chuyển đánh giá vào thùng rác (IsDeleted = 1).',
+      data: { reviewId: review.ReviewId, isDeleted: true }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Lỗi xóa mềm đánh giá.' });
+  }
+};
+
+/**
+ * Khôi phục đánh giá từ thùng rác (IsDeleted 1 -> 0)
+ * PATCH /api/v1/rooms/reviews/:reviewId/restore
+ */
+exports.restoreReview = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.UserId;
+    const { reviewId } = req.params;
+    const review = await Review.findOne({ where: { ReviewId: reviewId, UserId: userId, IsDeleted: true } });
+    if (!review) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy đánh giá trong thùng rác.' });
+    }
+    review.IsDeleted = false;
+    review.DeletedAt = null;
+    await review.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Đã khôi phục đánh giá (IsDeleted = 0).',
+      data: { reviewId: review.ReviewId, isDeleted: false }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Lỗi khôi phục đánh giá.' });
   }
 };
 

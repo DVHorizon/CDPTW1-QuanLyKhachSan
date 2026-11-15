@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { forgotPasswordApi, resetPasswordApi } from '../api/authApi';
 
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+const VN_PHONE_REGEX = /^(03|05|07|08|09)\d{8}$/;
+const FULLNAME_REGEX = /^[\p{L}]+(?:\s[\p{L}]+)*$/u;
+const isStrongPassword = (pwd) =>
+  typeof pwd === 'string' &&
+  pwd.length >= 8 &&
+  pwd.length <= 32 &&
+  !/\s/.test(pwd) &&
+  /[A-Z]/.test(pwd) &&
+  /[a-z]/.test(pwd) &&
+  /\d/.test(pwd) &&
+  /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?`~]/.test(pwd);
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -21,6 +34,7 @@ const Auth = () => {
   const [activeTab, setActiveTab] = useState(initialMode);
 
   // Form states - Đăng nhập
+  const [selectedRole, setSelectedRole] = useState('Guest');
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
@@ -31,12 +45,19 @@ const Auth = () => {
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [enrollClub, setEnrollClub] = useState(true);
   const [acceptTerms, setAcceptTerms] = useState(true);
 
-  // Form states - Khôi phục mật khẩu
+  // Form states - Khôi phục mật khẩu (2 bước OTP 6 số)
   const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryStep, setRecoveryStep] = useState('request'); // 'request' | 'reset'
+  const [otpCode, setOtpCode] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [demoOtpHint, setDemoOtpHint] = useState('');
 
   // UX states
   const [isLoading, setIsLoading] = useState(false);
@@ -62,11 +83,23 @@ const Auth = () => {
     }
   }, [isAuthenticated, user, navigate, location.search]);
 
+  // Countdown OTP 5 phút
+  useEffect(() => {
+    if (otpCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setOtpCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [otpCountdown]);
+
   // Đổi tab
   const switchTab = (tab) => {
     setActiveTab(tab);
     setErrorMessage('');
     setSuccessMessage('');
+    if (tab === 'recovery') {
+      setRecoveryStep('request');
+    }
   };
 
   // Xử lý Đăng Nhập
@@ -76,17 +109,17 @@ const Auth = () => {
     setSuccessMessage('');
 
     if (!loginIdentifier.trim()) {
-      setErrorMessage('Vui lòng nhập Email, Tên đăng nhập hoặc Số điện thoại.');
+      setErrorMessage('Email không được để trống');
       return;
     }
     if (!loginPassword) {
-      setErrorMessage('Vui lòng nhập mật khẩu.');
+      setErrorMessage('Mật khẩu không được để trống');
       return;
     }
 
     try {
       setIsLoading(true);
-      const res = await login(loginIdentifier.trim(), loginPassword);
+      const res = await login(loginIdentifier.trim(), loginPassword, selectedRole);
       if (res.success) {
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
@@ -99,7 +132,7 @@ const Auth = () => {
           }
         }, 700);
       } else {
-        setErrorMessage(res.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại.');
+        setErrorMessage(res.message || 'Email hoặc mật khẩu không chính xác');
       }
     } catch (err) {
       setErrorMessage('Đã xảy ra lỗi: ' + err.message);
@@ -114,18 +147,46 @@ const Auth = () => {
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (!fullName.trim()) {
-      setErrorMessage('Vui lòng nhập họ và tên đầy đủ.');
+    const cleanName = fullName.trim();
+    if (!cleanName) {
+      setErrorMessage('Họ và tên không được để trống');
       return;
     }
-    if (!regEmail.trim()) {
-      setErrorMessage('Vui lòng nhập địa chỉ email.');
+    if (cleanName.length < 2 || cleanName.length > 100 || !FULLNAME_REGEX.test(cleanName)) {
+      setErrorMessage('Họ và tên chỉ được chứa chữ cái và khoảng trắng đơn');
       return;
     }
-    if (!regPassword || regPassword.length < 6) {
-      setErrorMessage('Mật khẩu phải có độ dài tối thiểu 6 ký tự.');
+
+    const cleanEmail = regEmail.trim();
+    if (!cleanEmail) {
+      setErrorMessage('Email không được để trống');
       return;
     }
+    if (cleanEmail.length > 255 || !EMAIL_REGEX.test(cleanEmail)) {
+      setErrorMessage('Email không đúng định dạng');
+      return;
+    }
+
+    const cleanPhone = regPhone.trim();
+    if (!cleanPhone) {
+      setErrorMessage('Số điện thoại không được để trống');
+      return;
+    }
+    if (!VN_PHONE_REGEX.test(cleanPhone)) {
+      setErrorMessage('Số điện thoại không hợp lệ (yêu cầu 10 chữ số)');
+      return;
+    }
+
+    if (!isStrongPassword(regPassword)) {
+      setErrorMessage('Mật khẩu phải chứa chữ hoa, chữ thường, số và ký tự đặc biệt');
+      return;
+    }
+
+    if (regPassword !== regConfirmPassword) {
+      setErrorMessage('Mật khẩu xác nhận không khớp');
+      return;
+    }
+
     if (!acceptTerms) {
       setErrorMessage('Quý khách vui lòng đồng ý với Điều khoản dịch vụ & Chính sách quyền riêng tư.');
       return;
@@ -134,18 +195,20 @@ const Auth = () => {
     try {
       setIsLoading(true);
       const res = await register({
-        fullName: fullName.trim(),
-        email: regEmail.trim(),
-        phone: regPhone.trim(),
+        fullName: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        phoneNumber: cleanPhone,
         password: regPassword,
+        confirmPassword: regConfirmPassword,
         enrollClub
       });
 
       if (res.success) {
-        setSuccessMessage('Chúc mừng quý khách đã gia nhập Grand Horizon Elite! Đang kích hoạt...');
+        setSuccessMessage('Đăng ký tài khoản thành công! Đang kích hoạt phiên đăng nhập...');
         setTimeout(() => {
           navigate('/');
-        }, 1000);
+        }, 800);
       } else {
         setErrorMessage(res.message || 'Đăng ký không thành công. Vui lòng thử lại.');
       }
@@ -156,22 +219,86 @@ const Auth = () => {
     }
   };
 
-  // Xử lý Khôi Phục Mật Khẩu
-  const handleRecoverySubmit = (e) => {
+  // Bước 1 Quên mật khẩu: Gửi OTP 6 số
+  const handleRecoverySubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (!recoveryEmail.trim()) {
-      setErrorMessage('Vui lòng nhập Email hoặc Số điện thoại để khôi phục.');
+    const cleanEmail = recoveryEmail.trim();
+    if (!cleanEmail) {
+      setErrorMessage('Email không được để trống');
+      return;
+    }
+    if (!EMAIL_REGEX.test(cleanEmail)) {
+      setErrorMessage('Email không đúng định dạng');
       return;
     }
 
-    setIsLoading(true);
-    setTimeout(() => {
+    try {
+      setIsLoading(true);
+      const res = await forgotPasswordApi(cleanEmail);
+      if (res.success) {
+        setRecoveryStep('reset');
+        setOtpCountdown(res.expiresInSeconds || 300);
+        setDemoOtpHint(res.demoOtp || '');
+        setSuccessMessage(res.detail || 'Mã xác thực OTP 6 chữ số đã được gửi tới email của quý khách.');
+      } else {
+        setErrorMessage(res.message || 'Không thể gửi mã OTP. Vui lòng kiểm tra lại email.');
+      }
+    } catch (err) {
+      setErrorMessage('Lỗi kết nối máy chủ: ' + err.message);
+    } finally {
       setIsLoading(false);
-      setSuccessMessage('Yêu cầu đã được tiếp nhận! Mã OTP khôi phục mật khẩu đã được gửi đến địa chỉ của quý khách.');
-    }, 700);
+    }
+  };
+
+  // Bước 2 Quên mật khẩu: Xác thực OTP và đặt lại mật khẩu mới
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    if (!/^\d{6}$/.test(otpCode.trim())) {
+      setErrorMessage('Mã OTP không chính xác hoặc đã hết hạn');
+      return;
+    }
+    if (!isStrongPassword(resetNewPassword)) {
+      setErrorMessage('Mật khẩu phải chứa chữ hoa, chữ thường, số và ký tự đặc biệt');
+      return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      setErrorMessage('Mật khẩu xác nhận không khớp');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const res = await resetPasswordApi({
+        email: recoveryEmail.trim(),
+        otpCode: otpCode.trim(),
+        newPassword: resetNewPassword,
+        confirmPassword: resetConfirmPassword
+      });
+      if (res.success) {
+        setSuccessMessage(res.detail || 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.');
+        setOtpCode('');
+        setResetNewPassword('');
+        setResetConfirmPassword('');
+        setDemoOtpHint('');
+        setTimeout(() => {
+          setLoginIdentifier(recoveryEmail.trim());
+          setLoginPassword('');
+          setActiveTab('login');
+        }, 1200);
+      } else {
+        setErrorMessage(res.message || 'Mã OTP không chính xác hoặc đã hết hạn');
+      }
+    } catch (err) {
+      setErrorMessage('Lỗi kết nối máy chủ: ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
 
@@ -264,6 +391,59 @@ const Auth = () => {
           {/* ============================================================== */}
           {activeTab === 'login' && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {/* Chọn vai trò đăng nhập */}
+              <div className="p-3 bg-[#e5eeff]/70 border border-[#cbdbf5] rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-[#0b1c30] uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[15px] text-[#725b38]">badge</span>
+                    <span>Bạn đăng nhập với tư cách:</span>
+                  </span>
+                  <span className="text-[10px] text-[#725b38] font-semibold bg-[#fedeb2]/40 px-2 py-0.5 rounded-full border border-[#b9a277]/30">
+                    Phân quyền hệ thống
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { id: 'Guest', label: 'Khách hàng', icon: 'person', sample: 'guest@hoteldomain.vn' },
+                    { id: 'Admin', label: 'Quản trị viên', icon: 'shield_person', sample: 'admin@hoteldomain.vn' },
+                    { id: 'Receptionist', label: 'Lễ tân', icon: 'desk', sample: 'receptionist@hoteldomain.vn' },
+                    { id: 'Kitchen', label: 'Bếp / F&B', icon: 'restaurant', sample: 'kitchen@hoteldomain.vn' },
+                    { id: 'Housekeeping', label: 'Buồng phòng', icon: 'cleaning_services', sample: 'housekeeping@hoteldomain.vn' }
+                  ].map((role) => {
+                    const isChecked = selectedRole === role.id;
+                    return (
+                      <label
+                        key={role.id}
+                        onClick={() => {
+                          setSelectedRole(role.id);
+                          setLoginIdentifier(role.sample);
+                          setLoginPassword('123456');
+                        }}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs font-semibold cursor-pointer transition-all select-none ${
+                          isChecked
+                            ? 'bg-[#725b38] text-white border-[#725b38] shadow-xs'
+                            : 'bg-white text-[#203044] border-[#d3e4fe] hover:border-[#b9a277] hover:bg-[#fbf8f2]'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="loginRole"
+                          value={role.id}
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="w-3.5 h-3.5 accent-[#fedeb2] cursor-pointer"
+                        />
+                        <span className={`material-symbols-outlined text-[15px] ${isChecked ? 'text-[#fedeb2]' : 'text-[#725b38]'}`}>
+                          {role.icon}
+                        </span>
+                        <span className="truncate">{role.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-[#0b1c30] mb-2">
                   Email, Tên đăng nhập hoặc Số điện thoại
@@ -434,7 +614,7 @@ const Auth = () => {
                     disabled={isLoading}
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Tối thiểu 6 ký tự kèm số"
+                    placeholder="8–32 ký tự: chữ hoa, thường, số & ký tự đặc biệt"
                     className="w-full h-11 pl-12 pr-12 bg-white border border-[#d3e4fe] rounded-xl text-[#0b1c30] text-sm placeholder-[#76777d] focus:outline-none focus:border-[#725b38] focus:ring-2 focus:ring-[#725b38]/30 transition-all shadow-xs"
                   />
                   <button
@@ -447,6 +627,24 @@ const Auth = () => {
                       {showRegPassword ? 'visibility' : 'visibility_off'}
                     </span>
                   </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#0b1c30] mb-1.5">Xác nhận mật khẩu</label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-4 text-[#45464d] material-symbols-outlined text-xl pointer-events-none">
+                    verified_user
+                  </span>
+                  <input
+                    type={showRegPassword ? 'text' : 'password'}
+                    required
+                    disabled={isLoading}
+                    value={regConfirmPassword}
+                    onChange={(e) => setRegConfirmPassword(e.target.value)}
+                    placeholder="Nhập lại mật khẩu giống 100%"
+                    className="w-full h-11 pl-12 pr-4 bg-white border border-[#d3e4fe] rounded-xl text-[#0b1c30] text-sm placeholder-[#76777d] focus:outline-none focus:border-[#725b38] focus:ring-2 focus:ring-[#725b38]/30 transition-all shadow-xs"
+                  />
                 </div>
               </div>
 
@@ -500,7 +698,8 @@ const Auth = () => {
                     setFullName('Nguyễn Hoàng Nam');
                     setRegEmail(`hoangnam.${rand}@gmail.com`);
                     setRegPhone(`0905${rand}888`);
-                    setRegPassword('123456');
+                    setRegPassword('Horizon@2026');
+                    setRegConfirmPassword('Horizon@2026');
                     setAcceptTerms(true);
                   }}
                   className="font-bold underline hover:text-[#584323] cursor-pointer inline-flex items-center gap-1"
@@ -532,55 +731,153 @@ const Auth = () => {
           )}
 
           {/* ============================================================== */}
-          {/* RECOVERY FORM SECTION (Quên mật khẩu)                         */}
+          {/* RECOVERY FORM SECTION (Quên mật khẩu - OTP 6 số)               */}
           {/* ============================================================== */}
           {activeTab === 'recovery' && (
-            <form onSubmit={handleRecoverySubmit} className="space-y-4">
-              <div className="p-4 rounded-xl bg-[#e5eeff] border border-[#cbdbf5] text-xs text-[#203044] leading-relaxed">
-                <div className="flex items-center gap-1.5 text-[#725b38] font-bold text-sm mb-1">
-                  <span className="material-symbols-outlined text-lg">lock_reset</span>
-                  <span>Khôi Phục Quyền Truy Cập</span>
-                </div>
-                Vui lòng nhập Email hoặc Số điện thoại của tài khoản. Hệ thống bảo mật sẽ gửi liên kết và mã PIN khôi phục mật khẩu trực tiếp đến thông tin của quý khách.
-              </div>
+            <div className="space-y-4">
+              {recoveryStep === 'request' ? (
+                <form onSubmit={handleRecoverySubmit} className="space-y-4">
+                  <div className="p-4 rounded-xl bg-[#e5eeff] border border-[#cbdbf5] text-xs text-[#203044] leading-relaxed">
+                    <div className="flex items-center gap-1.5 text-[#725b38] font-bold text-sm mb-1">
+                      <span className="material-symbols-outlined text-lg">lock_reset</span>
+                      <span>Khôi Phục Quyền Truy Cập</span>
+                    </div>
+                    Nhập Email tài khoản đã đăng ký. Hệ thống sẽ gửi mã xác thực OTP gồm 6 chữ số có hiệu lực trong vòng 5 phút.
+                  </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[#0b1c30] mb-2">
-                  Email hoặc Số điện thoại đã đăng ký
-                </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-4 text-[#45464d] material-symbols-outlined text-xl pointer-events-none">
-                    mail
-                  </span>
-                  <input
-                    type="text"
-                    required
+                  <div>
+                    <label className="block text-xs font-semibold text-[#0b1c30] mb-2">
+                      Email nhận OTP đã đăng ký
+                    </label>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-4 text-[#45464d] material-symbols-outlined text-xl pointer-events-none">
+                        mail
+                      </span>
+                      <input
+                        type="email"
+                        required
+                        disabled={isLoading}
+                        value={recoveryEmail}
+                        onChange={(e) => setRecoveryEmail(e.target.value)}
+                        placeholder="name@email.com"
+                        className="w-full h-12 pl-12 pr-4 bg-white border border-[#d3e4fe] rounded-xl text-[#0b1c30] text-sm placeholder-[#76777d] focus:outline-none focus:border-[#725b38] focus:ring-2 focus:ring-[#725b38]/30 transition-all shadow-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
                     disabled={isLoading}
-                    value={recoveryEmail}
-                    onChange={(e) => setRecoveryEmail(e.target.value)}
-                    placeholder="name@email.com hoặc 0912..."
-                    className="w-full h-12 pl-12 pr-4 bg-white border border-[#d3e4fe] rounded-xl text-[#0b1c30] text-sm placeholder-[#76777d] focus:outline-none focus:border-[#725b38] focus:ring-2 focus:ring-[#725b38]/30 transition-all shadow-xs"
-                  />
-                </div>
-              </div>
+                    className="w-full h-12 rounded-xl bg-[#725b38] text-white text-sm font-bold shadow-md hover:bg-[#584323] transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-70 mt-2"
+                  >
+                    {isLoading ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        <span>Đang gửi mã OTP...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Gửi Mã Xác Thực OTP</span>
+                        <span className="material-symbols-outlined text-lg">send</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+                  <div className="p-3.5 rounded-xl bg-[#e5eeff] border border-[#cbdbf5] text-xs text-[#203044] leading-relaxed">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-[#725b38] flex items-center gap-1">
+                        <span className="material-symbols-outlined text-base">mark_email_read</span>
+                        Nhập mã OTP 6 số
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-white border border-[#cbdbf5] font-mono font-bold text-[11px] text-[#0b1c30]">
+                        {Math.floor(otpCountdown / 60)}:{String(otpCountdown % 60).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <p>
+                      Mã OTP đã gửi đến <strong>{recoveryEmail}</strong>.
+                    </p>
+                    {demoOtpHint && (
+                      <p className="mt-1.5 text-[11px] font-semibold text-[#725b38]">
+                        Mã OTP thử nghiệm: <code className="px-1.5 py-0.5 bg-white rounded border border-[#b9a277]">{demoOtpHint}</code>
+                      </p>
+                    )}
+                  </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full h-12 rounded-xl bg-[#725b38] text-white text-sm font-bold shadow-md hover:bg-[#584323] transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-70 mt-2"
-              >
-                {isLoading ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                    <span>Đang gửi mã PIN...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Gửi Liên Kết Khôi Phục</span>
-                    <span className="material-symbols-outlined text-lg">send</span>
-                  </>
-                )}
-              </button>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#0b1c30] mb-1.5">Mã xác thực OTP (6 chữ số)</label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      required
+                      disabled={isLoading}
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                      placeholder="••••••"
+                      className="w-full h-11 px-4 text-center tracking-[0.4em] font-mono font-bold bg-white border border-[#d3e4fe] rounded-xl text-[#0b1c30] text-base focus:outline-none focus:border-[#725b38] focus:ring-2 focus:ring-[#725b38]/30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#0b1c30] mb-1.5">Mật khẩu mới</label>
+                    <input
+                      type="password"
+                      required
+                      disabled={isLoading}
+                      value={resetNewPassword}
+                      onChange={(e) => setResetNewPassword(e.target.value)}
+                      placeholder="8–32 ký tự: chữ hoa, thường, số & ký tự đặc biệt"
+                      className="w-full h-11 px-4 bg-white border border-[#d3e4fe] rounded-xl text-[#0b1c30] text-sm focus:outline-none focus:border-[#725b38] focus:ring-2 focus:ring-[#725b38]/30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#0b1c30] mb-1.5">Xác nhận mật khẩu mới</label>
+                    <input
+                      type="password"
+                      required
+                      disabled={isLoading}
+                      value={resetConfirmPassword}
+                      onChange={(e) => setResetConfirmPassword(e.target.value)}
+                      placeholder="Nhập lại mật khẩu mới"
+                      className="w-full h-11 px-4 bg-white border border-[#d3e4fe] rounded-xl text-[#0b1c30] text-sm focus:outline-none focus:border-[#725b38] focus:ring-2 focus:ring-[#725b38]/30"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRecoveryStep('request');
+                        setErrorMessage('');
+                        setSuccessMessage('');
+                      }}
+                      className="text-[#725b38] hover:underline font-semibold cursor-pointer"
+                    >
+                      Đổi email khác / Gửi lại OTP
+                    </button>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full h-12 rounded-xl bg-[#725b38] text-white text-sm font-bold shadow-md hover:bg-[#584323] transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-70"
+                  >
+                    {isLoading ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        <span>Đang xác thực...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Xác Nhận Đặt Lại Mật Khẩu</span>
+                        <span className="material-symbols-outlined text-lg">check_circle</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
 
               <div className="text-center pt-2">
                 <button
@@ -592,7 +889,7 @@ const Auth = () => {
                   <span>Quay lại Đăng Nhập</span>
                 </button>
               </div>
-            </form>
+            </div>
           )}
         </div>
       </div>

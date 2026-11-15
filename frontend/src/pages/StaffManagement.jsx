@@ -10,6 +10,7 @@ import {
   resetUserPassword,
   deleteUser
 } from '../api/userManagementApi';
+import { cleanMessage, logSystemEvent } from '../utils/toastSanitizer';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HẰNG SỐ & GIAO DIỆN THEO SPEC 3
@@ -100,7 +101,16 @@ const StaffManagement = () => {
   const [toast, setToast] = useState(null);
 
   const showToast = useCallback((type, message, code = '') => {
-    setToast({ type, message, code });
+    const cleaned = cleanMessage(message) || 'Thao tác đã được xử lý.';
+    if (code || type === 'error') {
+      logSystemEvent({
+        code: code || 'STAFF_MANAGEMENT_EVENT',
+        message: cleaned,
+        rawMessage: typeof message === 'string' ? message : message?.message,
+        type: type === 'success' ? 'info' : 'error',
+      });
+    }
+    setToast({ type, message: cleaned, code: '' });
     setTimeout(() => {
       setToast(null);
     }, 4500);
@@ -456,7 +466,7 @@ const StaffManagement = () => {
             </span>
             <div>
               <p className="font-bold text-sm">{toast.message}</p>
-              {toast.code && <p className="text-[11px] opacity-75 font-mono">{toast.code}</p>}
+              
             </div>
             <button
               onClick={() => setToast(null)}

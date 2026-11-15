@@ -109,7 +109,7 @@ function normalizeStatusKey(st) {
 
 // Helper gọi API an toàn
 const callApiSafe = async (endpoint, options = {}) => {
-  const envUrl = import.meta.env.VITE_API_URL || '';
+  const envUrl = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
   const candidates = [
     `${envUrl}${endpoint}`,
     endpoint,
@@ -290,6 +290,43 @@ export default function RoomAvailability() {
     };
   }, [syncStatus, loadRoomMap]);
 
+  // ─── Đồng bộ thời gian thực Real-time qua SSE (/api/v1/room-map/stream) ─────
+  useEffect(() => {
+    if (!canView || !token) return;
+
+    let eventSource = null;
+    try {
+      const sseUrl = import.meta.env.VITE_API_URL
+        ? `${import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')}/api/v1/room-map/stream`
+        : '/api/v1/room-map/stream';
+
+      eventSource = new EventSource(sseUrl);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'ROOM_STATUS_CHANGED' && payload.data) {
+            const { roomId, newStatus } = payload.data;
+            const normStatus = normalizeStatusKey(newStatus);
+            setRooms((prev) =>
+              prev.map((r) =>
+                (r.id === roomId || r.roomId === roomId)
+                  ? { ...r, currentStatus: normStatus, status: normStatus, updatedAt: payload.data.updatedAt || new Date().toISOString() }
+                  : r
+              )
+            );
+          }
+        } catch (_) {}
+      };
+    } catch (_) {}
+
+    return () => {
+      if (eventSource) {
+        try { eventSource.close(); } catch (_) {}
+      }
+    };
+  }, [canView, token]);
+
   // ─── BỘ LỌC VÀ TÌM KIẾM ──────────────────────────────────────────────────
   const toggleStatusFilter = (statusCode) => {
     setStatusFilters((prev) =>
@@ -436,6 +473,52 @@ export default function RoomAvailability() {
     setNoteError('');
   };
 
+  // ─── Kiểm tra phân quyền truy cập URL màn hình (Test Case 1 & 2) ───────────
+  if (!token) {
+    console.warn('[RoomAvailability] ERROR_0009_UNAUTHENTICATED');
+    return (
+      <AdminLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+            <span className="material-symbols-outlined text-3xl">lock</span>
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Chưa xác thực danh tính</h2>
+          <p className="text-slate-600 mb-6 max-w-md">
+            Bạn cần đăng nhập để thực hiện chức năng này.
+          </p>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-6 py-2.5 rounded-lg bg-[#1F4E78] text-white font-semibold hover:brightness-110 transition-all cursor-pointer"
+          >
+            Đến trang Đăng Nhập
+          </button>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!canView) {
+    console.warn('[RoomAvailability] ERROR_0010_FORBIDDEN');
+    return (
+      <AdminLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mb-4">
+            <span className="material-symbols-outlined text-3xl">block</span>
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Truy Cập Bị Từ Chối (403)</h2>
+          <p className="text-slate-600 mb-6 max-w-md">
+            Bạn không có quyền thực hiện chức năng này.
+          </p>
+          <button
+            onClick={() => navigate('/admin/ban-lam-viec')}
+            className="px-6 py-2.5 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-700 transition-all cursor-pointer"
+          >
+            Quay lại Bàn Làm Việc
+          </button>
+        </div>
+      </AdminLayout>
+    );
+  }
   return (
     <AdminLayout>
       <div className="p-4 md:p-6 bg-[#F8FAFC] min-h-screen text-slate-800 font-sans">

@@ -4,7 +4,8 @@ const fnbOrderController = require('../../controllers/admin/fnbOrderController')
 const { verifyToken, optionalVerifyToken } = require('../../middlewares/authMiddleware');
 
 // Lấy danh sách phòng đang lưu trú phục vụ Room Service
-router.get('/active-stays', fnbOrderController.getActiveStays);
+router.get('/active-stays', optionalVerifyToken, fnbOrderController.getActiveStays);
+router.get('/my-table-reservation', optionalVerifyToken, fnbOrderController.getMyActiveTableReservation);
 
 // Đặt món Room Service online (FEAT-FNB-04: A4.4)
 router.post('/', verifyToken, fnbOrderController.createRoomServiceOrder);
@@ -30,6 +31,7 @@ router.patch('/kitchen/:orderId/ready', fnbOrderController.markOrderReady);
 router.patch('/kitchen/:orderId/restore', fnbOrderController.restoreOrder);
 
 // Xử lý thanh toán F&B (FEAT-FNB-07: A4.7)
+router.post('/initiate-payment', optionalVerifyToken, fnbOrderController.initiateOnlinePayment);
 router.patch('/:orderId/payment', verifyToken, fnbOrderController.processPayment);
 
 // FEAT-FNB-10 (Mã truy vết: A4.10): Đánh giá món ăn và chất lượng phục vụ F&B

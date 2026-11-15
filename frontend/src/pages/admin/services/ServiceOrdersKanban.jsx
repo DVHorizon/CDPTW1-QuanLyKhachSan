@@ -6,6 +6,7 @@ import {
   fetchServiceOrdersApi,
   updateServiceOrderStatusApi,
 } from "../../../api/serviceApi";
+import { cleanMessage, logSystemEvent } from "../../../utils/toastSanitizer";
 
 const ServiceOrdersKanban = () => {
   const [orders, setOrders] = useState([]);
@@ -30,7 +31,16 @@ const ServiceOrdersKanban = () => {
 
   // Helper show Toast
   const showToast = (message, type = "success") => {
-    setToast({ message, type });
+    const cleaned = cleanMessage(message) || "Thao tác đã được xử lý.";
+    if (type === "error") {
+      logSystemEvent({
+        code: "KANBAN_ORDERS_ERROR",
+        message: cleaned,
+        rawMessage: typeof message === "string" ? message : message?.message,
+        type: "error",
+      });
+    }
+    setToast({ message: cleaned, type });
     setTimeout(() => setToast(null), 4000);
   };
 

@@ -84,6 +84,12 @@ const NAV_GROUPS = [
         allowedRoles: ["Admin", "Receptionist"],
       },
       {
+        icon: "dark_mode",
+        label: "Kiểm Toán Đêm Tự Động",
+        to: "/admin/night-audit",
+        allowedRoles: ["Admin", "Receptionist"],
+      },
+      {
         icon: "account_balance",
         label: "Tài Chính & Sổ Cái",
         to: "/admin/tai-chinh",
@@ -115,9 +121,27 @@ const NAV_GROUPS = [
         allowedRoles: ["Admin", "Receptionist", "Housekeeping"],
       },
       {
+        icon: "celebration",
+        label: "Đặt Sảnh Tiệc & MICE (Sự Kiện Đoàn)",
+        to: "/admin/banquet-mice",
+        allowedRoles: ["Admin", "Receptionist", "Kitchen"],
+      },
+      {
         icon: "restaurant",
         label: "Quản Lý Thực Đơn (F&B)",
         to: "/admin/menu",
+        allowedRoles: ["Admin", "Kitchen", "Receptionist"],
+      },
+      {
+        icon: "inventory_2",
+        label: "Kho Nguyên Liệu Bếp",
+        to: "/admin/fnb/kitchen-inventory",
+        allowedRoles: ["Admin", "Kitchen"],
+      },
+      {
+        icon: "table_restaurant",
+        label: "Sơ Đồ Bàn Ăn (Table Map)",
+        to: "/admin/fnb/table-map",
         allowedRoles: ["Admin", "Kitchen", "Receptionist"],
       },
       {
@@ -185,7 +209,7 @@ const NAV_GROUPS = [
   },
   {
     id: "rooms_security",
-    title: "Cấu Hình Phòng & Ca Trực",
+    title: "Cấu Hình Phòng & Vận Hành",
     icon: "meeting_room",
     items: [
       {
@@ -210,6 +234,30 @@ const NAV_GROUPS = [
         icon: "event_available",
         label: "Điều Độ Lịch Trực Ca",
         to: "/admin/roster",
+        allowedRoles: ["Admin", "Receptionist"],
+      },
+      {
+        icon: "directions_car",
+        label: "Đón Tiễn Sân Bay & Đội Xe",
+        to: "/admin/transportation",
+        allowedRoles: ["Admin", "Receptionist"],
+      },
+      {
+        icon: "local_police",
+        label: "Khai Báo Tạm Trú Công An (A08)",
+        to: "/admin/police-declaration",
+        allowedRoles: ["Admin", "Receptionist"],
+      },
+      {
+        icon: "sync_alt",
+        label: "Đồng Bộ Kênh Bán Phòng OTA",
+        to: "/admin/channel-manager",
+        allowedRoles: ["Admin", "Receptionist"],
+      },
+      {
+        icon: "celebration",
+        label: "Đặt Sảnh Tiệc & Hội Nghị MICE",
+        to: "/admin/banquet-mice",
         allowedRoles: ["Admin", "Receptionist"],
       },
     ],
