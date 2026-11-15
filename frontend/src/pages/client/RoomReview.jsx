@@ -95,6 +95,7 @@ export default function RoomReview() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorCode, setErrorCode] = useState('');
+  const [showAlreadyReviewedModal, setShowAlreadyReviewedModal] = useState(false);
   const [toastMessage, setToastMessage] = useState(null); // { title: '', message: '', type: 'success' | 'info' | 'error' }
 
   // Tải thông tin booking nếu có bookingId
@@ -290,6 +291,7 @@ export default function RoomReview() {
         } else if (errCode === ERROR_CODES.ALREADY_REVIEWED) {
           setErrorCode(ERROR_CODES.ALREADY_REVIEWED);
           setErrorMessage(ERROR_MESSAGES.ALREADY_REVIEWED);
+          setShowAlreadyReviewedModal(true);
         } else if (errCode === ERROR_CODES.FILE_TOO_LARGE) {
           setErrorCode(ERROR_CODES.FILE_TOO_LARGE);
           setErrorMessage(ERROR_MESSAGES.FILE_TOO_LARGE);
@@ -994,6 +996,65 @@ export default function RoomReview() {
               </form>
             </div>
           </div>
+
+          {/* Modal Popup thông báo đã đánh giá kỳ nghỉ này rồi (ERROR_0041_ALREADY_REVIEWED) */}
+          {showAlreadyReviewedModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+              onClick={() => setShowAlreadyReviewedModal(false)}
+            >
+              <div
+                className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-100 text-center space-y-5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  aria-label="Đóng"
+                  onClick={() => setShowAlreadyReviewedModal(false)}
+                  className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 text-[#725b38] mx-auto flex items-center justify-center shadow-inner border border-amber-100">
+                  <span className="material-symbols-outlined text-[34px]">verified</span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#725b38]">
+                    Grand Horizon Resort &amp; Suites
+                  </div>
+                  <h3 className="text-xl font-serif font-bold text-slate-900">
+                    Kỳ Nghỉ Đã Được Đánh Giá
+                  </h3>
+                  <p className="text-sm font-medium text-slate-700">
+                    {ERROR_MESSAGES.ALREADY_REVIEWED}
+                  </p>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Mỗi lượt lưu trú chỉ được gửi đánh giá xác thực một lần. Cảm ơn quý khách đã chia sẻ trải nghiệm cùng Grand Horizon!
+                  </p>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowAlreadyReviewedModal(false)}
+                    className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-semibold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/my-bookings')}
+                    className="w-full sm:flex-1 py-3 px-5 rounded-xl bg-[#725b38] hover:bg-[#584323] text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                    <span>Về Lịch Sử Đặt Phòng</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Toast Notification */}
           {toastMessage && (
