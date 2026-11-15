@@ -350,19 +350,19 @@ const Header = ({ wishlistCount: propWishlistCount, onWishlistClick, lang: propL
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 pl-2 border-l border-[#dedad0] shrink-0">
+            <div className="flex items-center gap-2.5 pl-3 border-l border-[#dedad0] shrink-0">
               <Link
                 to="/lookup"
-                className="hidden sm:flex items-center gap-1 h-8.5 px-2.5 rounded-lg bg-white hover:bg-[#fbf8f2] text-[#203044] text-[12px] font-semibold transition-all border border-[#dedad0] shrink-0"
+                className="hidden sm:inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-white hover:bg-[#fbf8f2] text-[#203044] text-[14px] font-bold transition-all border border-[#dedad0] hover:border-[#b9a277] whitespace-nowrap shrink-0 shadow-xs"
               >
-                <span className="material-symbols-outlined text-[15px] text-[#b9a277]">qr_code_scanner</span>
+                <span className="material-symbols-outlined text-[18px] text-[#b9a277]">qr_code_scanner</span>
                 <span>Tra cứu</span>
               </Link>
               <Link
                 to="/auth"
-                className="flex items-center gap-1.5 h-8.5 px-3 rounded-lg bg-[#203044] hover:bg-[#131b2e] text-[#fedeb2] text-[12px] font-bold transition-all shadow-xs shrink-0 border border-[#b9a277]/40 hover:border-[#b9a277]"
+                className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl bg-[#203044] hover:bg-[#131b2e] text-[#fedeb2] text-[14.5px] font-bold transition-all shadow-[0_4px_14px_rgba(32,48,68,0.18)] hover:-translate-y-0.5 whitespace-nowrap shrink-0 border border-[#b9a277]/40 hover:border-[#b9a277]"
               >
-                <span className="material-symbols-outlined text-[16px]">account_circle</span>
+                <span className="material-symbols-outlined text-[19px]">account_circle</span>
                 <span>Đăng Nhập</span>
               </Link>
             </div>
