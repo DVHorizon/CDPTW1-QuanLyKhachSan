@@ -20,9 +20,9 @@ Blocked by: 03
 - Tạo `MinibarUsage` model với association đầy đủ (D14).
 
 ## Comments
-- 2026-10-26 (Hà): Đã hoàn thiện toàn bộ tính năng C6 (FEAT-INVOICE-01). Controller đặt tại `modules/services/controllers/bookingChargesController.js`, route gắn tại `routes/bookings.js` và alias `/bookings/:bookingId/charges` trong `server.js`. Test suite `test_feat_invoice_01_c6.js` bao phủ đủ 8/8 TC theo Spec Mục 1.7.
-- 2026-10-26 (Hà): Hoàn thiện Frontend C6:
+- Đã hoàn thiện toàn bộ tính năng C6 (FEAT-INVOICE-01). Controller đặt tại `modules/services/controllers/bookingChargesController.js`, route gắn tại `routes/bookings.js` và alias `/bookings/:bookingId/charges` trong `server.js`. Test suite `test_feat_invoice_01_c6.js` bao phủ đủ 8/8 TC theo Spec Mục 1.7.
+- Hoàn thiện Frontend C6:
   + API helper: `frontend/src/api/bookingApi.js` (`getBookingCharges`).
   + Component UI: `frontend/src/components/admin/BookingChargesModal.jsx` và `frontend/src/pages/admin/BookingChargesFolio.jsx` (`/admin/charges`).
   + Tích hợp vào `frontend/src/pages/BookingManagement.jsx`: Nút icon "Bảng kê" tại từng dòng trong bảng đặt phòng và nút "Xem Bảng Kê Chi Phí Lưu Trú (Folio)" trong popup Chi tiết booking.
-- 2026-11-11 (Hà): Đồng bộ Spec C6 & Controller `bookingChargesController.js` với toàn bộ các luồng phát sinh chi phí mới trên `master` (StayExtensions, RoomMoveRequests, MinibarProducts/MinibarInspectionLines, ServiceCategories, FoodOrders RoomInvoice, DamageItems/RoomInspectionReports) và cập nhật hiển thị bảng trên `BookingChargesFolio.jsx` & `BookingChargesModal.jsx`.
+- Đồng bộ Spec C6 & Controller `bookingChargesController.js` với toàn bộ các luồng phát sinh chi phí (StayExtensions, RoomMoveRequests, MinibarProducts/MinibarInspectionLines, ServiceCategories, FoodOrders RoomInvoice, DamageItems/RoomInspectionReports) và cập nhật hiển thị bảng trên `BookingChargesFolio.jsx` & `BookingChargesModal.jsx`.

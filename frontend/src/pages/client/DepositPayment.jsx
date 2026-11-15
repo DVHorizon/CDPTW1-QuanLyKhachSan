@@ -4,6 +4,7 @@ import Header from '../../components/layout/Header';
 import DepositInvoiceModal from '../../components/modals/DepositInvoiceModal';
 import { getBookingDetailsApi, processDepositPaymentApi } from '../../api/roomApi';
 import { useAuth } from '../../context/AuthContext';
+import { getAccessToken } from '../../utils/tokenStore';
 
 // Helper format VND currency
 const formatVND = (num) => {
@@ -56,7 +57,16 @@ export default function DepositPayment() {
   
   // Card form inputs
   const [cardNumber, setCardNumber] = useState('');
-  const [cardholderName, setCardholderName] = useState(user?.FullName ? user.FullName.toUpperCase() : 'NGUYEN VAN AN');
+  const [cardholderName, setCardholderName] = useState(
+    (user?.fullName || user?.FullName || 'NGUYEN VAN AN').toUpperCase()
+  );
+
+  useEffect(() => {
+    const resolvedName = user?.fullName || user?.FullName;
+    if (resolvedName && (!cardholderName || cardholderName === 'NGUYEN VAN AN')) {
+      setCardholderName(resolvedName.toUpperCase());
+    }
+  }, [user]);
   const [expiryDate, setExpiryDate] = useState('12/28');
   const [cvvCode, setCvvCode] = useState('');
 
@@ -234,7 +244,7 @@ export default function DepositPayment() {
     setErrorMessage('');
     setErrorCode('');
     const activeBookingId = booking?.bookingId || bookingIdParam || 1;
-    const token = localStorage.getItem('hotel_token') || sessionStorage.getItem('token');
+    const token = getAccessToken() || localStorage.getItem('hotel_token') || sessionStorage.getItem('token');
     try {
       setIsSubmitting(true);
       const c5Res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/v1/payments`, {
@@ -322,7 +332,7 @@ export default function DepositPayment() {
       // Nếu phương thức là VietQR hoặc Ví điện tử (VNPay/MoMo), tích hợp C5 Core Payment API
       if (paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'DIGITAL_WALLET') {
         const c5Method = paymentMethod === 'BANK_TRANSFER' ? 'VietQR' : (walletProvider === 'MOMO' ? 'MoMo' : 'VNPay');
-        const token = localStorage.getItem('hotel_token') || sessionStorage.getItem('token');
+        const token = getAccessToken() || localStorage.getItem('hotel_token') || sessionStorage.getItem('token');
 
         try {
           const c5Res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/v1/payments`, {
