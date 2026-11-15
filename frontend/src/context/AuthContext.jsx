@@ -32,7 +32,8 @@ export const AuthProvider = ({ children }) => {
           handleLogout();
         }
       } else {
-        const refreshed = await refreshAuthToken();
+        const hasSessionHint = Boolean(localStorage.getItem('hotel_user'));
+        const refreshed = hasSessionHint ? await refreshAuthToken() : null;
         if (refreshed?.success && refreshed.token) {
           setAccessToken(refreshed.token);
           setToken(refreshed.token);

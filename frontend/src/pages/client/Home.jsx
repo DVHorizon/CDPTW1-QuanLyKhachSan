@@ -753,7 +753,7 @@ function Home() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {visibleItems.map((branch, index) => (
                       <div
-                        key={branch.BranchId}
+                        key={`${branch.BranchId}-${index}`}
                         className="group bg-[#fafaf8] rounded-2xl overflow-hidden border border-[#dedad0] hover:border-[#b9a277] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col"
                       >
                         <div className="relative h-56 w-full overflow-hidden bg-slate-200">
@@ -915,11 +915,11 @@ function Home() {
 
             {/* Room Cards Grid (6 items) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
-              {filteredRooms.map((rt) => {
+              {filteredRooms.map((rt, idx) => {
                 const isWishlisted = wishlist.includes(rt.RoomTypeId);
                 return (
                   <div
-                    key={rt.RoomTypeId}
+                    key={`${rt.RoomTypeId}-${idx}`}
                     onClick={() => navigate(`/rooms/${rt.RoomTypeId}`)}
                     className="group bg-white rounded-2xl overflow-hidden shadow-[0_8px_30px_-15px_rgba(32,48,68,0.25)] hover:shadow-[0_20px_45px_-20px_rgba(32,48,68,0.45)] transition-all duration-300 flex flex-col justify-between border border-[#dedad0] hover:-translate-y-1 relative cursor-pointer"
                   >
@@ -1095,9 +1095,9 @@ function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-7">
-              {homeData.offers.map((offer) => (
+              {homeData.offers.map((offer, idx) => (
                 <div
-                  key={offer.OfferId}
+                  key={`${offer.OfferId}-${idx}`}
                   className="bg-[#203044]/80 backdrop-blur-md rounded-2xl p-7 border border-white/10 hover:border-[#b9a277] transition-all hover:shadow-[0_12px_32px_-8px_rgba(185,162,119,0.3)] flex flex-col justify-between relative overflow-hidden group"
                 >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-[#b9a277]/10 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
@@ -1177,9 +1177,9 @@ function Home() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {homeData.experiences.map((exp) => (
+              {homeData.experiences.map((exp, idx) => (
                 <div
-                  key={exp.id}
+                  key={`${exp.id}-${idx}`}
                   className="bg-white rounded-2xl overflow-hidden border border-[#dedad0] hover:border-[#b9a277] hover:shadow-lg transition-all flex flex-col justify-between group"
                 >
                   <div className="relative aspect-[4/3] overflow-hidden bg-[#203044]">
@@ -1236,9 +1236,9 @@ function Home() {
               {/* REVIEWS COLUMN */}
               <div className="lg:col-span-7 flex flex-col justify-between gap-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {homeData.reviews.slice(0, 4).map((rev) => (
+                  {homeData.reviews.slice(0, 4).map((rev, idx) => (
                     <div
-                      key={rev.ReviewId}
+                      key={`${rev.ReviewId}-${idx}`}
                       className="bg-white p-6 rounded-2xl border border-[#dedad0] shadow-sm flex flex-col justify-between hover:shadow-md transition-all"
                     >
                       <div>
