@@ -5,6 +5,21 @@ const crypto = require('crypto');
 const pool = require('../config/db');
 const { verifyToken, requirePermission } = require('../middlewares/authMiddleware');
 
+let userColumnsEnsured = false;
+async function ensureUserColumns() {
+  if (userColumnsEnsured) return;
+  const [cols] = await pool.query('SHOW COLUMNS FROM Users');
+  const names = new Set(cols.map((c) => c.Field));
+  const alters = [];
+  if (!names.has('EmployeeCode')) alters.push('ADD COLUMN EmployeeCode VARCHAR(20) NULL UNIQUE AFTER Phone');
+  if (!names.has('AvatarUrl')) alters.push('ADD COLUMN AvatarUrl VARCHAR(500) NULL AFTER EmployeeCode');
+  if (!names.has('MustChangePassword')) alters.push('ADD COLUMN MustChangePassword TINYINT(1) NOT NULL DEFAULT 0 AFTER Status');
+  if (alters.length > 0) {
+    await pool.query(`ALTER TABLE Users ${alters.join(', ')}`);
+  }
+  userColumnsEnsured = true;
+}
+
 /**
  * Helper: Ghi log kiểm toán nghiệp vụ vào bảng AuditLogs
  */
@@ -73,6 +88,7 @@ router.get('/roles', verifyToken, async (req, res) => {
 // GET /api/v1/users?search=&role=&status=&page=1&limit=10&sort=asc
 router.get('/', verifyToken, requirePermission('USER_MANAGE'), async (req, res) => {
   try {
+    await ensureUserColumns();
     const { search, role, status, page = 1, limit = 10, sort = 'asc' } = req.query;
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -216,6 +232,7 @@ router.get('/:id', verifyToken, requirePermission('USER_MANAGE'), async (req, re
 
 // ─── POST thêm tài khoản mới (Spec 3 - Mục 3.2–3.6 & Luồng 4.1) ─────────────────
 router.post('/', verifyToken, requirePermission('USER_MANAGE'), async (req, res) => {
+  await ensureUserColumns();
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();

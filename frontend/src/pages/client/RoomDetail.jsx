@@ -31,6 +31,7 @@ export default function RoomDetail() {
   // Dữ liệu loại phòng
   const [roomType, setRoomType] = useState(null);
   const [loadingRoom, setLoadingRoom] = useState(true);
+  const activeRoomTypeId = roomType?.RoomTypeId || id || 1;
 
   // Tham số kiểm tra phòng trống real-time (FEAT-GUEST-04)
   const today = useMemo(() => new Date(), []);
