@@ -51,6 +51,11 @@ module.exports = (sequelize) => {
     AssignedTo: {
       type: DataTypes.INTEGER,
       allowNull: true
+    },
+    Version: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1
     }
   }, {
     tableName: 'Invoices',

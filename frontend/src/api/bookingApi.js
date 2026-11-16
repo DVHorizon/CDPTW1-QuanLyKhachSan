@@ -1,34 +1,50 @@
 // frontend/src/api/bookingApi.js
+import { getAccessToken } from '../utils/tokenStore.js';
 
-const API_ENDPOINTS = [
-  ...(import.meta.env.VITE_API_URL
-    ? [`${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/v1/bookings`]
-    : []),
-  'http://localhost:5000/api/v1/bookings',
-  '/api/v1/bookings',
-  '/api/bookings',
-  'http://localhost:5000/api/v1/bookings',
-  'http://localhost:5000/api/bookings',
-  'http://localhost:5000/bookings',
-];
+const resolveToken = () =>
+  getAccessToken() ||
+  (typeof localStorage !== 'undefined'
+    ? localStorage.getItem('hotel_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('authToken')
+    : null);
+
+const getApiRoot = () => {
+  const envUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+    (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) ||
+    (typeof window === 'undefined' ? 'http://localhost:5000/api' : '/api');
+  const cleaned = String(envUrl).replace(/\/+$/, '');
+  return cleaned.endsWith('/v1') ? cleaned.slice(0, -3) : cleaned;
+};
+
+const API_ENDPOINTS = Array.from(
+  new Set([
+    `${getApiRoot()}/v1/bookings`,
+    '/api/v1/bookings',
+    '/api/bookings',
+    'http://localhost:5000/api/v1/bookings',
+    'http://localhost:5000/api/bookings',
+    'http://localhost:5000/bookings',
+  ])
+);
 
 async function safeFetchJson(path, options = {}) {
   let lastErr = null;
+  const { headers: optHeaders, ...restOptions } = options;
   for (const base of API_ENDPOINTS) {
     try {
       const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
-      const token = typeof window !== 'undefined'
-        ? (localStorage.getItem('hotel_token') || localStorage.getItem('token'))
-        : null;
+      const token = resolveToken();
 
       const res = await fetch(url, {
+        ...restOptions,
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-          ...(options.headers || {}),
+          ...(optHeaders || {}),
         },
-        ...options,
       });
 
       const text = await res.text();

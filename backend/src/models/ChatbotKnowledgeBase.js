@@ -36,6 +36,11 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
+    Version: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
   }, {
     tableName: 'ChatbotKnowledgeBase',
     timestamps: true,

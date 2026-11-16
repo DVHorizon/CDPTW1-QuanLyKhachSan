@@ -1,0 +1,65 @@
+{
+  "folders": [
+    {
+      "name": "🏛️ Grand Horizon (Root Monorepo)",
+      "path": "."
+    },
+    {
+      "name": "⚙️ Backend API (Port 5000)",
+      "path": "backend"
+    },
+    {
+      "name": "🌐 Frontend UI (Port 3000)",
+      "path": "frontend"
+    }
+  ],
+  "settings": {
+    "task.allowAutomaticTasks": "on",
+    "files.eol": "\n"
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "🚀 Grand Horizon: Auto-Start All (Docker + DB + BE + FE)",
+        "type": "shell",
+        "command": "npm start",
+        "options": {
+          "cwd": "${workspaceFolder:🏛️ Grand Horizon (Root Monorepo)}"
+        },
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated",
+          "clear": true
+        },
+        "runOptions": {
+          "runOn": "folderOpen"
+        },
+        "problemMatcher": []
+      }
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "🌐 Mở Giao diện Khách hàng (localhost:3000)",
+        "type": "chrome",
+        "request": "launch",
+        "url": "http://localhost:3000",
+        "webRoot": "${workspaceFolder:🌐 Frontend UI (Port 3000)}/src"
+      },
+      {
+        "name": "🏛️ Mở Trang Quản trị Admin PMS (localhost:3000/admin)",
+        "type": "chrome",
+        "request": "launch",
+        "url": "http://localhost:3000/admin",
+        "webRoot": "${workspaceFolder:🌐 Frontend UI (Port 3000)}/src"
+      }
+    ]
+  }
+}

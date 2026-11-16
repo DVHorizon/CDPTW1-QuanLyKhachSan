@@ -51,6 +51,11 @@ module.exports = (sequelize) => {
     GatewayResponse: {
       type: DataTypes.TEXT('long'),
       allowNull: true
+    },
+    Version: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1
     }
   }, {
     tableName: 'Payments',

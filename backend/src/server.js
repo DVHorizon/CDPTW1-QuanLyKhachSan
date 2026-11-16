@@ -43,11 +43,92 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'If-Match'],
   })
 );
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Bảo vệ tệp PDF hoá đơn trong /uploads/invoices (yêu cầu đăng nhập + nhân viên hoặc chủ booking)
+const { verifyToken: verifyUploadToken } = require('./middlewares/authMiddleware');
+const { Invoice: UploadInvoiceModel, Booking: UploadBookingModel } = require('./models');
+
+const protectInvoiceUploads = async (req, res, next) => {
+  let rawPath = '';
+  try {
+    rawPath = decodeURIComponent(req.path || '');
+  } catch (_) {
+    return res.status(403).json({
+      success: false,
+      code: 'ERROR_0010_FORBIDDEN',
+      message: 'Đường dẫn tệp hoá đơn không hợp lệ',
+    });
+  }
+
+  // Chặn mọi truy cập tới /uploads/invoices (kể cả biến thể //invoices hoặc path traversal)
+  if (!/(^|\/)invoices(\/|$)/i.test(rawPath)) {
+    return next();
+  }
+
+  let verified = false;
+  await verifyUploadToken(req, res, () => {
+    verified = true;
+  });
+  if (!verified || res.headersSent || !req.user) {
+    return;
+  }
+
+  try {
+    const reqFile = rawPath.replace(/^\/+invoices\/?/i, '');
+    if (!reqFile || reqFile.includes('..') || reqFile.includes('/') || reqFile.includes('\\') || !/\.pdf$/i.test(reqFile)) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Bạn không có quyền truy cập tệp hoá đơn này',
+      });
+    }
+
+    const roleName = String(req.user?.roleName || '').toLowerCase();
+    const permissions = Array.isArray(req.user?.permissions) ? req.user.permissions : [];
+    const isStaff =
+      [1, 2, 6, 7].includes(Number(req.user?.roleId || 0)) ||
+      ['admin', 'receptionist', 'staff', 'manager', 'accountant'].includes(roleName) ||
+      permissions.includes('view_invoices');
+
+    if (isStaff) {
+      return next();
+    }
+
+    const invoiceNumber = reqFile.replace(/^INV-/i, '').replace(/\.pdf$/i, '');
+    const invoice = await UploadInvoiceModel.findOne({
+      where: { InvoiceNumber: invoiceNumber },
+      include: [{ model: UploadBookingModel, attributes: ['BookingId', 'UserId'] }],
+    });
+
+    if (
+      !invoice ||
+      !invoice.Booking ||
+      !invoice.Booking.UserId ||
+      Number(invoice.Booking.UserId) !== Number(req.user?.userId)
+    ) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Bạn không có quyền xem hoá đơn này',
+      });
+    }
+
+    return next();
+  } catch (err) {
+    return res.status(403).json({
+      success: false,
+      code: 'ERROR_0010_FORBIDDEN',
+      message: 'Không thể xác thực quyền truy cập tệp hoá đơn',
+    });
+  }
+};
+
+app.use('/uploads', protectInvoiceUploads);
 // Phục vụ tệp tĩnh ảnh phòng, CCCD, thẻ khách và chữ ký số
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));

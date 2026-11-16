@@ -1,12 +1,22 @@
 /**
- * In-memory accessToken store (FEAT-GUEST-01 / Group 4)
- * Tránh lưu accessToken vào localStorage để giảm rủi ro XSS;
- * phiên đăng nhập được khôi phục tự động qua HttpOnly refreshToken cookie (/api/v1/auth/refresh).
+ * AccessToken store đồng bộ giữa In-memory và localStorage ('hotel_token')
+ * Đảm bảo tương thích đồng thời cho cả Guest Portal (getAccessToken) và toàn bộ phân hệ Admin PMS / C1-C14.
  */
-let memoryAccessToken = null;
+let memoryAccessToken =
+  typeof window !== 'undefined' ? localStorage.getItem('hotel_token') || null : null;
 
-export const getAccessToken = () =>
-  memoryAccessToken || (typeof window !== 'undefined' ? localStorage.getItem('hotel_token') : null) || null;
+export const getAccessToken = () => {
+  if (memoryAccessToken) return memoryAccessToken;
+  if (typeof window !== 'undefined') {
+    return (
+      localStorage.getItem('hotel_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('authToken') ||
+      null
+    );
+  }
+  return null;
+};
 
 export const setAccessToken = (token) => {
   memoryAccessToken = token || null;
