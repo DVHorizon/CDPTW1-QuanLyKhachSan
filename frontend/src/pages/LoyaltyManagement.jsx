@@ -137,12 +137,51 @@ const formatCurrency = (amount) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
 
+const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/%3E%3C/svg%3E";
+
 const LoyaltyManagement = () => {
   const [stats, setStats] = useState(defaultStatsData);
   const [tiers, setTiers] = useState(defaultTiersData);
   const [selectedTier, setSelectedTier] = useState(defaultTiersData[2]); // Default Gold
   const [pendingApprovals, setPendingApprovals] = useState(defaultPendingApprovals);
   const [members, setMembers] = useState(initialMemberData);
+
+  // Tab navigation: 'tiers' (Cấu hình hạng thẻ) | 'members' (Quản lý hội viên)
+  const [activeTab, setActiveTab] = useState('tiers');
+
+  // Member Search and Filter
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [memberTierFilter, setMemberTierFilter] = useState('ALL');
+  const [memberStatusFilter, setMemberStatusFilter] = useState('ALL');
+
+  // Member CRUD Modals state
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [isEditMemberModalOpen, setIsEditMemberModalOpen] = useState(false);
+  const [isMemberSubmitting, setIsMemberSubmitting] = useState(false);
+
+  const [newMemberForm, setNewMemberForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    tierId: 1,
+    loyaltyPoints: 0,
+    totalSpend: 0,
+    totalNights: 0,
+    avatarUrl: ''
+  });
+
+  const [editMemberForm, setEditMemberForm] = useState({
+    id: null,
+    fullName: '',
+    phone: '',
+    tierId: 1,
+    loyaltyPoints: 0,
+    totalSpend: 0,
+    totalNights: 0,
+    status: 'Active',
+    avatarUrl: '',
+    updatedAt: null
+  });
 
   // Notification state
   const [notice, setNotice] = useState(null);
@@ -176,6 +215,45 @@ const LoyaltyManagement = () => {
     discountRate: 0.20,
     perksText: 'Đưa đón trực thăng riêng, Bếp trưởng phục vụ tại phòng'
   });
+
+  // Test Case 6 & 7: Chuẩn hóa khoảng trắng & số Full-width ０-９
+  const normalizeFullWidth = (str) => {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+      .replace(/\u3000/g, ' ')
+      .trim();
+  };
+
+  // Test Case 11: Validate phần mở rộng ảnh và kích thước tệp
+  const handleImageUpload = (e, target = 'new') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validExts = ['jpg', 'jpeg', 'png', 'webp'];
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!validExts.includes(ext) || !file.type.startsWith('image/')) {
+      showNotice('[Kiểm Tra Hình Ảnh]: Tệp tải lên không hợp lệ! Chỉ chấp nhận file định dạng JPG, PNG, WEBP. Không chấp nhận file PDF hay thực thi (.exe)!', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showNotice('[Kiểm Tra Hình Ảnh]: Dung lượng file ảnh không được vượt quá 5MB!', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (target === 'new') {
+        setNewMemberForm(prev => ({ ...prev, avatarUrl: reader.result }));
+      } else {
+        setEditMemberForm(prev => ({ ...prev, avatarUrl: reader.result }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Sync edit form when selectedTier changes
   useEffect(() => {
@@ -230,15 +308,15 @@ const LoyaltyManagement = () => {
   const handleSaveTier = async () => {
     setIsSaving(true);
     try {
-      const numericPoints = parseInt(String(editReqPoints).replace(/\D/g, ''), 10) || selectedTier.pointsNeeded;
-      const numericNights = parseInt(String(editReqNights).replace(/\D/g, ''), 10) || 0;
-      const numericSpend = parseFloat(String(editReqSpend).replace(/[^0-9.]/g, '')) || 0;
+      const numericPoints = parseInt(normalizeFullWidth(editReqPoints).replace(/\D/g, ''), 10) || selectedTier.pointsNeeded;
+      const numericNights = parseInt(normalizeFullWidth(editReqNights).replace(/\D/g, ''), 10) || 0;
+      const numericSpend = parseFloat(normalizeFullWidth(editReqSpend).replace(/[^0-9.]/g, '')) || 0;
 
       const res = await fetch(`/api/loyalty/tiers/${selectedTier.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tierName: editTierName,
+          tierName: normalizeFullWidth(editTierName),
           pointsNeeded: numericPoints,
           minNights: numericNights,
           minSpendUsd: numericSpend,
@@ -250,6 +328,16 @@ const LoyaltyManagement = () => {
       });
 
       const data = await res.json();
+      if (res.status === 409) {
+        showNotice('Dữ liệu đã được cập nhật bởi một phiên làm việc khác. Vui lòng tải lại trang!', 'error');
+        await loadData();
+        return;
+      }
+      if (res.status === 404) {
+        showNotice('Không tìm thấy hạng thẻ hoặc đã bị xóa trước đó!', 'error');
+        await loadData();
+        return;
+      }
       if (data.success) {
         showNotice(data.message || `Đã lưu cấu hình hạng thẻ ${editTierName} thành công!`);
         await loadData();
@@ -266,7 +354,8 @@ const LoyaltyManagement = () => {
   // 2. THÊM HẠNG THẺ MỚI (CREATE)
   const handleCreateTier = async (e) => {
     e.preventDefault();
-    if (!newTierForm.tierName.trim()) {
+    const cleanTierName = normalizeFullWidth(newTierForm.tierName);
+    if (!cleanTierName) {
       showNotice('Vui lòng nhập tên hạng thẻ!', 'error');
       return;
     }
@@ -274,7 +363,7 @@ const LoyaltyManagement = () => {
     try {
       const perksArr = newTierForm.perksText
         .split(',')
-        .map(t => t.trim())
+        .map(t => normalizeFullWidth(t))
         .filter(Boolean)
         .map(text => ({ icon: 'stars', text }));
 
@@ -282,19 +371,23 @@ const LoyaltyManagement = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tierName: newTierForm.tierName,
-          tierCode: newTierForm.tierCode || undefined,
-          badgeName: newTierForm.badgeName,
-          minPoints: Number(newTierForm.minPoints) || 0,
-          minNights: Number(newTierForm.minNights) || 0,
-          minSpendUsd: Number(newTierForm.minSpendUsd) || 0,
-          pointMultiplier: Number(newTierForm.pointMultiplier) || 1.0,
-          discountRate: Number(newTierForm.discountRate) || 0.0,
+          tierName: cleanTierName,
+          tierCode: newTierForm.tierCode ? normalizeFullWidth(newTierForm.tierCode) : undefined,
+          badgeName: normalizeFullWidth(newTierForm.badgeName),
+          minPoints: Number(normalizeFullWidth(newTierForm.minPoints)) || 0,
+          minNights: Number(normalizeFullWidth(newTierForm.minNights)) || 0,
+          minSpendUsd: Number(normalizeFullWidth(newTierForm.minSpendUsd)) || 0,
+          pointMultiplier: Number(normalizeFullWidth(newTierForm.pointMultiplier)) || 1.0,
+          discountRate: Number(normalizeFullWidth(newTierForm.discountRate)) || 0.0,
           perks: perksArr
         })
       });
 
       const data = await res.json();
+      if (res.status === 409) {
+        showNotice(data.message || 'Hạng thẻ đã tồn tại!', 'error');
+        return;
+      }
       if (data.success) {
         showNotice(data.message || 'Thêm hạng thẻ mới thành công!');
         setIsAddTierModalOpen(false);
@@ -334,6 +427,11 @@ const LoyaltyManagement = () => {
         method: 'DELETE'
       });
       const data = await res.json();
+      if (res.status === 404) {
+        showNotice('Xóa không hợp lệ: Hạng thẻ không tồn tại hoặc đã bị xóa trước đó!', 'error');
+        await loadData();
+        return;
+      }
       if (data.success) {
         showNotice(data.message || `Đã xóa hạng thẻ ${selectedTier.code} thành công!`);
         await loadData();
@@ -344,6 +442,178 @@ const LoyaltyManagement = () => {
       showNotice(err.message, 'error');
     }
   };
+
+  // --- CRUD CHỨC NĂNG HỘI VIÊN (MEMBERS) ---
+  // 1. Thêm hội viên mới (CREATE MEMBER)
+  const handleCreateMember = async (e) => {
+    e.preventDefault();
+    const cleanName = normalizeFullWidth(newMemberForm.fullName);
+    const cleanEmail = normalizeFullWidth(newMemberForm.email);
+
+    // Test Case 4 & 6: Validate bắt buộc và khoảng trắng
+    if (!cleanName || cleanName.length === 0) {
+      showNotice('[Validate Form]: Họ tên hội viên không được để trống hoặc chỉ chứa khoảng trắng!', 'error');
+      return;
+    }
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      showNotice('[Validate Form]: Định dạng email không hợp lệ (ví dụ đúng: user@domain.com)!', 'error');
+      return;
+    }
+
+    setIsMemberSubmitting(true);
+    try {
+      const res = await fetch('/api/loyalty/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: cleanName,
+          email: cleanEmail,
+          phone: normalizeFullWidth(newMemberForm.phone),
+          tierId: Number(newMemberForm.tierId) || 1,
+          loyaltyPoints: Number(normalizeFullWidth(newMemberForm.loyaltyPoints)) || 0,
+          totalSpend: Number(normalizeFullWidth(newMemberForm.totalSpend)) || 0,
+          totalNights: Number(normalizeFullWidth(newMemberForm.totalNights)) || 0,
+          avatarUrl: newMemberForm.avatarUrl || null
+        })
+      });
+
+      const data = await res.json();
+      if (res.status === 409) {
+        showNotice(data.message || '[Kiểm Tra Trùng Lặp]: Dữ liệu đã tồn tại trong hệ thống!', 'error');
+        return;
+      }
+      if (data.success) {
+        showNotice(data.message || `Đã thêm hội viên "${cleanName}" thành công!`);
+        setIsAddMemberModalOpen(false);
+        setNewMemberForm({
+          fullName: '',
+          email: '',
+          phone: '',
+          tierId: 1,
+          loyaltyPoints: 0,
+          totalSpend: 0,
+          totalNights: 0,
+          avatarUrl: ''
+        });
+        await loadData();
+      } else {
+        showNotice(data.message || 'Lỗi khi thêm hội viên', 'error');
+      }
+    } catch (err) {
+      showNotice(err.message, 'error');
+    } finally {
+      setIsMemberSubmitting(false);
+    }
+  };
+
+  // 2. Mở modal sửa hội viên
+  const handleOpenEditMember = (member) => {
+    setEditMemberForm({
+      id: member.id,
+      fullName: member.name || '',
+      phone: member.phone || '',
+      tierId: member.tierId || (tiers.find(t => t.code === member.tier)?.tierId) || 1,
+      loyaltyPoints: member.currentPoints || 0,
+      totalSpend: member.spend || 0,
+      totalNights: member.nights || 0,
+      status: member.status || 'Active',
+      avatarUrl: member.avatarUrl || '',
+      updatedAt: member.updatedAt || null
+    });
+    setIsEditMemberModalOpen(true);
+  };
+
+  // 3. Lưu sửa hội viên (UPDATE MEMBER)
+  const handleSaveEditMember = async (e) => {
+    e.preventDefault();
+    const cleanName = normalizeFullWidth(editMemberForm.fullName);
+    if (!cleanName) {
+      showNotice('[Validate Form]: Họ tên không được để trống!', 'error');
+      return;
+    }
+
+    setIsMemberSubmitting(true);
+    try {
+      const res = await fetch(`/api/loyalty/members/${editMemberForm.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: cleanName,
+          phone: normalizeFullWidth(editMemberForm.phone),
+          tierId: Number(editMemberForm.tierId) || 1,
+          loyaltyPoints: Number(normalizeFullWidth(editMemberForm.loyaltyPoints)) || 0,
+          totalSpend: Number(normalizeFullWidth(editMemberForm.totalSpend)) || 0,
+          totalNights: Number(normalizeFullWidth(editMemberForm.totalNights)) || 0,
+          status: editMemberForm.status,
+          // Test Case 13: Giữ nguyên ảnh cũ nếu không tải ảnh mới
+          avatarUrl: editMemberForm.avatarUrl || undefined,
+          lastUpdatedAt: editMemberForm.updatedAt
+        })
+      });
+
+      const data = await res.json();
+      if (res.status === 409) {
+        // Test Case 2: Concurrency check / Optimistic Lock
+        showNotice('Dữ liệu đã được cập nhật bởi một phiên làm việc khác. Vui lòng tải lại trang!', 'error');
+        await loadData();
+        setIsEditMemberModalOpen(false);
+        return;
+      }
+      if (res.status === 404) {
+        // Test Case 3: ID không tồn tại
+        showNotice('Không tìm thấy hội viên hoặc hội viên đã bị xóa trước đó!', 'error');
+        await loadData();
+        setIsEditMemberModalOpen(false);
+        return;
+      }
+      if (data.success) {
+        showNotice(data.message || `Đã cập nhật hội viên #${editMemberForm.id} thành công!`);
+        setIsEditMemberModalOpen(false);
+        await loadData();
+      } else {
+        showNotice(data.message || 'Lỗi khi cập nhật hội viên', 'error');
+      }
+    } catch (err) {
+      showNotice(err.message, 'error');
+    } finally {
+      setIsMemberSubmitting(false);
+    }
+  };
+
+  // 4. Xóa hội viên (DELETE MEMBER)
+  const handleDeleteMember = async (member) => {
+    const confirmed = window.confirm(`Bạn có chắc chắn muốn hủy tư cách hội viên của "${member.name}" (${member.id}) không?`);
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/loyalty/members/${member.id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.status === 404) {
+        // Test Case 1: Xóa mục không tồn tại
+        showNotice(data.message || 'Xóa không hợp lệ: Hội viên không tồn tại hoặc đã bị xóa trước đó!', 'error');
+        await loadData();
+        return;
+      }
+      if (data.success) {
+        showNotice(data.message || `Đã hủy tư cách hội viên ${member.name} thành công!`);
+        await loadData();
+      } else {
+        showNotice(data.message || 'Lỗi khi xóa hội viên', 'error');
+      }
+    } catch (err) {
+      showNotice(err.message, 'error');
+    }
+  };
+
+  const filteredMembers = members.filter(m => {
+    const q = (memberSearchTerm || '').toLowerCase();
+    const matchSearch = !q || m.name?.toLowerCase().includes(q) || m.email?.toLowerCase().includes(q) || m.phone?.includes(q) || m.id?.toLowerCase().includes(q);
+    const matchTier = memberTierFilter === 'ALL' || m.tier?.toLowerCase().includes(memberTierFilter.toLowerCase());
+    const matchStatus = memberStatusFilter === 'ALL' || (memberStatusFilter === 'Active' ? m.status === 'Active' : m.status !== 'Active');
+    return matchSearch && matchTier && matchStatus;
+  });
 
   // --- CÁC HÀNH ĐỘNG HỆ THỐNG KHÁC ---
   // 4. Chạy lại thuật toán phân hạng thẻ
@@ -515,7 +785,28 @@ const LoyaltyManagement = () => {
           ))}
         </div>
 
-        {/* --- MAIN SPLIT CONTENT --- */}
+        {/* --- TAB NAVIGATION (QUY TẮC & HỘI VIÊN) --- */}
+        <div className="flex border-b border-gray-200 gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab('tiers')}
+            className={`px-6 py-3 font-bold text-sm border-b-2 flex items-center gap-2 transition-all ${activeTab === 'tiers' ? 'border-[#1B5E20] text-[#1B5E20] bg-emerald-50/50 rounded-t-xl' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+          >
+            <span className="material-symbols-outlined text-[20px]">layers</span>
+            Ma Trận Hạng Thẻ & Đặc Quyền ({tiers.length} Tiers)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('members')}
+            className={`px-6 py-3 font-bold text-sm border-b-2 flex items-center gap-2 transition-all ${activeTab === 'members' ? 'border-[#1B5E20] text-[#1B5E20] bg-emerald-50/50 rounded-t-xl' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+          >
+            <span className="material-symbols-outlined text-[20px]">group</span>
+            Quản Lý Danh Sách Hội Viên ({members.length} Hội viên)
+          </button>
+        </div>
+
+        {/* --- TAB 1: MA TRẬN HẠNG THẺ & ĐẶC QUYỀN --- */}
+        {activeTab === 'tiers' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
           {/* LEFT COLUMN: Tier List */}
@@ -809,6 +1100,145 @@ const LoyaltyManagement = () => {
 
           </div>
         </div>
+        )}
+
+        {/* --- TAB 2: QUẢN LÝ DANH SÁCH HỘI VIÊN --- */}
+        {activeTab === 'members' && (
+          <div className="flex flex-col gap-4 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 animate-in fade-in duration-300">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[300px]">
+                <div className="relative flex-1 min-w-[200px]">
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-gray-400 text-[18px]">search</span>
+                  <input
+                    type="text"
+                    placeholder="Tìm theo tên hội viên, email, SĐT, mã..."
+                    maxLength={100}
+                    value={memberSearchTerm}
+                    onChange={(e) => setMemberSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+                <select
+                  value={memberTierFilter}
+                  onChange={(e) => setMemberTierFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium bg-white focus:outline-none"
+                >
+                  <option value="ALL">Tất Cả Hạng Thẻ</option>
+                  {tiers.map(t => (
+                    <option key={t.id} value={t.code}>{t.code}</option>
+                  ))}
+                </select>
+                <select
+                  value={memberStatusFilter}
+                  onChange={(e) => setMemberStatusFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium bg-white focus:outline-none"
+                >
+                  <option value="ALL">Tất Cả Trạng Thái</option>
+                  <option value="Active">Hoạt Động</option>
+                  <option value="Inactive">Tạm Khóa</option>
+                </select>
+              </div>
+
+              <button
+                onClick={() => setIsAddMemberModalOpen(true)}
+                className="px-5 py-2.5 rounded-xl bg-[#1B5E20] hover:bg-[#144d18] text-white font-bold text-sm shadow-sm flex items-center gap-2 transition-all active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[18px]">person_add</span>
+                Thêm Hội Viên Mới
+              </button>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="w-full text-left text-sm text-gray-600">
+                <thead className="bg-gray-50 text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3">Hội Viên</th>
+                    <th className="px-4 py-3">Điện Thoại</th>
+                    <th className="px-4 py-3">Hạng Thẻ</th>
+                    <th className="px-4 py-3 text-right">Điểm Tích Lũy</th>
+                    <th className="px-4 py-3 text-right">Tổng Chi Tiêu</th>
+                    <th className="px-4 py-3 text-center">Đêm Nghỉ</th>
+                    <th className="px-4 py-3 text-center">Trạng Thái</th>
+                    <th className="px-4 py-3 text-center">Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {filteredMembers.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-gray-400">
+                        <span className="material-symbols-outlined text-4xl mb-1 text-gray-300">group_off</span>
+                        <p>Không tìm thấy hội viên nào phù hợp tiêu chí tìm kiếm!</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredMembers.map(m => (
+                      <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
+                        <td className="px-4 py-3.5 flex items-center gap-3">
+                          <img
+                            src={m.avatarUrl || DEFAULT_AVATAR}
+                            alt={m.name}
+                            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200 shadow-sm shrink-0"
+                          />
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm">{m.name}</div>
+                            <div className="text-xs text-gray-400 font-mono">{m.id} • {m.email}</div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 font-mono text-xs text-slate-700">{m.phone || 'Chưa cập nhật'}</td>
+                        <td className="px-4 py-3.5">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            m.tier?.includes('Lotus') ? 'bg-slate-900 text-white' :
+                            m.tier?.includes('Gold') ? 'bg-amber-100 text-amber-800' :
+                            m.tier?.includes('Silver') ? 'bg-sky-100 text-sky-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                            {m.tier}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-bold text-green-700 font-mono">
+                          {Number(m.currentPoints || 0).toLocaleString()} PTS
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-bold text-slate-800 font-mono">
+                          {formatCurrency(m.spend || 0)}
+                        </td>
+                        <td className="px-4 py-3.5 text-center font-bold text-slate-700">
+                          {m.nights || 0}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                            m.status === 'Active' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-red-100 text-red-800 border border-red-200'
+                          }`}>
+                            {m.status === 'Active' ? 'Hoạt Động' : 'Tạm Khóa'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenEditMember(m)}
+                              title="Sửa thông tin hội viên"
+                              className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMember(m)}
+                              title="Hủy tư cách hội viên"
+                              className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* --- ADD TIER MODAL OVERLAY (THÊM HẠNG THẺ MỚI) --- */}
         {isAddTierModalOpen && (
@@ -929,6 +1359,295 @@ const LoyaltyManagement = () => {
                       {isCreatingTier ? 'sync' : 'add_circle'}
                     </span>
                     {isCreatingTier ? 'Đang Tạo...' : 'Tạo Hạng Thẻ Mới'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* --- ADD MEMBER MODAL (THÊM HỘI VIÊN MỚI) --- */}
+        {isAddMemberModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-200">
+              <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800">
+                  <span className="material-symbols-outlined text-emerald-600">person_add</span>
+                  Thêm Hội Viên Mới
+                </h2>
+                <button onClick={() => setIsAddMemberModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateMember} className="p-6 flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Họ Và Tên *</label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={100}
+                      placeholder="VD: Trần Hoàng Nam"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                      value={newMemberForm.fullName}
+                      onChange={(e) => setNewMemberForm({ ...newMemberForm, fullName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Email *</label>
+                    <input
+                      type="email"
+                      required
+                      maxLength={100}
+                      placeholder="VD: nam.tran@example.com"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                      value={newMemberForm.email}
+                      onChange={(e) => setNewMemberForm({ ...newMemberForm, email: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Số Điện Thoại</label>
+                    <input
+                      type="tel"
+                      maxLength={20}
+                      placeholder="VD: 0912345678"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500/30 outline-none font-mono"
+                      value={newMemberForm.phone}
+                      onChange={(e) => setNewMemberForm({ ...newMemberForm, phone: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Hạng Thẻ Ban Đầu</label>
+                    <select
+                      value={newMemberForm.tierId}
+                      onChange={(e) => setNewMemberForm({ ...newMemberForm, tierId: Number(e.target.value) })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold focus:ring-2 focus:ring-emerald-500/30 outline-none bg-white"
+                    >
+                      {tiers.map((t, idx) => (
+                        <option key={t.id} value={t.tierId || idx + 1}>{t.code}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Điểm Tích Luỹ</label>
+                    <input
+                      type="text"
+                      maxLength={20}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-bold text-green-700 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                      value={newMemberForm.loyaltyPoints}
+                      onChange={(e) => setNewMemberForm({ ...newMemberForm, loyaltyPoints: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Chi Tiêu (VNĐ)</label>
+                    <input
+                      type="text"
+                      maxLength={20}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                      value={newMemberForm.totalSpend}
+                      onChange={(e) => setNewMemberForm({ ...newMemberForm, totalSpend: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Số Đêm Lưu Trú</label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                      value={newMemberForm.totalNights}
+                      onChange={(e) => setNewMemberForm({ ...newMemberForm, totalNights: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Upload Avatar (Test Case 11) */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Ảnh Đại Diện / Thẻ Hội Viên (JPG, PNG, WEBP &lt; 5MB)</label>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) => handleImageUpload(e, 'new')}
+                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                  />
+                  {newMemberForm.avatarUrl && (
+                    <div className="mt-2 flex items-center gap-3 p-2 bg-gray-50 rounded-lg border">
+                      <img
+                        src={newMemberForm.avatarUrl}
+                        alt="Preview"
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                        className="w-12 h-12 rounded-full object-cover border"
+                      />
+                      <span className="text-xs text-green-700 font-semibold">Đã tải ảnh lên thành công</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-3 mt-2 pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddMemberModalOpen(false)}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-semibold hover:bg-gray-50"
+                  >
+                    Huỷ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isMemberSubmitting}
+                    className="px-5 py-2 rounded-lg bg-[#1B5E20] hover:bg-[#144d18] text-white text-sm font-semibold shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <span className={`material-symbols-outlined text-[18px] ${isMemberSubmitting ? 'animate-spin' : ''}`}>
+                      {isMemberSubmitting ? 'sync' : 'add_circle'}
+                    </span>
+                    {isMemberSubmitting ? 'Đang Tạo...' : 'Đăng Ký Hội Viên'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* --- EDIT MEMBER MODAL (SỬA HỘI VIÊN) --- */}
+        {isEditMemberModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-200">
+              <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800">
+                  <span className="material-symbols-outlined text-amber-600">edit</span>
+                  Hiệu Chỉnh Thông Tin Hội Viên #{editMemberForm.id}
+                </h2>
+                <button onClick={() => setIsEditMemberModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditMember} className="p-6 flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Họ Và Tên *</label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={100}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium focus:ring-2 focus:ring-amber-500/30 outline-none"
+                      value={editMemberForm.fullName}
+                      onChange={(e) => setEditMemberForm({ ...editMemberForm, fullName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Số Điện Thoại</label>
+                    <input
+                      type="tel"
+                      maxLength={20}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-amber-500/30 outline-none font-mono"
+                      value={editMemberForm.phone}
+                      onChange={(e) => setEditMemberForm({ ...editMemberForm, phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Hạng Thẻ Phân Bổ</label>
+                    <select
+                      value={editMemberForm.tierId}
+                      onChange={(e) => setEditMemberForm({ ...editMemberForm, tierId: Number(e.target.value) })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold focus:ring-2 focus:ring-amber-500/30 outline-none bg-white"
+                    >
+                      {tiers.map((t, idx) => (
+                        <option key={t.id} value={t.tierId || idx + 1}>{t.code}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Trạng Thái Tài Khoản</label>
+                    <select
+                      value={editMemberForm.status}
+                      onChange={(e) => setEditMemberForm({ ...editMemberForm, status: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold focus:ring-2 focus:ring-amber-500/30 outline-none bg-white"
+                    >
+                      <option value="Active">Hoạt Động (Active)</option>
+                      <option value="Inactive">Tạm Ngưng (Inactive)</option>
+                      <option value="Suspended">Đình Chỉ (Suspended)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Điểm Tích Luỹ</label>
+                    <input
+                      type="text"
+                      maxLength={20}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-bold text-green-700 focus:ring-2 focus:ring-amber-500/30 outline-none"
+                      value={editMemberForm.loyaltyPoints}
+                      onChange={(e) => setEditMemberForm({ ...editMemberForm, loyaltyPoints: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Tổng Chi Tiêu (VNĐ)</label>
+                    <input
+                      type="text"
+                      maxLength={20}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-bold focus:ring-2 focus:ring-amber-500/30 outline-none"
+                      value={editMemberForm.totalSpend}
+                      onChange={(e) => setEditMemberForm({ ...editMemberForm, totalSpend: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Số Đêm Lưu Trú</label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm font-bold focus:ring-2 focus:ring-amber-500/30 outline-none"
+                      value={editMemberForm.totalNights}
+                      onChange={(e) => setEditMemberForm({ ...editMemberForm, totalNights: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Test Case 11 & 13: Ảnh đại diện & giữ nguyên nếu không chọn mới */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Đổi Ảnh Đại Diện (Để trống để giữ nguyên ảnh cũ)</label>
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={editMemberForm.avatarUrl || DEFAULT_AVATAR}
+                      alt="Avatar"
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                      className="w-12 h-12 rounded-full object-cover border border-gray-200 shadow-sm shrink-0"
+                    />
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => handleImageUpload(e, 'edit')}
+                      className="flex-1 px-3 py-2 text-xs border border-gray-300 rounded-lg file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-800 hover:file:bg-amber-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-2 pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditMemberModalOpen(false)}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-semibold hover:bg-gray-50"
+                  >
+                    Huỷ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isMemberSubmitting}
+                    className="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <span className={`material-symbols-outlined text-[18px] ${isMemberSubmitting ? 'animate-spin' : ''}`}>
+                      {isMemberSubmitting ? 'sync' : 'save'}
+                    </span>
+                    {isMemberSubmitting ? 'Đang Lưu...' : 'Lưu Thay Đổi'}
                   </button>
                 </div>
               </form>

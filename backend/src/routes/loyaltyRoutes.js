@@ -2,12 +2,31 @@
 
 const express = require('express');
 const router = express.Router();
+const {
+  normalizeText,
+  validateNonEmptyText,
+  normalizeAndValidateNumber,
+  validateSelectOption,
+  validatePageParam,
+  checkDoubleSubmit,
+  releaseDoubleSubmit,
+  validateImageExtensionOrMime
+} = require('../utils/webQaValidator');
+
 let pool = null;
 try {
   pool = require('../config/db');
 } catch (_) {
   pool = null;
 }
+
+// Chặn phương thức GET cho các URL xóa (Bảo vệ an toàn CSRF - Tình huống 14)
+router.get(['/tiers/:id/delete', '/tiers/delete', '/members/:id/delete', '/members/delete'], (req, res) => {
+  return res.status(405).json({
+    success: false,
+    message: '[Lỗ Hổng Bảo Mật URL Delete]: Thao tác xóa không được phép thực hiện qua phương thức GET URL. Bắt buộc phải sử dụng phương thức DELETE từ giao diện quản trị!'
+  });
+});
 
 // Default fallback tiers if DB is empty or unreachable
 const DEFAULT_TIERS = [
@@ -342,16 +361,36 @@ router.post('/tiers', async (req, res) => {
       retentionPolicy = 'Hiệu lực duy trì 12 tháng kể từ ngày nâng hạng.'
     } = req.body;
 
-    const finalName = tierName || code;
-    if (!finalName) {
-      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên hạng thẻ!' });
-    }
+    const rawName = tierName || code;
+    // Test Case 4, 5, 6: Validate không rỗng, không chỉ chứa khoảng trắng (thường & 2-byte), không quá 80 ký tự
+    const finalName = validateNonEmptyText(rawName, 'Tên hạng thẻ', 80);
 
-    const finalPoints = pointsNeeded !== undefined ? pointsNeeded : minPoints;
+    // Test Case 9: Chặn spam click / gửi lặp lại
+    checkDoubleSubmit(`create_tier_${finalName}`);
+
+    // Test Case 7: Validate dữ liệu số & hỗ trợ số Full-width ０-９
+    const finalPoints = normalizeAndValidateNumber(pointsNeeded !== undefined ? pointsNeeded : minPoints, 'Điểm tích lũy tối thiểu', { min: 0 });
+    const finalNights = normalizeAndValidateNumber(minNights, 'Số đêm lưu trú tối thiểu', { min: 0, integer: true });
+    const finalSpend = normalizeAndValidateNumber(minSpendUsd, 'Chi tiêu tối thiểu USD', { min: 0 });
+    const finalMultiplier = normalizeAndValidateNumber(pointMultiplier, 'Hệ số nhân điểm', { min: 1.0, max: 10.0 });
+    const finalDiscount = normalizeAndValidateNumber(discountRate, 'Tỷ lệ chiết khấu', { min: 0.0, max: 1.0 });
+
     let createdId = null;
-    let finalCode = tierCode;
+    let finalCode = tierCode ? normalizeText(tierCode) : null;
 
     if (pool) {
+      // Test Case 9: Kiểm tra trùng lặp bản ghi trong DB
+      const [existingTier] = await pool.query(
+        "SELECT TierId FROM MembershipTiers WHERE TierName = ? AND IsDeleted = 0",
+        [finalName]
+      );
+      if (existingTier && existingTier.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: `Hạng thẻ với tên "${finalName}" đã tồn tại trong hệ thống! Vui lòng không tạo trùng lặp.`
+        });
+      }
+
       const [maxRows] = await pool.query("SELECT MAX(TierId) AS maxId FROM MembershipTiers");
       const nextId = (maxRows[0]?.maxId || 0) + 1;
       if (!finalCode) {
@@ -371,13 +410,13 @@ router.post('/tiers', async (req, res) => {
         [
           finalName,
           finalCode,
-          badgeName || 'Hội viên mới',
+          badgeName ? normalizeText(badgeName) : 'Hội viên mới',
           badgeColor,
-          Number(finalPoints) || 0,
-          Number(minNights) || 0,
-          Number(minSpendUsd) || 0,
-          Number(pointMultiplier) || 1.0,
-          Number(discountRate) || 0.0,
+          finalPoints,
+          finalNights,
+          finalSpend,
+          finalMultiplier,
+          finalDiscount,
           icon,
           iconColor,
           colorClass,
@@ -396,12 +435,12 @@ router.post('/tiers', async (req, res) => {
         tierId: createdId,
         code: finalName,
         pointsNeeded: finalPoints,
-        pointMultiplier: Number(pointMultiplier),
-        discountRate: Number(discountRate)
+        pointMultiplier: finalMultiplier,
+        discountRate: finalDiscount
       }
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.status || 500).json({ success: false, message: err.message });
   }
 });
 
@@ -424,13 +463,57 @@ router.put('/tiers/:id', async (req, res) => {
       discountRate,
       icon,
       perks,
-      retentionPolicy
+      retentionPolicy,
+      lastUpdatedAt
     } = req.body;
 
-    const nameToSave = tierName || code;
-    const pointsToSave = minPoints !== undefined ? minPoints : pointsNeeded;
+    const rawName = tierName || code;
+    const nameToSave = rawName ? validateNonEmptyText(rawName, 'Tên hạng thẻ', 80) : undefined;
+    const pointsToSave = (minPoints !== undefined || pointsNeeded !== undefined)
+      ? normalizeAndValidateNumber(minPoints !== undefined ? minPoints : pointsNeeded, 'Điểm tích lũy tối thiểu', { min: 0 })
+      : undefined;
 
     if (pool) {
+      const numericId = parseInt(id, 10);
+      let whereClause = 'TierCode = ?';
+      let whereParams = [id];
+
+      if (!isNaN(numericId) && String(numericId) === String(id).trim()) {
+        whereClause = 'TierId = ? OR TierCode = ?';
+        whereParams = [numericId, id];
+      } else if (typeof id === 'string' && id.startsWith('TIER-')) {
+        const numPart = parseInt(id.replace('TIER-', ''), 10);
+        if (!isNaN(numPart)) {
+          whereClause = 'TierCode = ? OR TierId = ?';
+          whereParams = [id, numPart];
+        }
+      }
+
+      // Test Case 3: Kiểm tra sự tồn tại của ID
+      const [existing] = await pool.query(
+        `SELECT TierId, TierName, UpdatedAt FROM MembershipTiers WHERE (${whereClause}) AND IsDeleted = 0`,
+        whereParams
+      );
+
+      if (!existing || existing.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `Không tìm thấy hạng thẻ với mã "${id}" hoặc hạng thẻ đã bị xóa trước đó!`
+        });
+      }
+
+      // Test Case 2: Kiểm tra cập nhật trùng lặp / Concurrency Optimistic Lock
+      if (lastUpdatedAt && existing[0].UpdatedAt) {
+        const clientTimestamp = new Date(lastUpdatedAt).getTime();
+        const serverTimestamp = new Date(existing[0].UpdatedAt).getTime();
+        if (Math.abs(serverTimestamp - clientTimestamp) > 1000) {
+          return res.status(409).json({
+            success: false,
+            message: 'Dữ liệu hạng thẻ đã được cập nhật bởi một phiên làm việc khác. Vui lòng tải lại trang trước khi cập nhật!'
+          });
+        }
+      }
+
       const updateFields = [];
       const updateValues = [];
 
@@ -440,7 +523,7 @@ router.put('/tiers/:id', async (req, res) => {
       }
       if (badge) {
         updateFields.push('BadgeName = ?');
-        updateValues.push(badge);
+        updateValues.push(normalizeText(badge));
       }
       if (badgeColor) {
         updateFields.push('BadgeColor = ?');
@@ -448,23 +531,27 @@ router.put('/tiers/:id', async (req, res) => {
       }
       if (pointsToSave !== undefined) {
         updateFields.push('MinPoints = ?');
-        updateValues.push(Number(pointsToSave));
+        updateValues.push(pointsToSave);
       }
       if (minNights !== undefined) {
+        const validNights = normalizeAndValidateNumber(minNights, 'Số đêm tối thiểu', { min: 0, integer: true });
         updateFields.push('MinNights = ?');
-        updateValues.push(Number(minNights));
+        updateValues.push(validNights);
       }
       if (minSpendUsd !== undefined) {
+        const validSpend = normalizeAndValidateNumber(minSpendUsd, 'Chi tiêu tối thiểu USD', { min: 0 });
         updateFields.push('MinSpendUsd = ?');
-        updateValues.push(Number(minSpendUsd));
+        updateValues.push(validSpend);
       }
       if (pointMultiplier !== undefined) {
+        const validMult = normalizeAndValidateNumber(pointMultiplier, 'Hệ số nhân điểm', { min: 1.0, max: 10.0 });
         updateFields.push('PointMultiplier = ?');
-        updateValues.push(Number(pointMultiplier));
+        updateValues.push(validMult);
       }
       if (discountRate !== undefined) {
+        const validDisc = normalizeAndValidateNumber(discountRate, 'Tỷ lệ chiết khấu', { min: 0.0, max: 1.0 });
         updateFields.push('DiscountRate = ?');
-        updateValues.push(Number(discountRate));
+        updateValues.push(validDisc);
       }
       if (icon) {
         updateFields.push('Icon = ?');
@@ -476,28 +563,13 @@ router.put('/tiers/:id', async (req, res) => {
       }
       if (retentionPolicy) {
         updateFields.push('RetentionPolicy = ?');
-        updateValues.push(retentionPolicy);
+        updateValues.push(normalizeText(retentionPolicy));
       }
 
       if (updateFields.length > 0) {
-        const numericId = parseInt(id, 10);
-        let whereClause = 'TierCode = ?';
-        let whereParams = [id];
-
-        if (!isNaN(numericId) && String(numericId) === String(id).trim()) {
-          whereClause = 'TierId = ? OR TierCode = ?';
-          whereParams = [numericId, id];
-        } else if (typeof id === 'string' && id.startsWith('TIER-')) {
-          const numPart = parseInt(id.replace('TIER-', ''), 10);
-          if (!isNaN(numPart)) {
-            whereClause = 'TierCode = ? OR TierId = ?';
-            whereParams = [id, numPart];
-          }
-        }
-
         await pool.query(
-          `UPDATE MembershipTiers SET ${updateFields.join(', ')} WHERE ${whereClause}`,
-          [...updateValues, ...whereParams]
+          `UPDATE MembershipTiers SET ${updateFields.join(', ')} WHERE TierId = ?`,
+          [...updateValues, existing[0].TierId]
         );
       }
     }
@@ -507,7 +579,7 @@ router.put('/tiers/:id', async (req, res) => {
       message: `Đã lưu cấu hình hạng thẻ ${nameToSave || id} thành công!`
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.status || 500).json({ success: false, message: err.message });
   }
 });
 
@@ -534,13 +606,17 @@ router.delete('/tiers/:id', async (req, res) => {
         }
       }
 
+      // Test Case 1: Xóa mục không tồn tại -> Báo lỗi 404 không hợp lệ
       const [tiers] = await pool.query(
         `SELECT TierId, TierName FROM MembershipTiers WHERE (${whereClause}) AND IsDeleted = 0`,
         whereParams
       );
 
       if (!tiers || tiers.length === 0) {
-        return res.status(404).json({ success: false, message: 'Hạng thẻ không tồn tại hoặc đã bị xóa!' });
+        return res.status(404).json({
+          success: false,
+          message: 'Xóa không hợp lệ: Hạng thẻ không tồn tại hoặc đã bị xóa trước đó!'
+        });
       }
 
       const targetTier = tiers[0];
@@ -565,7 +641,7 @@ router.delete('/tiers/:id', async (req, res) => {
       message: `Đã xóa hạng thẻ ${id} thành công!`
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.status || 500).json({ success: false, message: err.message });
   }
 });
 
@@ -574,6 +650,16 @@ router.delete('/tiers/:id', async (req, res) => {
 // ---------------------------------------------------------------------------------
 router.get('/members', async (req, res) => {
   try {
+    // Test Case 10: Kiểm tra tham số URL phân trang an toàn
+    let page = 1;
+    let limit = 100;
+    try {
+      if (req.query.page) page = validatePageParam(req.query.page, 1, 1000);
+      if (req.query.limit) limit = validatePageParam(req.query.limit, 100, 500);
+    } catch (urlErr) {
+      return res.status(400).json({ success: false, message: urlErr.message });
+    }
+
     let members = [
       { id: 'MB-001', userId: 1, name: 'Nguyễn Văn A', email: 'nguyenvana@gmail.com', phone: '0901234567', tier: 'Black Lotus VIP', tierId: 4, currentPoints: 125000, lifetimePoints: 125000, spend: 125000000, nights: 52, joinDate: '2023-01-15', status: 'Active' },
       { id: 'MB-002', userId: 2, name: 'Trần Thị B', email: 'tranthib@gmail.com', phone: '0912345678', tier: 'Gold Elite', tierId: 3, currentPoints: 28000, lifetimePoints: 35000, spend: 85000000, nights: 24, joinDate: '2023-03-22', status: 'Active' },
@@ -583,6 +669,7 @@ router.get('/members', async (req, res) => {
 
     if (pool) {
       try {
+        const offset = (page - 1) * limit;
         const [rows] = await pool.query(`
           SELECT 
             u.UserId,
@@ -595,14 +682,16 @@ router.get('/members', async (req, res) => {
             u.TotalSpend,
             u.TotalNights,
             u.Status,
+            u.AvatarUrl,
             u.CreatedAt,
+            u.UpdatedAt,
             COALESCE(mt.TierName, 'Classic Blue') AS TierName
           FROM Users u
           LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
-          WHERE u.TierId IS NOT NULL
+          WHERE u.TierId IS NOT NULL AND u.IsDeleted = 0
           ORDER BY u.LoyaltyPoints DESC, u.UserId ASC
-          LIMIT 100
-        `);
+          LIMIT ? OFFSET ?
+        `, [limit, offset]);
 
         if (rows.length > 0) {
           members = rows.map(r => ({
@@ -617,9 +706,13 @@ router.get('/members', async (req, res) => {
             lifetimePoints: Number(r.LifetimePoints) || Number(r.LoyaltyPoints) || 0,
             spend: Number(r.TotalSpend) || 0,
             nights: Number(r.TotalNights) || 0,
+            avatarUrl: r.AvatarUrl || null,
+            updatedAt: r.UpdatedAt || r.CreatedAt || null,
             joinDate: r.CreatedAt ? new Date(r.CreatedAt).toISOString().split('T')[0] : '2023-01-01',
             status: r.Status === 'Active' ? 'Active' : 'Inactive'
           }));
+        } else if (page > 1) {
+          members = [];
         }
       } catch (dbErr) {
         console.warn('[Loyalty] DB members query error, using defaults:', dbErr.message);
@@ -629,10 +722,12 @@ router.get('/members', async (req, res) => {
     return res.json({
       success: true,
       members,
-      total: members.length
+      total: members.length,
+      page,
+      limit
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.status || 500).json({ success: false, message: err.message });
   }
 });
 
@@ -648,21 +743,42 @@ router.post('/members', async (req, res) => {
       tierId = 1,
       loyaltyPoints = 0,
       totalSpend = 0,
-      totalNights = 0
+      totalNights = 0,
+      avatarUrl
     } = req.body;
 
-    if (!fullName || !email) {
-      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp Họ tên và Email hội viên!' });
+    // Test Case 4, 5, 6: Validate họ tên và email
+    const validName = validateNonEmptyText(fullName, 'Họ tên hội viên', 100);
+    const validEmail = validateNonEmptyText(email, 'Email hội viên', 100);
+
+    // Test Case 11: Validate hình ảnh
+    if (avatarUrl) {
+      validateImageExtensionOrMime(avatarUrl);
     }
+
+    // Test Case 9: Chặn double submit
+    checkDoubleSubmit(`create_member_${validEmail}`);
+
+    // Test Case 7: Chuẩn hóa số
+    const validPoints = normalizeAndValidateNumber(loyaltyPoints, 'Điểm tích lũy ban đầu', { min: 0 });
+    const validSpend = normalizeAndValidateNumber(totalSpend, 'Tổng chi tiêu', { min: 0 });
+    const validNights = normalizeAndValidateNumber(totalNights, 'Tổng số đêm', { min: 0, integer: true });
+    const validTierId = normalizeAndValidateNumber(tierId, 'Hạng thẻ', { min: 1, integer: true });
 
     if (pool) {
       // Check if email already exists
-      const [existing] = await pool.query("SELECT UserId, FullName FROM Users WHERE Email = ?", [email]);
+      const [existing] = await pool.query("SELECT UserId, FullName, TierId FROM Users WHERE Email = ? AND IsDeleted = 0", [validEmail]);
       if (existing.length > 0) {
+        if (existing[0].TierId !== null) {
+          return res.status(409).json({
+            success: false,
+            message: `Hội viên với email "${validEmail}" (${existing[0].FullName}) đã tồn tại trong hệ thống!`
+          });
+        }
         // Update user to become a member
         await pool.query(
           "UPDATE Users SET TierId = ?, LoyaltyPoints = LoyaltyPoints + ?, TotalSpend = TotalSpend + ? WHERE UserId = ?",
-          [tierId, Number(loyaltyPoints) || 0, Number(totalSpend) || 0, existing[0].UserId]
+          [validTierId, validPoints, validSpend, existing[0].UserId]
         );
         return res.json({
           success: true,
@@ -671,30 +787,31 @@ router.post('/members', async (req, res) => {
         });
       }
 
-      const username = email.split('@')[0] + '_' + Math.floor(Math.random() * 1000);
+      const username = validEmail.split('@')[0] + '_' + Math.floor(Math.random() * 1000);
       const defaultPasswordHash = '$2a$10$wK1W6M0K4xZfZf1h5gQx2.U9eLw4Uv4E0n4B4D4F4H4J4L4N4P4R.'; // dummy hash for hotel guest
 
       // Insert new guest user as member
       const [insertRes] = await pool.query(
-        `INSERT INTO Users (Username, FullName, Email, Phone, PasswordHash, RoleId, TierId, LoyaltyPoints, LifetimePoints, TotalSpend, TotalNights, Status, MustChangePassword, IsDeleted)
-         VALUES (?, ?, ?, ?, ?, 4, ?, ?, ?, ?, ?, 'Active', 0, 0)`,
+        `INSERT INTO Users (Username, FullName, Email, Phone, PasswordHash, RoleId, TierId, LoyaltyPoints, LifetimePoints, TotalSpend, TotalNights, AvatarUrl, Status, MustChangePassword, IsDeleted)
+         VALUES (?, ?, ?, ?, ?, 4, ?, ?, ?, ?, ?, ?, 'Active', 0, 0)`,
         [
           username,
-          fullName,
-          email,
-          phone || '',
+          validName,
+          validEmail,
+          phone ? normalizeText(phone) : '',
           defaultPasswordHash,
-          tierId,
-          Number(loyaltyPoints) || 0,
-          Number(loyaltyPoints) || 0,
-          Number(totalSpend) || 0,
-          Number(totalNights) || 0
+          validTierId,
+          validPoints,
+          validPoints,
+          validSpend,
+          validNights,
+          avatarUrl || null
         ]
       );
 
       return res.status(201).json({
         success: true,
-        message: `Đăng ký hội viên mới "${fullName}" thành công!`,
+        message: `Đăng ký hội viên mới "${validName}" thành công!`,
         userId: insertRes.insertId,
         memberId: `MB-${String(insertRes.insertId).padStart(3, '0')}`
       });
@@ -702,10 +819,10 @@ router.post('/members', async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Đăng ký hội viên mới "${fullName}" thành công!`
+      message: `Đăng ký hội viên mới "${validName}" thành công!`
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.status || 500).json({ success: false, message: err.message });
   }
 });
 
@@ -723,24 +840,85 @@ router.put('/members/:id', async (req, res) => {
       loyaltyPoints,
       totalSpend,
       totalNights,
-      status
+      status,
+      avatarUrl,
+      lastUpdatedAt
     } = req.body;
 
-    if (!cleanId) {
-      return res.status(400).json({ success: false, message: 'Mã hội viên không hợp lệ!' });
+    if (!cleanId || isNaN(cleanId)) {
+      return res.status(400).json({ success: false, message: '[Kiểm Tra ID]: Mã hội viên không hợp lệ!' });
     }
 
     if (pool) {
+      // Test Case 3: Kiểm tra sự tồn tại của hội viên
+      const [users] = await pool.query(
+        "SELECT UserId, FullName, TierId, AvatarUrl, UpdatedAt FROM Users WHERE UserId = ? AND IsDeleted = 0",
+        [cleanId]
+      );
+
+      if (!users || users.length === 0 || users[0].TierId === null) {
+        return res.status(404).json({
+          success: false,
+          message: `Không tìm thấy hội viên với mã #${cleanId} hoặc hội viên đã bị xóa!`
+        });
+      }
+
+      // Test Case 2: Kiểm tra cập nhật trùng lặp (Concurrency Check / Optimistic Locking)
+      if (lastUpdatedAt && users[0].UpdatedAt) {
+        const clientTimestamp = new Date(lastUpdatedAt).getTime();
+        const serverTimestamp = new Date(users[0].UpdatedAt).getTime();
+        if (Math.abs(serverTimestamp - clientTimestamp) > 1000) {
+          return res.status(409).json({
+            success: false,
+            message: 'Dữ liệu hội viên đã được cập nhật bởi một phiên làm việc khác. Vui lòng tải lại trang trước khi cập nhật!'
+          });
+        }
+      }
+
       const updateFields = [];
       const updateValues = [];
 
-      if (fullName) { updateFields.push('FullName = ?'); updateValues.push(fullName); }
-      if (phone !== undefined) { updateFields.push('Phone = ?'); updateValues.push(phone); }
-      if (tierId !== undefined) { updateFields.push('TierId = ?'); updateValues.push(Number(tierId)); }
-      if (loyaltyPoints !== undefined) { updateFields.push('LoyaltyPoints = ?'); updateValues.push(Number(loyaltyPoints)); }
-      if (totalSpend !== undefined) { updateFields.push('TotalSpend = ?'); updateValues.push(Number(totalSpend)); }
-      if (totalNights !== undefined) { updateFields.push('TotalNights = ?'); updateValues.push(Number(totalNights)); }
-      if (status) { updateFields.push('Status = ?'); updateValues.push(status); }
+      if (fullName !== undefined) {
+        const validName = validateNonEmptyText(fullName, 'Họ tên hội viên', 100);
+        updateFields.push('FullName = ?');
+        updateValues.push(validName);
+      }
+      if (phone !== undefined) {
+        updateFields.push('Phone = ?');
+        updateValues.push(normalizeText(phone));
+      }
+      if (tierId !== undefined) {
+        const validTier = normalizeAndValidateNumber(tierId, 'Hạng thẻ', { min: 1, integer: true });
+        updateFields.push('TierId = ?');
+        updateValues.push(validTier);
+      }
+      if (loyaltyPoints !== undefined) {
+        const validPoints = normalizeAndValidateNumber(loyaltyPoints, 'Điểm tích lũy', { min: 0 });
+        updateFields.push('LoyaltyPoints = ?');
+        updateValues.push(validPoints);
+      }
+      if (totalSpend !== undefined) {
+        const validSpend = normalizeAndValidateNumber(totalSpend, 'Tổng chi tiêu', { min: 0 });
+        updateFields.push('TotalSpend = ?');
+        updateValues.push(validSpend);
+      }
+      if (totalNights !== undefined) {
+        const validNights = normalizeAndValidateNumber(totalNights, 'Tổng số đêm', { min: 0, integer: true });
+        updateFields.push('TotalNights = ?');
+        updateValues.push(validNights);
+      }
+      if (status !== undefined) {
+        // Test Case 8: Select option validation
+        validateSelectOption(status, ['Active', 'Inactive', 'Suspended'], 'Trạng thái hội viên');
+        updateFields.push('Status = ?');
+        updateValues.push(status);
+      }
+      // Test Case 11 & 13: Cập nhật hình ảnh (Nếu rỗng/không chọn thì giữ nguyên ảnh cũ trong DB)
+      if (avatarUrl !== undefined && avatarUrl !== null && String(avatarUrl).trim() !== '') {
+        validateImageExtensionOrMime(avatarUrl);
+        updateFields.push('AvatarUrl = ?');
+        updateValues.push(avatarUrl);
+      }
 
       if (updateFields.length > 0) {
         updateValues.push(cleanId);
@@ -756,7 +934,7 @@ router.put('/members/:id', async (req, res) => {
       message: `Đã cập nhật thông tin hội viên #${cleanId} thành công!`
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.status || 500).json({ success: false, message: err.message });
   }
 });
 
@@ -768,24 +946,42 @@ router.delete('/members/:id', async (req, res) => {
     const { id } = req.params;
     const cleanId = parseInt(String(id).replace(/\D/g, ''), 10);
 
-    if (!cleanId) {
-      return res.status(400).json({ success: false, message: 'Mã hội viên không hợp lệ!' });
+    if (!cleanId || isNaN(cleanId)) {
+      return res.status(400).json({ success: false, message: '[Kiểm Tra ID]: Mã hội viên không hợp lệ!' });
     }
 
     if (pool) {
+      // Test Case 1: Xóa mục không tồn tại -> Báo lỗi 404 không hợp lệ
+      const [users] = await pool.query(
+        "SELECT UserId, FullName, TierId FROM Users WHERE UserId = ? AND IsDeleted = 0",
+        [cleanId]
+      );
+
+      if (!users || users.length === 0 || users[0].TierId === null) {
+        return res.status(404).json({
+          success: false,
+          message: 'Xóa không hợp lệ: Hội viên không tồn tại hoặc đã bị hủy tư cách trước đó!'
+        });
+      }
+
       // Set TierId = NULL and reset points
       await pool.query(
         "UPDATE Users SET TierId = NULL, Status = 'Inactive' WHERE UserId = ?",
         [cleanId]
       );
+
+      return res.json({
+        success: true,
+        message: `Đã hủy tư cách hội viên của tài khoản "${users[0].FullName}" (#${cleanId}) thành công!`
+      });
     }
 
     return res.json({
       success: true,
-      message: `Đã hủy tư cách hội viên của tài khoản #${cleanId} thành công!`
+      message: `Đã xóa hội viên #${cleanId} thành công!`
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.status || 500).json({ success: false, message: err.message });
   }
 });
 

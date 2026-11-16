@@ -48,6 +48,52 @@ app.use(
 );
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// ─── Web QA Security & Safety Guard (Tuân thủ 14 tình huống kiểm thử QA) ───
+// Test Case 14: Chặn tuyệt đối xóa dữ liệu bằng phương thức GET (Phòng chống CSRF)
+app.use((req, res, next) => {
+  if (req.method === 'GET') {
+    const rawUrl = (req.originalUrl || req.url || '').toLowerCase();
+    if (
+      rawUrl.includes('/delete') ||
+      rawUrl.includes('action=delete') ||
+      rawUrl.includes('method=delete')
+    ) {
+      return res.status(405).json({
+        success: false,
+        code: 'METHOD_NOT_ALLOWED',
+        message: '[Lỗ Hổng Bảo Mật URL Delete]: Thao tác xóa không được phép thực hiện qua phương thức GET URL. Bắt buộc phải sử dụng phương thức DELETE từ giao diện quản trị!'
+      });
+    }
+  }
+  next();
+});
+
+// Test Case 10: Kiểm tra an toàn tham số URL (page, limit, search)
+app.use((req, res, next) => {
+  if (req.query && req.query.page !== undefined) {
+    let pStr = String(req.query.page).trim();
+    // Chuyển ký tự full-width sang half-width
+    pStr = pStr.replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+    const pNum = Number(pStr);
+    if (isNaN(pNum) || pNum <= 0 || !Number.isInteger(pNum)) {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_URL_PARAM',
+        message: `[Kiểm Tra URL]: Tham số trang page="${req.query.page}" không hợp lệ. Phải là số nguyên dương!`
+      });
+    }
+    if (pNum > 1000000) {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_URL_PARAM',
+        message: `[Kiểm Tra URL]: Tham số trang page=${pNum} vượt quá giới hạn tối đa cho phép!`
+      });
+    }
+    req.query.page = pNum;
+  }
+  next();
+});
 // Phục vụ tệp tĩnh ảnh phòng, CCCD, thẻ khách và chữ ký số
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));

@@ -532,6 +532,10 @@ router.delete('/channels/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const state = await getChannelState();
+    const existing = (state.channels || []).find(c => c.id === id || c.code === id);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy kênh OTA #${id} hoặc đã bị xóa trước đó!` });
+    }
     const channels = (state.channels || []).filter(c => c.id !== id && c.code !== id);
     await saveChannelState({ channels });
 

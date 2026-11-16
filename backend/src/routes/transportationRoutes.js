@@ -456,14 +456,26 @@ async function saveTransferRecord(transfer, sortOrder = 0) {
 
 async function deleteTransferRecord(id) {
   await ensureAirportTransfersTable();
+  let foundInDb = false;
   if (isTableReady) {
     try {
-      await pool.query('DELETE FROM AirportTransfers WHERE id = ?', [id]);
+      const [existing] = await pool.query('SELECT id FROM AirportTransfers WHERE id = ?', [id]);
+      if (existing && existing.length > 0) {
+        await pool.query('DELETE FROM AirportTransfers WHERE id = ?', [id]);
+        foundInDb = true;
+      }
     } catch (e) {
       console.warn('[Transportation] Lỗi xóa AirportTransfers:', e.message);
     }
   }
-  TRANSFERS_MEM = TRANSFERS_MEM.filter(t => t.id !== id && t.code !== id);
+  const memIdx = TRANSFERS_MEM.findIndex(t => t.id === id || t.code === id);
+  if (memIdx !== -1) {
+    TRANSFERS_MEM.splice(memIdx, 1);
+  } else if (!foundInDb) {
+    const notFoundErr = new Error(`Không tìm thấy chuyến đưa đón #${id} hoặc đã bị xóa trước đó!`);
+    notFoundErr.status = 404;
+    throw notFoundErr;
+  }
 }
 
 // 1. GET /api/transportation/overview
@@ -684,7 +696,7 @@ router.get('/transfers', async (req, res) => {
     const list = await getAllTransfers();
     res.json({ success: true, count: list.length, data: list });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.message });
   }
 });
 
@@ -746,7 +758,7 @@ router.put('/transfers/:id', async (req, res) => {
       data: transfer
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.message });
   }
 });
 
@@ -760,7 +772,7 @@ router.delete('/transfers/:id', async (req, res) => {
       message: `Đã xóa chuyến đưa đón #${id} thành công!`
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.message });
   }
 });
 

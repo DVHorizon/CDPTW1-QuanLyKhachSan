@@ -62,6 +62,27 @@ const errorHandler = (err, req, res, next) => { // eslint-disable-line no-unused
     });
   }
 
+  // MySQL / Sequelize numeric cast or data too long errors (Test Case 3 & 5)
+  if (err.code === 'ER_DATA_TOO_LONG' || err.message?.includes('Data too long')) {
+    return res.status(400).json({
+      success: false,
+      code: 'DATA_TOO_LONG',
+      errorCode: 'DATA_TOO_LONG',
+      message: '[Quá Tải Text]: Dữ liệu nhập vào vượt quá độ dài tối đa cho phép của hệ thống!',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  if (err.code === 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD' || err.message?.includes('Incorrect integer value') || err.message?.includes('Out of range')) {
+    return res.status(400).json({
+      success: false,
+      code: 'INVALID_NUMERIC_VALUE',
+      errorCode: 'INVALID_NUMERIC_VALUE',
+      message: '[Kiểm Tra Số/ID]: Giá trị số hoặc ID không hợp lệ trong hệ thống!',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   // Mặc định 500
   const statusCode = err.statusCode || err.status || 500;
   return res.status(statusCode).json({
