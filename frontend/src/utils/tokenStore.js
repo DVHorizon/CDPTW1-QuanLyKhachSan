@@ -5,12 +5,23 @@
  */
 let memoryAccessToken = null;
 
-export const getAccessToken = () => memoryAccessToken;
+export const getAccessToken = () =>
+  memoryAccessToken || (typeof window !== 'undefined' ? localStorage.getItem('hotel_token') : null) || null;
 
 export const setAccessToken = (token) => {
   memoryAccessToken = token || null;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem('hotel_token', token);
+    } else {
+      localStorage.removeItem('hotel_token');
+    }
+  }
 };
 
 export const clearAccessToken = () => {
   memoryAccessToken = null;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('hotel_token');
+  }
 };
