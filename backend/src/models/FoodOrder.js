@@ -1,0 +1,51 @@
+const { DataTypes } = require('sequelize');
+
+module.exports = (sequelize) => {
+  return sequelize.define('FoodOrder', {
+    FoodOrderId: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    StayId: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    TableId: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    UserId: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+    OrderTime: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW
+    },
+    OrderType: {
+      type: DataTypes.ENUM('RoomService', 'Restaurant'),
+      defaultValue: 'RoomService'
+    },
+    Status: {
+      type: DataTypes.ENUM('Pending', 'Confirmed', 'Preparing', 'Ready', 'Delivering', 'Served', 'Delivered', 'Cancelled'),
+      defaultValue: 'Pending'
+    },
+    TotalAmount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0
+    },
+    PaymentMode: {
+      type: DataTypes.ENUM('RoomInvoice', 'PayNow'),
+      allowNull: false
+    },
+    Note: {
+      type: DataTypes.STRING,
+      allowNull: true
+    }
+  }, {
+    tableName: 'FoodOrders',
+    timestamps: false
+  });
+};

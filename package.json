@@ -1,0 +1,15 @@
+{
+  "name": "grand-horizon-hotel-pms",
+  "version": "1.0.0",
+  "scripts": {
+    "test:manual": "node scripts/test_manual.js",
+    "seed": "docker exec hotel_backend node src/seeders/seedPristineClean.js",
+    "test:e2e": "node backend/tests/e2e_services_c1_c14/runner.js",
+    "test:security": "node scripts/test_xss_defense.js"
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "^9.5.1",
+    "bcryptjs": "^3.0.3",
+    "sequelize-cli": "^6.6.5"
+  }
+}

@@ -1,11 +1,13 @@
+const path = require('path');
 const { Sequelize } = require('sequelize');
 const dbConfig = require('./config').development;
 
 let sequelize;
 if (dbConfig.dialect === 'sqlite') {
+  const sqlitePath = path.resolve(__dirname, '../../database.sqlite');
   sequelize = new Sequelize({
     dialect: 'sqlite',
-    storage: dbConfig.storage || './database.sqlite',
+    storage: sqlitePath,
     logging: dbConfig.logging
   });
 } else {

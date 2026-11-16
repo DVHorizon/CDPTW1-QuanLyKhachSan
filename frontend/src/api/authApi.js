@@ -7,6 +7,14 @@ const safeFetch = async (endpoint, options = {}) => {
   const primaryUrl = `${API_BASE_URL}${endpoint}`;
   try {
     const res = await fetch(primaryUrl, options);
+    // Nếu Vite proxy trả lỗi 500/502/504 rỗng (do chưa cấu hình proxy target), tự động fallback sang cổng 5000
+    if (res.status >= 500 && API_BASE_URL.startsWith('/')) {
+      const cloned = res.clone();
+      const bodyText = await cloned.text().catch(() => '');
+      if (!bodyText || bodyText.trim() === '') {
+        return await fetch(`http://localhost:5000${API_BASE_URL}${endpoint}`, options);
+      }
+    }
     return res;
   } catch (primaryErr) {
     console.warn(`Primary fetch tới ${primaryUrl} gặp lỗi mạng, đang thử fallback:`, primaryErr);
@@ -31,7 +39,16 @@ export const loginUser = async ({ identifier, password }) => {
       body: JSON.stringify({ identifier, password })
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = {
+        success: false,
+        message: res.status >= 500 ? 'Lỗi máy chủ nội bộ. Vui lòng thử lại sau.' : text || 'Phản hồi không hợp lệ từ máy chủ.'
+      };
+    }
     return data;
   } catch (error) {
     console.error('Lỗi API login:', error);
@@ -147,3 +164,28 @@ export const loginWithFacebook = async (payload) => {
     };
   }
 };
+
+/**
+ * Cập nhật thông tin tài khoản hiện tại
+ * PUT /api/v1/auth/me
+ */
+export const updateCurrentUser = async (token, userData) => {
+  try {
+    if (!token) return { success: false, message: 'Chưa xác thực' };
+    const res = await safeFetch('/v1/auth/me', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(userData)
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (error) {
+    console.error('Lỗi API updateCurrentUser:', error);
+    return { success: false, message: 'Lỗi mạng khi cập nhật hồ sơ' };
+  }
+};
+

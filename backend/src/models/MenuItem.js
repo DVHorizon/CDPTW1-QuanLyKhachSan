@@ -31,26 +31,6 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(1000),
       allowNull: true,
     },
-    SKU: {
-      type: DataTypes.STRING(50),
-      allowNull: true,
-    },
-    Ingredients: {
-      type: DataTypes.STRING(1000),
-      allowNull: true,
-    },
-    Allergens: {
-      type: DataTypes.STRING(500),
-      allowNull: true,
-    },
-    ServingTime: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
-    },
-    KitchenStation: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
-    },
     Status: {
       type: DataTypes.STRING(30),
       allowNull: true,
@@ -70,6 +50,11 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true,
       defaultValue: DataTypes.NOW,
+    },
+    Version: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      defaultValue: 1,
     }
   }, {
     tableName: 'MenuItems',
