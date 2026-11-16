@@ -406,7 +406,7 @@ export default function BookingEngine() {
       return;
     }
 
-    const phoneRegex = /^(\+?[1-9]\d{7,14}|0[1-9]\d{8})$/;
+    const phoneRegex = /^(0\d{9}|\+?[1-9]\d{7,14})$/;
     if (!phoneRegex.test(cleanPhone)) {
       setErrorCode('ERROR_0004_INVALID_FORMAT');
       setErrorMessage('Số điện thoại liên lạc không đúng định dạng chuẩn (VD: +84912345678 hoặc 0912345678)');
@@ -772,8 +772,11 @@ export default function BookingEngine() {
                       <input 
                         id="phone"
                         type="tel"
-                        value={phoneNumber.replace(/^\+84\s?/, '')}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        inputMode="numeric"
+                        maxLength={10}
+                        pattern="0\d{9}"
+                        value={phoneNumber.replace(/^\+84\s?/, '').replace(/\D/g, '').slice(0, 10)}
+                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
                         placeholder=""
                         className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#725b38] focus:border-transparent transition-all"
                         required

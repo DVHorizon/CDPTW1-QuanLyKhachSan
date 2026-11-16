@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }) => {
       setAccessToken(response.token);
       setToken(response.token);
       setUser(response.user);
-      localStorage.removeItem('hotel_token');
+      localStorage.setItem('hotel_token', response.token);
       localStorage.setItem('hotel_user', JSON.stringify(response.user));
     }
     return response;
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }) => {
       setAccessToken(response.token);
       setToken(response.token);
       setUser(response.user);
-      localStorage.removeItem('hotel_token');
+      localStorage.setItem('hotel_token', response.token);
       localStorage.setItem('hotel_user', JSON.stringify(response.user));
     }
     return response;
@@ -84,7 +84,7 @@ export const AuthProvider = ({ children }) => {
       setAccessToken(response.token);
       setToken(response.token);
       setUser(response.user);
-      localStorage.removeItem('hotel_token');
+      localStorage.setItem('hotel_token', response.token);
       localStorage.setItem('hotel_user', JSON.stringify(response.user));
     }
     return response;
@@ -96,7 +96,7 @@ export const AuthProvider = ({ children }) => {
       setAccessToken(response.token);
       setToken(response.token);
       setUser(response.user);
-      localStorage.removeItem('hotel_token');
+      localStorage.setItem('hotel_token', response.token);
       localStorage.setItem('hotel_user', JSON.stringify(response.user));
     }
     return response;
