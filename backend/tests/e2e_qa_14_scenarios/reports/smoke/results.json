@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-18T05:36:29.182Z",
+  "generatedAt": "2026-11-18T06:12:22.017Z",
   "mode": "smoke",
   "tier": "smoke",
   "smoke": {
@@ -8,7 +8,7 @@
       {
         "name": "MySQL Live Connection & Baseline Counts",
         "status": "PASS",
-        "details": "Users=21, Roles=7, Services=16, ServiceCategories=6, Bookings=16, Stays=11"
+        "details": "Users=21, Roles=7, Services=18, ServiceCategories=8, Bookings=16, Stays=11"
       },
       {
         "name": "Backend Live Health (:5000/api/health)",
@@ -23,7 +23,7 @@
       {
         "name": "WebSocket /ws/v1/dashboard",
         "status": "PASS",
-        "details": "READY(seq=0) + PING/PONG(serverTime=2026-11-18T05:36:08.009Z)"
+        "details": "READY(seq=0) + PING/PONG(serverTime=2026-11-18T06:12:04.569Z)"
       },
       {
         "name": "All 7 Role API Logins + /auth/me + /auth/refresh",
@@ -33,17 +33,17 @@
       {
         "name": "Headless CDP Multi-Tab + Incognito Isolation + UI Login",
         "status": "PASS",
-        "details": "Chrome/157.0.8103.51 | ctxA(tabA1 roleId=1, tabA2 localStorage=true, rootLen=39648, imgs=0, apiReqs=25, consoleErrs=0, pageErrs=0) | ctxB(incognito hotel_user=null)"
+        "details": "Chrome/157.0.8103.51 | ctxA(tabA1 roleId=1, tabA2 localStorage=true, rootLen=39739, imgs=0, apiReqs=24, consoleErrs=0, pageErrs=0) | ctxB(incognito hotel_user=null)"
       },
       {
         "name": "Browser Process & Temp Profile Cleanup",
         "status": "PASS",
-        "details": "Removed C:\\Users\\DANGVA~1\\AppData\\Local\\Temp\\e2e-cdp-1QGQdy"
+        "details": "Removed C:\\Users\\DANGVA~1\\AppData\\Local\\Temp\\e2e-cdp-JuyCL8"
       },
       {
         "name": "DB Fixture Seed & Reverse-FK Cleanup Round-Trip",
         "status": "PASS",
-        "details": "Seeded Cat=7, Svc=17, Booking=21, Inv=5, KB=26; preClean=5 -> postClean=0; baseline counts intact"
+        "details": "Seeded Cat=19, Svc=28, Booking=26, Inv=11, KB=31; preClean=5 -> postClean=0; baseline counts intact"
       }
     ]
   },

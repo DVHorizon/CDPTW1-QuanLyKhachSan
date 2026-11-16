@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import AdminLayout from "../../../components/admin/layout/AdminLayout";
 import styles from "./ServiceManagement.module.css";
 import {
   fetchServicesApi,
+  fetchServiceByIdApi,
   fetchCategoriesApi,
   createServiceApi,
   updateServiceApi,
@@ -13,6 +14,14 @@ import {
   createCategoryApi,
 } from "../../../api/serviceApi";
 import { cleanMessage, extractErrorCode, logSystemEvent } from "../../../utils/toastSanitizer";
+import {
+  trimUnicode,
+  isBlankUnicode,
+  normalizeFullWidthDigits,
+  parseUrlPageParam,
+  isConflict409,
+  CONFLICT_RELOAD_MESSAGE,
+} from "../../../utils/qaInputUtils";
 
 // ─── DỮ LIỆU DANH MỤC MẪU BAN ĐẦU (FALLBACK) ──────────────────────────────────
 
@@ -35,6 +44,8 @@ const INITIAL_SERVICES = [
     Description:
       "Tiếp đón với trà ấm, ngâm chân muối khoáng biển và massage tinh dầu thảo dược thiên nhiên.",
     Status: "Active",
+    Version: 1,
+    version: 1,
     category: { CategoryId: 1, CategoryName: "Spa & Trị liệu" },
   },
   {
@@ -47,6 +58,8 @@ const INITIAL_SERVICES = [
     Description:
       "Xe sang Maybach đời mới, tài xế riêng chuẩn VIP đón khách tận sảnh ga đến.",
     Status: "Active",
+    Version: 1,
+    version: 1,
     category: { CategoryId: 2, CategoryName: "Vận chuyển Concierge" },
   },
   {
@@ -59,6 +72,8 @@ const INITIAL_SERVICES = [
     Description:
       "Hải trình khám phá vịnh biển 3 tiếng kèm tiệc rượu vang và canapé cao cấp.",
     Status: "Active",
+    Version: 1,
+    version: 1,
     category: { CategoryId: 3, CategoryName: "Tour & Trải nghiệm" },
   },
   {
@@ -71,6 +86,8 @@ const INITIAL_SERVICES = [
     Description:
       "Quy trình giặt sấy bảo quản sợi tơ tằm, ép nhiệt và đóng gói chống bụi.",
     Status: "Active",
+    Version: 1,
+    version: 1,
     category: { CategoryId: 4, CategoryName: "Buồng phòng & Giặt là" },
   },
   {
@@ -83,6 +100,8 @@ const INITIAL_SERVICES = [
     Description:
       "Bàn tiệc riêng tư sát biển, thực đơn 5 món chế biến trực tiếp bởi Bếp trưởng.",
     Status: "Inactive",
+    Version: 1,
+    version: 1,
     category: { CategoryId: 5, CategoryName: "Ẩm thực F&B" },
   },
 ];
@@ -90,12 +109,11 @@ const INITIAL_SERVICES = [
 // Helper: Chuẩn hóa chuỗi tìm kiếm bỏ dấu tiếng Việt (Mục 0.2)
 const normalizeSearch = (str) => {
   if (!str) return "";
-  return str
+  return trimUnicode(str)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[đĐ]/g, (m) => (m === "đ" ? "d" : "D"))
-    .toLowerCase()
-    .trim();
+    .toLowerCase();
 };
 
 // Helper: Định dạng tiền tệ VND làm tròn 0 chữ số (Mục 0.2)
@@ -201,42 +219,63 @@ const CreateCategoryModal = ({ isOpen, onClose, onSuccess, showToast }) => {
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [nameError, setNameError] = useState(null);
+  const [descError, setDescError] = useState(null);
+  const submittingRef = useRef(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const trimmed = categoryName.trim();
+    if (submittingRef.current || isSubmitting) return;
+
+    const trimmed = trimUnicode(categoryName);
+    const trimmedDesc = trimUnicode(description);
+
+    let hasErr = false;
     if (!trimmed) {
-      setError("Tên nhóm dịch vụ không được để trống");
-      return;
-    }
-    if (trimmed.length < 2) {
-      setError("Tên nhóm dịch vụ phải có ít nhất 2 ký tự");
-      return;
-    }
-    if (trimmed.length > 100) {
-      setError("Tên nhóm dịch vụ không được vượt quá 100 ký tự");
-      return;
-    }
-    if (description && description.length > 500) {
-      setError("Mô tả nhóm dịch vụ không được vượt quá 500 ký tự");
-      return;
+      setNameError("Tên nhóm dịch vụ không được để trống");
+      hasErr = true;
+    } else if (trimmed.length < 2) {
+      setNameError("Tên nhóm dịch vụ phải có ít nhất 2 ký tự");
+      hasErr = true;
+    } else if (trimmed.length > 100) {
+      setNameError("Tên nhóm dịch vụ không được vượt quá 100 ký tự");
+      hasErr = true;
+    } else {
+      setNameError(null);
     }
 
+    if (trimmedDesc.length > 500) {
+      setDescError("Mô tả nhóm dịch vụ không được vượt quá 500 ký tự");
+      hasErr = true;
+    } else {
+      setDescError(null);
+    }
+
+    if (hasErr) return;
+
+    submittingRef.current = true;
     setIsSubmitting(true);
-    setError(null);
     try {
       const res = await createCategoryApi({
         categoryName: trimmed,
-        description: description.trim(),
+        description: trimmedDesc,
       });
       showToast("Tạo nhóm dịch vụ thành công!", "success", "SUCCESS_0001_CREATED");
+      setCategoryName("");
+      setDescription("");
       onSuccess(res.data);
       onClose();
     } catch (err) {
-      setError(cleanMessage(err?.message || err?.error) || "Không thể tạo mới nhóm dịch vụ.");
+      const msg = cleanMessage(err?.message || err?.error) || "Không thể tạo mới nhóm dịch vụ.";
+      if (err?.field === "description") {
+        setDescError(msg);
+      } else {
+        setNameError(msg);
+      }
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -262,30 +301,37 @@ const CreateCategoryModal = ({ isOpen, onClose, onSuccess, showToast }) => {
                 Tên Nhóm Dịch Vụ <span className={styles.requiredStar}>*</span>
               </label>
               <input
-                className={`${styles.inputControl} ${error ? styles.inputError : ""}`}
+                className={`${styles.inputControl} ${nameError ? styles.inputError : ""}`}
                 type="text"
                 placeholder="VD: Tour & Trải Nghiệm, Dịch Vụ Thể Thao..."
                 value={categoryName}
                 onChange={(e) => {
-                  setCategoryName(e.target.value);
-                  if (error) setError(null);
+                  const val = e.target.value;
+                  setCategoryName(val);
+                  if (trimUnicode(val).length > 100) {
+                    setNameError("Tên nhóm dịch vụ không được vượt quá 100 ký tự");
+                  } else if (nameError) {
+                    setNameError(null);
+                  }
                 }}
                 autoFocus
               />
-              {error && <span className={styles.errorMessage}>{error}</span>}
+              {nameError && <span className={styles.errorMessage}>{nameError}</span>}
             </div>
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Mô Tả Nhóm (Tối đa 500 ký tự)</label>
               <textarea
-                className={styles.textareaControl}
+                className={`${styles.textareaControl} ${descError ? styles.inputError : ""}`}
                 rows="3"
                 placeholder="Mô tả nhóm dịch vụ..."
                 value={description}
                 onChange={(e) => {
                   setDescription(e.target.value);
                   if (error) setError(null);
+                  setDescError(trimUnicode(e.target.value).length > 500 ? "Mô tả nhóm dịch vụ không được vượt quá 500 ký tự" : null);
                 }}
               />
+              {descError && <span className={styles.errorMessage}>{descError}</span>}
             </div>
           </div>
           <div className={styles.modalFooter}>
@@ -368,7 +414,6 @@ const HeaderSection = ({ onAddNew, onAddCategory, onExportExcel }) => (
 // ─── DANH SÁCH & BỘ LỌC DỊCH VỤ ───────────────────────────────────────────────
 
 const ServiceListSection = ({
-  services,
   filteredServices,
   categories,
   selectedId,
@@ -386,25 +431,37 @@ const ServiceListSection = ({
   sortBy,
   setSortBy,
   currentPage,
-  setCurrentPage,
+  onPageChange,
   itemsPerPage,
   setItemsPerPage,
+  onResetAllFilters,
 }) => {
-  // Kiểm tra lỗi khoảng giá hợp lệ (FEAT-SERVICE-02)
-  const isPriceRangeInvalid = useMemo(() => {
-    if (minPrice !== "" && maxPrice !== "") {
-      const minP = Number(minPrice);
-      const maxP = Number(maxPrice);
+  const searchTooLong = useMemo(() => trimUnicode(searchTerm).length > 100, [searchTerm]);
+
+  // Kiểm tra lỗi khoảng giá hợp lệ (FEAT-SERVICE-02 & QA Scenario #4, #7)
+  const priceFilterError = useMemo(() => {
+    const cleanMin = trimUnicode(normalizeFullWidthDigits(minPrice));
+    const cleanMax = trimUnicode(normalizeFullWidthDigits(maxPrice));
+
+    if (cleanMin !== "" && (!/^-?\d+(?:\.\d+)?$/.test(cleanMin) || Number(cleanMin) < 0)) {
+      return "Giá tối thiểu không hợp lệ (phải là số không âm)";
+    }
+    if (cleanMax !== "" && (!/^-?\d+(?:\.\d+)?$/.test(cleanMax) || Number(cleanMax) < 0)) {
+      return "Giá tối đa không hợp lệ (phải là số không âm)";
+    }
+    if (cleanMin !== "" && cleanMax !== "") {
+      const minP = Number(cleanMin);
+      const maxP = Number(cleanMax);
       if (!isNaN(minP) && !isNaN(maxP) && minP > maxP) {
-        return true;
+        return "Khoảng giá không hợp lệ: Giá tối thiểu không được lớn hơn giá tối đa";
       }
     }
-    return false;
+    return null;
   }, [minPrice, maxPrice]);
 
   const hasActiveFilters = useMemo(() => {
     return (
-      Boolean(searchTerm.trim()) ||
+      Boolean(trimUnicode(searchTerm)) ||
       categoryFilter !== "All" ||
       statusFilter !== "All" ||
       minPrice !== "" ||
@@ -412,16 +469,6 @@ const ServiceListSection = ({
       sortBy !== "name_asc"
     );
   }, [searchTerm, categoryFilter, statusFilter, minPrice, maxPrice, sortBy]);
-
-  const handleResetFilters = () => {
-    setSearchTerm("");
-    setCategoryFilter("All");
-    setStatusFilter("All");
-    setMinPrice("");
-    setMaxPrice("");
-    setSortBy("name_asc");
-    setCurrentPage(1);
-  };
 
   const totalPages = Math.ceil((filteredServices?.length || 0) / itemsPerPage) || 1;
   const paginatedServices = useMemo(() => {
@@ -464,15 +511,18 @@ const ServiceListSection = ({
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
-              setCurrentPage(1);
+              onPageChange(1);
             }}
-            className={styles.searchInput}
+            className={`${styles.searchInput} ${searchTooLong ? styles.inputError : ""}`}
             placeholder="Tìm theo mã SKU, tên dịch vụ (ví dụ: 'an uong' khớp 'Ăn uống')..."
             type="text"
           />
           {searchTerm && (
             <button
-              onClick={() => setSearchTerm("")}
+              onClick={() => {
+                setSearchTerm("");
+                onPageChange(1);
+              }}
               className={styles.searchClearBtn}
               type="button"
             >
@@ -486,7 +536,7 @@ const ServiceListSection = ({
             value={categoryFilter}
             onChange={(e) => {
               setCategoryFilter(e.target.value);
-              setCurrentPage(1);
+              onPageChange(1);
             }}
             className={styles.selectControl}
           >
@@ -504,7 +554,7 @@ const ServiceListSection = ({
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
-              setCurrentPage(1);
+              onPageChange(1);
             }}
             className={styles.selectControl}
           >
@@ -515,15 +565,21 @@ const ServiceListSection = ({
         </div>
       </div>
 
+      {searchTooLong && (
+        <div className={styles.filterErrorText} role="alert">
+          <span className="material-symbols-outlined text-[16px]">error</span>
+          <span>Từ khoá tìm kiếm không được vượt quá 100 ký tự</span>
+        </div>
+      )}
+
       {/* Hàng bộ lọc nâng cao: Sắp xếp (sortBy) & Khoảng giá (minPrice - maxPrice) */}
       <div className={styles.filterRowAdvanced}>
-        {/* Sắp xếp */}
         <div>
           <select
             value={sortBy}
             onChange={(e) => {
               setSortBy(e.target.value);
-              setCurrentPage(1);
+              onPageChange(1);
             }}
             className={styles.selectControl}
             title="Sắp xếp danh sách dịch vụ"
@@ -534,41 +590,38 @@ const ServiceListSection = ({
           </select>
         </div>
 
-        {/* Khoảng giá */}
+        {/* Khoảng giá hỗ trợ chuẩn hóa chữ số full-width ０-９ (QA Scenario #7) */}
         <div className={styles.priceRangeGroup}>
           <input
-            type="number"
-            min="0"
-            step="10000"
+            type="text"
+            inputMode="numeric"
             placeholder="Giá từ (VND)..."
             value={minPrice}
             onChange={(e) => {
-              setMinPrice(e.target.value);
-              setCurrentPage(1);
+              setMinPrice(normalizeFullWidthDigits(e.target.value));
+              onPageChange(1);
             }}
             className={styles.priceRangeInput}
             title="Đơn giá tối thiểu"
           />
           <span className={styles.priceRangeSeparator}>-</span>
           <input
-            type="number"
-            min="0"
-            step="10000"
+            type="text"
+            inputMode="numeric"
             placeholder="Đến (VND)..."
             value={maxPrice}
             onChange={(e) => {
-              setMaxPrice(e.target.value);
-              setCurrentPage(1);
+              setMaxPrice(normalizeFullWidthDigits(e.target.value));
+              onPageChange(1);
             }}
             className={styles.priceRangeInput}
             title="Đơn giá tối đa"
           />
         </div>
 
-        {/* Nút đặt lại bộ lọc */}
         {hasActiveFilters && (
           <button
-            onClick={handleResetFilters}
+            onClick={onResetAllFilters}
             className={styles.resetFilterBtn}
             type="button"
             title="Đặt lại toàn bộ tiêu chí lọc"
@@ -578,11 +631,10 @@ const ServiceListSection = ({
           </button>
         )}
 
-        {/* Thông báo lỗi khi minPrice > maxPrice (ERROR_0004_INVALID_FORMAT) */}
-        {isPriceRangeInvalid && (
-          <div className={styles.filterErrorText}>
+        {priceFilterError && (
+          <div className={styles.filterErrorText} role="alert">
             <span className="material-symbols-outlined text-[16px]">error</span>
-            <span>Khoảng giá không hợp lệ: Giá tối thiểu không được lớn hơn giá tối đa</span>
+            <span>{priceFilterError}</span>
           </div>
         )}
       </div>
@@ -662,7 +714,7 @@ const ServiceListSection = ({
         </div>
       )}
 
-      {/* Phân trang gọn gàng thông minh (Ellipsis windowing) */}
+      {/* Phân trang */}
       <div className={styles.paginationWrapper}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", flexWrap: "wrap" }}>
           <span>
@@ -680,7 +732,7 @@ const ServiceListSection = ({
             value={itemsPerPage}
             onChange={(e) => {
               if (setItemsPerPage) setItemsPerPage(Number(e.target.value));
-              setCurrentPage(1);
+              onPageChange(1);
             }}
             className={styles.pageSizeSelect}
             title="Số lượng hiển thị trên mỗi trang"
@@ -694,9 +746,8 @@ const ServiceListSection = ({
         </div>
 
         <div className={styles.paginationControls}>
-          {/* Nút về trang đầu */}
           <button
-            onClick={() => setCurrentPage(1)}
+            onClick={() => onPageChange(1)}
             disabled={currentPage === 1}
             className={styles.pageNavBtn}
             title="Trang đầu"
@@ -707,9 +758,8 @@ const ServiceListSection = ({
             </span>
           </button>
 
-          {/* Nút lùi 1 trang */}
           <button
-            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
             disabled={currentPage === 1}
             className={styles.pageNavBtn}
             title="Trang trước"
@@ -720,7 +770,6 @@ const ServiceListSection = ({
             </span>
           </button>
 
-          {/* Dải số trang có rút gọn: Tối đa 7 ô */}
           {(() => {
             let pages = [];
             if (totalPages <= 7) {
@@ -764,7 +813,7 @@ const ServiceListSection = ({
               return (
                 <button
                   key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
+                  onClick={() => onPageChange(pageNum)}
                   className={`${styles.pageBtn} ${pageNum === currentPage ? styles.pageBtnActive : ""}`}
                   type="button"
                 >
@@ -774,10 +823,9 @@ const ServiceListSection = ({
             });
           })()}
 
-          {/* Nút tiến 1 trang */}
           <button
-            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-            disabled={currentPage === totalPages || totalPages === 0}
+            onClick={() => onPageChange(Math.min(currentPage + 1, totalPages))}
+            disabled={currentPage >= totalPages || totalPages === 0}
             className={styles.pageNavBtn}
             title="Trang sau"
             type="button"
@@ -787,10 +835,9 @@ const ServiceListSection = ({
             </span>
           </button>
 
-          {/* Nút đến trang cuối */}
           <button
-            onClick={() => setCurrentPage(totalPages)}
-            disabled={currentPage === totalPages || totalPages === 0}
+            onClick={() => onPageChange(totalPages)}
+            disabled={currentPage >= totalPages || totalPages === 0}
             className={styles.pageNavBtn}
             title="Trang cuối"
             type="button"
@@ -820,6 +867,8 @@ const ServiceEditorSection = ({
   setFormErrors,
   isSubmitting = false,
   isTogglingStatus = false,
+  conflictError = null,
+  onReloadConflict,
 }) => {
   const selectedCategory = useMemo(() => {
     return categories.find((c) => Number(c.CategoryId) === Number(formData?.CategoryId));
@@ -867,9 +916,47 @@ const ServiceEditorSection = ({
           </span>
         </div>
         <span className={styles.skuBadge}>
-          {isCreatingNew ? "Tạo Mới" : `Mã: ${formData.ServiceCode}`}
+          {isCreatingNew
+            ? "Tạo Mới"
+            : `Mã: ${formData.ServiceCode} • v${formData.version ?? formData.Version ?? 1}`}
         </span>
       </div>
+
+      {/* Cảnh báo xung đột phiên bản 409 (QA Scenario #2) */}
+      {conflictError && (
+        <div
+          role="alert"
+          data-testid="conflict-reload-banner"
+          style={{
+            backgroundColor: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: "0.5rem",
+            padding: "0.75rem 1rem",
+            color: "#991b1b",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.75rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", fontWeight: 600 }}>
+            <span className="material-symbols-outlined text-[20px]">sync_problem</span>
+            <span>{conflictError}</span>
+          </div>
+          {onReloadConflict && (
+            <button
+              type="button"
+              onClick={onReloadConflict}
+              className={`${styles.btn} ${styles.btnOutline}`}
+              style={{ borderColor: "#dc2626", color: "#dc2626", padding: "0.25rem 0.75rem", fontSize: "0.75rem" }}
+            >
+              <span className="material-symbols-outlined text-[16px]">refresh</span>
+              <span>Tải lại ngay</span>
+            </button>
+          )}
+        </div>
+      )}
 
       <form
         onSubmit={(e) => {
@@ -951,8 +1038,18 @@ const ServiceEditorSection = ({
             placeholder="Nhập tên dịch vụ (2–150 ký tự)"
             value={formData.ServiceName || ""}
             onChange={(e) => {
-              setFormData({ ...formData, ServiceName: e.target.value });
-              if (formErrors?.serviceName && setFormErrors) setFormErrors((prev) => ({ ...prev, serviceName: null }));
+              const val = e.target.value;
+              setFormData({ ...formData, ServiceName: val });
+              if (setFormErrors) {
+                if (trimUnicode(val).length > 150) {
+                  setFormErrors((prev) => ({
+                    ...prev,
+                    serviceName: "Tên dịch vụ không được vượt quá 150 ký tự",
+                  }));
+                } else if (formErrors?.serviceName) {
+                  setFormErrors((prev) => ({ ...prev, serviceName: null }));
+                }
+              }
             }}
           />
           {formErrors?.serviceName && (
@@ -976,14 +1073,27 @@ const ServiceEditorSection = ({
                 color: "#10b981",
                 fontSize: "1.125rem",
               }}
-              type="number"
-              min="1"
-              step="any"
+              type="text"
+              inputMode="decimal"
               placeholder="0"
               value={formData.Price ?? ""}
               onChange={(e) => {
-                setFormData({ ...formData, Price: e.target.value });
-                if (formErrors?.price && setFormErrors) setFormErrors((prev) => ({ ...prev, price: null }));
+                const normalized = normalizeFullWidthDigits(e.target.value);
+                setFormData({ ...formData, Price: normalized });
+                if (formErrors?.price && setFormErrors) {
+                  setFormErrors((prev) => ({ ...prev, price: null }));
+                }
+              }}
+              onPaste={(e) => {
+                const pasted = e.clipboardData?.getData("text");
+                if (pasted && /[\uFF10-\uFF19\uFF0E\uFF0D\uFF0B]/.test(pasted)) {
+                  e.preventDefault();
+                  const normalized = normalizeFullWidthDigits(pasted);
+                  setFormData({ ...formData, Price: normalized });
+                  if (formErrors?.price && setFormErrors) {
+                    setFormErrors((prev) => ({ ...prev, price: null }));
+                  }
+                }
               }}
             />
             {formErrors?.price && (
@@ -1001,8 +1111,18 @@ const ServiceEditorSection = ({
               placeholder="VD: Lượt, Giờ, Phần, Chuyến..."
               value={formData.Unit || ""}
               onChange={(e) => {
-                setFormData({ ...formData, Unit: e.target.value });
-                if (formErrors?.unit && setFormErrors) setFormErrors((prev) => ({ ...prev, unit: null }));
+                const val = e.target.value;
+                setFormData({ ...formData, Unit: val });
+                if (setFormErrors) {
+                  if (trimUnicode(val).length > 50) {
+                    setFormErrors((prev) => ({
+                      ...prev,
+                      unit: "Đơn vị tính không được vượt quá 50 ký tự",
+                    }));
+                  } else if (formErrors?.unit) {
+                    setFormErrors((prev) => ({ ...prev, unit: null }));
+                  }
+                }
               }}
             />
             {formErrors?.unit && (
@@ -1041,9 +1161,16 @@ const ServiceEditorSection = ({
             placeholder="Mô tả tiêu chuẩn phục vụ, quy trình SOP đón tiếp..."
             value={formData.Description || ""}
             onChange={(e) => {
-              setFormData({ ...formData, Description: e.target.value });
+              const val = e.target.value;
+              setFormData({ ...formData, Description: val });
               if (formErrors?.description && setFormErrors) {
                 setFormErrors((prev) => ({ ...prev, description: null }));
+              }
+              if (trimUnicode(val).length > 1000 && setFormErrors) {
+                setFormErrors((prev) => ({
+                  ...prev,
+                  description: "Mô tả dịch vụ không được vượt quá 1000 ký tự",
+                }));
               }
             }}
           ></textarea>
@@ -1137,8 +1264,11 @@ const ServiceEditorSection = ({
 // ─── TRANG CHÍNH ──────────────────────────────────────────────────────────────
 
 const ServiceManagement = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [services, setServices] = useState(INITIAL_SERVICES);
   const [categories, setCategories] = useState(INITIAL_CATEGORIES);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState(INITIAL_SERVICES[0]?.ServiceId || 1);
   const [previousSelectedId, setPreviousSelectedId] = useState(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -1154,19 +1284,21 @@ const ServiceManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(8);
 
-  // Form Editor
+  // Form Editor & Optimistic Locking / URL Param Errors
   const [formData, setFormData] = useState(INITIAL_SERVICES[0]);
   const [originalData, setOriginalData] = useState(INITIAL_SERVICES[0]);
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const [conflictError, setConflictError] = useState(null);
+  const [urlParamError, setUrlParamError] = useState(null);
+
+  // Synchronous submit lock ref (QA Scenario #9)
+  const submittingRef = useRef(false);
 
   // Thông báo
   const [notification, setNotification] = useState(null);
 
-  /**
-   * Hiển thị thông báo thân thiện và tự động ghi log kỹ thuật ra Console
-   */
   const showToast = (rawMsg, type = "success", code = null) => {
     const message = cleanMessage(rawMsg);
     const extractedCode = code || extractErrorCode(rawMsg);
@@ -1178,14 +1310,28 @@ const ServiceManagement = () => {
       message,
       rawMessage: rawMsg,
       type,
-      context: { page: 'ServiceManagement', selectedId, isCreatingNew }
+      context: { page: "ServiceManagement", selectedId, isCreatingNew },
     });
 
     setTimeout(() => setNotification(null), 4000);
   };
 
+  const toEditorItem = (svc) => {
+    if (!svc) return null;
+    const cleanPrice =
+      svc.Price !== undefined && svc.Price !== null ? Math.floor(Number(svc.Price)) : "";
+    const ver = Number(svc.version ?? svc.Version ?? 1);
+    return {
+      ...svc,
+      Price: cleanPrice,
+      Version: ver,
+      version: ver,
+    };
+  };
+
   const loadData = async () => {
     try {
+      setConflictError(null);
       const [svcRes, catRes] = await Promise.all([
         fetchServicesApi({ status: "All", pageSize: 500, all: "true" }),
         fetchCategoriesApi(),
@@ -1200,12 +1346,12 @@ const ServiceManagement = () => {
       if (svcRes && svcRes.success && Array.isArray(svcRes.data)) {
         setServices(svcRes.data);
         if (svcRes.data.length > 0) {
-          const first = svcRes.data[0];
-          setSelectedId(first.ServiceId);
-          const cleanPrice = first.Price !== undefined && first.Price !== null ? Math.floor(Number(first.Price)) : "";
-          const firstClean = { ...first, Price: cleanPrice };
-          setFormData(firstClean);
-          setOriginalData(firstClean);
+          const currentTarget =
+            svcRes.data.find((s) => s.ServiceId === selectedId) || svcRes.data[0];
+          setSelectedId(currentTarget.ServiceId);
+          const item = toEditorItem(currentTarget);
+          setFormData(item);
+          setOriginalData(item);
         } else {
           setSelectedId(null);
           setFormData(null);
@@ -1219,7 +1365,12 @@ const ServiceManagement = () => {
       }
     } catch (err) {
       console.warn("Lỗi khi tải dữ liệu từ API:", err);
-      showToast(cleanMessage(err?.message || err?.error) || "Không thể tải dữ liệu dịch vụ từ máy chủ.", "error");
+      showToast(
+        cleanMessage(err?.message || err?.error) || "Không thể tải dữ liệu dịch vụ từ máy chủ.",
+        "error"
+      );
+    } finally {
+      setIsDataLoaded(true);
     }
   };
 
@@ -1229,40 +1380,31 @@ const ServiceManagement = () => {
 
   // Tính toán danh sách dịch vụ đã lọc & sắp xếp (FEAT-SERVICE-02)
   const filteredServices = useMemo(() => {
+    const cleanMin = trimUnicode(normalizeFullWidthDigits(minPrice));
+    const cleanMax = trimUnicode(normalizeFullWidthDigits(maxPrice));
+    const minP = cleanMin !== "" && /^-?\d+(?:\.\d+)?$/.test(cleanMin) ? Number(cleanMin) : null;
+    const maxP = cleanMax !== "" && /^-?\d+(?:\.\d+)?$/.test(cleanMax) ? Number(cleanMax) : null;
+
     let result = services.filter((svc) => {
-      // 1. Tìm kiếm không dấu trên tên, mã SKU, tên nhóm và mô tả
       const matchSearch =
-        !searchTerm.trim() ||
-        normalizeSearch(svc.ServiceName).includes(
-          normalizeSearch(searchTerm),
-        ) ||
-        normalizeSearch(svc.ServiceCode).includes(
-          normalizeSearch(searchTerm),
-        ) ||
-        normalizeSearch(svc.category?.CategoryName || "").includes(
-          normalizeSearch(searchTerm),
-        );
+        isBlankUnicode(searchTerm) ||
+        normalizeSearch(svc.ServiceName).includes(normalizeSearch(searchTerm)) ||
+        normalizeSearch(svc.ServiceCode).includes(normalizeSearch(searchTerm)) ||
+        normalizeSearch(svc.category?.CategoryName || "").includes(normalizeSearch(searchTerm)) ||
+        normalizeSearch(svc.Description || "").includes(normalizeSearch(searchTerm));
 
-      // 2. Lọc theo nhóm dịch vụ
       const matchCategory =
-        categoryFilter === "All" ||
-        String(svc.CategoryId) === String(categoryFilter);
+        categoryFilter === "All" || String(svc.CategoryId) === String(categoryFilter);
 
-      // 3. Lọc theo trạng thái
       const matchStatus = statusFilter === "All" || svc.Status === statusFilter;
 
-      // 4. Lọc theo khoảng giá minPrice - maxPrice
       const priceNum = Number(svc.Price);
-      const minP = minPrice !== "" && !isNaN(Number(minPrice)) ? Number(minPrice) : null;
-      const maxP = maxPrice !== "" && !isNaN(Number(maxPrice)) ? Number(maxPrice) : null;
-
       const matchMinPrice = minP === null || priceNum >= minP;
       const matchMaxPrice = maxP === null || priceNum <= maxP;
 
       return matchSearch && matchCategory && matchStatus && matchMinPrice && matchMaxPrice;
     });
 
-    // 5. Sắp xếp theo sortBy (FEAT-SERVICE-02: name_asc, price_asc, price_desc)
     result.sort((a, b) => {
       if (sortBy === "price_asc") {
         const diff = Number(a.Price) - Number(b.Price);
@@ -1274,7 +1416,6 @@ const ServiceManagement = () => {
         if (diff !== 0) return diff;
         return (a.ServiceName || "").localeCompare(b.ServiceName || "", "vi");
       }
-      // Mặc định (name_asc): theo CategoryName A→Z, trong cùng nhóm sắp theo ServiceName A→Z
       const catA = a.category?.CategoryName || "";
       const catB = b.category?.CategoryName || "";
       const catComp = catA.localeCompare(catB, "vi");
@@ -1286,27 +1427,133 @@ const ServiceManagement = () => {
     return result;
   }, [services, searchTerm, categoryFilter, statusFilter, minPrice, maxPrice, sortBy]);
 
+  // Kiểm tra URL query params: ?page=, ?id=, ?serviceId=, ?status=, ?categoryId= (QA Scenarios #3, #8, #10)
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil((filteredServices?.length || 0) / itemsPerPage));
+    const pageCheck = parseUrlPageParam(searchParams, "page", isDataLoaded ? totalPages : null);
+
+    if (!pageCheck.valid) {
+      setUrlParamError(`Trang không hợp lệ hoặc không tồn tại: ${pageCheck.error}`);
+      showToast(pageCheck.error, "error", "ERROR_0004_INVALID_PAGE");
+      return;
+    }
+
+    if (searchParams.has("page") && pageCheck.page !== currentPage) {
+      setCurrentPage(pageCheck.page);
+    }
+
+    const urlStatus = searchParams.get("status");
+    if (urlStatus !== null) {
+      const cleanSt = trimUnicode(urlStatus);
+      if (!["Active", "Inactive", "All"].includes(cleanSt)) {
+        setUrlParamError(
+          `Tham số trạng thái (status="${urlStatus}") trên URL không hợp lệ. Chỉ chấp nhận Active, Inactive hoặc All.`
+        );
+        return;
+      }
+      if (cleanSt !== statusFilter) {
+        setStatusFilter(cleanSt);
+      }
+    }
+
+    const urlId = searchParams.get("id") ?? searchParams.get("serviceId");
+    if (urlId !== null) {
+      const cleanId = normalizeFullWidthDigits(trimUnicode(urlId));
+      const isCode = /^SVC-[A-Z0-9]+-\d+$/i.test(cleanId);
+      const isPosInt = /^\d+$/.test(cleanId) && Number(cleanId) >= 1;
+
+      if (!isCode && !isPosInt) {
+        setUrlParamError(`Mã dịch vụ trên URL ("${urlId}") không đúng định dạng hợp lệ.`);
+        return;
+      }
+
+      if (isDataLoaded) {
+        const matched = services.find(
+          (s) =>
+            String(s.ServiceId) === String(Number(cleanId)) ||
+            String(s.ServiceCode).toUpperCase() === cleanId.toUpperCase()
+        );
+        if (matched) {
+          setUrlParamError(null);
+          if (selectedId !== matched.ServiceId) {
+            handleSelectService(matched.ServiceId);
+          }
+        } else {
+          fetchServiceByIdApi(cleanId)
+            .then((res) => {
+              if (res?.data) {
+                setUrlParamError(null);
+                const item = toEditorItem(res.data);
+                setSelectedId(item.ServiceId);
+                setFormData(item);
+                setOriginalData(item);
+              } else {
+                setUrlParamError(`Dịch vụ có mã "${urlId}" không tồn tại hoặc đã bị xoá.`);
+              }
+            })
+            .catch((err) => {
+              setUrlParamError(
+                cleanMessage(err?.message) ||
+                  `Dịch vụ có mã "${urlId}" không tồn tại hoặc đã bị xoá.`
+              );
+            });
+          return;
+        }
+      }
+    }
+
+    setUrlParamError(null);
+  }, [searchParams, filteredServices.length, itemsPerPage, isDataLoaded]);
+
+  const handlePageChange = (nextPage) => {
+    const safePage = Math.max(1, Number(nextPage) || 1);
+    setCurrentPage(safePage);
+    setUrlParamError(null);
+    const nextParams = new URLSearchParams(searchParams);
+    if (safePage === 1 && !nextParams.has("page")) {
+      return;
+    }
+    nextParams.set("page", String(safePage));
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleResetAllFilters = () => {
+    setSearchTerm("");
+    setCategoryFilter("All");
+    setStatusFilter("All");
+    setMinPrice("");
+    setMaxPrice("");
+    setSortBy("name_asc");
+    setCurrentPage(1);
+    setUrlParamError(null);
+    setSearchParams({}, { replace: true });
+  };
+
   const handleSelectService = (idOrCode) => {
     const found = services.find((s) => s.ServiceId === idOrCode || s.ServiceCode === idOrCode);
     if (found) {
       setSelectedId(found.ServiceId);
-      const cleanPrice = found.Price !== undefined && found.Price !== null ? Math.floor(Number(found.Price)) : "";
-      const item = { ...found, Price: cleanPrice };
+      const item = toEditorItem(found);
       setFormData(item);
       setOriginalData(item);
       setIsCreatingNew(false);
       setFormErrors({});
+      setConflictError(null);
     }
   };
 
   const handleAddNew = () => {
     const activeCat = categories.find((c) => !c.IsDeleted && c.Status === "Active");
     if (!activeCat) {
-      showToast("Vui lòng tạo ít nhất một nhóm dịch vụ đang hoạt động trước khi tạo dịch vụ mới!", "warning");
+      showToast(
+        "Vui lòng tạo ít nhất một nhóm dịch vụ đang hoạt động trước khi tạo dịch vụ mới!",
+        "warning"
+      );
     }
     setPreviousSelectedId(selectedId);
     setIsCreatingNew(true);
     setSelectedId(null);
+    setConflictError(null);
     setFormData({
       ServiceCode: "",
       CategoryId: activeCat ? activeCat.CategoryId : "",
@@ -1315,6 +1562,8 @@ const ServiceManagement = () => {
       Unit: "Lượt",
       Description: "",
       Status: "Active",
+      Version: 1,
+      version: 1,
     });
     setFormErrors({});
     showToast("Đã mở mẫu tạo mới dịch vụ", "info");
@@ -1323,6 +1572,7 @@ const ServiceManagement = () => {
   const handleCancelNew = () => {
     setIsCreatingNew(false);
     setFormErrors({});
+    setConflictError(null);
     const targetId = previousSelectedId || (services.length > 0 ? services[0].ServiceId : null);
     if (targetId) {
       handleSelectService(targetId);
@@ -1337,6 +1587,7 @@ const ServiceManagement = () => {
     if (originalData) {
       setFormData({ ...originalData });
       setFormErrors({});
+      setConflictError(null);
       showToast("Đã hoàn tác các thay đổi chưa lưu", "info");
     }
   };
@@ -1359,14 +1610,17 @@ const ServiceManagement = () => {
       errors.categoryId = "Vui lòng chọn nhóm dịch vụ";
       validationCodes.categoryId = "ERROR_0001_REQUIRED";
     } else {
-      const selectedCat = categories.find((c) => Number(c.CategoryId) === Number(formData.CategoryId));
+      const selectedCat = categories.find(
+        (c) => Number(c.CategoryId) === Number(formData.CategoryId)
+      );
       if (selectedCat && (selectedCat.IsDeleted || selectedCat.Status === "Inactive")) {
-        errors.categoryId = "Nhóm dịch vụ đã ngừng hoạt động, không thể áp dụng cho dịch vụ hoạt động";
+        errors.categoryId =
+          "Nhóm dịch vụ đã ngừng hoạt động, không thể áp dụng cho dịch vụ hoạt động";
         validationCodes.categoryId = "ERROR_0014_INACTIVE_REFERENCE";
       }
     }
 
-    const trimmedName = (formData.ServiceName || "").trim();
+    const trimmedName = trimUnicode(formData.ServiceName || "");
     if (!trimmedName) {
       errors.serviceName = "Tên dịch vụ không được để trống";
       validationCodes.serviceName = "ERROR_0001_REQUIRED";
@@ -1378,12 +1632,11 @@ const ServiceManagement = () => {
       validationCodes.serviceName = "ERROR_0003_MAX_LENGTH";
     }
 
-    const numPrice = Number(formData.Price);
-    if (
-      formData.Price === undefined ||
-      formData.Price === "" ||
-      isNaN(numPrice)
-    ) {
+    const rawPriceStr = trimUnicode(normalizeFullWidthDigits(String(formData.Price ?? "")));
+    const isStrictNumeric = /^-?\d+(?:\.\d+)?$/.test(rawPriceStr);
+    const numPrice = isStrictNumeric ? Number(rawPriceStr) : NaN;
+
+    if (!rawPriceStr || !isStrictNumeric || isNaN(numPrice)) {
       errors.price = "Đơn giá không đúng định dạng số";
       validationCodes.price = "ERROR_0004_INVALID_FORMAT";
     } else if (numPrice <= 0) {
@@ -1394,7 +1647,7 @@ const ServiceManagement = () => {
       validationCodes.price = "ERROR_0012_OUT_OF_RANGE";
     }
 
-    const trimmedUnit = (formData.Unit || "").trim();
+    const trimmedUnit = trimUnicode(formData.Unit || "");
     if (!trimmedUnit) {
       errors.unit = "Đơn vị tính không được để trống";
       validationCodes.unit = "ERROR_0001_REQUIRED";
@@ -1403,20 +1656,20 @@ const ServiceManagement = () => {
       validationCodes.unit = "ERROR_0003_MAX_LENGTH";
     }
 
-    if (formData.Description && formData.Description.length > 1000) {
+    const trimmedDesc = trimUnicode(formData.Description || "");
+    if (trimmedDesc.length > 1000) {
       errors.description = "Mô tả dịch vụ không được vượt quá 1000 ký tự";
       validationCodes.description = "ERROR_0003_MAX_LENGTH";
     }
 
     setFormErrors(errors);
 
-    // Ghi mã lỗi xác thực ra Console nếu phát hiện dữ liệu form không hợp lệ
     if (Object.keys(errors).length > 0) {
       console.warn("[Xác thực Form Dịch Vụ] Dữ liệu nhập vào chưa hợp lệ:", {
         validationCodes,
         errors,
         formData,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -1425,11 +1678,13 @@ const ServiceManagement = () => {
 
   const handleSave = async () => {
     if (isSubmitting || isTogglingStatus) return;
+    if (submittingRef.current) return;
     if (!validateForm()) {
       showToast("Vui lòng kiểm tra lại các trường lỗi trên form!", "error");
       return;
     }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       if (isCreatingNew) {
@@ -1446,8 +1701,16 @@ const ServiceManagement = () => {
             showToast("Thêm mới dịch vụ thành công!", "success", "SUCCESS_0001_CREATED");
           }
         } catch (apiErr) {
-          const field = apiErr?.field || (apiErr?.code === "ERROR_0014_INACTIVE_REFERENCE" ? "categoryId" : null);
-          const errMsg = cleanMessage(apiErr?.message || apiErr?.error) || "Không thể tạo mới dịch vụ trong cơ sở dữ liệu. Vui lòng đăng nhập tài khoản Quản trị viên (Admin).";
+          const field =
+            apiErr?.field ||
+            (apiErr?.code === "ERROR_0014_INACTIVE_REFERENCE"
+              ? "categoryId"
+              : apiErr?.code === "ERROR_0007_DUPLICATE"
+                ? "serviceName"
+                : null);
+          const errMsg =
+            cleanMessage(apiErr?.message || apiErr?.error) ||
+            "Không thể tạo mới dịch vụ trong cơ sở dữ liệu.";
           if (field) {
             setFormErrors((prev) => ({ ...prev, [field]: errMsg }));
           }
@@ -1455,14 +1718,12 @@ const ServiceManagement = () => {
           return;
         }
 
-        const cleanCreatedPrice = created.Price !== undefined && created.Price !== null ? Math.floor(Number(created.Price)) : "";
-        const enrichedCreated = {
+        const enrichedCreated = toEditorItem({
           ...created,
-          Price: cleanCreatedPrice,
           category:
             created.category ||
             categories.find((cat) => Number(cat.CategoryId) === Number(created.CategoryId)),
-        };
+        });
 
         const nextList = [enrichedCreated, ...services];
         setServices(nextList);
@@ -1470,6 +1731,7 @@ const ServiceManagement = () => {
         setFormData(enrichedCreated);
         setOriginalData(enrichedCreated);
         setIsCreatingNew(false);
+        setConflictError(null);
       } else {
         let updatedFromServer = null;
         try {
@@ -1479,8 +1741,21 @@ const ServiceManagement = () => {
           );
           updatedFromServer = res?.data;
         } catch (apiErr) {
-          const field = apiErr?.field || (apiErr?.code === "ERROR_0014_INACTIVE_REFERENCE" ? "categoryId" : null);
-          const errMsg = cleanMessage(apiErr?.message || apiErr?.error) || "Không thể cập nhật thông tin dịch vụ vào cơ sở dữ liệu. Vui lòng đăng nhập tài khoản Quản trị viên (Admin).";
+          if (isConflict409(apiErr)) {
+            setConflictError(CONFLICT_RELOAD_MESSAGE);
+            showToast(CONFLICT_RELOAD_MESSAGE, "error", "ERROR_0023_CONFLICT");
+            return;
+          }
+          const field =
+            apiErr?.field ||
+            (apiErr?.code === "ERROR_0014_INACTIVE_REFERENCE"
+              ? "categoryId"
+              : apiErr?.code === "ERROR_0007_DUPLICATE"
+                ? "serviceName"
+                : null);
+          const errMsg =
+            cleanMessage(apiErr?.message || apiErr?.error) ||
+            "Không thể cập nhật thông tin dịch vụ vào cơ sở dữ liệu.";
           if (field) {
             setFormErrors((prev) => ({ ...prev, [field]: errMsg }));
           }
@@ -1488,26 +1763,22 @@ const ServiceManagement = () => {
           return;
         }
 
-        const cleanPrice = updatedFromServer?.Price !== undefined && updatedFromServer?.Price !== null
-          ? Math.floor(Number(updatedFromServer.Price))
-          : (formData.Price !== undefined && formData.Price !== null ? Math.floor(Number(formData.Price)) : "");
-
-        const merged = {
+        const merged = toEditorItem({
           ...formData,
           ...(updatedFromServer || {}),
-          Price: cleanPrice,
-          category: categories.find(
-            (cat) => Number(cat.CategoryId) === Number(formData.CategoryId)
-          ),
-        };
+          category:
+            updatedFromServer?.category ||
+            categories.find((cat) => Number(cat.CategoryId) === Number(formData.CategoryId)),
+        });
         const updated = services.map((s) =>
           s.ServiceId === formData.ServiceId ? merged : s
         );
         setServices(updated);
         setFormData(merged);
         setOriginalData(merged);
+        setConflictError(null);
         showToast(
-          `Đã lưu cập nhật cho dịch vụ ${formData.ServiceName}!`,
+          `Đã lưu cập nhật cho dịch vụ ${merged.ServiceName}!`,
           "success"
         );
       }
@@ -1516,65 +1787,98 @@ const ServiceManagement = () => {
     } finally {
       setIsSubmitting(false);
     }
+    submittingRef.current = false;
   };
 
   const handleToggleStatus = async () => {
     if (isSubmitting || isTogglingStatus) return;
+    if (submittingRef.current) return;
     const isCurrentlyActive = formData.Status === "Active";
 
+    submittingRef.current = true;
     setIsTogglingStatus(true);
     try {
       if (isCurrentlyActive) {
+        let resData = null;
         try {
-          await deactivateServiceApi(
-            formData.ServiceId || formData.ServiceCode,
+          const res = await deactivateServiceApi(
+            formData.ServiceId || formData.ServiceCode
           );
+          resData = res?.data;
         } catch (apiErr) {
-          showToast(
-            cleanMessage(apiErr?.message || apiErr?.error) || "Không thể thay đổi trạng thái dịch vụ trong cơ sở dữ liệu.",
-            "error",
-            apiErr?.code || "ERROR_STATUS_SERVICE"
-          );
+          if (isConflict409(apiErr)) {
+            setConflictError(CONFLICT_RELOAD_MESSAGE);
+            showToast(CONFLICT_RELOAD_MESSAGE, "error", "ERROR_0023_CONFLICT");
+            return;
+          }
+          const errMsg =
+            cleanMessage(apiErr?.message || apiErr?.error) ||
+            "Dịch vụ này đã ngừng hoạt động hoặc đã bị xóa ở phiên khác.";
+          setConflictError(errMsg);
+          showToast(errMsg, "error", apiErr?.code || "ERROR_STATUS_SERVICE");
           return;
         }
-        const updated = { ...formData, Status: "Inactive" };
+        const updated = toEditorItem({
+          ...formData,
+          ...(resData || {}),
+          Status: "Inactive",
+          Version: resData?.Version ?? resData?.version ?? (Number(formData.version || 1) + 1),
+          version: resData?.version ?? resData?.Version ?? (Number(formData.version || 1) + 1),
+        });
         setFormData(updated);
         setOriginalData(updated);
         setServices((prev) =>
-          prev.map((s) =>
-            s.ServiceId === formData.ServiceId ? updated : s,
-          ),
+          prev.map((s) => (s.ServiceId === formData.ServiceId ? updated : s))
         );
+        setConflictError(null);
         showToast(
           `Dịch vụ ${formData.ServiceName} đã chuyển sang trạng thái: "Ngừng cung cấp"`,
-          "warning",
+          "warning"
         );
       } else {
+        let resData = null;
         try {
-          await reactivateServiceApi(
-            formData.ServiceId || formData.ServiceCode,
+          const res = await reactivateServiceApi(
+            formData.ServiceId || formData.ServiceCode
           );
+          resData = res?.data;
         } catch (apiErr) {
-          const field = apiErr?.field || (apiErr?.code === "ERROR_0014_INACTIVE_REFERENCE" ? "categoryId" : null);
-          const errMsg = cleanMessage(apiErr?.message || apiErr?.error) || "Không thể kích hoạt lại dịch vụ này.";
+          if (isConflict409(apiErr)) {
+            setConflictError(CONFLICT_RELOAD_MESSAGE);
+            showToast(CONFLICT_RELOAD_MESSAGE, "error", "ERROR_0023_CONFLICT");
+            return;
+          }
+          const field =
+            apiErr?.field ||
+            (apiErr?.code === "ERROR_0014_INACTIVE_REFERENCE" ? "categoryId" : null);
+          const errMsg =
+            cleanMessage(apiErr?.message || apiErr?.error) ||
+            "Không thể kích hoạt lại dịch vụ này.";
           if (field) {
             setFormErrors((prev) => ({ ...prev, [field]: errMsg }));
+          } else {
+            setConflictError(errMsg);
           }
           showToast(errMsg, "error", apiErr?.code || "ERROR_STATUS_SERVICE");
           return;
         }
-        const updated = { ...formData, Status: "Active" };
+        const updated = toEditorItem({
+          ...formData,
+          ...(resData || {}),
+          Status: "Active",
+          Version: resData?.Version ?? resData?.version ?? (Number(formData.version || 1) + 1),
+          version: resData?.version ?? resData?.Version ?? (Number(formData.version || 1) + 1),
+        });
         setFormData(updated);
         setOriginalData(updated);
         setServices((prev) =>
-          prev.map((s) =>
-            s.ServiceId === formData.ServiceId ? updated : s,
-          ),
+          prev.map((s) => (s.ServiceId === formData.ServiceId ? updated : s))
         );
+        setConflictError(null);
         showToast(
           `Dịch vụ ${formData.ServiceName} đã được kích hoạt thành công!`,
           "success",
-          "SUCCESS_SERVICE_REACTIVATED",
+          "SUCCESS_SERVICE_REACTIVATED"
         );
       }
     } catch (err) {
@@ -1582,6 +1886,7 @@ const ServiceManagement = () => {
     } finally {
       setIsTogglingStatus(false);
     }
+    submittingRef.current = false;
   };
 
   const handleExportExcel = async () => {
@@ -1646,7 +1951,7 @@ const ServiceManagement = () => {
         link.setAttribute("href", url);
         link.setAttribute(
           "download",
-          `Bang_Gia_Dich_Vu_${new Date().toISOString().slice(0, 10)}.csv`,
+          `Bang_Gia_Dich_Vu_${new Date().toISOString().slice(0, 10)}.csv`
         );
         document.body.appendChild(link);
         link.click();
@@ -1690,6 +1995,41 @@ const ServiceManagement = () => {
           </div>
         )}
 
+        {/* Cảnh báo lỗi tham số URL (?page=abc, ?page=99999, ?id=abc) - QA Scenarios #3 & #10 */}
+        {urlParamError && (
+          <div
+            role="alert"
+            data-testid="url-param-error"
+            style={{
+              backgroundColor: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: "0.75rem",
+              padding: "0.875rem 1.25rem",
+              marginBottom: "1rem",
+              color: "#991b1b",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "1rem",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", fontWeight: 600 }}>
+              <span className="material-symbols-outlined text-[22px]">error</span>
+              <span>{urlParamError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetAllFilters}
+              className={`${styles.btn} ${styles.btnOutline}`}
+              style={{ borderColor: "#dc2626", color: "#dc2626" }}
+            >
+              <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+              <span>Quay về trang 1</span>
+            </button>
+          </div>
+        )}
+
         {/* 1. Header tác vụ */}
         <HeaderSection
           onAddNew={handleAddNew}
@@ -1729,9 +2069,10 @@ const ServiceManagement = () => {
             sortBy={sortBy}
             setSortBy={setSortBy}
             currentPage={currentPage}
-            setCurrentPage={setCurrentPage}
+            onPageChange={handlePageChange}
             itemsPerPage={itemsPerPage}
             setItemsPerPage={setItemsPerPage}
+            onResetAllFilters={handleResetAllFilters}
           />
 
           <ServiceEditorSection
@@ -1747,6 +2088,8 @@ const ServiceManagement = () => {
             setFormErrors={setFormErrors}
             isSubmitting={isSubmitting}
             isTogglingStatus={isTogglingStatus}
+            conflictError={conflictError}
+            onReloadConflict={loadData}
           />
         </div>
       </div>
