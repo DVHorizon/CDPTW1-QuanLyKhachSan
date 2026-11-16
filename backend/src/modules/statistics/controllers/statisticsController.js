@@ -10,6 +10,20 @@
 const ExcelJS = require('exceljs');
 const pool = require('../../../config/db');
 const { broadcastDashboardUpdate } = require('../../../sockets/socketHandler');
+const {
+  normalizeFullWidthDigits,
+  trimUnicode,
+  validatePaginationParams,
+  sendValidationError,
+} = require('../../../shared/utils/qaValidators');
+
+/**
+ * Chuẩn hóa chuỗi ngày đầu vào (trimUnicode + normalizeFullWidthDigits)
+ */
+function normalizeDateParam(raw) {
+  if (raw === undefined || raw === null) return '';
+  return normalizeFullWidthDigits(trimUnicode(String(raw)));
+}
 
 /**
  * Kiểm tra xác thực và phân quyền RBAC cho các API thống kê
@@ -26,15 +40,15 @@ function checkStatsPermission(req, res) {
     return false;
   }
 
-  const roleId = Number(req.user.roleId || 0);
-  const roleName = String(req.user.roleName || req.user.Role || '').toLowerCase();
+  const roleId = Number(req.user.roleId || req.user.RoleId || 0);
+  const roleName = String(req.user.roleName || req.user.RoleName || req.user.Role || '').toLowerCase();
 
   const isGuest =
     roleId === 5 ||
     roleName === 'guest' ||
     roleName === 'customer' ||
     roleName === 'khách hàng' ||
-    (![1, 2, 3, 4].includes(roleId) &&
+    (![1, 2, 3, 4, 6, 7].includes(roleId) &&
       !['admin', 'receptionist', 'staff', 'manager', 'accountant', 'kitchen', 'housekeeping'].includes(roleName));
 
   if (isGuest) {
@@ -54,7 +68,7 @@ function checkStatsPermission(req, res) {
  */
 function isValidDateString(dateStr) {
   if (!dateStr || typeof dateStr !== 'string') return false;
-  const trimmed = dateStr.trim();
+  const trimmed = normalizeDateParam(dateStr);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return false;
   const [y, m, d] = trimmed.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
@@ -96,19 +110,41 @@ async function getRevenueDashboard(req, res) {
   try {
     if (!checkStatsPermission(req, res)) return;
 
+    if (req.query?.page !== undefined || req.query?.pageSize !== undefined) {
+      const pagCheck = validatePaginationParams(req.query, {
+        total: 10,
+        defaultPageSize: 10,
+        maxPageSize: 100,
+      });
+      if (!pagCheck.ok) {
+        return sendValidationError(res, pagCheck);
+      }
+    }
+
     const rawDate = req.query.date;
-    const branchName = req.query.branchName ? String(req.query.branchName).trim() : null;
+    const branchName = req.query.branchName ? trimUnicode(String(req.query.branchName)) : null;
+    if (branchName && branchName.length > 200) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0003_MAX_LENGTH',
+        field: 'branchName',
+        message: 'Tên chi nhánh không được vượt quá 200 ký tự',
+      });
+    }
+
     let targetDate = formatDateYMD(new Date());
 
     if (rawDate !== undefined && rawDate !== '') {
-      if (!isValidDateString(String(rawDate))) {
+      const normDate = normalizeDateParam(rawDate);
+      if (!isValidDateString(normDate)) {
         return res.status(400).json({
           success: false,
           code: 'ERROR_0004_INVALID_FORMAT',
+          field: 'date',
           message: 'Định dạng ngày không hợp lệ (YYYY-MM-DD)',
         });
       }
-      targetDate = String(rawDate).trim();
+      targetDate = normDate;
     }
 
     const startOfDay = `${targetDate} 00:00:00`;
@@ -562,14 +598,31 @@ async function getOccupancyReport(req, res) {
   try {
     if (!checkStatsPermission(req, res)) return;
 
+    if (req.query?.page !== undefined || req.query?.pageSize !== undefined) {
+      const pagCheck = validatePaginationParams(req.query, {
+        total: 12,
+        defaultPageSize: 12,
+        maxPageSize: 100,
+      });
+      if (!pagCheck.ok) {
+        return sendValidationError(res, pagCheck);
+      }
+    }
+
     const today = new Date();
     const thirtyDaysAgo = new Date(today.getTime() - 29 * 86400000);
 
-    const rawFrom = req.query.fromDate || req.query.dateFrom;
-    const rawTo = req.query.toDate || req.query.dateTo;
+    const rawFrom = req.query.fromDate !== undefined ? req.query.fromDate : req.query.dateFrom;
+    const rawTo = req.query.toDate !== undefined ? req.query.toDate : req.query.dateTo;
 
-    const fromDate = rawFrom ? String(rawFrom).trim() : formatDateYMD(thirtyDaysAgo);
-    const toDate = rawTo ? String(rawTo).trim() : formatDateYMD(today);
+    const fromDate =
+      rawFrom !== undefined && rawFrom !== ''
+        ? normalizeDateParam(rawFrom)
+        : formatDateYMD(thirtyDaysAgo);
+    const toDate =
+      rawTo !== undefined && rawTo !== ''
+        ? normalizeDateParam(rawTo)
+        : formatDateYMD(today);
 
     if (!isValidDateString(fromDate) || !isValidDateString(toDate)) {
       return res.status(400).json({
@@ -624,11 +677,13 @@ async function exportOccupancyReport(req, res) {
   try {
     if (!checkStatsPermission(req, res)) return;
 
-    const format = String(req.query.format || 'xlsx').trim().toLowerCase();
+    const rawFormat = req.query.format !== undefined ? String(req.query.format) : 'xlsx';
+    const format = trimUnicode(rawFormat).toLowerCase();
     if (format !== 'xlsx' && format !== 'csv') {
       return res.status(400).json({
         success: false,
         code: 'ERROR_0005_INVALID_VALUE',
+        field: 'format',
         message: 'Định dạng xuất file không được hỗ trợ (chỉ hỗ trợ xlsx hoặc csv)',
       });
     }
@@ -636,11 +691,17 @@ async function exportOccupancyReport(req, res) {
     const today = new Date();
     const thirtyDaysAgo = new Date(today.getTime() - 29 * 86400000);
 
-    const rawFrom = req.query.fromDate || req.query.dateFrom;
-    const rawTo = req.query.toDate || req.query.dateTo;
+    const rawFrom = req.query.fromDate !== undefined ? req.query.fromDate : req.query.dateFrom;
+    const rawTo = req.query.toDate !== undefined ? req.query.toDate : req.query.dateTo;
 
-    const fromDate = rawFrom ? String(rawFrom).trim() : formatDateYMD(thirtyDaysAgo);
-    const toDate = rawTo ? String(rawTo).trim() : formatDateYMD(today);
+    const fromDate =
+      rawFrom !== undefined && rawFrom !== ''
+        ? normalizeDateParam(rawFrom)
+        : formatDateYMD(thirtyDaysAgo);
+    const toDate =
+      rawTo !== undefined && rawTo !== ''
+        ? normalizeDateParam(rawTo)
+        : formatDateYMD(today);
 
     if (!isValidDateString(fromDate) || !isValidDateString(toDate)) {
       return res.status(400).json({

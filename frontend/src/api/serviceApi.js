@@ -1,16 +1,33 @@
 /**
  * frontend/src/api/serviceApi.js
  * API client giao tiếp với module Dịch vụ & Biểu phí (/api/v1/services)
- * Chuẩn hóa theo đặc tả FEAT-SERVICE-01
+ * Chuẩn hóa theo đặc tả FEAT-SERVICE-01..04 & 14 QA Scenarios
  */
 
-const BASE_URL = 'http://localhost:5000/api/v1/services';
+import { getAccessToken } from '../utils/tokenStore.js';
+import { trimUnicode, normalizeFullWidthDigits } from '../utils/qaInputUtils.js';
+
+const resolveToken = () =>
+  getAccessToken() ||
+  (typeof localStorage !== 'undefined'
+    ? localStorage.getItem('hotel_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('authToken')
+    : null);
+
+const getApiRoot = () => {
+  const envUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+    (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) ||
+    (typeof window === 'undefined' ? 'http://localhost:5000/api' : '/api');
+  const cleaned = String(envUrl).replace(/\/+$/, '');
+  return cleaned.endsWith('/v1') ? cleaned.slice(0, -3) : cleaned;
+};
+
+const BASE_URL = `${getApiRoot()}/v1/services`;
 
 const getAuthHeaders = () => {
-  const token =
-    localStorage.getItem('hotel_token') ||
-    localStorage.getItem('token') ||
-    localStorage.getItem('authToken');
+  const token = resolveToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -23,24 +40,44 @@ const getAuthHeaders = () => {
  */
 export const fetchServicesApi = async (params = {}) => {
   const query = new URLSearchParams();
-  if (params.page) query.append('page', params.page);
-  if (params.pageSize) query.append('pageSize', params.pageSize);
+  if (params.page !== undefined && params.page !== null && params.page !== '') {
+    query.append('page', params.page);
+  }
+  if (params.pageSize !== undefined && params.pageSize !== null && params.pageSize !== '') {
+    query.append('pageSize', params.pageSize);
+  }
   if (params.all) query.append('all', params.all);
   if (params.search) query.append('search', params.search);
   const targetGroup = params.group !== undefined ? params.group : params.categoryId;
   if (targetGroup && targetGroup !== 'All') query.append('group', targetGroup);
   if (params.status) query.append('status', params.status);
-  if (params.minPrice !== undefined && params.minPrice !== '') query.append('minPrice', params.minPrice);
-  if (params.maxPrice !== undefined && params.maxPrice !== '') query.append('maxPrice', params.maxPrice);
+  if (params.minPrice !== undefined && params.minPrice !== '') {
+    query.append('minPrice', normalizeFullWidthDigits(params.minPrice));
+  }
+  if (params.maxPrice !== undefined && params.maxPrice !== '') {
+    query.append('maxPrice', normalizeFullWidthDigits(params.maxPrice));
+  }
   if (params.sortBy) query.append('sortBy', params.sortBy);
 
   const url = `${BASE_URL}${query.toString() ? '?' + query.toString() : ''}`;
   const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw err;
+    throw { status: res.status, ...err };
   }
   return await res.json();
+};
+
+/**
+ * 1b. Lấy chi tiết dịch vụ theo ID hoặc mã dịch vụ (QA Scenario #3)
+ */
+export const fetchServiceByIdApi = async (id) => {
+  const res = await fetch(`${BASE_URL}/${encodeURIComponent(id)}`, {
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
+  return data;
 };
 
 /**
@@ -53,7 +90,7 @@ export const fetchCategoriesApi = async (params = {}) => {
   const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw err;
+    throw { status: res.status, ...err };
   }
   return await res.json();
 };
@@ -63,76 +100,107 @@ export const fetchCategoriesApi = async (params = {}) => {
  */
 export const createServiceApi = async (serviceData) => {
   const catId = serviceData.CategoryId !== undefined ? serviceData.CategoryId : serviceData.categoryId;
-  const name = serviceData.ServiceName !== undefined ? serviceData.ServiceName : (serviceData.serviceName || serviceData.name || '');
+  const name =
+    serviceData.ServiceName !== undefined
+      ? serviceData.ServiceName
+      : serviceData.serviceName || serviceData.name || '';
   const price = serviceData.Price !== undefined ? serviceData.Price : serviceData.price;
-  const unit = serviceData.Unit !== undefined ? serviceData.Unit : (serviceData.unit || '');
-  const desc = serviceData.Description !== undefined ? serviceData.Description : (serviceData.description || serviceData.sop || '');
+  const unit =
+    serviceData.Unit !== undefined ? serviceData.Unit : serviceData.unit || '';
+  const desc =
+    serviceData.Description !== undefined
+      ? serviceData.Description
+      : serviceData.description || serviceData.sop || '';
+
+  const normPrice = price !== undefined && price !== null && price !== ''
+    ? Number(normalizeFullWidthDigits(trimUnicode(price)))
+    : null;
 
   const res = await fetch(BASE_URL, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
-      categoryId: catId ? Number(catId) : null,
-      serviceName: String(name).trim(),
-      price: price !== '' ? Number(price) : null,
-      unit: String(unit).trim(),
-      description: String(desc || ''),
+      categoryId: catId ? Number(normalizeFullWidthDigits(catId)) : null,
+      serviceName: trimUnicode(name),
+      price: normPrice,
+      unit: trimUnicode(unit),
+      description: trimUnicode(desc),
     }),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
 /**
- * 4. Cập nhật dịch vụ
+ * 4. Cập nhật dịch vụ (kèm version cho Optimistic Locking - QA Scenario #2)
  */
 export const updateServiceApi = async (id, serviceData) => {
   const catId = serviceData.CategoryId !== undefined ? serviceData.CategoryId : serviceData.categoryId;
-  const name = serviceData.ServiceName !== undefined ? serviceData.ServiceName : (serviceData.serviceName || serviceData.name || '');
+  const name =
+    serviceData.ServiceName !== undefined
+      ? serviceData.ServiceName
+      : serviceData.serviceName || serviceData.name || '';
   const price = serviceData.Price !== undefined ? serviceData.Price : serviceData.price;
-  const unit = serviceData.Unit !== undefined ? serviceData.Unit : (serviceData.unit || '');
-  const desc = serviceData.Description !== undefined ? serviceData.Description : (serviceData.description || serviceData.sop || '');
+  const unit =
+    serviceData.Unit !== undefined ? serviceData.Unit : serviceData.unit || '';
+  const desc =
+    serviceData.Description !== undefined
+      ? serviceData.Description
+      : serviceData.description || serviceData.sop || '';
+  const version =
+    serviceData.version !== undefined ? serviceData.version : serviceData.Version;
 
-  const res = await fetch(`${BASE_URL}/${id}`, {
+  const normPrice = price !== undefined && price !== null && price !== ''
+    ? Number(normalizeFullWidthDigits(trimUnicode(price)))
+    : null;
+
+  const payload = {
+    categoryId: catId ? Number(normalizeFullWidthDigits(catId)) : null,
+    serviceName: trimUnicode(name),
+    price: normPrice,
+    unit: trimUnicode(unit),
+    description: trimUnicode(desc),
+  };
+  if (version !== undefined && version !== null && version !== '') {
+    payload.version = Number(normalizeFullWidthDigits(version));
+  }
+
+  const res = await fetch(`${BASE_URL}/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: getAuthHeaders(),
-    body: JSON.stringify({
-      categoryId: catId ? Number(catId) : null,
-      serviceName: String(name).trim(),
-      price: price !== '' ? Number(price) : null,
-      unit: String(unit).trim(),
-      description: String(desc || ''),
-    }),
+    body: JSON.stringify(payload),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
 /**
  * 5. Ngừng cung cấp dịch vụ (Soft-delete: Status = 'Inactive')
  */
-export const deactivateServiceApi = async (id) => {
-  const res = await fetch(`${BASE_URL}/${id}/deactivate`, {
+export const deactivateServiceApi = async (id, payload = {}) => {
+  const res = await fetch(`${BASE_URL}/${encodeURIComponent(id)}/deactivate`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
+    body: Object.keys(payload).length > 0 ? JSON.stringify(payload) : undefined,
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
 /**
  * 6. Kích hoạt lại dịch vụ (Status = 'Active')
  */
-export const reactivateServiceApi = async (id) => {
-  const res = await fetch(`${BASE_URL}/${id}/reactivate`, {
+export const reactivateServiceApi = async (id, payload = {}) => {
+  const res = await fetch(`${BASE_URL}/${encodeURIComponent(id)}/reactivate`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
+    body: Object.keys(payload).length > 0 ? JSON.stringify(payload) : undefined,
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -145,13 +213,13 @@ export const createCategoryApi = async (categoryData) => {
     headers: getAuthHeaders(),
     body: JSON.stringify(categoryData),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
 // ─── FEAT-SERVICE-03: ĐẶT DỊCH VỤ & SERVICE ORDERS ───────────────────────────
-const ORDERS_BASE_URL = 'http://localhost:5000/api/v1/service-orders';
+const ORDERS_BASE_URL = `${getApiRoot()}/v1/service-orders`;
 
 /**
  * 8. Lấy danh sách các phòng đang lưu trú (CheckedIn hoặc Extended) cho Lễ tân
@@ -160,8 +228,8 @@ export const fetchActiveStaysApi = async () => {
   const res = await fetch(`${ORDERS_BASE_URL}/active-stays`, {
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -172,8 +240,8 @@ export const fetchMyActiveStayApi = async () => {
   const res = await fetch(`${ORDERS_BASE_URL}/my-stay`, {
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -186,8 +254,8 @@ export const createServiceOrderApi = async (orderPayload) => {
     headers: getAuthHeaders(),
     body: JSON.stringify(orderPayload),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -203,28 +271,25 @@ export const fetchServiceOrdersApi = async (params = {}) => {
   const res = await fetch(url, {
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
 /**
  * 12. Cập nhật tiến độ đơn dịch vụ (FEAT-SERVICE-04 / C4)
  * PATCH /api/v1/service-orders/:orderId/status
- * @param {number|string} orderId
- * @param {object} payload { newStatus: 'InProgress' | 'Completed' | 'Cancelled', cancelReason?: string }
  */
 export const updateServiceOrderStatusApi = async (orderId, payload) => {
-  const res = await fetch(`${ORDERS_BASE_URL}/${orderId}/status`, {
+  const res = await fetch(`${ORDERS_BASE_URL}/${encodeURIComponent(orderId)}/status`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
-
 
 /**
  * 13. Xuất danh mục dịch vụ Excel (.xlsx) chuẩn chỉnh
@@ -236,15 +301,19 @@ export const exportServicesExcelApi = async (params = {}) => {
   const targetGroup = params.group !== undefined ? params.group : params.categoryId;
   if (targetGroup && targetGroup !== 'All') query.append('group', targetGroup);
   if (params.status) query.append('status', params.status);
-  if (params.minPrice !== undefined && params.minPrice !== '') query.append('minPrice', params.minPrice);
-  if (params.maxPrice !== undefined && params.maxPrice !== '') query.append('maxPrice', params.maxPrice);
+  if (params.minPrice !== undefined && params.minPrice !== '') {
+    query.append('minPrice', normalizeFullWidthDigits(params.minPrice));
+  }
+  if (params.maxPrice !== undefined && params.maxPrice !== '') {
+    query.append('maxPrice', normalizeFullWidthDigits(params.maxPrice));
+  }
   if (params.sortBy) query.append('sortBy', params.sortBy);
 
   const url = `${BASE_URL}/export${query.toString() ? '?' + query.toString() : ''}`;
   const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw err;
+    throw { status: res.status, ...err };
   }
   const blob = await res.blob();
   const contentDisposition = res.headers.get('Content-Disposition') || '';

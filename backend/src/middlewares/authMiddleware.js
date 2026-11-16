@@ -4,6 +4,21 @@ const pool = require('../config/db');
 const JWT_SECRET = process.env.JWT_SECRET || 'grand_horizon_secret_key_2026_luxury_hotel';
 
 /**
+ * Tải danh sách quyền (PermissionName) theo RoleId từ RolePermissions + Permissions
+ */
+async function loadRolePermissions(roleId) {
+  if (!roleId) return [];
+  const [rows] = await pool.query(
+    `SELECT DISTINCT p.PermissionName
+     FROM RolePermissions rp
+     JOIN Permissions p ON rp.PermissionId = p.PermissionId
+     WHERE rp.RoleId = ?`,
+    [roleId]
+  );
+  return rows.map((r) => r.PermissionName).filter(Boolean);
+}
+
+/**
  * Middleware xác thực JWT token từ Header Authorization
  * Đồng thời kiểm tra trạng thái thực tế trong Database (Status !== 'Locked', IsDeleted === 0)
  * Giúp thu hồi quyền / khóa tài khoản tức thì mà không cần chờ JWT hết hạn.
@@ -57,6 +72,8 @@ const verifyToken = async (req, res, next) => {
       });
     }
 
+    const permissions = await loadRolePermissions(dbUser.RoleId);
+
     req.user = {
       ...decoded,
       userId: dbUser.UserId,
@@ -65,7 +82,9 @@ const verifyToken = async (req, res, next) => {
       fullName: dbUser.FullName,
       email: dbUser.Email,
       phone: dbUser.Phone,
-      status: dbUser.Status
+      status: dbUser.Status,
+      permissions,
+      _permissionsLoaded: true
     };
 
     next();
@@ -99,6 +118,7 @@ const optionalVerifyToken = async (req, res, next) => {
       [decoded.userId]
     );
     if (rows.length > 0 && rows[0].Status === 'Active') {
+      const permissions = await loadRolePermissions(rows[0].RoleId);
       req.user = {
         ...decoded,
         userId: rows[0].UserId,
@@ -106,7 +126,10 @@ const optionalVerifyToken = async (req, res, next) => {
         roleName: rows[0].RoleName,
         fullName: rows[0].FullName,
         email: rows[0].Email,
-        phone: rows[0].Phone
+        phone: rows[0].Phone,
+        status: rows[0].Status,
+        permissions,
+        _permissionsLoaded: true
       };
     }
   } catch (_) {
@@ -124,25 +147,12 @@ const requirePermissions = (requiredPermissions) => {
 
   return async (req, res, next) => {
     if (!req.user) {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({
-          success: false,
-          code: 'ERROR_0009_UNAUTHENTICATED',
-          message: 'Bạn cần đăng nhập để thực hiện chức năng này'
-        });
-      }
-
-      const token = authHeader.split(' ')[1];
-      try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;
-      } catch (error) {
-        return res.status(401).json({
-          success: false,
-          code: 'ERROR_0009_UNAUTHENTICATED',
-          message: 'Bạn cần đăng nhập để thực hiện chức năng này'
-        });
+      let verified = false;
+      await verifyToken(req, res, () => {
+        verified = true;
+      });
+      if (!verified || res.headersSent || !req.user) {
+        return;
       }
     }
 
@@ -153,18 +163,23 @@ const requirePermissions = (requiredPermissions) => {
       return next();
     }
 
-    // Kiểm tra quyền cụ thể trong CSDL
+    // Kiểm tra quyền cụ thể trong CSDL (ưu tiên danh sách đã nạp sẵn từ verifyToken)
     try {
-      const [rows] = await pool.query(
-        `SELECT p.PermissionName
-         FROM RolePermissions rp
-         JOIN Permissions p ON rp.PermissionId = p.PermissionId
-         WHERE rp.RoleId = ? AND p.PermissionName IN (?)`,
-        [roleId, perms]
-      );
+      let hasAll = false;
+      if (req.user._permissionsLoaded && Array.isArray(req.user.permissions)) {
+        hasAll = perms.every((p) => req.user.permissions.includes(p));
+      } else {
+        const [rows] = await pool.query(
+          `SELECT p.PermissionName
+           FROM RolePermissions rp
+           JOIN Permissions p ON rp.PermissionId = p.PermissionId
+           WHERE rp.RoleId = ? AND p.PermissionName IN (?)`,
+          [roleId, perms]
+        );
 
-      const heldNames = rows.map((r) => r.PermissionName);
-      const hasAll = perms.every((p) => heldNames.includes(p));
+        const heldNames = rows.map((r) => r.PermissionName);
+        hasAll = perms.every((p) => heldNames.includes(p));
+      }
 
       if (!hasAll) {
         return res.status(403).json({
@@ -244,5 +259,6 @@ module.exports = {
   requirePermission,
   requireInternalStaff,
   requireAdmin,
+  loadRolePermissions,
   JWT_SECRET
 };

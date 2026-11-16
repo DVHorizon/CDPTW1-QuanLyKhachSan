@@ -44,6 +44,11 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(500),
       allowNull: true,
     },
+    Version: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
   }, {
     tableName: 'ServiceOrders',
     timestamps: false,

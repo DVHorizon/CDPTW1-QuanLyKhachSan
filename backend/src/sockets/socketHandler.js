@@ -613,8 +613,10 @@ function broadcastDashboardUpdate(payload) {
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       if (!client.pathname || client.pathname === '/ws/v1/dashboard' || client.pathname === '/ws') {
-        client.send(message);
-        sentCount++;
+        try {
+          client.send(message);
+          sentCount++;
+        } catch (_) {}
       }
     }
   });
@@ -640,8 +642,10 @@ function notifyDashboardEvent(action, eventData = {}) {
   wss.clients.forEach((client) => {
     if (client.readyState === 1 /* OPEN */) {
       if (!client.pathname || client.pathname === '/ws/v1/dashboard' || client.pathname === '/ws') {
-        client.send(JSON.stringify(payload));
-        count++;
+        try {
+          client.send(JSON.stringify(payload));
+          count++;
+        } catch (_) {}
       }
     }
   });

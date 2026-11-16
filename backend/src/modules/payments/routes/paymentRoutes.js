@@ -8,10 +8,10 @@
 const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/paymentController');
-const { verifyToken, optionalVerifyToken } = require('../../../middlewares/authMiddleware');
+const { verifyToken } = require('../../../middlewares/authMiddleware');
 
 // 1. Tạo yêu cầu thanh toán (POST /api/v1/payments)
-router.post('/', optionalVerifyToken, paymentController.createPayment);
+router.post('/', verifyToken, paymentController.createPayment);
 
 // Health check ping
 router.get('/ping', (req, res) =>
@@ -19,7 +19,7 @@ router.get('/ping', (req, res) =>
 );
 
 // 2. Tra cứu trạng thái giao dịch (GET /api/v1/payments/:paymentId)
-router.get('/:paymentId', optionalVerifyToken, paymentController.getPaymentStatus);
+router.get('/:paymentId', verifyToken, paymentController.getPaymentStatus);
 
 // 3. Webhook nhận callback từ Gateway (POST /api/v1/payments/webhook/:method)
 router.post('/webhook/:method', paymentController.handleWebhook);

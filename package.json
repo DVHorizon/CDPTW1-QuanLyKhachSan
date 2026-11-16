@@ -1,14 +1,25 @@
 {
   "name": "grand-horizon-hotel-pms",
   "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
+    "start": "node scripts/start-all.js",
+    "dev": "node scripts/start-all.js",
+    "start:local": "node scripts/start-all.js --local",
+    "dev:workspaces": "npm run dev --workspaces --if-present",
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend",
+    "migrate": "npm run bootstrap --workspace=backend",
+    "seed": "npm run seed --workspace=backend",
     "test:manual": "node scripts/test_manual.js",
-    "seed": "docker exec hotel_backend node src/seeders/seedPristineClean.js",
     "test:e2e": "node backend/tests/e2e_services_c1_c14/runner.js",
     "test:security": "node scripts/test_xss_defense.js"
   },
   "dependencies": {
-    "@elastic/elasticsearch": "^9.5.1",
+    "@elastic/elasticsearch": "^8.13.0",
     "bcryptjs": "^3.0.3",
     "sequelize-cli": "^6.6.5"
   }

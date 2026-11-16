@@ -1,16 +1,28 @@
 // frontend/src/api/invoiceApi.js
+import { getAccessToken } from '../utils/tokenStore.js';
 
-const getApiBase = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/v1/invoices`;
-  }
-  return 'http://localhost:5000/api/v1/invoices';
+const resolveToken = () =>
+  getAccessToken() ||
+  (typeof localStorage !== 'undefined'
+    ? localStorage.getItem('hotel_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('authToken')
+    : null);
+
+const getApiRoot = () => {
+  const envUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+    (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) ||
+    (typeof window === 'undefined' ? 'http://localhost:5000/api' : '/api');
+  const cleaned = String(envUrl).replace(/\/+$/, '');
+  return cleaned.endsWith('/v1') ? cleaned.slice(0, -3) : cleaned;
 };
 
+const getApiBase = () => `${getApiRoot()}/v1/invoices`;
+const getPaymentApiBase = () => `${getApiRoot()}/v1/payments`;
+
 function getAuthHeaders() {
-  const token = typeof window !== 'undefined'
-    ? (localStorage.getItem('hotel_token') || localStorage.getItem('token') || localStorage.getItem('authToken'))
-    : null;
+  const token = resolveToken();
   return {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
@@ -26,9 +38,10 @@ const invoiceApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.message || 'Lỗi khi tạo hoá đơn tổng hợp');
+      err.status = res.status;
       err.code = data.code;
       err.data = data;
       throw err;
@@ -56,18 +69,20 @@ const invoiceApi = {
     const res = await fetch(`${getApiBase()}/${invoiceId}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.message || 'Không thể tải chi tiết hoá đơn');
+      const err = new Error(data.message || 'Không thể tải chi tiết hoá đơn');
+      err.status = res.status;
+      err.code = data.code;
+      err.data = data;
+      throw err;
     }
     return data?.data || null;
   },
 
   // C8: Lấy URL để xem hoặc tải PDF trực tiếp
   getInvoicePdfUrl: (invoiceId, mode = 'inline', regenerate = false) => {
-    const token = typeof window !== 'undefined'
-      ? (localStorage.getItem('hotel_token') || localStorage.getItem('token') || localStorage.getItem('authToken'))
-      : '';
+    const token = resolveToken() || '';
     const base = `${getApiBase()}/${invoiceId}/pdf?mode=${mode}${regenerate ? '&regenerate=true' : ''}`;
     // Kèm token query param nếu mở tab mới không gửi được Authorization header
     return token ? `${base}&token=${token}` : base;
@@ -81,13 +96,18 @@ const invoiceApi = {
     });
     if (!res.ok) {
       let msg = 'Không thể xuất file PDF hoá đơn.';
+      let code = null;
       try {
         const errJson = await res.json();
         if (errJson?.message) msg = errJson.message;
+        if (errJson?.code) code = errJson.code;
       } catch (e) {
         // ignore
       }
-      throw new Error(msg);
+      const err = new Error(msg);
+      err.status = res.status;
+      err.code = code;
+      throw err;
     }
     return await res.blob();
   },
@@ -97,7 +117,7 @@ const invoiceApi = {
     const res = await fetch(`${getApiBase()}/${invoiceId}/pdf-info`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     return data?.data || null;
   },
 
@@ -108,9 +128,10 @@ const invoiceApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ tenders, note, releaseHoldOnComplete }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.message || 'Lỗi quyết toán hoá đơn.');
+      err.status = res.status;
       err.code = data.code;
       err.data = data;
       throw err;
@@ -141,10 +162,12 @@ const invoiceApi = {
     const res = await fetch(`${getApiBase()}?${query.toString()}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.message || 'Không thể tải danh sách hoá đơn');
+      err.status = res.status;
       err.code = data.code;
+      err.data = data;
       throw err;
     }
     return data;
@@ -155,10 +178,12 @@ const invoiceApi = {
     const res = await fetch(`${getApiBase()}/${invoiceId}/transactions`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.message || 'Không thể tải lịch sử giao dịch');
+      err.status = res.status;
       err.code = data.code;
+      err.data = data;
       throw err;
     }
     return data;
@@ -166,18 +191,16 @@ const invoiceApi = {
 
   // Hỗ trợ kích hoạt hoàn tiền giao dịch qua C5
   refundPayment: async (paymentId, { refundReason, refundAmount }) => {
-    let paymentApiUrl = 'http://localhost:5000/api/v1/payments';
-    if (import.meta.env.VITE_API_URL) {
-      paymentApiUrl = `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/v1/payments`;
-    }
+    const paymentApiUrl = getPaymentApiBase();
     const res = await fetch(`${paymentApiUrl}/${paymentId}/refund`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify({ refundReason, refundAmount }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.message || 'Lỗi khi thực hiện hoàn tiền giao dịch.');
+      err.status = res.status;
       err.code = data.code;
       err.data = data;
       throw err;
@@ -187,10 +210,7 @@ const invoiceApi = {
 
   // C9: Quyết toán / Thanh toán cho Invoice qua Core Payment C5
   settleInvoicePayment: async ({ invoiceId, amount, paymentMethod, method, returnUrl, transactionCode }) => {
-    let paymentApiUrl = 'http://localhost:5000/api/v1/payments';
-    if (import.meta.env.VITE_API_URL) {
-      paymentApiUrl = `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/v1/payments`;
-    }
+    const paymentApiUrl = getPaymentApiBase();
     const resolvedMethod = method || paymentMethod || 'Cash';
     const res = await fetch(paymentApiUrl, {
       method: 'POST',
@@ -204,9 +224,10 @@ const invoiceApi = {
         transactionCode,
       }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.message || 'Lỗi quyết toán thanh toán.');
+      err.status = res.status;
       err.code = data.code;
       err.data = data;
       throw err;
@@ -216,10 +237,7 @@ const invoiceApi = {
 
   // C5: Tạo yêu cầu thanh toán Core Payment (hỗ trợ cả Booking & Invoice)
   createPayment: async ({ bookingId, invoiceId, amount, method, paymentMethod, returnUrl, transactionCode }) => {
-    let paymentApiUrl = 'http://localhost:5000/api/v1/payments';
-    if (import.meta.env.VITE_API_URL) {
-      paymentApiUrl = `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/v1/payments`;
-    }
+    const paymentApiUrl = getPaymentApiBase();
     const resolvedMethod = method || paymentMethod || 'VietQR';
     const res = await fetch(paymentApiUrl, {
       method: 'POST',
@@ -234,9 +252,10 @@ const invoiceApi = {
         transactionCode,
       }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.message || 'Lỗi khởi tạo giao dịch thanh toán C5.');
+      err.status = res.status;
       err.code = data.code;
       err.data = data;
       throw err;
@@ -246,17 +265,16 @@ const invoiceApi = {
 
   // C5: Tra cứu trạng thái giao dịch Core Payment
   getPaymentStatus: async (paymentIdOrCode) => {
-    let paymentApiUrl = `http://localhost:5000/api/v1/payments/${encodeURIComponent(paymentIdOrCode)}`;
-    if (import.meta.env.VITE_API_URL) {
-      paymentApiUrl = `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/v1/payments/${encodeURIComponent(paymentIdOrCode)}`;
-    }
+    const paymentApiUrl = `${getPaymentApiBase()}/${encodeURIComponent(paymentIdOrCode)}`;
     const res = await fetch(paymentApiUrl, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.message || 'Không tìm thấy giao dịch thanh toán.');
+      err.status = res.status;
       err.code = data.code;
+      err.data = data;
       throw err;
     }
     return data;

@@ -3,13 +3,30 @@
  * API Client cho Phân hệ Trợ lý AI Concierge (C13) & Quản trị Cơ sở Tri thức AI (C14)
  */
 
-const BASE_URL = 'http://localhost:5000/api/v1/ai';
+import { getAccessToken } from '../utils/tokenStore.js';
+import { trimUnicode } from '../utils/qaInputUtils.js';
+
+const resolveToken = () =>
+  getAccessToken() ||
+  (typeof localStorage !== 'undefined'
+    ? localStorage.getItem('hotel_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('authToken')
+    : null);
+
+const getApiRoot = () => {
+  const envUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+    (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) ||
+    (typeof window === 'undefined' ? 'http://localhost:5000/api' : '/api');
+  const cleaned = String(envUrl).replace(/\/+$/, '');
+  return cleaned.endsWith('/v1') ? cleaned.slice(0, -3) : cleaned;
+};
+
+const BASE_URL = `${getApiRoot()}/v1/ai`;
 
 const getAuthHeaders = () => {
-  const token =
-    localStorage.getItem('hotel_token') ||
-    localStorage.getItem('token') ||
-    localStorage.getItem('authToken');
+  const token = resolveToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -25,12 +42,12 @@ export const sendChatMessageApi = async ({ message, conversationId = null }) => 
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
-      message,
+      message: trimUnicode(message),
       ...(conversationId ? { conversationId } : {}),
     }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -41,14 +58,22 @@ export const fetchKnowledgeBaseApi = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.category && params.category !== 'All') query.append('category', params.category);
   if (params.status && params.status !== 'All') query.append('status', params.status);
-  if (params.search && String(params.search).trim()) query.append('search', String(params.search).trim());
+  if (params.search && trimUnicode(params.search)) {
+    query.append('search', trimUnicode(params.search));
+  }
+  if (params.page !== undefined && params.page !== null && String(params.page) !== '') {
+    query.append('page', String(params.page));
+  }
+  if (params.pageSize !== undefined && params.pageSize !== null && String(params.pageSize) !== '') {
+    query.append('pageSize', String(params.pageSize));
+  }
 
   const url = `${BASE_URL}/knowledge-base${query.toString() ? `?${query.toString()}` : ''}`;
   const res = await fetch(url, {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -62,12 +87,12 @@ export const createKnowledgeItemApi = async (payload) => {
     body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
 /**
- * 4. Cập nhật kịch bản tri thức AI (Chỉ Admin - C14)
+ * 4. Cập nhật kịch bản tri thức AI (Chỉ Admin - C14, kèm version Optimistic Locking)
  */
 export const updateKnowledgeItemApi = async (id, payload) => {
   const res = await fetch(`${BASE_URL}/knowledge-base/${id}`, {
@@ -76,21 +101,28 @@ export const updateKnowledgeItemApi = async (id, payload) => {
     body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
 /**
  * 5. Bật / Tắt trạng thái kích hoạt kịch bản tri thức AI (Chỉ Admin - C14)
  */
-export const toggleKnowledgeStatusApi = async (id, status) => {
+export const toggleKnowledgeStatusApi = async (id, status, version = null) => {
+  const body =
+    status && typeof status === 'object'
+      ? status
+      : {
+          ...(status ? { status } : {}),
+          ...(version !== null && version !== undefined ? { version } : {}),
+        };
   const res = await fetch(`${BASE_URL}/knowledge-base/${id}/status`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
-    body: JSON.stringify(status ? { status } : {}),
+    body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -103,7 +135,7 @@ export const deleteKnowledgeItemApi = async (id) => {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -111,12 +143,12 @@ export const deleteKnowledgeItemApi = async (id) => {
  * 7. Kiểm thử độ tương đồng & chính xác câu trả lời AI (Relevance Sandbox - C14)
  */
 export const testKnowledgeRelevanceApi = async (queryText) => {
-  const query = new URLSearchParams({ query: String(queryText || '').trim() });
+  const query = new URLSearchParams({ query: trimUnicode(queryText) });
   const res = await fetch(`${BASE_URL}/knowledge-base/test?${query.toString()}`, {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -126,13 +158,19 @@ export const testKnowledgeRelevanceApi = async (queryText) => {
 export const fetchConversationsApi = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.status && params.status !== 'All') query.append('status', params.status);
+  if (params.page !== undefined && params.page !== null && String(params.page) !== '') {
+    query.append('page', String(params.page));
+  }
+  if (params.pageSize !== undefined && params.pageSize !== null && String(params.pageSize) !== '') {
+    query.append('pageSize', String(params.pageSize));
+  }
 
   const url = `${BASE_URL}/conversations${query.toString() ? `?${query.toString()}` : ''}`;
   const res = await fetch(url, {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -144,21 +182,24 @@ export const fetchConversationDetailApi = async (conversationId) => {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
 /**
  * 10. Nhân viên Lễ tân tiếp nhận xử lý hội thoại hoặc chuyển lại cho AI (Handover - C13)
  */
-export const claimHandoverApi = async (conversationId, action = 'to_staff') => {
+export const claimHandoverApi = async (conversationId, action = 'to_staff', version = null) => {
   const res = await fetch(`${BASE_URL}/conversations/${conversationId}/handover`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ action }),
+    body: JSON.stringify({
+      action,
+      ...(version !== null && version !== undefined ? { version } : {}),
+    }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -169,22 +210,23 @@ export const sendStaffReplyApi = async (conversationId, message) => {
   const res = await fetch(`${BASE_URL}/conversations/${conversationId}/messages`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message: trimUnicode(message) }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
 /**
  * 12. Hoàn tất và đóng phiên hội thoại (C13)
  */
-export const resolveConversationApi = async (conversationId) => {
+export const resolveConversationApi = async (conversationId, version = null) => {
   const res = await fetch(`${BASE_URL}/conversations/${conversationId}/resolve`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
+    body: JSON.stringify(version !== null && version !== undefined ? { version } : {}),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };

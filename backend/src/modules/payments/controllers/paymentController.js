@@ -24,9 +24,69 @@ const {
   createGatewayTransaction,
   verifyWebhookSignature,
 } = require('../services/paymentGatewayService');
+const {
+  CONFLICT_MESSAGE,
+  normalizeFullWidthDigits,
+  trimUnicode,
+  isBlankUnicode,
+  parseStrictPositiveInt,
+  parseStrictNumber,
+  extractExpectedVersion,
+  assertVersionMatch,
+  sendValidationError,
+} = require('../../../shared/utils/qaValidators');
 
 // Quyết định D6: coi PAID_STATUSES = ['Paid', 'Success', 'Completed'] là đã thu
 const PAID_STATUSES = ['Paid', 'Success', 'Completed'];
+
+function isStaffOrAdminUser(user) {
+  if (!user) return false;
+  const roleId = Number(user.roleId || user.RoleId || 0);
+  const userRole = String(user.roleName || user.role?.RoleName || user.Role || '').toLowerCase();
+  if (roleId === 5 || userRole === 'guest') return false;
+  return (
+    [1, 2, 3, 4, 6, 7].includes(roleId) ||
+    ['admin', 'receptionist', 'staff', 'manager', 'accountant'].includes(userRole)
+  );
+}
+
+function resolvePaymentIdentifier(rawId) {
+  if (rawId === undefined || rawId === null || isBlankUnicode(String(rawId))) {
+    return {
+      ok: false,
+      status: 400,
+      code: 'ERROR_0004_INVALID_FORMAT',
+      field: 'paymentId',
+      message: 'Mã giao dịch thanh toán không hợp lệ',
+    };
+  }
+  const str = trimUnicode(String(rawId));
+  if (/^PMT-[A-Za-z0-9-]+$/i.test(str)) {
+    return { ok: true, byCode: true, transactionCode: str };
+  }
+  const parsed = parseStrictPositiveInt(rawId, {
+    field: 'paymentId',
+    message: 'Mã giao dịch thanh toán không hợp lệ',
+  });
+  if (!parsed.ok) {
+    return parsed;
+  }
+  return { ok: true, byCode: false, paymentId: parsed.value };
+}
+
+function serializePayment(payment, extra = {}) {
+  const json = typeof payment?.toJSON === 'function' ? payment.toJSON() : { ...(payment || {}) };
+  const ver = Number(payment?.Version ?? json?.Version ?? 1);
+  return {
+    ...json,
+    ...extra,
+    paymentId: payment.PaymentId ?? json.PaymentId,
+    status: payment.Status ?? json.Status,
+    transactionCode: payment.TransactionCode ?? json.TransactionCode,
+    version: ver,
+    Version: ver,
+  };
+}
 
 /**
  * 1. POST /api/v1/payments (alias /payments)
@@ -37,9 +97,17 @@ exports.createPayment = async (req, res) => {
 
   try {
     const userId = req.user?.userId || req.user?.UserId || req.user?.id;
-    const userRole = req.user?.roleName || req.user?.role?.RoleName || req.user?.Role || '';
-    const userEmail = req.user?.email || req.user?.Email || '';
-    const isStaffOrAdmin = ['Admin', 'Receptionist', 'Staff', 'Manager', 'Accountant'].includes(userRole);
+    const userEmail = trimUnicode(req.user?.email || req.user?.Email || '');
+    const isStaffOrAdmin = isStaffOrAdminUser(req.user);
+
+    if (!userId) {
+      await transaction.rollback();
+      return res.status(401).json({
+        success: false,
+        code: 'ERROR_0009_UNAUTHENTICATED',
+        message: 'Bạn cần đăng nhập để thực hiện chức năng này',
+      });
+    }
 
     const {
       bookingId,
@@ -50,8 +118,19 @@ exports.createPayment = async (req, res) => {
       returnUrl,
       depositOption,
       transactionCode: requestedTxCode,
-    } = req.body;
-    const method = rawMethod || aliasMethod;
+    } = req.body || {};
+
+    const rawMethodVal = rawMethod !== undefined ? rawMethod : aliasMethod;
+    if (rawMethodVal !== undefined && rawMethodVal !== null && typeof rawMethodVal !== 'string') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        field: 'method',
+        message: 'Phương thức thanh toán không hợp lệ',
+      });
+    }
+    const method = trimUnicode(rawMethodVal || '');
 
     // 1. Phân quyền phương thức thanh toán theo Actor (Mục 1.4.a)
     if (!isStaffOrAdmin) {
@@ -67,8 +146,10 @@ exports.createPayment = async (req, res) => {
     }
 
     // 2. Validate Context (bookingId XOR invoiceId) (Mục 1.4.b)
-    const hasBooking = bookingId !== undefined && bookingId !== null && bookingId !== '';
-    const hasInvoice = invoiceId !== undefined && invoiceId !== null && invoiceId !== '';
+    const hasBooking =
+      bookingId !== undefined && bookingId !== null && !isBlankUnicode(String(bookingId));
+    const hasInvoice =
+      invoiceId !== undefined && invoiceId !== null && !isBlankUnicode(String(invoiceId));
 
     if ((!hasBooking && !hasInvoice) || (hasBooking && hasInvoice)) {
       await transaction.rollback();
@@ -79,6 +160,30 @@ exports.createPayment = async (req, res) => {
       });
     }
 
+    let parsedBookingIdVal = null;
+    let parsedInvoiceIdVal = null;
+    if (hasBooking) {
+      const parsedBId = parseStrictPositiveInt(bookingId, {
+        field: 'bookingId',
+        message: 'Mã đặt phòng (bookingId) không hợp lệ',
+      });
+      if (!parsedBId.ok) {
+        await transaction.rollback();
+        return sendValidationError(res, parsedBId);
+      }
+      parsedBookingIdVal = parsedBId.value;
+    } else {
+      const parsedIId = parseStrictPositiveInt(invoiceId, {
+        field: 'invoiceId',
+        message: 'Mã hoá đơn (invoiceId) không hợp lệ',
+      });
+      if (!parsedIId.ok) {
+        await transaction.rollback();
+        return sendValidationError(res, parsedIId);
+      }
+      parsedInvoiceIdVal = parsedIId.value;
+    }
+
     // 3. Validate Phương thức thanh toán (Method)
     const VALID_METHODS = ['Cash', 'Card', 'BankTransfer', 'VNPay', 'MoMo', 'VietQR'];
     if (!method || !VALID_METHODS.includes(method)) {
@@ -86,39 +191,92 @@ exports.createPayment = async (req, res) => {
       return res.status(400).json({
         success: false,
         code: 'ERROR_0005_INVALID_VALUE',
+        field: 'method',
         message: 'Phương thức thanh toán không hợp lệ',
       });
     }
 
+    // Validate returnUrl (QA Scenarios #4, #5, #6)
+    let cleanReturnUrl = '';
+    if (returnUrl !== undefined && returnUrl !== null) {
+      if (typeof returnUrl !== 'string') {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0004_INVALID_FORMAT',
+          field: 'returnUrl',
+          message: 'URL quay lại không hợp lệ',
+        });
+      }
+      cleanReturnUrl = trimUnicode(returnUrl);
+      if (cleanReturnUrl.length > 500) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0003_MAX_LENGTH',
+          field: 'returnUrl',
+          message: 'URL quay lại không được vượt quá 500 ký tự',
+        });
+      }
+    }
+
     // Yêu cầu returnUrl đối với VNPay / MoMo
     if (['VNPay', 'MoMo'].includes(method)) {
-      if (!returnUrl || typeof returnUrl !== 'string' || !returnUrl.trim()) {
+      if (!cleanReturnUrl) {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
           code: 'ERROR_0001_REQUIRED',
+          field: 'returnUrl',
           message: 'URL quay lại không hợp lệ',
         });
       }
     }
 
-    // 4. Validate Số tiền (Amount > 0)
-    const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        code: 'ERROR_0012_OUT_OF_RANGE',
-        message: 'Số tiền phải lớn hơn 0',
-      });
+    if (requestedTxCode !== undefined && requestedTxCode !== null) {
+      if (typeof requestedTxCode !== 'string') {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0004_INVALID_FORMAT',
+          field: 'transactionCode',
+          message: 'Mã giao dịch không hợp lệ',
+        });
+      }
+      if (trimUnicode(requestedTxCode).length > 150) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0003_MAX_LENGTH',
+          field: 'transactionCode',
+          message: 'Mã giao dịch không được vượt quá 150 ký tự',
+        });
+      }
     }
 
-    // 5. Kiểm tra tính hợp lệ và quyền sở hữu theo Context
+    // 4. Validate Số tiền (Amount > 0, hỗ trợ chữ số full-width ０-９)
+    const parsedAmount = parseStrictNumber(amount, {
+      normalizeFullWidth: true,
+      allowDecimal: true,
+      min: 0.01,
+      field: 'amount',
+      message: 'Số tiền phải lớn hơn 0',
+    });
+    if (!parsedAmount.ok) {
+      await transaction.rollback();
+      return sendValidationError(res, parsedAmount);
+    }
+    const numAmount = parsedAmount.value;
+
+    // 5. Kiểm tra tính hợp lệ và quyền sở hữu theo Context (khoá dòng chống race condition)
     let targetBooking = null;
     let targetInvoice = null;
 
     if (hasBooking) {
-      targetBooking = await Booking.findByPk(Number(bookingId), { transaction });
+      targetBooking = await Booking.findByPk(parsedBookingIdVal, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
       if (!targetBooking) {
         await transaction.rollback();
         return res.status(404).json({
@@ -128,12 +286,9 @@ exports.createPayment = async (req, res) => {
         });
       }
 
-      // Guest chỉ được thanh toán cho booking của chính mình (hoặc đơn DirectWeb vừa đặt trực tuyến)
-      if (!isStaffOrAdmin && userId) {
+      // Guest chỉ được thanh toán cho booking của chính mình
+      if (!isStaffOrAdmin) {
         let isOwner = targetBooking.UserId && Number(targetBooking.UserId) === Number(userId);
-        if (!isOwner && Number(targetBooking.UserId) === 1 && targetBooking.BookingSource === 'DirectWeb') {
-          isOwner = true;
-        }
         if (!isOwner && userEmail && BookingGuest) {
           const guest = await BookingGuest.findOne({
             where: { BookingId: targetBooking.BookingId, Email: userEmail },
@@ -170,7 +325,11 @@ exports.createPayment = async (req, res) => {
         },
         transaction,
       });
-      const totalPaid = paidPayments.reduce((sum, p) => sum + Number(p.Amount || 0), 0);
+      const totalPaid = paidPayments.reduce((sum, p) => {
+        const amt = Number(p.Amount || 0);
+        const ref = Number(p.RefundAmount || 0);
+        return sum + Math.max(0, amt - ref);
+      }, 0);
       const bookingTotal = Number(targetBooking.TotalAmount || 0);
       const remainingBalance = Math.max(0, bookingTotal - totalPaid);
 
@@ -184,23 +343,18 @@ exports.createPayment = async (req, res) => {
       }
     } else {
       // hasInvoice
-      if (!isStaffOrAdmin && !userId) {
-        await transaction.rollback();
-        return res.status(401).json({
-          success: false,
-          code: 'ERROR_0009_UNAUTHENTICATED',
-          message: 'Bạn cần đăng nhập để thực hiện chức năng này',
-        });
-      }
-
-      targetInvoice = await Invoice.findByPk(Number(invoiceId), {
+      targetInvoice = await Invoice.findByPk(parsedInvoiceIdVal, {
         include: [
+          {
+            model: Booking,
+          },
           {
             model: Stay,
             include: [{ model: Booking }],
           },
         ],
         transaction,
+        lock: transaction.LOCK.UPDATE,
       });
 
       if (!targetInvoice) {
@@ -214,12 +368,20 @@ exports.createPayment = async (req, res) => {
 
       // Guest chỉ được thanh toán cho hoá đơn của mình
       if (!isStaffOrAdmin) {
-        const stayOwnerId =
+        const ownerUserId =
+          targetInvoice.Booking?.UserId ||
           targetInvoice.Stay?.Booking?.UserId ||
           targetInvoice.Stay?.booking?.UserId ||
           targetInvoice.stay?.booking?.UserId ||
-          targetInvoice.BookingId;
-        const isOwner = stayOwnerId && Number(stayOwnerId) === Number(userId);
+          null;
+        let isOwner = ownerUserId && Number(ownerUserId) === Number(userId);
+        if (!isOwner && userEmail && BookingGuest && targetInvoice.BookingId) {
+          const guest = await BookingGuest.findOne({
+            where: { BookingId: targetInvoice.BookingId, Email: userEmail },
+            transaction,
+          });
+          if (guest) isOwner = true;
+        }
 
         if (!isOwner) {
           await transaction.rollback();
@@ -249,7 +411,11 @@ exports.createPayment = async (req, res) => {
         },
         transaction,
       });
-      const totalPaid = paidPayments.reduce((sum, p) => sum + Number(p.Amount || 0), 0);
+      const totalPaid = paidPayments.reduce((sum, p) => {
+        const amt = Number(p.Amount || 0);
+        const ref = Number(p.RefundAmount || 0);
+        return sum + Math.max(0, amt - ref);
+      }, 0);
       const remainingInvoice = Math.max(0, Number(targetInvoice.TotalAmount) - totalPaid);
 
       if (numAmount > remainingInvoice) {
@@ -280,12 +446,14 @@ exports.createPayment = async (req, res) => {
           // Lazy timeout: đánh dấu Failed
           existingPending.Status = 'Failed';
           existingPending.GatewayResponse = JSON.stringify({ reason: 'Timeout' });
+          existingPending.Version = Number(existingPending.Version || 1) + 1;
           await existingPending.save({ transaction });
         } else {
           // Nếu client truyền mã PMT hợp lệ hoặc đổi số tiền/phương thức, đồng bộ lại bản ghi Pending
-          const cleanReqCode = requestedTxCode && /^PMT-\d{14}-\d{4}$/.test(String(requestedTxCode).trim())
-            ? String(requestedTxCode).trim()
-            : null;
+          const cleanReqCode =
+            requestedTxCode && /^PMT-\d{14}-\d{4}$/.test(trimUnicode(String(requestedTxCode)))
+              ? trimUnicode(String(requestedTxCode))
+              : null;
           if (cleanReqCode && existingPending.TransactionCode !== cleanReqCode) {
             existingPending.TransactionCode = cleanReqCode;
             existingPending.Amount = numAmount;
@@ -298,29 +466,51 @@ exports.createPayment = async (req, res) => {
             transactionCode: existingPending.TransactionCode,
             amount: Number(existingPending.Amount),
             method: existingPending.PaymentMethod,
-            returnUrl,
+            returnUrl: cleanReturnUrl,
           });
 
           return res.status(200).json({
             success: true,
             code: 'SUCCESS_0001_CREATED',
             message: 'Đã có yêu cầu thanh toán đang chờ xử lý',
-            data: {
-              ...existingPending.toJSON(),
-              ...gwData,
-              paymentId: existingPending.PaymentId,
-              status: existingPending.Status,
-              transactionCode: existingPending.TransactionCode,
-            },
+            data: serializePayment(existingPending, gwData),
           });
         }
+      }
+    } else {
+      // 6b. Chống bấm đúp (Duplicate submit guard trong cửa sổ 5 giây cho giao dịch tại quầy - QA Scenario #9)
+      const recentCutoff = new Date(Date.now() - 5000);
+      const dupWhere = {
+        PaymentMethod: method,
+        Amount: numAmount,
+        Status: 'Paid',
+        PaymentDate: { [Op.gte]: recentCutoff },
+        ...(hasBooking
+          ? { BookingId: targetBooking.BookingId }
+          : { InvoiceId: targetInvoice.InvoiceId }),
+      };
+
+      const recentDuplicate = await Payment.findOne({
+        where: dupWhere,
+        order: [['PaymentId', 'DESC']],
+        transaction,
+      });
+
+      if (recentDuplicate) {
+        await transaction.rollback();
+        return res.status(409).json({
+          success: false,
+          code: 'ERROR_0007_DUPLICATE',
+          message: 'Giao dịch thanh toán trùng lặp vừa được ghi nhận, vui lòng không gửi liên tiếp',
+          existingPaymentId: recentDuplicate.PaymentId,
+        });
       }
     }
 
     // 7. Tạo giao dịch Payment mới
     const transactionCode =
-      requestedTxCode && /^PMT-\d{14}-\d{4}$/.test(String(requestedTxCode).trim())
-        ? String(requestedTxCode).trim()
+      requestedTxCode && /^PMT-\d{14}-\d{4}$/.test(trimUnicode(String(requestedTxCode)))
+        ? trimUnicode(String(requestedTxCode))
         : generateTransactionCode();
     const isOnline = ['VNPay', 'MoMo', 'VietQR'].includes(method);
     const initialStatus = isOnline ? 'Pending' : 'Paid';
@@ -336,6 +526,7 @@ exports.createPayment = async (req, res) => {
         TransactionCode: transactionCode,
         Status: initialStatus,
         GatewayResponse: isOnline ? null : 'In-person payment confirmed by staff',
+        Version: 1,
       },
       { transaction }
     );
@@ -356,6 +547,7 @@ exports.createPayment = async (req, res) => {
         } else if (totalPaid > 0) {
           targetInvoice.Status = 'PartiallyPaid';
         }
+        targetInvoice.Version = Number(targetInvoice.Version || 1) + 1;
         await targetInvoice.save({ transaction });
       }
     }
@@ -379,7 +571,7 @@ exports.createPayment = async (req, res) => {
         transactionCode,
         amount: numAmount,
         method,
-        returnUrl,
+        returnUrl: cleanReturnUrl,
         orderInfo: hasBooking
           ? `Đặt cọc phòng Booking #${targetBooking.BookingId}`
           : `Thanh toán hoá đơn #${targetInvoice.InvoiceId}`,
@@ -390,13 +582,7 @@ exports.createPayment = async (req, res) => {
       success: true,
       code: 'SUCCESS_0001_CREATED',
       message: 'Tạo yêu cầu thanh toán thành công',
-      data: {
-        ...newPayment.toJSON(),
-        ...gatewayResult,
-        paymentId: newPayment.PaymentId,
-        status: newPayment.Status,
-        transactionCode: newPayment.TransactionCode,
-      },
+      data: serializePayment(newPayment, gatewayResult),
     });
   } catch (error) {
     if (!transaction.finished) await transaction.rollback();
@@ -415,15 +601,26 @@ exports.createPayment = async (req, res) => {
  */
 exports.getPaymentStatus = async (req, res) => {
   try {
-    const { paymentId } = req.params;
+    const userId = req.user?.userId || req.user?.UserId || req.user?.id;
+    const userEmail = trimUnicode(req.user?.email || req.user?.Email || '');
+    const isStaffOrAdmin = isStaffOrAdminUser(req.user);
 
-    let payment = null;
-    if (!isNaN(Number(paymentId))) {
-      payment = await Payment.findByPk(Number(paymentId));
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        code: 'ERROR_0009_UNAUTHENTICATED',
+        message: 'Bạn cần đăng nhập để tra cứu giao dịch thanh toán',
+      });
     }
-    if (!payment) {
-      payment = await Payment.findOne({ where: { TransactionCode: paymentId } });
+
+    const idCheck = resolvePaymentIdentifier(req.params.paymentId);
+    if (!idCheck.ok) {
+      return sendValidationError(res, idCheck);
     }
+
+    const payment = idCheck.byCode
+      ? await Payment.findOne({ where: { TransactionCode: idCheck.transactionCode } })
+      : await Payment.findByPk(idCheck.paymentId);
 
     if (!payment) {
       return res.status(404).json({
@@ -433,21 +630,50 @@ exports.getPaymentStatus = async (req, res) => {
       });
     }
 
+    // Kiểm tra quyền sở hữu đối với Guest (QA Scenario #14)
+    if (!isStaffOrAdmin) {
+      let isOwner = payment.UserId && Number(payment.UserId) === Number(userId);
+      if (!isOwner && payment.BookingId) {
+        const b = await Booking.findByPk(payment.BookingId);
+        if (b && b.UserId && Number(b.UserId) === Number(userId)) {
+          isOwner = true;
+        }
+        if (!isOwner && userEmail && BookingGuest) {
+          const guest = await BookingGuest.findOne({
+            where: { BookingId: payment.BookingId, Email: userEmail },
+          });
+          if (guest) isOwner = true;
+        }
+      }
+      if (!isOwner && payment.InvoiceId) {
+        const inv = await Invoice.findByPk(payment.InvoiceId, {
+          include: [{ model: Booking }],
+        });
+        if (inv?.Booking?.UserId && Number(inv.Booking.UserId) === Number(userId)) {
+          isOwner = true;
+        }
+      }
+
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          code: 'ERROR_0010_FORBIDDEN',
+          message: 'Bạn không có quyền xem giao dịch thanh toán này',
+        });
+      }
+    }
+
     // Lazy timeout check (VietQR > 15m, VNPay/MoMo > 30m)
     if (payment.Status === 'Pending' && isPaymentExpired(payment)) {
       payment.Status = 'Failed';
       payment.GatewayResponse = JSON.stringify({ reason: 'Timeout' });
+      payment.Version = Number(payment.Version || 1) + 1;
       await payment.save();
     }
 
     return res.status(200).json({
       success: true,
-      data: {
-        ...payment.toJSON(),
-        paymentId: payment.PaymentId,
-        status: payment.Status,
-        transactionCode: payment.TransactionCode,
-      },
+      data: serializePayment(payment),
     });
   } catch (error) {
     console.error('Error in getPaymentStatus:', error);
@@ -476,18 +702,22 @@ exports.handleWebhook = async (req, res) => {
       signature,
     } = req.body;
 
-    if (!transactionCode) {
+    if (!transactionCode || typeof transactionCode !== 'string' || isBlankUnicode(transactionCode)) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
+        code: 'ERROR_0001_REQUIRED',
         message: 'Mã giao dịch transactionCode là bắt buộc',
       });
     }
 
+    const cleanTxCode = trimUnicode(transactionCode);
+
     // 1. Tìm bản ghi Payment theo transactionCode
     const payment = await Payment.findOne({
-      where: { TransactionCode: transactionCode },
+      where: { TransactionCode: cleanTxCode },
       transaction,
+      lock: transaction.LOCK.UPDATE,
     });
 
     if (!payment) {
@@ -521,7 +751,7 @@ exports.handleWebhook = async (req, res) => {
       return res.status(200).json({
         success: true,
         message: 'Giao dịch đã được cập nhật trước đó',
-        data: payment,
+        data: serializePayment(payment),
       });
     }
 
@@ -539,12 +769,16 @@ exports.handleWebhook = async (req, res) => {
         processedAt: new Date().toISOString(),
       }
     );
+    payment.Version = Number(payment.Version || 1) + 1;
     await payment.save({ transaction });
 
     // 5. Cập nhật trạng thái Invoice / Booking liên quan nếu thanh toán thành công
     if (isSuccess) {
       if (payment.InvoiceId) {
-        const invoice = await Invoice.findByPk(payment.InvoiceId, { transaction });
+        const invoice = await Invoice.findByPk(payment.InvoiceId, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
         if (invoice) {
           const allPaid = await Payment.findAll({
             where: {
@@ -559,6 +793,7 @@ exports.handleWebhook = async (req, res) => {
           } else if (totalPaid > 0) {
             invoice.Status = 'PartiallyPaid';
           }
+          invoice.Version = Number(invoice.Version || 1) + 1;
           await invoice.save({ transaction });
         }
       }
@@ -618,7 +853,7 @@ exports.handleWebhook = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Xử lý webhook thanh toán thành công',
-      data: payment,
+      data: serializePayment(payment),
     });
   } catch (error) {
     if (!transaction.finished) await transaction.rollback();
@@ -641,7 +876,7 @@ exports.refundPayment = async (req, res) => {
   try {
     const userRole = req.user?.roleName || req.user?.role?.RoleName || req.user?.Role || '';
     // Quyết định D5: Refund chỉ Admin. Hệ thống không có vai trò Kế toán.
-    const isAuthorized = userRole === 'Admin' || req.user?.roleId === 1;
+    const isAuthorized = userRole === 'Admin' || Number(req.user?.roleId) === 1;
 
     if (!isAuthorized) {
       await transaction.rollback();
@@ -652,23 +887,30 @@ exports.refundPayment = async (req, res) => {
       });
     }
 
-    const { paymentId } = req.params;
-    const { refundReason, refundAmount } = req.body;
+    const idCheck = resolvePaymentIdentifier(req.params.paymentId);
+    if (!idCheck.ok) {
+      await transaction.rollback();
+      return sendValidationError(res, idCheck);
+    }
 
-    let payment = null;
-    if (!isNaN(Number(paymentId))) {
-      payment = await Payment.findByPk(Number(paymentId), {
-        transaction,
-        lock: transaction.LOCK.UPDATE,
-      });
+    const verExtract = extractExpectedVersion(req);
+    if (!verExtract.ok) {
+      await transaction.rollback();
+      return sendValidationError(res, verExtract);
     }
-    if (!payment) {
-      payment = await Payment.findOne({
-        where: { TransactionCode: paymentId },
-        transaction,
-        lock: transaction.LOCK.UPDATE,
-      });
-    }
+
+    const { refundReason, refundAmount } = req.body || {};
+
+    const payment = idCheck.byCode
+      ? await Payment.findOne({
+          where: { TransactionCode: idCheck.transactionCode },
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        })
+      : await Payment.findByPk(idCheck.paymentId, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
 
     if (!payment) {
       await transaction.rollback();
@@ -679,7 +921,16 @@ exports.refundPayment = async (req, res) => {
       });
     }
 
-    // Chỉ hoàn tiền khi trạng thái hiện tại là Paid (Mục 1.9 & 1.8)
+    // Kiểm tra Optimistic Locking (QA Scenario #2)
+    if (verExtract.provided) {
+      const verCheck = assertVersionMatch(payment, verExtract.version, 'Version');
+      if (!verCheck.ok) {
+        await transaction.rollback();
+        return sendValidationError(res, verCheck);
+      }
+    }
+
+    // Chỉ hoàn tiền khi trạng thái hiện tại là Paid (Mục 1.9 & 1.8 & QA Scenario #1)
     if (payment.Status !== 'Paid') {
       await transaction.rollback();
       return res.status(400).json({
@@ -689,43 +940,68 @@ exports.refundPayment = async (req, res) => {
       });
     }
 
-    // Validate refundReason (2-500 ký tự)
-    if (!refundReason || typeof refundReason !== 'string' || !refundReason.trim()) {
+    // Validate refundReason (2-500 ký tự, hỗ trợ trimUnicode \u3000 - QA Scenarios #4, #5, #6)
+    if (refundReason === undefined || refundReason === null || typeof refundReason !== 'string' || isBlankUnicode(refundReason)) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
         code: 'ERROR_0001_REQUIRED',
+        field: 'refundReason',
         message: 'Lý do hoàn tiền không được để trống',
       });
     }
 
-    const trimmedReason = refundReason.trim();
-    if (trimmedReason.length < 2 || trimmedReason.length > 500) {
+    const trimmedReason = trimUnicode(refundReason);
+    if (trimmedReason.length < 2) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
         code: 'ERROR_0002_MIN_LENGTH',
+        field: 'refundReason',
         message: 'Lý do hoàn tiền phải từ 2 đến 500 ký tự',
       });
     }
+    if (trimmedReason.length > 500) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0003_MAX_LENGTH',
+        field: 'refundReason',
+        message: 'Lý do hoàn tiền không được vượt quá 500 ký tự',
+      });
+    }
 
-    // Validate refundAmount
-    const amountVal = (refundAmount !== undefined && refundAmount !== null)
-      ? Number(refundAmount)
-      : Number(payment.Amount);
+    // Validate refundAmount (hỗ trợ chữ số full-width ０-９ - QA Scenario #7)
+    let amountVal = Number(payment.Amount);
+    if (refundAmount !== undefined && refundAmount !== null && !isBlankUnicode(String(refundAmount))) {
+      const parsedRefundAmt = parseStrictNumber(refundAmount, {
+        normalizeFullWidth: true,
+        allowDecimal: true,
+        field: 'refundAmount',
+        message: 'Số tiền hoàn phải lớn hơn 0 và không vượt quá số tiền giao dịch gốc',
+      });
+      if (!parsedRefundAmt.ok) {
+        await transaction.rollback();
+        return sendValidationError(res, parsedRefundAmt);
+      }
+      amountVal = parsedRefundAmt.value;
+    }
+
     if (isNaN(amountVal) || amountVal <= 0 || amountVal > Number(payment.Amount)) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
         code: 'ERROR_0012_OUT_OF_RANGE',
+        field: 'refundAmount',
         message: 'Số tiền hoàn phải lớn hơn 0 và không vượt quá số tiền giao dịch gốc',
       });
     }
 
-    // Cập nhật trạng thái
+    // Cập nhật trạng thái và tăng Version
     payment.Status = 'Refunded';
     payment.RefundReason = trimmedReason;
     payment.RefundAmount = amountVal;
+    payment.Version = Number(payment.Version || 1) + 1;
 
     // Ghi bổ sung vào GatewayResponse
     let currentGw = {};
@@ -781,6 +1057,7 @@ exports.refundPayment = async (req, res) => {
         }
 
         invoice.PdfPath = null;
+        invoice.Version = Number(invoice.Version || 1) + 1;
         await invoice.save({ transaction });
 
         // Xoá file vật lý PDF đã cache
@@ -809,7 +1086,7 @@ exports.refundPayment = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Hoàn tiền giao dịch thành công',
-      data: payment,
+      data: serializePayment(payment),
     });
   } catch (error) {
     if (!transaction.finished) await transaction.rollback();

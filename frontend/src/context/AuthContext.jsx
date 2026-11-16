@@ -20,16 +20,27 @@ export const AuthProvider = ({ children }) => {
 
   const [isLoading, setIsLoading] = useState(true);
 
-  // Đồng bộ hóa trạng thái tài khoản khi khởi chạy qua accessToken memory hoặc HttpOnly refresh cookie
+  // Đồng bộ hóa trạng thái tài khoản khi khởi chạy qua accessToken hoặc HttpOnly refresh cookie
   useEffect(() => {
     const verifyUser = async () => {
       if (token) {
+        setAccessToken(token);
         const freshUser = await fetchCurrentUser(token);
         if (freshUser) {
           setUser(freshUser);
           localStorage.setItem('hotel_user', JSON.stringify(freshUser));
         } else {
-          handleLogout();
+          const refreshed = await refreshAuthToken();
+          if (refreshed?.success && refreshed.token) {
+            setAccessToken(refreshed.token);
+            setToken(refreshed.token);
+            if (refreshed.user) {
+              setUser(refreshed.user);
+              localStorage.setItem('hotel_user', JSON.stringify(refreshed.user));
+            }
+          } else {
+            handleLogout();
+          }
         }
       } else {
         const hasSessionHint = Boolean(localStorage.getItem('hotel_user'));
@@ -42,8 +53,7 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('hotel_user', JSON.stringify(refreshed.user));
           }
         } else {
-          // Nếu có legacy hotel_token trong localStorage thì dọn sạch để tuân thủ in-memory accessToken
-          localStorage.removeItem('hotel_token');
+          clearAccessToken();
           localStorage.removeItem('hotel_user');
           setUser(null);
         }
@@ -115,24 +125,27 @@ export const AuthProvider = ({ children }) => {
     clearAccessToken();
     setToken(null);
     setUser(null);
-    localStorage.removeItem('hotel_token');
     localStorage.removeItem('hotel_user');
   };
 
-  const value = {
-    user,
-    token,
-    isAuthenticated: Boolean(token && user),
-    isLoading,
-    login: handleLogin,
-    register: handleRegister,
-    loginGoogle: handleGoogleLogin,
-    loginFacebook: handleFacebookLogin,
-    updateUser: handleUpdateUser,
-    logout: handleLogout
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isLoading,
+        isAuthenticated: !!user && !!token,
+        login: handleLogin,
+        register: handleRegister,
+        loginGoogle: handleGoogleLogin,
+        loginFacebook: handleFacebookLogin,
+        updateUser: handleUpdateUser,
+        logout: handleLogout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {
@@ -142,5 +155,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-export default AuthContext;
