@@ -145,6 +145,17 @@ router.use(async (req, res, next) => {
   next();
 });
 
+// 0. GET /api/smart-lock/overview & GET /
+router.get('/overview', (req, res, next) => {
+  req.url = '/keys';
+  router.handle(req, res, next);
+});
+
+router.get('/', (req, res, next) => {
+  req.url = '/keys';
+  router.handle(req, res, next);
+});
+
 // 1. GET /api/smart-lock/keys - Lấy danh sách khóa đang hiệu lực
 router.get('/keys', async (req, res) => {
   try {

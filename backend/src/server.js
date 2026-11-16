@@ -207,21 +207,29 @@ app.use('/api/v1/roles', require('./routes/roleRoutes'));
 // ─── Operations & Smart Lock routes (tuyen/7) ─────────────────────────────
 // Route Audit Logs & Fraud Prevention
 app.use('/api/audit', require('./routes/auditLogRoutes'));
+app.use('/api/v1/audit', require('./routes/auditLogRoutes'));
 
 // Route Tiếp Thị & Chăm Sóc Khách Hàng Đa Kênh (Marketing Automation)
 app.use('/api/marketing', require('./routes/marketingAutomationRoutes'));
+app.use('/api/v1/marketing', require('./routes/marketingAutomationRoutes'));
 
 // Route Quản Lý Kho Đồ Tiêu Hao, Minibar & Luân Chuyển Đồ Vải (Inventory & Linen)
 app.use('/api/housekeeping/inventory', require('./routes/housekeepingInventoryRoutes'));
+app.use('/api/v1/housekeeping/inventory', require('./routes/housekeepingInventoryRoutes'));
 
 // Route Tiếp Nhận Sự Cố & Bảo Trì Kỹ Thuật Buồng Phòng (Engineering & Maintenance Ticketing)
 app.use('/api/maintenance', require('./routes/maintenanceRoutes'));
+app.use('/api/v1/maintenance', require('./routes/maintenanceRoutes'));
 
 // Route Quản Lý Đồ Thất Lạc & Bỏ Quên (Lost & Found Management)
 app.use('/api/housekeeping/lost-and-found', require('./routes/lostAndFoundRoutes'));
+app.use('/api/v1/housekeeping/lost-and-found', require('./routes/lostAndFoundRoutes'));
+app.use('/api/lost-and-found', require('./routes/lostAndFoundRoutes'));
+app.use('/api/v1/lost-and-found', require('./routes/lostAndFoundRoutes'));
 
 // Route Khóa Cửa Điện Tử Thông Minh IoT (E-Key & Smart Lock Management)
 app.use('/api/smart-lock', require('./routes/smartLockRoutes'));
+app.use('/api/v1/smart-lock', require('./routes/smartLockRoutes'));
 
 // Route Quản lý Đón tiễn sân bay & Lịch trình xe đưa đón (Airport Transfer & Shuttle Fleet - Module 50)
 app.use('/api/transportation', require('./routes/transportationRoutes'));
@@ -256,6 +264,12 @@ app.use('/api/roster', rosterRoutes);
 app.use('/api/v1/roster', rosterRoutes);
 app.use('/api/admin/roster', rosterRoutes);
 app.use('/api/v1/admin/roster', rosterRoutes);
+
+// Route Bàn giao ca & Quỹ tiền mặt Lễ tân (Front Desk Shift Handover & Cash Drawer - Module 48)
+const cashShiftRoutes = require('./routes/cashShiftRoutes');
+app.use('/api/cash-shifts', cashShiftRoutes);
+app.use('/api/v1/cash-shift', cashShiftRoutes);
+app.use('/api/v1/cash-shifts', cashShiftRoutes);
 
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal

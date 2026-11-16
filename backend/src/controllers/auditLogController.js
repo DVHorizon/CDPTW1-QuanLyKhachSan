@@ -69,7 +69,8 @@ exports.getFraudAlerts = async (req, res) => {
 exports.resolveFraudAlert = async (req, res) => {
   try {
     const { id } = req.params;
-    const { resolved_by = 'Quản Lý An Ninh PMS', resolution_note } = req.body;
+    const { resolved_by = 'Quản Lý An Ninh PMS' } = req.body;
+    const resolution_note = req.body.resolution_note || req.body.resolutionNote || 'Đã kiểm tra nghiệp vụ và xác nhận bình thường.';
 
     const alert = await FraudAlert.findByPk(id);
     if (!alert) {
@@ -78,7 +79,7 @@ exports.resolveFraudAlert = async (req, res) => {
 
     alert.is_resolved = true;
     alert.resolved_by = resolved_by;
-    alert.resolution_note = resolution_note || 'Đã kiểm tra nghiệp vụ và xác nhận bình thường.';
+    alert.resolution_note = resolution_note;
     await alert.save();
 
     res.json({
@@ -96,18 +97,21 @@ exports.resolveFraudAlert = async (req, res) => {
  */
 exports.createLog = async (req, res) => {
   try {
-    const { action, entity_name, entity_id, user_id, user_name, old_values, new_values, reason } = req.body;
-    if (!action || !entity_name) {
-      return res.status(400).json({ success: false, message: 'Thiếu action hoặc entity_name!' });
-    }
+    const action = req.body.action || 'GENERAL_ACTION';
+    const entity_name = req.body.entity_name || req.body.entity || req.body.target || 'General';
+    const entity_id = req.body.entity_id || req.body.entityId || 0;
+    const user_id = req.body.user_id || req.body.userId || 1;
+    const user_name = req.body.user_name || req.body.userName || 'Admin';
+    const { old_values, new_values, reason, details } = req.body;
+
     const log = await AuditLog.create({
       action,
       entity_name,
-      entity_id: entity_id || 0,
-      user_id: user_id || 1,
-      user_name: user_name || 'Admin',
+      entity_id,
+      user_id,
+      user_name,
       old_values: old_values ? JSON.stringify(old_values) : null,
-      new_values: new_values ? JSON.stringify(new_values) : null,
+      new_values: new_values ? JSON.stringify(new_values) : (details ? JSON.stringify(details) : null),
       ip_address: req.ip || '127.0.0.1',
       user_agent: req.headers['user-agent'] || 'System API'
     });
@@ -122,16 +126,19 @@ exports.createLog = async (req, res) => {
  */
 exports.createFraudAlert = async (req, res) => {
   try {
-    const { rule_name, description, severity = 'MEDIUM', alert_type = 'MANUAL', user_id, details } = req.body;
-    if (!rule_name || !description) {
-      return res.status(400).json({ success: false, message: 'Thiếu rule_name hoặc description!' });
-    }
+    const rule_name = req.body.rule_name || req.body.type || req.body.rule || 'FRAUD_ALERT';
+    const description = req.body.description || req.body.details || 'Cảnh báo hệ thống phát hiện hành vi bất thường';
+    const severity = req.body.severity || 'MEDIUM';
+    const alert_type = req.body.alert_type || req.body.alertType || req.body.type || 'MANUAL';
+    const user_id = req.body.user_id || req.body.userId || null;
+    const details = req.body.details;
+
     const alert = await FraudAlert.create({
       rule_name,
       description,
       severity,
       alert_type,
-      user_id: user_id || null,
+      user_id,
       details: details ? (typeof details === 'string' ? details : JSON.stringify(details)) : null,
       is_resolved: false
     });

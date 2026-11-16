@@ -416,6 +416,12 @@ router.post('/', async (req, res) => {
     if (!payload.hash) {
       payload.hash = `${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}-LF25`;
     }
+    if (!payload.foundDate) {
+      payload.foundDate = new Date().toISOString().split('T')[0];
+    }
+    if (!payload.foundTime) {
+      payload.foundTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) || '10:00 SA';
+    }
 
     // Đảm bảo có chuỗi bảo quản ban đầu
     if (!payload.custodyChain || payload.custodyChain.length === 0) {

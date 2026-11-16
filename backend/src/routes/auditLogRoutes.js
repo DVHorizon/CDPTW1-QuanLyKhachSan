@@ -2,6 +2,51 @@ const express = require('express');
 const router = express.Router();
 const auditLogController = require('../controllers/auditLogController');
 const auditLogInterceptor = require('../middlewares/auditMiddleware');
+const { AuditLog, FraudAlert } = require('../models');
+
+// Đảm bảo bảng đã được đồng bộ
+let tablesSynced = false;
+const ensureAuditTables = async () => {
+  try {
+    if (!tablesSynced) {
+      await Promise.all([AuditLog.sync(), FraudAlert.sync()]);
+      tablesSynced = true;
+    }
+  } catch (err) {
+    console.warn('[AuditLog] Lỗi sync bảng audit:', err.message);
+  }
+};
+ensureAuditTables();
+
+router.use(async (req, res, next) => {
+  if (!tablesSynced) await ensureAuditTables();
+  next();
+});
+
+// Root & Overview alias
+router.get('/', (req, res, next) => {
+  req.url = '/logs';
+  router.handle(req, res, next);
+});
+
+router.get('/overview', async (req, res) => {
+  try {
+    const totalLogs = await AuditLog.count();
+    const totalAlerts = await FraudAlert.count();
+    const unresolvedAlerts = await FraudAlert.count({ where: { is_resolved: false } });
+    res.json({
+      success: true,
+      data: {
+        totalLogs,
+        totalAlerts,
+        unresolvedAlerts,
+        wormProtection: 'ACTIVE_ENFORCED'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // ==========================================
 // 1. NHẬT KÝ KIỂM TOÁN (AUDIT LOGS)

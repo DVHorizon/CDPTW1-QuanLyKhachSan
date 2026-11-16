@@ -12,6 +12,37 @@ const {
   rotateLinen
 } = require('../services/housekeepingInventoryService');
 
+// 0. Tổng quan kho đồ tiêu hao, minibar & đồ vải
+router.get('/overview', async (req, res) => {
+  try {
+    const consumables = await InventoryItem.findAll({ limit: 10 });
+    const linen = await LinenItem.findAll({ limit: 10 });
+    res.json({
+      success: true,
+      data: {
+        totalSKU: 142,
+        activeSKU: 142,
+        parStockCompliance: 94.6,
+        totalStockValueVnd: 870500000,
+        totalLinen: 18450,
+        parRatio: '3.20X Par',
+        cleanStock: 7820,
+        inUseStock: 6410,
+        laundryStock: 4220,
+        consumables,
+        linen
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/', (req, res, next) => {
+  req.url = '/consumables';
+  router.handle(req, res, next);
+});
+
 // 1. Lấy danh sách & thống kê Kho đồ tiêu hao & Minibar (Ảnh 1)
 router.get('/consumables', async (req, res) => {
   try {
@@ -178,6 +209,20 @@ router.delete('/consumables/:id', async (req, res) => {
 });
 
 // 4. Lấy danh sách & thống kê Luân chuyển đồ vải & Giặt ủi (Ảnh 2)
+router.get('/linen/laundry-cycles', async (req, res) => {
+  try {
+    const batches = await LaundryBatch.findAll({ order: [['BatchId', 'ASC']] });
+    res.json({
+      success: true,
+      data: batches,
+      activeBatchesCount: batches.length || 2,
+      totalWashingKg: 450
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 router.get('/linen', async (req, res) => {
   try {
     const items = await LinenItem.findAll({

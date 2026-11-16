@@ -6,6 +6,17 @@ const {
   getTickets
 } = require('../services/maintenanceTicketingService');
 
+// 0. Tổng quan sự cố & bảo trì
+router.get('/overview', (req, res, next) => {
+  req.url = '/tickets';
+  router.handle(req, res, next);
+});
+
+router.get('/', (req, res, next) => {
+  req.url = '/tickets';
+  router.handle(req, res, next);
+});
+
 // 1. Lấy danh sách phiếu & KPI tổng quan (Ảnh 1)
 router.get('/tickets', async (req, res) => {
   try {

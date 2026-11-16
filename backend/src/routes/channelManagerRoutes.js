@@ -313,6 +313,17 @@ async function queryPmsRoomTypes() {
   }
 }
 
+// 0. Aliases for root and state
+router.get('/', (req, res, next) => {
+  req.url = '/overview';
+  router.handle(req, res, next);
+});
+
+router.get('/state', (req, res, next) => {
+  req.url = '/overview';
+  router.handle(req, res, next);
+});
+
 // 1. GET /api/channel-manager/overview
 router.get('/overview', async (req, res) => {
   const state = await getChannelState();
