@@ -17,7 +17,13 @@ router.use('/night-audit',   require('../../routes/nightAuditRoutes'));
 router.use('/transportation', require('../../routes/transportationRoutes'));
 router.use('/police-declaration', require('../../routes/policeDeclarationRoutes'));
 router.use('/channel-manager', require('../../routes/channelManagerRoutes'));
-// Dùng lại auditLog route hiện có
 router.use('/audit-logs', require('../../routes/auditLogRoutes'));
+router.use('/roster', require('../../routes/rosterRoutes'));
+router.use('/loyalty', require('../../routes/loyaltyRoutes'));
+router.use('/marketing', require('../../routes/marketingAutomationRoutes'));
+router.use('/inventory', require('../../routes/housekeepingInventoryRoutes'));
+router.use('/maintenance', require('../../routes/maintenanceRoutes'));
+router.use('/smart-lock', require('../../routes/smartLockRoutes'));
+router.use('/banquet-events', require('../../routes/banquetRoutes'));
 router.get('/ping', (req, res) => res.json({ module: 'operations', owner: 'Tuyền', status: 'ready' }));
 module.exports = router;

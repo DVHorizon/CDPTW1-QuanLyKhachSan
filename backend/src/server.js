@@ -204,6 +204,13 @@ app.use('/api/v1/loyalty', loyaltyRoutes);
 app.use('/api/admin/loyalty', loyaltyRoutes);
 app.use('/api/v1/admin/loyalty', loyaltyRoutes);
 
+// Route Phân ca, Chấm công & Điều độ nhân sự (Staff Schedule & Roster - Module 3)
+const rosterRoutes = require('./routes/rosterRoutes');
+app.use('/api/roster', rosterRoutes);
+app.use('/api/v1/roster', rosterRoutes);
+app.use('/api/admin/roster', rosterRoutes);
+app.use('/api/v1/admin/roster', rosterRoutes);
+
 // ─── MODULAR ROUTES /api/v1/{module}/* ────────────────────────────────────
 // 👤 Bảo  — Guest Portal
 app.use('/api/v1/guest',      require('./modules/guest'));

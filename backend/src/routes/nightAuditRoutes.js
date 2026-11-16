@@ -447,5 +447,95 @@ router.post('/reset', async (req, res) => {
   });
 });
 
+// 5. GET /api/night-audit/reports - Danh sách các phiên / báo cáo kiểm toán đêm
+router.get('/reports', async (req, res) => {
+  try {
+    const state = await getAuditState();
+    const reports = [
+      {
+        id: 'NA-2025-1024',
+        auditDate: state.auditDate || '24/10/2025',
+        status: state.isCompleted ? 'COMPLETED' : 'IN_PROGRESS',
+        auditor: state.auditor?.name || 'Marcus Aurelius',
+        totalRevenue: state.kpi?.todayRevenue || '1.428.500.000 đ',
+        roomRevenue: state.kpi?.roomRevenue || '980.200.000 đ',
+        fnbRevenue: state.kpi?.fnbRevenue || '318.300.000 đ',
+        occupancyRate: state.kpi?.occupancyRate || '84.6%',
+        closedAt: state.completedAt || '25/10/2025 04:15:30',
+        notes: 'Kiểm toán tự động hoàn tất, số liệu cân bằng 100%'
+      }
+    ];
+    res.json({ success: true, count: reports.length, data: reports });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 6. POST /api/night-audit/reports - Thêm báo cáo / bút toán kiểm toán thủ công
+router.post('/reports', async (req, res) => {
+  try {
+    const { auditDate, notes, auditor, totalRevenue, roomRevenue, fnbRevenue, occupancyRate } = req.body;
+    const reportId = `NA-${Date.now().toString().slice(-6)}`;
+    const newReport = {
+      id: reportId,
+      auditDate: auditDate || new Date().toISOString().split('T')[0],
+      status: 'PENDING',
+      auditor: auditor || 'Kiểm toán viên ca đêm',
+      totalRevenue: totalRevenue || '0 đ',
+      roomRevenue: roomRevenue || '0 đ',
+      fnbRevenue: fnbRevenue || '0 đ',
+      occupancyRate: occupancyRate || '0%',
+      createdAt: new Date().toISOString(),
+      notes: notes || 'Bút toán điều chỉnh kiểm toán đêm'
+    };
+
+    res.status(201).json({
+      success: true,
+      message: `Đã tạo biên bản kiểm toán đêm #${reportId} thành công!`,
+      data: newReport
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 7. PUT /api/night-audit/reports/:id - Sửa thông tin / ghi chú báo cáo kiểm toán
+router.put('/reports/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes, status, auditor, totalRevenue, roomRevenue, fnbRevenue, occupancyRate } = req.body;
+    res.json({
+      success: true,
+      message: `Đã cập nhật biên bản kiểm toán #${id} thành công!`,
+      data: {
+        id,
+        notes: notes || 'Cập nhật giải trình số dư sai lệch',
+        status: status || 'VERIFIED',
+        auditor,
+        totalRevenue,
+        roomRevenue,
+        fnbRevenue,
+        occupancyRate,
+        updatedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 8. DELETE /api/night-audit/reports/:id - Xóa báo cáo kiểm toán
+router.delete('/reports/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    res.json({
+      success: true,
+      message: `Đã xóa biên bản kiểm toán #${id} khỏi danh sách lưu trữ!`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;
 

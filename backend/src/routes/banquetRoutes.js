@@ -509,4 +509,124 @@ router.get('/:id/beo-export', (req, res) => {
   });
 });
 
+// PUT /api/banquet-events/:id - Cập nhật / Sửa thông tin sự kiện tiệc
+router.put('/:id', (req, res) => {
+  const { id } = req.params;
+  const eventIndex = MICE_EVENTS.findIndex(e => e.id === id || e.beoNumber?.includes(id));
+  if (eventIndex === -1) {
+    return res.status(404).json({ success: false, message: `Không tìm thấy sự kiện tiệc #${id}` });
+  }
+
+  const existing = MICE_EVENTS[eventIndex];
+  const {
+    title,
+    eventType,
+    company,
+    contactPerson,
+    date,
+    timeRange,
+    venueId,
+    venueName,
+    pax,
+    catering,
+    setup,
+    financial,
+    status,
+    statusBadge
+  } = req.body;
+
+  if (title) existing.title = title;
+  if (eventType) existing.eventType = eventType;
+  if (company) existing.company = company;
+  if (contactPerson) existing.contactPerson = { ...existing.contactPerson, ...contactPerson };
+  if (date) existing.date = date;
+  if (timeRange) existing.timeRange = timeRange;
+  if (venueId || venueName) {
+    existing.venue = {
+      ...existing.venue,
+      id: venueId || existing.venue?.id,
+      name: venueName || existing.venue?.name
+    };
+  }
+  if (pax) {
+    existing.pax = Number(pax);
+    existing.paxLabel = `${pax} Khách`;
+  }
+  if (catering) existing.catering = { ...existing.catering, ...catering };
+  if (setup) existing.setup = { ...existing.setup, ...setup };
+  if (financial) existing.financial = { ...existing.financial, ...financial };
+  if (status) existing.status = status;
+  if (statusBadge) existing.statusBadge = statusBadge;
+
+  return res.json({
+    success: true,
+    message: `Đã cập nhật thông tin sự kiện tiệc [${existing.title}] thành công!`,
+    data: existing
+  });
+});
+
+// DELETE /api/banquet-events/:id - Hủy / Xóa đặt tiệc
+router.delete('/:id', (req, res) => {
+  const { id } = req.params;
+  const eventIndex = MICE_EVENTS.findIndex(e => e.id === id || e.beoNumber?.includes(id));
+  if (eventIndex === -1) {
+    return res.status(404).json({ success: false, message: `Không tìm thấy sự kiện tiệc #${id}` });
+  }
+
+  const removed = MICE_EVENTS.splice(eventIndex, 1)[0];
+  return res.json({
+    success: true,
+    message: `Đã hủy và xóa hồ sơ sự kiện [${removed.title}] khỏi hệ thống!`
+  });
+});
+
+// POST /api/banquet-events/venues - Thêm sảnh tiệc mới
+router.post('/venues', (req, res) => {
+  const { name, type, paxMax, areaM2, ceilingHeight } = req.body;
+  if (!name) {
+    return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên sảnh tiệc!' });
+  }
+  const newVenue = {
+    id: `HALL-${Date.now().toString().slice(-4)}`,
+    name,
+    type: type || 'Ballroom sang trọng',
+    paxMax: Number(paxMax) || 300,
+    areaM2: Number(areaM2) || 450,
+    ceilingHeight: ceilingHeight || '6.0m'
+  };
+  VENUES.push(newVenue);
+  return res.status(201).json({
+    success: true,
+    message: `Đã thêm sảnh tiệc [${name}] thành công!`,
+    data: newVenue
+  });
+});
+
+// PUT /api/banquet-events/venues/:id - Sửa sảnh tiệc
+router.put('/venues/:id', (req, res) => {
+  const venue = VENUES.find(v => v.id === req.params.id);
+  if (!venue) {
+    return res.status(404).json({ success: false, message: `Không tìm thấy sảnh tiệc #${req.params.id}` });
+  }
+  Object.assign(venue, req.body, { id: venue.id });
+  return res.json({
+    success: true,
+    message: `Đã cập nhật sảnh tiệc [${venue.name}] thành công!`,
+    data: venue
+  });
+});
+
+// DELETE /api/banquet-events/venues/:id - Xóa sảnh tiệc
+router.delete('/venues/:id', (req, res) => {
+  const idx = VENUES.findIndex(v => v.id === req.params.id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, message: `Không tìm thấy sảnh tiệc #${req.params.id}` });
+  }
+  VENUES.splice(idx, 1);
+  return res.json({
+    success: true,
+    message: `Đã xóa sảnh tiệc khỏi danh mục!`
+  });
+});
+
 module.exports = router;

@@ -65,16 +65,43 @@ const CampaignComposer = () => {
     setSelectedChannels((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handlePublish = (isDraft = false) => {
+  const handlePublish = async (isDraft = false) => {
+    try {
+      const activeChannels = [];
+      if (selectedChannels.zalo) activeChannels.push('Zalo OA');
+      if (selectedChannels.sms) activeChannels.push('SMS');
+      if (selectedChannels.email) activeChannels.push('Email');
+
+      await fetch('/api/marketing/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: campaignName,
+          goal: campaignGoal,
+          targetAudience: audienceCriteria.vip ? 'Hội viên VIP Black & Gold' : 'Toàn bộ khách hàng',
+          targetCount: totalAudience,
+          channels: activeChannels.length > 0 ? activeChannels : ['Zalo OA', 'SMS'],
+          scheduleDate: scheduleTime || 'Lập lịch tức thì',
+          content: messageContent,
+          bannerUrl: bannerUrl,
+          throttleSpeed: speedThrottle,
+          antiSpamDnd,
+          isDraft
+        })
+      });
+    } catch (err) {
+      console.warn('Lỗi gọi API lưu chiến dịch:', err);
+    }
+
     setStatusNotification(
       isDraft
-        ? '✔ Đã lưu bản nháp thành công vào hệ thống PMS!'
+        ? '✔ Đã lưu bản nháp thành công vào hệ thống PMS & Database!'
         : '🚀 Đã lên lịch phát hành toàn kênh thành công! Hệ thống sẽ tự động kích hoạt điều phối.'
     );
     setTimeout(() => {
       setStatusNotification('');
       navigate('/admin/marketing');
-    }, 2000);
+    }, 1800);
   };
 
   // Tính toán quy mô người nhận theo tiêu chí

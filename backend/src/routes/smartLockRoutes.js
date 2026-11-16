@@ -395,4 +395,138 @@ router.post('/sync-mesh', async (req, res) => {
   }
 });
 
+// 7. POST /api/smart-lock/keys - Thêm khóa mới
+router.post('/keys', async (req, res) => {
+  try {
+    const {
+      RoomNumber,
+      BookingId,
+      GuestName,
+      GuestPhone,
+      GuestEmail,
+      GuestTier,
+      LockType,
+      ValidFrom,
+      ValidTo,
+      AccessAreas,
+      Provider = 'VISIONLINE'
+    } = req.body;
+
+    if (!RoomNumber || !GuestName) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp số phòng và tên khách hàng' });
+    }
+
+    const passcodePin = req.body.passcodePin || Math.floor(100000 + Math.random() * 900000).toString();
+    const keyId = req.body.keyId || `EK-${Math.floor(1000 + Math.random() * 9000)}-${RoomNumber}`;
+    const digitalKeyUrl = `https://wallet.grandhorizon.vn/pass/${keyId}`;
+    const rfidCardUid = req.body.rfidCardUid || `04:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`;
+
+    const newKey = await SmartLockKey.create({
+      KeyId: keyId,
+      BookingId: BookingId || `RES-${Math.floor(1000 + Math.random() * 9000)}`,
+      RoomNumber,
+      RoomWing: req.body.roomWing || (RoomNumber.startsWith('14') ? 'Sky Villa' : 'Ocean Wing'),
+      RoomType: req.body.roomType || (RoomNumber.startsWith('14') ? 'Penthouse Suite' : 'Deluxe Seaview'),
+      GuestName,
+      GuestPhone: GuestPhone || '+84 900 123 456',
+      GuestEmail: GuestEmail || `${GuestName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+      GuestTier: GuestTier || 'SILVER RESIDENT',
+      LockType: LockType || 'App BLE Mobile Key',
+      PhysicalCardsCount: req.body.physicalCardsCount ?? (LockType?.includes('NFC') || LockType?.includes('Thẻ') ? 1 : 0),
+      PasscodePin: passcodePin,
+      DigitalKeyUrl: digitalKeyUrl,
+      RfidCardUid: rfidCardUid,
+      Provider,
+      ValidFrom: ValidFrom || new Date().toISOString().split('T')[0],
+      ValidTo: ValidTo || `${new Date(Date.now() + 3*86400000).toISOString().split('T')[0]} (Hết hạn: 12:00)`,
+      BatteryLevel: Number(req.body.batteryLevel) || 92,
+      BatteryStatus: req.body.batteryStatus || 'Tối ưu',
+      SignalDbm: Number(req.body.signalDbm) || -56,
+      AccessAreas: AccessAreas && AccessAreas.length > 0 ? AccessAreas : [`Cửa Phòng ${RoomNumber}`, 'Thang Máy Tầng 8', 'Phòng Gym & Spa'],
+      Status: req.body.status || 'ACTIVE',
+      DoorSensorStatus: req.body.doorSensorStatus || 'AN TOÀN (LATCHED)',
+      HardwareSerial: req.body.hardwareSerial || `AC-${RoomNumber}-2024`,
+      HardwareFirmware: req.body.hardwareFirmware || 'v4.18.2',
+      LastTapTime: new Date().toLocaleTimeString('vi-VN')
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Đã tạo khóa điện tử cho phòng ${RoomNumber} thành công!`,
+      data: newKey
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi tạo khóa', error: error.message });
+  }
+});
+
+// 8. PUT /api/smart-lock/keys/:id - Sửa thông tin khóa
+router.put('/keys/:id', async (req, res) => {
+  try {
+    const key = await SmartLockKey.findByPk(req.params.id);
+    if (!key) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy khóa ${req.params.id}` });
+    }
+
+    const {
+      RoomNumber,
+      GuestName,
+      GuestPhone,
+      GuestEmail,
+      GuestTier,
+      LockType,
+      PhysicalCardsCount,
+      PasscodePin,
+      ValidFrom,
+      ValidTo,
+      AccessAreas,
+      Status,
+      DoorSensorStatus,
+      Provider
+    } = req.body;
+
+    if (RoomNumber !== undefined) key.RoomNumber = RoomNumber;
+    if (GuestName !== undefined) key.GuestName = GuestName;
+    if (GuestPhone !== undefined) key.GuestPhone = GuestPhone;
+    if (GuestEmail !== undefined) key.GuestEmail = GuestEmail;
+    if (GuestTier !== undefined) key.GuestTier = GuestTier;
+    if (LockType !== undefined) key.LockType = LockType;
+    if (PhysicalCardsCount !== undefined) key.PhysicalCardsCount = Number(PhysicalCardsCount);
+    if (PasscodePin !== undefined) key.PasscodePin = PasscodePin;
+    if (ValidFrom !== undefined) key.ValidFrom = ValidFrom;
+    if (ValidTo !== undefined) key.ValidTo = ValidTo;
+    if (AccessAreas !== undefined) key.AccessAreas = AccessAreas;
+    if (Status !== undefined) key.Status = Status;
+    if (DoorSensorStatus !== undefined) key.DoorSensorStatus = DoorSensorStatus;
+    if (Provider !== undefined) key.Provider = Provider;
+
+    await key.save();
+    res.json({
+      success: true,
+      message: `Đã cập nhật thông tin khóa phòng ${key.RoomNumber} (#${key.KeyId}) thành công!`,
+      data: key
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi cập nhật khóa', error: error.message });
+  }
+});
+
+// 9. DELETE /api/smart-lock/keys/:id - Xóa khóa
+router.delete('/keys/:id', async (req, res) => {
+  try {
+    const key = await SmartLockKey.findByPk(req.params.id);
+    if (!key) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy khóa ${req.params.id}` });
+    }
+
+    await key.destroy();
+    res.json({
+      success: true,
+      message: `Đã xóa khóa ${req.params.id} khỏi hệ thống!`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi xóa khóa', error: error.message });
+  }
+});
+
 module.exports = router;

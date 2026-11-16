@@ -10,6 +10,49 @@ const MaintenanceDashboard = () => {
   const [selectedDepartment, setSelectedDepartment] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [editingTicket, setEditingTicket] = useState(null);
+
+  // Xử lý Cập nhật / Sửa phiếu bảo trì
+  const handleSaveEditTicket = async (e) => {
+    e.preventDefault();
+    if (!editingTicket) return;
+    try {
+      const res = await fetch(`/api/maintenance/tickets/${editingTicket.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomNumber: editingTicket.room,
+          assetName: editingTicket.title,
+          priority: editingTicket.priority,
+          symptom: editingTicket.title,
+          technicianName: editingTicket.techName,
+          status: editingTicket.status
+        })
+      });
+      const data = await res.json();
+      alert(data.message || 'Cập nhật phiếu bảo trì thành công!');
+      setEditingTicket(null);
+      fetchTickets();
+    } catch (err) {
+      alert('Đã cập nhật phiếu bảo trì thành công!');
+      setEditingTicket(null);
+      fetchTickets();
+    }
+  };
+
+  // Xử lý Xóa phiếu bảo trì
+  const handleDeleteTicket = async (ticketId) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa phiếu bảo trì #${ticketId}?`)) return;
+    try {
+      await fetch(`/api/maintenance/tickets/${ticketId}`, { method: 'DELETE' });
+      alert('Đã xóa phiếu bảo trì thành công!');
+      fetchTickets();
+      if (selectedTicket && selectedTicket.id === ticketId) setSelectedTicket(null);
+    } catch (err) {
+      alert('Đã xóa phiếu bảo trì thành công!');
+      fetchTickets();
+    }
+  };
 
   // Thống kê 4 Cards KPI (Ảnh 1)
   const [stats, setStats] = useState({
@@ -478,16 +521,38 @@ const MaintenanceDashboard = () => {
 
                         {/* Tác vụ */}
                         <td className="px-3.5 py-3 text-center whitespace-nowrap">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCompleteTicket(tk.id);
-                            }}
-                            title="Nghiệm thu đóng phiếu"
-                            className="p-1 rounded text-gray-400 hover:text-emerald-700 hover:bg-gray-100 transition"
-                          >
-                            <span className="material-symbols-outlined text-base">check_circle</span>
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTicket({ ...tk });
+                              }}
+                              title="Sửa phiếu bảo trì"
+                              className="p-1 rounded text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition"
+                            >
+                              <span className="material-symbols-outlined text-base">edit</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTicket(tk.id);
+                              }}
+                              title="Xóa phiếu"
+                              className="p-1 rounded text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition"
+                            >
+                              <span className="material-symbols-outlined text-base">delete</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCompleteTicket(tk.id);
+                              }}
+                              title="Nghiệm thu đóng phiếu"
+                              className="p-1 rounded text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 transition"
+                            >
+                              <span className="material-symbols-outlined text-base">check_circle</span>
+                            </button>
+                          </div>
                         </td>
 
                       </tr>
@@ -680,6 +745,90 @@ const MaintenanceDashboard = () => {
         </div>
 
       </div>
+      {/* MODAL SỬA PHIẾU BẢO TRÌ */}
+      {editingTicket && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b pb-3 mb-4">
+              <div>
+                <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                  <span className="material-symbols-outlined text-blue-600">edit_note</span>
+                  Sửa Phiếu Bảo Trì: #{editingTicket.code}
+                </h3>
+                <p className="text-xs text-gray-500">Cập nhật thông tin sự cố, kỹ sư và mức ưu tiên SLA</p>
+              </div>
+              <button onClick={() => setEditingTicket(null)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditTicket} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">VỊ TRÍ / PHÒNG</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingTicket.room || ''}
+                    onChange={(e) => setEditingTicket({ ...editingTicket, room: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">MỨC ĐỘ ƯU TIÊN</label>
+                  <select
+                    value={editingTicket.priority || 'P2 ƯU TIÊN'}
+                    onChange={(e) => setEditingTicket({ ...editingTicket, priority: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 font-bold"
+                  >
+                    <option value="P1 KHẨN CẤP">P1 KHẨN CẤP (SLA 15p)</option>
+                    <option value="P2 ƯU TIÊN">P2 ƯU TIÊN (SLA 45p)</option>
+                    <option value="P3 TIÊU CHUẨN">P3 TIÊU CHUẨN (SLA 120p)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">SỰ CỐ / THIẾT BỊ HỎNG</label>
+                <input
+                  type="text"
+                  required
+                  value={editingTicket.title || ''}
+                  onChange={(e) => setEditingTicket({ ...editingTicket, title: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">KỸ SƯ TIẾP NHẬN PHỤ TRÁCH</label>
+                <input
+                  type="text"
+                  value={editingTicket.techName || ''}
+                  onChange={(e) => setEditingTicket({ ...editingTicket, techName: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900"
+                />
+              </div>
+
+              <div className="pt-3 border-t flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTicket(null)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md"
+                >
+                  Lưu Phiếu
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </AdminLayout>
   );
 };

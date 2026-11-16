@@ -454,6 +454,18 @@ async function saveTransferRecord(transfer, sortOrder = 0) {
   }
 }
 
+async function deleteTransferRecord(id) {
+  await ensureAirportTransfersTable();
+  if (isTableReady) {
+    try {
+      await pool.query('DELETE FROM AirportTransfers WHERE id = ?', [id]);
+    } catch (e) {
+      console.warn('[Transportation] Lỗi xóa AirportTransfers:', e.message);
+    }
+  }
+  TRANSFERS_MEM = TRANSFERS_MEM.filter(t => t.id !== id && t.code !== id);
+}
+
 // 1. GET /api/transportation/overview
 router.get('/overview', async (req, res) => {
   const transfers = await getAllTransfers();
@@ -664,6 +676,163 @@ router.patch('/transfers/:id/dispatch', async (req, res) => {
     message: `Đã điều phối ${transfer.vehicleName} (${transfer.plateNumber}) • Tài xế ${transfer.driverName} cho chuyến ${transfer.code}!`,
     data: transfer
   });
+});
+
+// 5. GET /api/transportation/transfers - Danh sách chuyến xe
+router.get('/transfers', async (req, res) => {
+  try {
+    const list = await getAllTransfers();
+    res.json({ success: true, count: list.length, data: list });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 6. PUT /api/transportation/transfers/:id - Sửa thông tin chuyến đưa đón
+router.put('/transfers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const transfers = await getAllTransfers();
+    const transfer = transfers.find(t => t.id === id || t.code === id);
+    if (!transfer) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy chuyến xe #${id}` });
+    }
+
+    const {
+      guestName,
+      guestPhone,
+      flightNumber,
+      pickupTime,
+      estimatedArrival,
+      guestCount,
+      luggageCount,
+      vehicleId,
+      vehicleName,
+      plateNumber,
+      driverId,
+      driverName,
+      driverPhone,
+      direction,
+      status,
+      statusBadge,
+      vipNote,
+      roomNumber
+    } = req.body;
+
+    if (guestName !== undefined) transfer.guestName = guestName;
+    if (guestPhone !== undefined) transfer.guestPhone = guestPhone;
+    if (flightNumber !== undefined) transfer.flightNumber = flightNumber;
+    if (pickupTime !== undefined) transfer.pickupTime = pickupTime;
+    if (estimatedArrival !== undefined) transfer.estimatedArrival = estimatedArrival;
+    if (guestCount !== undefined) transfer.guestCount = Number(guestCount);
+    if (luggageCount !== undefined) transfer.luggageCount = Number(luggageCount);
+    if (vehicleId !== undefined) transfer.vehicleId = vehicleId;
+    if (vehicleName !== undefined) transfer.vehicleName = vehicleName;
+    if (plateNumber !== undefined) transfer.plateNumber = plateNumber;
+    if (driverId !== undefined) transfer.driverId = driverId;
+    if (driverName !== undefined) transfer.driverName = driverName;
+    if (driverPhone !== undefined) transfer.driverPhone = driverPhone;
+    if (direction !== undefined) transfer.direction = direction;
+    if (status !== undefined) transfer.status = status;
+    if (statusBadge !== undefined) transfer.statusBadge = statusBadge;
+    if (vipNote !== undefined) transfer.vipNote = vipNote;
+    if (roomNumber !== undefined) transfer.roomNumber = roomNumber;
+
+    await saveTransferRecord(transfer, transfer.sortOrder ?? 1);
+
+    res.json({
+      success: true,
+      message: `Đã cập nhật thông tin chuyến xe ${transfer.code || id} thành công!`,
+      data: transfer
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 7. DELETE /api/transportation/transfers/:id - Xóa chuyến đưa đón
+router.delete('/transfers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await deleteTransferRecord(id);
+    res.json({
+      success: true,
+      message: `Đã xóa chuyến đưa đón #${id} thành công!`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 8. Đội xe (Fleet Vehicles): GET, POST, PUT, DELETE
+router.get('/vehicles', (req, res) => {
+  res.json({ success: true, count: FLEET_VEHICLES.length, data: FLEET_VEHICLES });
+});
+
+router.post('/vehicles', (req, res) => {
+  const { name, plateNumber, capacity, type } = req.body;
+  if (!name || !plateNumber) {
+    return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên xe và biển số xe!' });
+  }
+  const newVehicle = {
+    id: `VEH-${Date.now().toString().slice(-4)}`,
+    name,
+    plateNumber,
+    capacity: Number(capacity) || 7,
+    type: type || 'SUV Hạng Sang',
+    status: 'AVAILABLE'
+  };
+  FLEET_VEHICLES.push(newVehicle);
+  res.status(201).json({ success: true, message: `Đã thêm xe ${name} (${plateNumber})!`, data: newVehicle });
+});
+
+router.put('/vehicles/:id', (req, res) => {
+  const v = FLEET_VEHICLES.find(x => x.id === req.params.id);
+  if (!v) return res.status(404).json({ success: false, message: 'Không tìm thấy xe' });
+  Object.assign(v, req.body);
+  res.json({ success: true, message: `Đã cập nhật xe ${v.name}!`, data: v });
+});
+
+router.delete('/vehicles/:id', (req, res) => {
+  const idx = FLEET_VEHICLES.findIndex(x => x.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Không tìm thấy xe' });
+  FLEET_VEHICLES.splice(idx, 1);
+  res.json({ success: true, message: `Đã xóa xe khỏi đội xe!` });
+});
+
+// 9. Tài xế (Chauffeurs): GET, POST, PUT, DELETE
+router.get('/drivers', (req, res) => {
+  res.json({ success: true, count: CHAUFFEURS.length, data: CHAUFFEURS });
+});
+
+router.post('/drivers', (req, res) => {
+  const { name, phone, licenseClass } = req.body;
+  if (!name || !phone) {
+    return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên và số điện thoại tài xế!' });
+  }
+  const newDriver = {
+    id: `DRV-${Date.now().toString().slice(-4)}`,
+    name,
+    phone,
+    licenseClass: licenseClass || 'Hạng D',
+    status: 'ON_DUTY'
+  };
+  CHAUFFEURS.push(newDriver);
+  res.status(201).json({ success: true, message: `Đã thêm tài xế ${name}!`, data: newDriver });
+});
+
+router.put('/drivers/:id', (req, res) => {
+  const d = CHAUFFEURS.find(x => x.id === req.params.id);
+  if (!d) return res.status(404).json({ success: false, message: 'Không tìm thấy tài xế' });
+  Object.assign(d, req.body);
+  res.json({ success: true, message: `Đã cập nhật thông tin tài xế ${d.name}!`, data: d });
+});
+
+router.delete('/drivers/:id', (req, res) => {
+  const idx = CHAUFFEURS.findIndex(x => x.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Không tìm thấy tài xế' });
+  CHAUFFEURS.splice(idx, 1);
+  res.json({ success: true, message: `Đã xóa tài xế khỏi danh sách!` });
 });
 
 module.exports = router;

@@ -7,6 +7,7 @@ const auditLogInterceptor = require('../middlewares/auditMiddleware');
 // 1. NHẬT KÝ KIỂM TOÁN (AUDIT LOGS)
 // ==========================================
 router.get('/logs', auditLogController.getLogs);
+router.post('/logs', auditLogController.createLog);
 
 // CƠ CHẾ BẢO VỆ WORM: Chặn tuyệt đối mọi hành vi Sửa hoặc Xóa Log
 router.put('/logs/:id', auditLogController.rejectLogModification);
@@ -18,7 +19,10 @@ router.delete('/logs', auditLogController.rejectLogModification);
 // 2. CẢNH BÁO BẤT THƯỜNG (FRAUD ALERTS)
 // ==========================================
 router.get('/alerts', auditLogController.getFraudAlerts);
+router.post('/alerts', auditLogController.createFraudAlert);
+router.put('/alerts/:id', auditLogController.updateFraudAlert);
 router.put('/alerts/:id/resolve', auditLogController.resolveFraudAlert);
+router.delete('/alerts/:id', auditLogController.deleteFraudAlert);
 
 // ==========================================
 // 3. CÁC ROUTE KIỂM THỬ & MÔ PHỎNG AN NINH

@@ -194,11 +194,24 @@ export default function BanquetMiceBooking() {
 
   // Modals state
   const [showNewContractModal, setShowNewContractModal] = useState(false);
+  const [showEditEventModal, setShowEditEventModal] = useState(false);
   const [show3DFloorPlanModal, setShow3DFloorPlanModal] = useState(false);
   const [showBEOExportModal, setShowBEOExportModal] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [toast, setToast] = useState(null);
+
+  const [editEventForm, setEditEventForm] = useState({
+    id: '',
+    title: '',
+    company: '',
+    eventType: '',
+    date: '',
+    timeRange: '',
+    pax: 200,
+    totalAmount: 0,
+    status: ''
+  });
 
   // New Event Form State (5-step wizard)
   const [wizardStep, setWizardStep] = useState(1);
@@ -372,6 +385,41 @@ export default function BanquetMiceBooking() {
     e.preventDefault();
     setShowDispatchModal(false);
     showNotification(`Đã gửi lệnh điều phối khẩn đến ${dispatchForm.department}!`);
+  };
+
+  // Handle Save Edit Event
+  const handleSaveEditEvent = (e) => {
+    e.preventDefault();
+    setEvents((prev) =>
+      prev.map((ev) => {
+        if (ev.id === editEventForm.id) {
+          return {
+            ...ev,
+            title: editEventForm.title,
+            company: editEventForm.company,
+            eventType: editEventForm.eventType,
+            date: editEventForm.date,
+            timeRange: editEventForm.timeRange,
+            pax: Number(editEventForm.pax),
+            paxPill: `${editEventForm.pax} Khách VIP`,
+            financial: {
+              ...ev.financial,
+              totalAmount: Number(editEventForm.totalAmount),
+            },
+          };
+        }
+        return ev;
+      })
+    );
+    setShowEditEventModal(false);
+    showNotification('✔ Đã cập nhật thông tin sự kiện tiệc thành công!');
+  };
+
+  // Handle Delete Event
+  const handleDeleteEvent = (id) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa sự kiện #${id}?`)) return;
+    setEvents((prev) => prev.filter((ev) => ev.id !== id));
+    showNotification(`✔ Đã xóa sự kiện #${id} khỏi hệ thống!`);
   };
 
   return (
@@ -942,6 +990,35 @@ export default function BanquetMiceBooking() {
                     <MIcon name="sensors" className="text-base" />
                     <span>Thông Báo Đội AV & Kỹ Thuật</span>
                   </button>
+
+                  <button
+                    onClick={() => {
+                      setEditEventForm({
+                        id: currentEvent.id,
+                        title: currentEvent.title,
+                        company: currentEvent.company,
+                        eventType: currentEvent.eventType,
+                        date: currentEvent.date || '2025-10-24',
+                        timeRange: currentEvent.timeRange,
+                        pax: currentEvent.pax,
+                        totalAmount: currentEvent.financial?.totalAmount || 0,
+                        status: currentEvent.status
+                      });
+                      setShowEditEventModal(true);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-lg border border-blue-600 text-blue-700 hover:bg-blue-50 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                  >
+                    <MIcon name="edit" className="text-base" />
+                    <span>Sửa Thông Tin Sự Kiện</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteEvent(currentEvent.id)}
+                    className="w-full py-2.5 px-3 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                  >
+                    <MIcon name="delete" className="text-base" />
+                    <span>Xóa / Hủy Tiệc</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1310,6 +1387,120 @@ export default function BanquetMiceBooking() {
                       Xác Nhận Ký Hợp Đồng & Phát Hành BEO
                     </button>
                   )}
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* MODAL SỬA THÔNG TIN SỰ KIỆN / HỢP ĐỒNG TIỆC */}
+        {/* ========================================================================= */}
+        {showEditEventModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <MIcon name="edit_note" className="text-blue-600" />
+                    Sửa Thông Tin Sự Kiện: #{editEventForm.id}
+                  </h3>
+                  <p className="text-xs text-slate-500">Cập nhật tên sự kiện, công ty, quy mô số khách và thời gian</p>
+                </div>
+                <button onClick={() => setShowEditEventModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                  <MIcon name="close" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditEvent} className="p-5 space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">TÊN SỰ KIỆN</label>
+                  <input
+                    type="text"
+                    required
+                    value={editEventForm.title}
+                    onChange={(e) => setEditEventForm({ ...editEventForm, title: e.target.value })}
+                    className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 text-slate-900 font-semibold focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">CÔNG TY / ĐƠN VỊ TỔ CHỨC</label>
+                  <input
+                    type="text"
+                    required
+                    value={editEventForm.company}
+                    onChange={(e) => setEditEventForm({ ...editEventForm, company: e.target.value })}
+                    className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 text-slate-900 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">LOẠI SỰ KIỆN</label>
+                    <input
+                      type="text"
+                      value={editEventForm.eventType}
+                      onChange={(e) => setEditEventForm({ ...editEventForm, eventType: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 text-slate-900 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">SỐ LƯỢNG KHÁCH (PAX)</label>
+                    <input
+                      type="number"
+                      value={editEventForm.pax}
+                      onChange={(e) => setEditEventForm({ ...editEventForm, pax: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 text-slate-900 font-bold focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">NGÀY TỔ CHỨC</label>
+                    <input
+                      type="date"
+                      value={editEventForm.date}
+                      onChange={(e) => setEditEventForm({ ...editEventForm, date: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 text-slate-900 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">KHUNG GIỜ</label>
+                    <input
+                      type="text"
+                      value={editEventForm.timeRange}
+                      onChange={(e) => setEditEventForm({ ...editEventForm, timeRange: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 text-slate-900 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">TỔNG GIÁ TRỊ HỢP ĐỒNG (VNĐ)</label>
+                  <input
+                    type="number"
+                    value={editEventForm.totalAmount}
+                    onChange={(e) => setEditEventForm({ ...editEventForm, totalAmount: e.target.value })}
+                    className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 font-mono font-bold text-emerald-800 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditEventModal(false)}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition"
+                  >
+                    Lưu Thay Đổi
+                  </button>
                 </div>
               </form>
             </div>

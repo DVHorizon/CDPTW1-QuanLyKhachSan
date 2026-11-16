@@ -449,4 +449,128 @@ router.post('/webhook-simulate', async (req, res) => {
   });
 });
 
+// 5. GET /api/channel-manager/channels - Danh sách các kênh OTA kết nối
+router.get('/channels', async (req, res) => {
+  try {
+    const state = await getChannelState();
+    res.json({ success: true, count: (state.channels || []).length, data: state.channels || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 6. POST /api/channel-manager/channels - Thêm kết nối kênh OTA mới
+router.post('/channels', async (req, res) => {
+  try {
+    const { name, code, commissionRate, apiEndpoint, isTwoWaySync = true } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên kênh OTA!' });
+    }
+
+    const state = await getChannelState();
+    const channelId = code || `OTA-${Date.now().toString().slice(-4)}`;
+    const newChannel = {
+      id: channelId,
+      name,
+      code: channelId,
+      logo: req.body.logo || 'hub',
+      status: 'CONNECTED',
+      statusLabel: 'KẾT NỐI 2 CHIỀU ONLINE',
+      isTwoWaySync,
+      commissionRate: commissionRate || '15%',
+      bookingsToday: 0,
+      revenueToday: 0,
+      revenueShort: '0M đ',
+      latency: '85ms',
+      lastSync: new Date().toLocaleTimeString('vi-VN')
+    };
+
+    const channels = [...(state.channels || []), newChannel];
+    await saveChannelState({ channels });
+
+    res.status(201).json({
+      success: true,
+      message: `Đã kết nối thành công kênh phân phối OTA [${name}]!`,
+      data: newChannel
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 7. PUT /api/channel-manager/channels/:id - Sửa cấu hình kênh OTA
+router.put('/channels/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const state = await getChannelState();
+    const channels = state.channels || [];
+    const chIndex = channels.findIndex(c => c.id === id || c.code === id);
+    if (chIndex === -1) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy kênh OTA #${id}` });
+    }
+
+    channels[chIndex] = {
+      ...channels[chIndex],
+      ...req.body,
+      id: channels[chIndex].id // Không đổi id
+    };
+
+    await saveChannelState({ channels });
+
+    res.json({
+      success: true,
+      message: `Đã cập nhật cấu hình kênh OTA [${channels[chIndex].name}] thành công!`,
+      data: channels[chIndex]
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 8. DELETE /api/channel-manager/channels/:id - Ngắt kết nối / Xóa kênh OTA
+router.delete('/channels/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const state = await getChannelState();
+    const channels = (state.channels || []).filter(c => c.id !== id && c.code !== id);
+    await saveChannelState({ channels });
+
+    res.json({
+      success: true,
+      message: `Đã ngắt kết nối và xóa kênh OTA #${id} khỏi Channel Manager!`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 9. PUT /api/channel-manager/allotments/:id - Sửa hạn ngạch Allotment / Stop-Sell của phòng
+router.put('/allotments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const state = await getChannelState();
+    const allotments = state.allotments || [];
+    const idx = allotments.findIndex(a => a.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy phân bổ phòng #${id}` });
+    }
+
+    allotments[idx] = {
+      ...allotments[idx],
+      ...req.body,
+      id: allotments[idx].id
+    };
+
+    await saveChannelState({ allotments });
+
+    res.json({
+      success: true,
+      message: `Đã cập nhật hạn ngạch phòng [${allotments[idx].roomTypeName || id}] thành công!`,
+      data: allotments[idx]
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

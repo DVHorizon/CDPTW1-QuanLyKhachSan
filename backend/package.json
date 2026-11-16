@@ -28,6 +28,7 @@
     "test:charges-c6": "node tests/test_feat_invoice_01_c6.js",
     "test:invoice-c6-c7-c8": "node tests/test_feat_invoice_c6_c7_c8.js",
     "test:loyalty": "node tests/test_loyalty_management.js",
+    "test:tuyen:crud": "node tests/test_tuyen_all_crud.js",
     "test:manual": "node ../scripts/test_manual.js",
     "test:all": "node tests/test_feat_guest_06_pricing_calculation.js && node tests/test_feat_guest_07_voucher_redemption.js && node tests/test_feat_guest_05_booking_engine.js && node tests/test_feat_guest_08_deposit_payment.js"
   },

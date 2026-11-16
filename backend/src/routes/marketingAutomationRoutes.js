@@ -4,7 +4,12 @@ const {
   GATEWAY_CONFIG,
   getAllCampaigns,
   createCampaign,
+  updateCampaign,
+  deleteCampaign,
   getAllTemplates,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
   createDispatchLog,
   getDispatchLogs,
   getRealtimeAudienceCounts
@@ -91,6 +96,30 @@ router.post('/campaigns', async (req, res) => {
   }
 });
 
+// 3.1 Cập nhật / Sửa chiến dịch
+router.put('/campaigns/:id', async (req, res) => {
+  try {
+    const updated = await updateCampaign(req.params.id, req.body);
+    res.json({
+      success: true,
+      message: `Đã cập nhật thông tin chiến dịch ${req.params.id} thành công!`,
+      data: updated
+    });
+  } catch (error) {
+    res.status(error.message.includes('Không tìm thấy') ? 404 : 500).json({ success: false, message: error.message });
+  }
+});
+
+// 3.2 Xóa chiến dịch
+router.delete('/campaigns/:id', async (req, res) => {
+  try {
+    const result = await deleteCampaign(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(error.message.includes('Không tìm thấy') ? 404 : 500).json({ success: false, message: error.message });
+  }
+});
+
 // 4. Lấy danh sách mẫu Template tin nhắn tự động theo sự kiện từ Database
 router.get('/templates', async (req, res) => {
   try {
@@ -98,6 +127,48 @@ router.get('/templates', async (req, res) => {
     res.json({ success: true, data: templates });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 4.1 Tạo mới mẫu Template
+router.post('/templates', async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập tên mẫu tin nhắn!' });
+    }
+    const template = await createTemplate(req.body);
+    res.status(201).json({
+      success: true,
+      message: 'Đã tạo mẫu tin nhắn mới thành công!',
+      data: template
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 4.2 Cập nhật / Sửa mẫu Template
+router.put('/templates/:id', async (req, res) => {
+  try {
+    const updated = await updateTemplate(req.params.id, req.body);
+    res.json({
+      success: true,
+      message: `Đã cập nhật mẫu tin nhắn ${req.params.id} thành công!`,
+      data: updated
+    });
+  } catch (error) {
+    res.status(error.message.includes('Không tìm thấy') ? 404 : 500).json({ success: false, message: error.message });
+  }
+});
+
+// 4.3 Xóa mẫu Template
+router.delete('/templates/:id', async (req, res) => {
+  try {
+    const result = await deleteTemplate(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(error.message.includes('Không tìm thấy') ? 404 : 500).json({ success: false, message: error.message });
   }
 });
 

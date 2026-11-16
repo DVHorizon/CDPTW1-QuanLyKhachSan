@@ -355,12 +355,108 @@ async function getRealtimeAudienceCounts() {
   }
 }
 
+async function updateCampaign(id, data) {
+  const where = isNaN(id) ? { CampaignCode: id } : { [Op.or]: [{ CampaignId: id }, { CampaignCode: id }] };
+  const campaign = await MarketingCampaign.findOne({ where });
+  if (!campaign) {
+    throw new Error(`Không tìm thấy chiến dịch với mã ${id}`);
+  }
+
+  if (data.name !== undefined) campaign.CampaignName = data.name;
+  if (data.goal !== undefined) campaign.Goal = data.goal;
+  if (data.subtitle !== undefined) campaign.Subtitle = data.subtitle;
+  if (data.targetAudience !== undefined) campaign.TargetAudience = data.targetAudience;
+  if (data.targetCount !== undefined) campaign.TargetCount = Number(data.targetCount);
+  if (data.channels !== undefined) {
+    campaign.Channels = Array.isArray(data.channels) ? data.channels.join(', ') : data.channels;
+  }
+  if (data.scheduleDate !== undefined) campaign.ScheduleDate = data.scheduleDate;
+  if (data.content !== undefined) campaign.Content = data.content;
+  if (data.bannerUrl !== undefined) campaign.BannerUrl = data.bannerUrl;
+  if (data.status !== undefined) {
+    campaign.Status = data.status;
+    campaign.StatusLabel = data.status === 'COMPLETED' ? 'Đã Hoàn Thành' : data.status === 'SCHEDULED' ? 'Đã Lên Lịch' : data.status === 'DRAFT' ? 'Bản Nháp' : data.status;
+  }
+  if (data.statusLabel !== undefined) campaign.StatusLabel = data.statusLabel;
+
+  await campaign.save();
+  return campaign;
+}
+
+async function deleteCampaign(id) {
+  const where = isNaN(id) ? { CampaignCode: id } : { [Op.or]: [{ CampaignId: id }, { CampaignCode: id }] };
+  const campaign = await MarketingCampaign.findOne({ where });
+  if (!campaign) {
+    throw new Error(`Không tìm thấy chiến dịch với mã ${id}`);
+  }
+  await campaign.destroy();
+  return { success: true, message: `Đã xóa chiến dịch ${id} thành công` };
+}
+
+async function createTemplate(data) {
+  const totalCount = await GuestNotificationTemplate.count();
+  const templateCode = data.code || `TMPL-CUSTOM-${Date.now().toString().slice(-4)}`;
+  const template = await GuestNotificationTemplate.create({
+    TemplateCode: templateCode,
+    Name: data.name,
+    EventTrigger: data.eventTrigger || 'MANUAL',
+    EventName: data.eventName || 'Sự kiện thủ công',
+    Channels: Array.isArray(data.channels) ? data.channels.join(', ') : (data.channels || 'Zalo OA, SMS, Email'),
+    BannerUrl: data.bannerUrl || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&auto=format&fit=crop&q=80',
+    Title: data.title || data.name,
+    Content: data.content || '',
+    Tokens: Array.isArray(data.tokens) ? data.tokens.join(',') : (data.tokens || '{{TEN_KHACH}},{{MA_DAT_PHONG}}'),
+    IsActive: data.isActive !== false
+  });
+  return template;
+}
+
+async function updateTemplate(id, data) {
+  const where = isNaN(id) ? { TemplateCode: id } : { [Op.or]: [{ TemplateId: id }, { TemplateCode: id }] };
+  const template = await GuestNotificationTemplate.findOne({ where });
+  if (!template) {
+    throw new Error(`Không tìm thấy mẫu tin nhắn với mã ${id}`);
+  }
+
+  if (data.name !== undefined) template.Name = data.name;
+  if (data.eventName !== undefined) template.EventName = data.eventName;
+  if (data.eventTrigger !== undefined) template.EventTrigger = data.eventTrigger;
+  if (data.channels !== undefined) {
+    template.Channels = Array.isArray(data.channels) ? data.channels.join(', ') : data.channels;
+  }
+  if (data.bannerUrl !== undefined) template.BannerUrl = data.bannerUrl;
+  if (data.title !== undefined) template.Title = data.title;
+  if (data.content !== undefined) template.Content = data.content;
+  if (data.tokens !== undefined) {
+    template.Tokens = Array.isArray(data.tokens) ? data.tokens.join(',') : data.tokens;
+  }
+  if (data.isActive !== undefined) template.IsActive = data.isActive;
+
+  await template.save();
+  return template;
+}
+
+async function deleteTemplate(id) {
+  const where = isNaN(id) ? { TemplateCode: id } : { [Op.or]: [{ TemplateId: id }, { TemplateCode: id }] };
+  const template = await GuestNotificationTemplate.findOne({ where });
+  if (!template) {
+    throw new Error(`Không tìm thấy mẫu tin nhắn với mã ${id}`);
+  }
+  await template.destroy();
+  return { success: true, message: `Đã xóa mẫu tin nhắn ${id} thành công` };
+}
+
 module.exports = {
   GATEWAY_CONFIG,
   initMarketingDatabase,
   getAllCampaigns,
   createCampaign,
+  updateCampaign,
+  deleteCampaign,
   getAllTemplates,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
   createDispatchLog,
   getDispatchLogs,
   getRealtimeAudienceCounts

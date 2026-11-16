@@ -92,6 +92,94 @@ exports.resolveFraudAlert = async (req, res) => {
 };
 
 /**
+ * THÊM LOG KIỂM TOÁN THỦ CÔNG
+ */
+exports.createLog = async (req, res) => {
+  try {
+    const { action, entity_name, entity_id, user_id, user_name, old_values, new_values, reason } = req.body;
+    if (!action || !entity_name) {
+      return res.status(400).json({ success: false, message: 'Thiếu action hoặc entity_name!' });
+    }
+    const log = await AuditLog.create({
+      action,
+      entity_name,
+      entity_id: entity_id || 0,
+      user_id: user_id || 1,
+      user_name: user_name || 'Admin',
+      old_values: old_values ? JSON.stringify(old_values) : null,
+      new_values: new_values ? JSON.stringify(new_values) : null,
+      ip_address: req.ip || '127.0.0.1',
+      user_agent: req.headers['user-agent'] || 'System API'
+    });
+    return res.status(201).json({ success: true, message: 'Đã tạo nhật ký kiểm toán thành công!', data: log });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * THÊM CẢNH BÁO GIAN LẬN THỦ CÔNG
+ */
+exports.createFraudAlert = async (req, res) => {
+  try {
+    const { rule_name, description, severity = 'MEDIUM', alert_type = 'MANUAL', user_id, details } = req.body;
+    if (!rule_name || !description) {
+      return res.status(400).json({ success: false, message: 'Thiếu rule_name hoặc description!' });
+    }
+    const alert = await FraudAlert.create({
+      rule_name,
+      description,
+      severity,
+      alert_type,
+      user_id: user_id || null,
+      details: details ? (typeof details === 'string' ? details : JSON.stringify(details)) : null,
+      is_resolved: false
+    });
+    return res.status(201).json({ success: true, message: 'Đã tạo cảnh báo gian lận thành công!', data: alert });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * SỬA CẢNH BÁO GIAN LẬN
+ */
+exports.updateFraudAlert = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const alert = await FraudAlert.findByPk(id);
+    if (!alert) return res.status(404).json({ success: false, message: 'Không tìm thấy cảnh báo!' });
+
+    const { severity, description, resolution_note, is_resolved, resolved_by } = req.body;
+    if (severity) alert.severity = severity;
+    if (description) alert.description = description;
+    if (resolution_note !== undefined) alert.resolution_note = resolution_note;
+    if (is_resolved !== undefined) alert.is_resolved = is_resolved;
+    if (resolved_by) alert.resolved_by = resolved_by;
+
+    await alert.save();
+    return res.json({ success: true, message: 'Đã cập nhật cảnh báo thành công!', data: alert });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * XÓA CẢNH BÁO GIAN LẬN (FALSE POSITIVE)
+ */
+exports.deleteFraudAlert = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const alert = await FraudAlert.findByPk(id);
+    if (!alert) return res.status(404).json({ success: false, message: 'Không tìm thấy cảnh báo!' });
+    await alert.destroy();
+    return res.json({ success: true, message: `Đã hủy cảnh báo gian lận #${id} thành công!` });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * CHẶN ĐỨNG THAO TÁC SỬA/XÓA BẢNG LOG (WORM Enforcement)
  * Bất kỳ yêu cầu PUT/DELETE nào tới logs đều bị chặn tại đây và sinh Fraud Alert
  */

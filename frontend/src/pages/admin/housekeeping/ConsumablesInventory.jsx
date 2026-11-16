@@ -18,6 +18,102 @@ const ConsumablesInventory = () => {
   const [feedbackMessage, setFeedbackMessage] = useState({ text: '', type: '' });
   const [autoRefreshSec, setAutoRefreshSec] = useState(60);
 
+  // State cho Thêm & Sửa Mặt Hàng (SKU Master)
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [itemForm, setItemForm] = useState({
+    name: '',
+    category: 'Minibar',
+    supplier: '',
+    location: '',
+    currentStock: 50,
+    parStock: 100,
+    minAlertLevel: 20,
+    costPrice: 20000,
+    sellingPrice: 45000,
+    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=80',
+    storageTemp: 'Kho mát (10-15°C)'
+  });
+
+  const handleCreateNewItem = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/housekeeping/inventory/consumables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemName: itemForm.name,
+          category: itemForm.category,
+          supplier: itemForm.supplier,
+          location: itemForm.location,
+          currentStock: Number(itemForm.currentStock),
+          parStock: Number(itemForm.parStock),
+          minAlertLevel: Number(itemForm.minAlertLevel),
+          costPrice: Number(itemForm.costPrice),
+          sellingPrice: Number(itemForm.sellingPrice),
+          imageUrl: itemForm.imageUrl,
+          storageTemp: itemForm.storageTemp
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowAddItemModal(false);
+        fetchBackendData();
+        setFeedbackMessage({ text: `✔ Đã thêm mặt hàng [${itemForm.name}] thành công!`, type: 'success' });
+      } else {
+        alert(data.message || 'Lỗi thêm mặt hàng');
+      }
+    } catch (err) {
+      console.warn('Lỗi thêm mặt hàng:', err);
+    }
+  };
+
+  const handleUpdateItem = async (e) => {
+    e.preventDefault();
+    if (!selectedItem) return;
+    try {
+      const res = await fetch(`/api/housekeeping/inventory/consumables/${selectedItem.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemName: itemForm.name,
+          category: itemForm.category,
+          supplier: itemForm.supplier,
+          location: itemForm.location,
+          currentStock: Number(itemForm.currentStock),
+          parStock: Number(itemForm.parStock),
+          minAlertLevel: Number(itemForm.minAlertLevel),
+          costPrice: Number(itemForm.costPrice),
+          sellingPrice: Number(itemForm.sellingPrice),
+          imageUrl: itemForm.imageUrl,
+          storageTemp: itemForm.storageTemp
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowEditItemModal(false);
+        fetchBackendData();
+        setFeedbackMessage({ text: `✔ Đã cập nhật mặt hàng [${itemForm.name}] thành công!`, type: 'success' });
+      } else {
+        alert(data.message || 'Lỗi cập nhật mặt hàng');
+      }
+    } catch (err) {
+      console.warn('Lỗi cập nhật mặt hàng:', err);
+    }
+  };
+
+  const handleDeleteItem = async (id) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa mặt hàng #${id} khỏi danh mục kho?`)) return;
+    try {
+      await fetch(`/api/housekeeping/inventory/consumables/${id}`, { method: 'DELETE' });
+      fetchBackendData();
+      setSelectedItem(null);
+      setFeedbackMessage({ text: `✔ Đã xóa mặt hàng thành công!`, type: 'success' });
+    } catch (err) {
+      console.warn('Lỗi xóa mặt hàng:', err);
+    }
+  };
+
   // Thống kê 4 Card KPI (Ảnh 1)
   const [stats, setStats] = useState({
     totalSku: 142,
@@ -299,6 +395,28 @@ const ConsumablesInventory = () => {
 
           {/* Action buttons */}
           <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              onClick={() => {
+                setItemForm({
+                  name: '',
+                  category: 'Minibar',
+                  supplier: 'Nhà phân phối HORECA',
+                  location: 'Kho A-01',
+                  currentStock: 100,
+                  parStock: 200,
+                  minAlertLevel: 30,
+                  costPrice: 25000,
+                  sellingPrice: 55000,
+                  imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=80',
+                  storageTemp: 'Kho mát (10-15°C)'
+                });
+                setShowAddItemModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-sm transition transform active:scale-95"
+            >
+              <span className="material-symbols-outlined text-base">post_add</span>
+              + Thêm Mặt Hàng SKU Mới
+            </button>
             <button
               onClick={() => {
                 setActionType('IN');
@@ -607,13 +725,46 @@ const ConsumablesInventory = () => {
                 </div>
 
                 {/* Thông tin chi tiết */}
-                <div>
-                  <h3 className="font-extrabold text-gray-900 text-sm leading-snug">
-                    {selectedItem.name}
-                  </h3>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    Nhà phân phối độc quyền: {selectedItem.supplier}
-                  </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-extrabold text-gray-900 text-sm leading-snug">
+                      {selectedItem.name}
+                    </h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Nhà phân phối độc quyền: {selectedItem.supplier}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setItemForm({
+                          name: selectedItem.name,
+                          category: selectedItem.category || 'Minibar',
+                          supplier: selectedItem.supplier || '',
+                          location: selectedItem.location || '',
+                          currentStock: selectedItem.currentStock || 0,
+                          parStock: selectedItem.parStock || 100,
+                          minAlertLevel: selectedItem.minAlertLevel || 20,
+                          costPrice: parseFloat(String(selectedItem.costPrice).replace(/[^0-9.]/g, '')) || 0,
+                          sellingPrice: parseFloat(String(selectedItem.sellingPrice).replace(/[^0-9.]/g, '')) || 0,
+                          imageUrl: selectedItem.imageUrl,
+                          storageTemp: selectedItem.storageTemp
+                        });
+                        setShowEditItemModal(true);
+                      }}
+                      className="px-2 py-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 flex items-center gap-0.5 transition"
+                    >
+                      <span className="material-symbols-outlined text-xs">edit</span> Sửa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteItem(selectedItem.id)}
+                      className="px-2 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded hover:bg-rose-100 flex items-center gap-0.5 transition"
+                    >
+                      <span className="material-symbols-outlined text-xs">delete</span> Xóa
+                    </button>
+                  </div>
                 </div>
 
                 {/* Bảng giá vốn & giá niêm yết */}
@@ -794,6 +945,301 @@ const ConsumablesInventory = () => {
         </div>
 
       </div>
+
+      {/* MODAL THÊM MẶT HÀNG MỚI */}
+      {showAddItemModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b pb-3 mb-4">
+              <div>
+                <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                  <span className="material-symbols-outlined text-blue-600">post_add</span>
+                  Thêm Mặt Hàng SKU Kho Mới
+                </h3>
+                <p className="text-xs text-gray-500">Tạo mã hàng hóa mới vào sổ cái kho tiêu hao & minibar</p>
+              </div>
+              <button onClick={() => setShowAddItemModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateNewItem} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">TÊN MẶT HÀNG</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ví dụ: Rượu Vang Đỏ Bordeaux 375ml"
+                  value={itemForm.name}
+                  onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">DANH MỤC</label>
+                  <select
+                    value={itemForm.category}
+                    onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 font-semibold"
+                  >
+                    <option value="Minibar">Minibar</option>
+                    <option value="Bath Amenities">Bath Amenities</option>
+                    <option value="Nespresso/Trà">Nespresso / Trà</option>
+                    <option value="Khác">Tiêu hao khác</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">VỊ TRÍ LƯU KHO</label>
+                  <input
+                    type="text"
+                    placeholder="Kho A-02, Kệ B-04..."
+                    value={itemForm.location}
+                    onChange={(e) => setItemForm({ ...itemForm, location: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">NHÀ PHÂN PHỐI</label>
+                  <input
+                    type="text"
+                    value={itemForm.supplier}
+                    onChange={(e) => setItemForm({ ...itemForm, supplier: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">BẢO QUẢN</label>
+                  <input
+                    type="text"
+                    value={itemForm.storageTemp}
+                    onChange={(e) => setItemForm({ ...itemForm, storageTemp: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">TỒN BAN ĐẦU</label>
+                  <input
+                    type="number"
+                    value={itemForm.currentStock}
+                    onChange={(e) => setItemForm({ ...itemForm, currentStock: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-gray-50 font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">PAR STOCK</label>
+                  <input
+                    type="number"
+                    value={itemForm.parStock}
+                    onChange={(e) => setItemForm({ ...itemForm, parStock: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-gray-50 font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">CẢNH BÁO MIN</label>
+                  <input
+                    type="number"
+                    value={itemForm.minAlertLevel}
+                    onChange={(e) => setItemForm({ ...itemForm, minAlertLevel: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-gray-50 font-mono font-bold text-rose-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">GIÁ VỐN NHẬP (VNĐ)</label>
+                  <input
+                    type="number"
+                    value={itemForm.costPrice}
+                    onChange={(e) => setItemForm({ ...itemForm, costPrice: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-gray-50 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">GIÁ BÁN PHÒNG (VNĐ)</label>
+                  <input
+                    type="number"
+                    value={itemForm.sellingPrice}
+                    onChange={(e) => setItemForm({ ...itemForm, sellingPrice: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-gray-50 font-mono font-bold text-emerald-700"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddItemModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-lg shadow-md"
+                >
+                  Lưu SKU Mới
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SỬA MẶT HÀNG */}
+      {showEditItemModal && selectedItem && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b pb-3 mb-4">
+              <div>
+                <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                  <span className="material-symbols-outlined text-blue-600">edit_note</span>
+                  Sửa Thông Tin Mặt Hàng #{selectedItem.sku}
+                </h3>
+                <p className="text-xs text-gray-500">Cập nhật đơn giá, nhà phân phối và định mức kho</p>
+              </div>
+              <button onClick={() => setShowEditItemModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateItem} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">TÊN MẶT HÀNG</label>
+                <input
+                  type="text"
+                  required
+                  value={itemForm.name}
+                  onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">DANH MỤC</label>
+                  <select
+                    value={itemForm.category}
+                    onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 font-semibold"
+                  >
+                    <option value="Minibar">Minibar</option>
+                    <option value="Bath Amenities">Bath Amenities</option>
+                    <option value="Nespresso/Trà">Nespresso / Trà</option>
+                    <option value="Khác">Tiêu hao khác</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">VỊ TRÍ LƯU KHO</label>
+                  <input
+                    type="text"
+                    value={itemForm.location}
+                    onChange={(e) => setItemForm({ ...itemForm, location: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">NHÀ PHÂN PHỐI</label>
+                  <input
+                    type="text"
+                    value={itemForm.supplier}
+                    onChange={(e) => setItemForm({ ...itemForm, supplier: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">BẢO QUẢN</label>
+                  <input
+                    type="text"
+                    value={itemForm.storageTemp}
+                    onChange={(e) => setItemForm({ ...itemForm, storageTemp: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">TỒN THỰC</label>
+                  <input
+                    type="number"
+                    value={itemForm.currentStock}
+                    onChange={(e) => setItemForm({ ...itemForm, currentStock: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-gray-50 font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">PAR STOCK</label>
+                  <input
+                    type="number"
+                    value={itemForm.parStock}
+                    onChange={(e) => setItemForm({ ...itemForm, parStock: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-gray-50 font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">CẢNH BÁO MIN</label>
+                  <input
+                    type="number"
+                    value={itemForm.minAlertLevel}
+                    onChange={(e) => setItemForm({ ...itemForm, minAlertLevel: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-gray-50 font-mono font-bold text-rose-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">GIÁ VỐN NHẬP (VNĐ)</label>
+                  <input
+                    type="number"
+                    value={itemForm.costPrice}
+                    onChange={(e) => setItemForm({ ...itemForm, costPrice: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-gray-50 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">GIÁ BÁN PHÒNG (VNĐ)</label>
+                  <input
+                    type="number"
+                    value={itemForm.sellingPrice}
+                    onChange={(e) => setItemForm({ ...itemForm, sellingPrice: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-gray-50 font-mono font-bold text-emerald-700"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditItemModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-lg shadow-md"
+                >
+                  Lưu Cập Nhật
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </AdminLayout>
   );
 };

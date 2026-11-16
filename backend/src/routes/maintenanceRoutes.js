@@ -65,7 +65,9 @@ router.patch('/tickets/:id/assign', async (req, res) => {
     const { id } = req.params;
     const { technicianName, specialty } = req.body;
     const { MaintenanceTicket } = require('../models');
-    const ticket = await MaintenanceTicket.findByPk(id);
+    const { Op } = require('sequelize');
+    const where = isNaN(id) ? { TicketCode: id } : { [Op.or]: [{ TicketId: id }, { TicketCode: id }] };
+    const ticket = await MaintenanceTicket.findOne({ where });
     if (!ticket) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu' });
 
     ticket.TechnicianName = technicianName;
@@ -75,6 +77,73 @@ router.patch('/tickets/:id/assign', async (req, res) => {
     await ticket.save();
 
     res.json({ success: true, message: `Đã phân công ${technicianName} xử lý phiếu #${ticket.TicketCode}`, ticket });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 5. Cập nhật / Sửa thông tin phiếu bảo trì toàn diện
+router.put('/tickets/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { MaintenanceTicket } = require('../models');
+    const { Op } = require('sequelize');
+    const where = isNaN(id) ? { TicketCode: id } : { [Op.or]: [{ TicketId: id }, { TicketCode: id }] };
+    const ticket = await MaintenanceTicket.findOne({ where });
+    if (!ticket) return res.status(404).json({ success: false, message: `Không tìm thấy phiếu #${id}` });
+
+    const {
+      roomNumber,
+      assetName,
+      category,
+      priority,
+      symptom,
+      description,
+      technicianName,
+      technicianSpecialty,
+      status,
+      statusLabel,
+      notes
+    } = req.body;
+
+    if (roomNumber !== undefined) ticket.RoomNumber = roomNumber;
+    if (assetName !== undefined) ticket.AssetName = assetName;
+    if (category !== undefined) ticket.Category = category;
+    if (priority !== undefined) ticket.Priority = priority;
+    if (symptom !== undefined) ticket.Symptom = symptom;
+    if (description !== undefined) ticket.Description = description;
+    if (technicianName !== undefined) ticket.TechnicianName = technicianName;
+    if (technicianSpecialty !== undefined) ticket.TechnicianSpecialty = technicianSpecialty;
+    if (status !== undefined) ticket.Status = status;
+    if (statusLabel !== undefined) ticket.StatusLabel = statusLabel;
+    if (notes !== undefined) ticket.ResolutionNotes = notes;
+
+    await ticket.save();
+    res.json({
+      success: true,
+      message: `Đã cập nhật thông tin phiếu bảo trì #${ticket.TicketCode || id} thành công!`,
+      data: ticket
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 6. Xóa / Hủy phiếu bảo trì
+router.delete('/tickets/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { MaintenanceTicket } = require('../models');
+    const { Op } = require('sequelize');
+    const where = isNaN(id) ? { TicketCode: id } : { [Op.or]: [{ TicketId: id }, { TicketCode: id }] };
+    const ticket = await MaintenanceTicket.findOne({ where });
+    if (!ticket) return res.status(404).json({ success: false, message: `Không tìm thấy phiếu #${id}` });
+
+    await ticket.destroy();
+    res.json({
+      success: true,
+      message: `Đã xóa phiếu bảo trì #${id} thành công!`
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

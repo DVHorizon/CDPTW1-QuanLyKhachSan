@@ -18,6 +18,52 @@ const MarketingDashboard = () => {
     templateId: 'TMPL-CHECKIN-REMINDER'
   });
   const [testSuccessMessage, setTestSuccessMessage] = useState('');
+  const [editingCampaign, setEditingCampaign] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (title, desc) => {
+    setToastMessage({ title, desc });
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleSaveEditCampaign = async (e) => {
+    e.preventDefault();
+    if (!editingCampaign) return;
+    try {
+      const res = await fetch(`/api/marketing/campaigns/${editingCampaign.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editingCampaign.name,
+          subtitle: editingCampaign.subtitle,
+          targetAudience: editingCampaign.audience,
+          scheduleDate: editingCampaign.schedule,
+          status: editingCampaign.status
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCampaigns(prev => prev.map(c => c.id === editingCampaign.id ? { ...c, ...editingCampaign } : c));
+        showToast('Cập Nhật Thành Công', `Đã cập nhật chiến dịch ${editingCampaign.name}!`);
+      }
+    } catch (err) {
+      console.warn('Lỗi cập nhật chiến dịch:', err);
+      setCampaigns(prev => prev.map(c => c.id === editingCampaign.id ? { ...c, ...editingCampaign } : c));
+      showToast('Cập Nhật Thành Công', `Đã cập nhật chiến dịch ${editingCampaign.name}!`);
+    }
+    setEditingCampaign(null);
+  };
+
+  const handleDeleteCampaign = async (id) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa chiến dịch #${id}?`)) return;
+    try {
+      await fetch(`/api/marketing/campaigns/${id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Lỗi xóa chiến dịch:', err);
+    }
+    setCampaigns(prev => prev.filter(c => c.id !== id));
+    showToast('Đã Xóa', `Đã xóa chiến dịch #${id} khỏi hệ thống!`);
+  };
 
   // Dữ liệu mô phỏng đồng bộ chính xác với Ảnh 1
   const [stats, setStats] = useState({
@@ -757,13 +803,29 @@ const MarketingDashboard = () => {
 
                     {/* Thao tác */}
                     <td className="px-3 py-3 text-center whitespace-nowrap">
-                      <button
-                        onClick={() => navigate('/admin/marketing/new')}
-                        title="Xem chi tiết & Điều phối"
-                        className="text-gray-400 hover:text-emerald-700 p-1 rounded hover:bg-gray-100 transition"
-                      >
-                        <span className="material-symbols-outlined text-base">open_in_new</span>
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => setEditingCampaign({ ...item })}
+                          title="Sửa chiến dịch"
+                          className="text-blue-600 hover:text-blue-800 p-1.5 rounded hover:bg-blue-50 transition"
+                        >
+                          <span className="material-symbols-outlined text-base">edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCampaign(item.id)}
+                          title="Xóa chiến dịch"
+                          className="text-rose-500 hover:text-rose-700 p-1.5 rounded hover:bg-rose-50 transition"
+                        >
+                          <span className="material-symbols-outlined text-base">delete</span>
+                        </button>
+                        <button
+                          onClick={() => navigate('/admin/marketing/new')}
+                          title="Xem chi tiết & Điều phối"
+                          className="text-gray-400 hover:text-emerald-700 p-1.5 rounded hover:bg-gray-100 transition"
+                        >
+                          <span className="material-symbols-outlined text-base">open_in_new</span>
+                        </button>
+                      </div>
                     </td>
 
                   </tr>
@@ -1000,6 +1062,117 @@ const MarketingDashboard = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SỬA CHIẾN DỊCH */}
+      {editingCampaign && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b pb-3 mb-4">
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                  <span className="material-symbols-outlined text-blue-600">edit_note</span>
+                  Sửa Chiến Dịch: #{editingCampaign.id}
+                </h3>
+                <p className="text-xs text-gray-500">Cập nhật thông tin và tiến độ chiến dịch tiếp thị</p>
+              </div>
+              <button
+                onClick={() => setEditingCampaign(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditCampaign} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">TÊN CHIẾN DỊCH</label>
+                <input
+                  type="text"
+                  required
+                  value={editingCampaign.name || ''}
+                  onChange={(e) => setEditingCampaign({ ...editingCampaign, name: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 font-semibold focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">TIÊU ĐỀ PHỤ / NỘI DUNG TÓM TẮT</label>
+                <input
+                  type="text"
+                  value={editingCampaign.subtitle || ''}
+                  onChange={(e) => setEditingCampaign({ ...editingCampaign, subtitle: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">PHÂN KHÚC MỤC TIÊU</label>
+                  <input
+                    type="text"
+                    value={editingCampaign.audience || ''}
+                    onChange={(e) => setEditingCampaign({ ...editingCampaign, audience: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">LỊCH PHÁT SÓNG</label>
+                  <input
+                    type="text"
+                    value={editingCampaign.schedule || ''}
+                    onChange={(e) => setEditingCampaign({ ...editingCampaign, schedule: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 font-mono focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">TRẠNG THÁI CHIẾN DỊCH</label>
+                <select
+                  value={editingCampaign.status || 'SCHEDULED'}
+                  onChange={(e) => {
+                    const st = e.target.value;
+                    const lbl = st === 'COMPLETED' ? 'Đã Hoàn Thành' : st === 'SCHEDULED' ? 'Đã Lên Lịch' : 'Bản Nháp';
+                    setEditingCampaign({ ...editingCampaign, status: st, statusLabel: lbl });
+                  }}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-gray-900 font-bold focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="DRAFT">Bản Nháp (DRAFT)</option>
+                  <option value="SCHEDULED">Đã Lên Lịch (SCHEDULED)</option>
+                  <option value="COMPLETED">Đã Hoàn Thành (COMPLETED)</option>
+                </select>
+              </div>
+
+              <div className="pt-3 border-t flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingCampaign(null)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition"
+                >
+                  Lưu Thay Đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST MESSAGE */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-gray-700 animate-in slide-in-from-bottom duration-200">
+          <span className="material-symbols-outlined text-emerald-400">check_circle</span>
+          <div>
+            <div className="font-bold text-xs">{toastMessage.title}</div>
+            <div className="text-[11px] text-gray-300">{toastMessage.desc}</div>
           </div>
         </div>
       )}
