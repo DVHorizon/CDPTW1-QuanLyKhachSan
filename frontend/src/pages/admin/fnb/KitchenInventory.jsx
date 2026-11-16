@@ -333,28 +333,32 @@ export default function KitchenInventory() {
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm flex items-start justify-between">
+          <div className="bg-white p-5 rounded-xl border border-amber-200 shadow-sm flex items-start justify-between relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
             <div>
-              <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase">LÔ HÀNG ĐANG GIAO TRONG NGÀY</p>
-              <h3 className="text-3xl font-bold text-slate-900 mt-2">04 <span className="text-sm font-normal text-slate-500">chuyến nhập</span></h3>
-              <p className="text-xs text-slate-500 font-medium mt-1">Nhà cung cấp hải sản & Wagyu đến lúc 14:30</p>
+              <p className="text-xs font-semibold tracking-wider text-amber-600 uppercase flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                HẾT HÀNG (OUT OF STOCK)
+              </p>
+              <h3 className="text-3xl font-bold text-amber-700 mt-2">{metrics.outOfStockCount || 0} <span className="text-sm font-normal text-amber-600">mặt hàng</span></h3>
+              <p className="text-xs text-amber-600 font-medium mt-1">Cần kích hoạt nhập hàng hoặc tạm dừng món</p>
             </div>
-            <div className="p-2.5 bg-sky-50 text-sky-700 rounded-lg">
-              <span className="material-symbols-outlined text-2xl">local_shipping</span>
+            <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
+              <span className="material-symbols-outlined text-2xl">remove_shopping_cart</span>
             </div>
           </div>
 
           <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm flex items-start justify-between">
             <div>
-              <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase">NHIỆT ĐỘ KHO B2 REALTIME</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-2 font-mono">-18.4°C / +2.1°C</h3>
+              <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase">TỒN KHO AN TOÀN</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-2">{metrics.inStockCount || 0} <span className="text-sm font-normal text-slate-500">SKU</span></h3>
               <p className="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">ac_unit</span>
-                Tất cả cảm biến ổn định (HACCP Level 4.19)
+                <span className="material-symbols-outlined text-[14px]">verified</span>
+                Đạt chuẩn định mức phục vụ bếp
               </p>
             </div>
-            <div className="p-2.5 bg-blue-50 text-blue-700 rounded-lg">
-              <span className="material-symbols-outlined text-2xl">thermostat</span>
+            <div className="p-2.5 bg-sky-50 text-sky-700 rounded-lg">
+              <span className="material-symbols-outlined text-2xl">check_circle</span>
             </div>
           </div>
         </div>

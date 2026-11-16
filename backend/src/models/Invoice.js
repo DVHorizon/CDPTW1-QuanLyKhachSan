@@ -13,7 +13,7 @@ module.exports = (sequelize) => {
     },
     BookingId: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true
     },
     InvoiceNumber: {
       type: DataTypes.STRING(50),
