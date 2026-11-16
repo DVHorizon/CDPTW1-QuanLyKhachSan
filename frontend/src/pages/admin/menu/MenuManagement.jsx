@@ -110,7 +110,7 @@ const MenuManagement = () => {
     setFormData({ 
       ItemName: '', 
       CategoryId: 5, 
-      Price: 0, 
+      Price: '', 
       Status: 'Available', 
       ServingTime: 'Cả Ngày', 
       KitchenStation: 'Bếp Nóng 01', 
@@ -128,15 +128,31 @@ const MenuManagement = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!formData.ImageUrl || formData.ImageUrl.trim() === '') {
+      setMessageModal({
+        isOpen: true,
+        type: 'error',
+        isConflict: false,
+        title: 'THIẾU ẢNH MÓN ĂN',
+        message: 'Vui lòng tải lên ảnh món ăn từ máy tính trước khi lưu (ảnh là bắt buộc).'
+      });
+      return;
+    }
+
     const url = editingItem
       ? `http://localhost:5000/api/v1/menu-items/${editingItem.MenuItemId}`
       : 'http://localhost:5000/api/v1/menu-items';
+
+    const payload = {
+      ...formData,
+      Price: Number(formData.Price) || 0
+    };
 
     try {
       const response = await fetch(url, {
         method: editingItem ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       const result = await response.json();
       
@@ -183,7 +199,14 @@ const MenuManagement = () => {
       const result = await response.json();
       
       if (response.ok) {
-        // Show success briefly if needed, or just refresh
+        if (result.alreadyUpdated) {
+          setMessageModal({
+            isOpen: true,
+            type: 'info',
+            title: 'THÔNG BÁO ĐỒNG BỘ THỜI GIAN THỰC',
+            message: result.message
+          });
+        }
         fetchMenu();
       } else {
         setMessageModal({ isOpen: true, type: 'error', title: 'LỖI', message: result.message });

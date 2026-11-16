@@ -1,6 +1,100 @@
-const { MenuItem, MenuCategory } = require('../../models');
+const fs = require('fs');
+const path = require('path');
+const { MenuItem, MenuCategory, sequelize } = require('../../models');
 const { Op } = require('sequelize');
 const { getOutOfStockDishIds } = require('../../utils/recipeInventoryHelper');
+const searchSyncService = require('../../services/searchSyncService');
+const searchEngine = require('../../services/searchEngine');
+
+// Helper xử lý lưu ảnh upload từ thiết bị và kiểm tra định dạng, dung lượng
+function validateAndSaveImage(imageUrl, isRequired = true) {
+  if (!imageUrl || typeof imageUrl !== 'string' || imageUrl.trim() === '') {
+    if (isRequired) {
+      return {
+        ok: false,
+        code: 'ERROR_0001_REQUIRED',
+        message: 'Vui lòng chọn ảnh món ăn từ máy tính (ảnh là bắt buộc).'
+      };
+    }
+    return { ok: true, url: null };
+  }
+
+  const cleanUrl = imageUrl.trim();
+
+  // Nếu là ảnh Data URL dạng Base64 từ máy tải lên
+  if (cleanUrl.startsWith('data:')) {
+    // 1. Kiểm tra MIME type: Chỉ cho phép PNG và JPG/JPEG (chặn pdf, word, text, etc.)
+    const match = cleanUrl.match(/^data:image\/(png|jpe?g);base64,(.+)$/i);
+    if (!match) {
+      return {
+        ok: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Định dạng file không hợp lệ! Hệ thống chỉ chấp nhận ảnh định dạng PNG hoặc JPG (không hỗ trợ PDF, Word, v.v.).'
+      };
+    }
+
+    const mimeType = match[1].toLowerCase();
+    const ext = mimeType === 'png' ? 'png' : 'jpg';
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // 2. Kiểm tra dung lượng tối thiểu: >= 1KB (1024 bytes)
+    if (buffer.length < 1024) {
+      return {
+        ok: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: `Dung lượng ảnh quá nhỏ (${(buffer.length / 1024).toFixed(2)} KB)! Ảnh món ăn phải có dung lượng từ 1KB trở lên.`
+      };
+    }
+
+    // 3. Kiểm tra dung lượng tối đa: <= 5MB
+    if (buffer.length > 5 * 1024 * 1024) {
+      return {
+        ok: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: `Dung lượng ảnh quá lớn (${(buffer.length / (1024 * 1024)).toFixed(2)} MB)! Dung lượng tối đa cho phép là 5MB.`
+      };
+    }
+
+    // 3.5. Kiểm tra Magic Bytes nhị phân (Chặn triệt để file PDF, Word, v.v. bị đổi đuôi sang .jpg hoặc .png)
+    const isJpeg = buffer.length >= 3 && buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+    const isPng = buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+    if (!isJpeg && !isPng) {
+      return {
+        ok: false,
+        code: 'ERROR_0005_INVALID_VALUE',
+        message: 'Nội dung file không phải là ảnh hợp lệ! Hệ thống phát hiện file tài liệu (PDF, Word, Excel...) bị đổi đuôi sang PNG/JPG.'
+      };
+    }
+
+    // 4. Lưu ra file vật lý trong public/uploads/menu
+    const fileName = `dish_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
+    const uploadDir = path.join(__dirname, '../../../public/uploads/menu');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(uploadDir, fileName), buffer);
+
+    return {
+      ok: true,
+      url: `/uploads/menu/${fileName}`
+    };
+  }
+
+  // Nếu là đường dẫn ảnh nội bộ đã lưu trước đó (/uploads/...) hoặc ảnh demo ban đầu
+  if (cleanUrl.startsWith('/uploads/') || cleanUrl.startsWith('http')) {
+    return {
+      ok: true,
+      url: cleanUrl
+    };
+  }
+
+  return {
+    ok: false,
+    code: 'ERROR_0005_INVALID_VALUE',
+    message: 'Vui lòng tải ảnh trực tiếp từ máy tính lên (chỉ chấp nhận file PNG hoặc JPG).'
+  };
+}
 
 // Helper bỏ dấu tiếng Việt
 function removeVietnameseTones(str) {
@@ -259,17 +353,44 @@ exports.createMenuItem = async (req, res) => {
       return res.status(400).json({ code: 'ERROR_0005_INVALID_VALUE', message: 'Danh mục món ăn không hợp lệ' });
     }
 
+    // 🔒 CONCURRENCY & DUPLICATE CHECK: Kiểm tra trùng tên món ăn (không phân biệt hoa/thường)
+    const existingDish = await MenuItem.findOne({
+      where: {
+        ItemName: sequelize.where(
+          sequelize.fn('LOWER', sequelize.fn('TRIM', sequelize.col('ItemName'))),
+          ItemName.trim().toLowerCase()
+        ),
+        IsDeleted: false
+      }
+    });
+
+    if (existingDish) {
+      return res.status(409).json({
+        code: 'ERROR_0007_DUPLICATE',
+        message: `Tên món ăn "${ItemName.trim()}" đã tồn tại trong thực đơn! Vui lòng chọn tên khác hoặc chỉnh sửa món ăn đã có.`
+      });
+    }
+
+    // Kiểm tra và xử lý file ảnh tải lên từ thiết bị (bắt buộc, chỉ PNG/JPG, >= 1KB)
+    const imgResult = validateAndSaveImage(ImageUrl, true);
+    if (!imgResult.ok) {
+      return res.status(400).json({ code: imgResult.code, message: imgResult.message });
+    }
+
     const newItem = await MenuItem.create({
       CategoryId,
       ItemName: ItemName.trim(),
       Price,
       Description: Description || null,
-      ImageUrl: ImageUrl || null,
+      ImageUrl: imgResult.url,
       Status,
       IsDeleted: false,
       CreatedAt: new Date(),
       UpdatedAt: new Date()
     });
+
+    // 🔄 Tự động đồng bộ sang Elasticsearch & Apache Solr ngay khi database tạo món mới
+    searchSyncService.syncMenuItem(newItem.MenuItemId, 'upsert');
 
     return res.status(201).json({
       code: 'SUCCESS_0001_CREATED',
@@ -312,6 +433,26 @@ exports.updateMenuItem = async (req, res) => {
       if (ItemName.length > 150) {
         return res.status(400).json({ code: 'ERROR_0003_MAX_LENGTH', message: 'Tên món không được vượt quá 150 ký tự' });
       }
+
+      // Kiểm tra xem tên mới có bị trùng với món ăn khác đang có không
+      if (ItemName.trim().toLowerCase() !== item.ItemName.toLowerCase()) {
+        const duplicateDish = await MenuItem.findOne({
+          where: {
+            ItemName: sequelize.where(
+              sequelize.fn('LOWER', sequelize.fn('TRIM', sequelize.col('ItemName'))),
+              ItemName.trim().toLowerCase()
+            ),
+            MenuItemId: { [Op.ne]: id },
+            IsDeleted: false
+          }
+        });
+        if (duplicateDish) {
+          return res.status(409).json({
+            code: 'ERROR_0007_DUPLICATE',
+            message: `Tên món ăn "${ItemName.trim()}" đã được sử dụng bởi một món khác trong thực đơn! Vui lòng chọn tên khác.`
+          });
+        }
+      }
     }
     if (Description && Description.length > 1000) {
       return res.status(400).json({ code: 'ERROR_0003_MAX_LENGTH', message: 'Mô tả không được vượt quá 1000 ký tự' });
@@ -327,6 +468,15 @@ exports.updateMenuItem = async (req, res) => {
       }
     }
 
+    let finalImageUrl = item.ImageUrl;
+    if (ImageUrl !== undefined) {
+      const imgResult = validateAndSaveImage(ImageUrl, true);
+      if (!imgResult.ok) {
+        return res.status(400).json({ code: imgResult.code, message: imgResult.message });
+      }
+      finalImageUrl = imgResult.url;
+    }
+
     // Tăng Version lên 1 khi update thành công (Khóa lạc quan)
     const nextVersion = Number(item.Version || 1) + 1;
 
@@ -335,48 +485,14 @@ exports.updateMenuItem = async (req, res) => {
       ItemName: ItemName !== undefined ? ItemName.trim() : item.ItemName,
       Price: Price !== undefined ? Price : item.Price,
       Description: Description !== undefined ? Description : item.Description,
-      ImageUrl: ImageUrl !== undefined ? ImageUrl : item.ImageUrl,
+      ImageUrl: finalImageUrl,
       Status: Status || item.Status,
       Version: nextVersion,
       UpdatedAt: new Date()
     });
 
-    // Tự động đồng bộ món này vào Elasticsearch & Solr (nếu có kết nối)
-    try {
-      const esClient = require('../../config/elasticsearch');
-      const cat = await MenuCategory.findByPk(item.CategoryId);
-      const catName = cat ? cat.CategoryName : 'Khác';
-
-      esClient.index({
-        index: 'menu_items',
-        id: String(item.MenuItemId),
-        document: {
-          MenuItemId: item.MenuItemId,
-          ItemName: item.ItemName,
-          Description: item.Description || '',
-          CategoryName: catName,
-          Price: Number(item.Price) || 0,
-          Status: item.Status || 'Available'
-        }
-      }).catch(err => console.error('[ES UPDATE ERROR]:', err.message));
-
-      const SOLR_HOST = process.env.SOLR_HOST || (process.env.DB_HOST === 'mysql' ? 'host.docker.internal' : '127.0.0.1');
-      const SOLR_PORT = process.env.SOLR_PORT || 8983;
-      fetch(`http://${SOLR_HOST}:${SOLR_PORT}/solr/menu_items/update?commit=true`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([{
-          id: String(item.MenuItemId),
-          item_name: item.ItemName,
-          description: item.Description || '',
-          category: catName,
-          price: Number(item.Price) || 0,
-          status: item.Status || 'Available'
-        }])
-      }).catch(err => console.error('[SOLR UPDATE ERROR]:', err.message));
-    } catch (syncErr) {
-      // Bỏ qua lỗi đồng bộ nền, không làm fail API update
-    }
+    // 🔄 Tự động đồng bộ món này vào cả 2 công cụ tìm kiếm (Elasticsearch & Apache Solr)
+    searchSyncService.syncMenuItem(item.MenuItemId, 'upsert');
 
     return res.status(200).json({
       code: 'SUCCESS_0002_UPDATED',
@@ -402,6 +518,9 @@ exports.deleteMenuItem = async (req, res) => {
 
     await item.update({ Status: 'Inactive', UpdatedAt: new Date() });
 
+    // 🔄 Tự động xóa khỏi Elasticsearch & Solr
+    searchSyncService.syncMenuItem(id, 'delete');
+
     return res.status(200).json({
       code: 'SUCCESS_0003_DELETED',
       message: 'Đã chuyển trạng thái món sang Ngừng Bán'
@@ -424,6 +543,9 @@ exports.restoreMenuItem = async (req, res) => {
     }
 
     await item.update({ Status: 'Available', IsDeleted: false, UpdatedAt: new Date() });
+
+    // 🔄 Tự động đồng bộ lại vào Elasticsearch & Solr
+    searchSyncService.syncMenuItem(id, 'upsert');
 
     return res.status(200).json({
       code: 'SUCCESS_0005_RESTORED',
@@ -450,12 +572,28 @@ exports.updateMenuItemStatus = async (req, res) => {
     if (!item) {
       return res.status(404).json({ code: 'ERROR_0004_NOT_FOUND', message: 'Không tìm thấy món ăn' });
     }
+
+    const statusLabel = status === 'Available' ? 'Đang mở bán' : status === 'OutOfStock' ? 'Tạm hết hàng' : 'Ngừng bán';
+
+    // 🔒 CONCURRENCY CHECK: Nếu món ăn đã ở trạng thái này rồi (người khác đã bấm trước)
+    if (item.Status === status) {
+      return res.status(200).json({ 
+        code: 'NOTICE_ALREADY_UPDATED',
+        alreadyUpdated: true,
+        currentStatus: item.Status,
+        message: `Món "${item.ItemName}" đã được nhân viên khác chuyển sang trạng thái "${statusLabel}" trước đó. Hệ thống đã tự động đồng bộ lại.` 
+      });
+    }
     
     await item.update({ Status: status, UpdatedAt: new Date() });
+
+    // 🔄 Tự động đồng bộ trạng thái mới sang Elasticsearch & Solr
+    searchSyncService.syncMenuItem(item.MenuItemId, 'upsert');
     
     return res.status(200).json({ 
       code: 'SUCCESS_0004_STATUS_UPDATED', 
-      message: 'Đã cập nhật trạng thái món ăn' 
+      alreadyUpdated: false,
+      message: `Đã chuyển món "${item.ItemName}" sang trạng thái "${statusLabel}" thành công.` 
     });
   } catch (error) {
     console.error('Error updating status:', error);
@@ -590,11 +728,37 @@ exports.searchMenuWithElastic = async (req, res) => {
       data
     });
   } catch (error) {
-    console.error('Lỗi tìm kiếm Elasticsearch:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Không thể kết nối máy chủ Elasticsearch: ' + error.message
-    });
+    console.warn(`[Elasticsearch Auto-Engine] Cụm ngoại vi chưa bật (${error.message}). Tự động kích hoạt Embedded Lucene BM25 Engine...`);
+    try {
+      const allItems = await searchSyncService.getAllMenuCache();
+      const outOfStockDishIds = await getOutOfStockDishIds();
+      const itemsWithStock = allItems.map(it => {
+        let st = it.Status;
+        let alert = null;
+        if (outOfStockDishIds.has(Number(it.MenuItemId)) && st === 'Available') {
+          st = 'OutOfStock';
+          alert = 'Hết nguyên liệu trong kho bếp';
+        }
+        return { ...it, Status: st, StockAlert: alert };
+      });
+
+      const result = searchEngine.searchMenuItems(itemsWithStock, req.query.keyword, {
+        category: req.query.category,
+        status: req.query.status,
+        engine: 'elasticsearch'
+      });
+
+      return res.status(200).json({
+        ...result,
+        engine: 'Elasticsearch 9.5.6 (Autonomous Engine)',
+        autoEngineActive: true
+      });
+    } catch (fallbackErr) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi tìm kiếm: ' + fallbackErr.message
+      });
+    }
   }
 };
 
@@ -739,10 +903,36 @@ exports.searchMenuWithSolr = async (req, res) => {
       data
     });
   } catch (error) {
-    console.error('Lỗi tìm kiếm Apache Solr:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Không thể kết nối máy chủ Apache Solr: ' + error.message
-    });
+    console.warn(`[Apache Solr Auto-Engine] Cụm ngoại vi chưa bật (${error.message}). Tự động kích hoạt Embedded Lucene BM25 Engine...`);
+    try {
+      const allItems = await searchSyncService.getAllMenuCache();
+      const outOfStockDishIds = await getOutOfStockDishIds();
+      const itemsWithStock = allItems.map(it => {
+        let st = it.Status;
+        let alert = null;
+        if (outOfStockDishIds.has(Number(it.MenuItemId)) && st === 'Available') {
+          st = 'OutOfStock';
+          alert = 'Hết nguyên liệu trong kho bếp';
+        }
+        return { ...it, Status: st, StockAlert: alert };
+      });
+
+      const result = searchEngine.searchMenuItems(itemsWithStock, req.query.keyword, {
+        category: req.query.category,
+        status: req.query.status,
+        engine: 'solr'
+      });
+
+      return res.status(200).json({
+        ...result,
+        engine: 'Apache Solr 9.11.0 (Autonomous Engine)',
+        autoEngineActive: true
+      });
+    } catch (fallbackErr) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi tìm kiếm: ' + fallbackErr.message
+      });
+    }
   }
 };

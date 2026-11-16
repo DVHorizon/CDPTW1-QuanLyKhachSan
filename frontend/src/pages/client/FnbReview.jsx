@@ -116,9 +116,17 @@ const FnbReview = () => {
     }
   };
 
-  // Đổi số sao món ăn
+  // Đổi số sao món ăn và tự động tính điểm sao trung bình theo đặc tả FEAT-FNB-10
   const handleDishRatingChange = (menuItemId, stars) => {
-    setDishRatings(prev => ({ ...prev, [menuItemId]: stars }));
+    setDishRatings(prev => {
+      const updated = { ...prev, [menuItemId]: stars };
+      const starValues = Object.values(updated);
+      if (starValues.length > 0) {
+        const avg = starValues.reduce((sum, val) => sum + val, 0) / starValues.length;
+        setRating(Math.round(avg));
+      }
+      return updated;
+    });
   };
 
   // Gửi đánh giá lên API (POST /api/v1/fnb-orders/{orderId}/reviews)

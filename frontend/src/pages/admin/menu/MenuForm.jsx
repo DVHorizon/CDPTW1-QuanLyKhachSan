@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 const MenuForm = ({ 
   isEditing, 
@@ -9,10 +9,125 @@ const MenuForm = ({
   onCancel,
   onDelete
 }) => {
-  const [isEditingImage, setIsEditingImage] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [imgBroken, setImgBroken] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Reset imgBroken khi đổi món hoặc đổi imageUrl
+  React.useEffect(() => {
+    setImgBroken(false);
+    setUploadError('');
+  }, [formData.ImageUrl, formData.ItemName]);
+
+  // Xử lý chọn ảnh từ máy tính với validation định dạng sâu (MIME + Extension + Magic Bytes + Image Decode)
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+    const validExtensions = ['.png', '.jpg', '.jpeg'];
+    const lowerName = file.name.toLowerCase();
+    const hasValidExt = validExtensions.some(ext => lowerName.endsWith(ext));
+    const hasValidMime = validTypes.includes(file.type);
+
+    // 1. Chặn tất cả các file không phải PNG / JPG (chặn pdf, word doc/docx, excel, v.v.)
+    if (!hasValidMime || !hasValidExt) {
+      setUploadError('Định dạng file không hợp lệ! Hệ thống chỉ chấp nhận ảnh PNG hoặc JPG. Không được chọn file PDF, Word, Excel hay tài liệu khác.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // 2. Kiểm tra dung lượng tối thiểu: >= 1KB (1024 bytes)
+    if (file.size < 1024) {
+      setUploadError(`Dung lượng ảnh quá nhỏ (${(file.size / 1024).toFixed(2)} KB)! Ảnh món ăn phải có dung lượng từ 1KB trở lên.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // 3. Kiểm tra dung lượng tối đa: <= 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError(`Dung lượng ảnh vượt quá giới hạn (${(file.size / (1024 * 1024)).toFixed(2)} MB)! Dung lượng tối đa là 5MB.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // 4. KIỂM TRA MAGIC BYTES NHỊ PHÂN (Chặn triệt để file PDF, Word đổi đuôi sang .jpg / .png)
+    try {
+      const headerSlice = await file.slice(0, 4).arrayBuffer();
+      const header = new Uint8Array(headerSlice);
+      const isJpeg = header.length >= 3 && header[0] === 0xFF && header[1] === 0xD8 && header[2] === 0xFF;
+      const isPng = header.length >= 4 && header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
+
+      if (!isJpeg && !isPng) {
+        setUploadError('Tệp tải lên không phải là ảnh hợp lệ! Hệ thống phát hiện file tài liệu (PDF, Word, Excel...) bị cố tình đổi đuôi sang .jpg/.png.');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+    } catch (readErr) {
+      setUploadError('Không thể đọc dữ liệu file. Vui lòng chọn ảnh khác!');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // 5. Đọc file thành Base64 Data URL và kiểm tra khả năng giải mã ảnh thực tế
+    setUploadError('');
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const dataUrl = uploadEvent.target.result;
+
+      // Dùng HTML Image Object kiểm tra render thực tế
+      const testImg = new Image();
+      testImg.onload = () => {
+        if (testImg.naturalWidth === 0 || testImg.naturalHeight === 0) {
+          setUploadError('File ảnh bị lỗi hoặc không thể hiển thị nội dung. Vui lòng chọn ảnh khác!');
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+        setUploadError('');
+        setImgBroken(false);
+        setFormData(prev => ({
+          ...prev,
+          ImageUrl: dataUrl
+        }));
+      };
+      testImg.onerror = () => {
+        setUploadError('Nội dung file không thể giải mã thành ảnh hợp lệ! Không chấp nhận file giả mạo.');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      };
+      testImg.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = (e) => {
+    e.stopPropagation();
+    setFormData(prev => ({ ...prev, ImageUrl: '' }));
+    setUploadError('');
+    setImgBroken(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const onFormSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.ImageUrl || formData.ImageUrl.trim() === '') {
+      setUploadError('Vui lòng tải lên ảnh món ăn từ máy tính (ảnh là bắt buộc)!');
+      return;
+    }
+    if (imgBroken) {
+      setUploadError('Ảnh hiện tại bị lỗi hoặc không thể hiển thị. Vui lòng bấm Đổi Ảnh Khác để tải ảnh hợp lệ!');
+      return;
+    }
+    const priceNum = Number(formData.Price);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      setUploadError('Giá bán niêm yết phải lớn hơn 0 VNĐ!');
+      return;
+    }
+    setUploadError('');
+    handleSave(e);
+  };
 
   return (
-    <form onSubmit={handleSave} className="flex flex-col h-full justify-between gap-space-md">
+    <form onSubmit={onFormSubmit} className="flex flex-col h-full justify-between gap-space-md">
       <div className="flex flex-col gap-space-md">
         
         {/*  Drawer Header  */}
@@ -58,35 +173,99 @@ const MenuForm = ({
           </select>
         </div>
 
-        {/*  Visual Preview Card  */}
-        <div className="relative w-full h-52 rounded-xl overflow-hidden shadow-sm bg-surface-container flex items-center justify-center group">
-           <img src={formData.ImageUrl || "https://loremflickr.com/320/240/food,dish?lock=999"} alt={formData.ItemName} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300" />
-           
-           {!isEditingImage ? (
-             <div onClick={() => setIsEditingImage(true)} className="absolute inset-0 bg-black/5 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer">
-                <div className="flex items-center gap-2 bg-white/90 text-on-surface font-bold px-4 py-2 rounded-lg shadow-sm">
-                  <span className="material-symbols-outlined text-[20px]">add_photo_alternate</span>
-                  Thay Ảnh Món / Dán Link
+        {/* Hidden File Input (Chỉ nhận PNG, JPG, JPEG) */}
+        <input 
+          type="file" 
+          ref={fileInputRef}
+          accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+
+        {/*  Visual Image Upload Area (Lấy ảnh từ máy tính)  */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <span className="font-label-sm text-label-sm uppercase font-bold text-on-surface-variant tracking-wider flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-admin-primary">photo_camera</span>
+              Ảnh Món Ăn (Tải Từ Máy Tính) *
+            </span>
+            <span className="text-[11px] text-slate-500 font-mono">PNG / JPG, ≥ 1KB</span>
+          </div>
+
+          <div 
+            onClick={() => fileInputRef.current?.click()}
+            className={`relative w-full h-52 rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center group ${
+              uploadError 
+                ? 'border-rose-400 bg-rose-50/50' 
+                : (formData.ImageUrl && formData.ImageUrl.trim().length > 5 && !imgBroken)
+                  ? 'border-emerald-500/50 bg-slate-900' 
+                  : 'border-slate-300 hover:border-emerald-600 bg-slate-50 hover:bg-slate-100/70'
+            }`}
+          >
+            {(formData.ImageUrl && formData.ImageUrl.trim().length > 5 && !imgBroken) ? (
+              <>
+                <img 
+                  src={formData.ImageUrl} 
+                  alt={formData.ItemName || 'Ảnh món ăn'} 
+                  onError={() => setImgBroken(true)}
+                  onLoad={() => setImgBroken(false)}
+                  className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300" 
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2.5 p-3">
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-800 rounded-lg text-xs font-bold shadow-md hover:bg-slate-100 transition"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">autorenew</span>
+                    Đổi Ảnh Khác
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-bold shadow-md hover:bg-rose-700 transition"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    Xóa Ảnh
+                  </button>
                 </div>
-             </div>
-           ) : (
-             <div className="absolute inset-0 bg-black/60 flex items-center justify-center p-4">
-                <div className="flex flex-col gap-2 w-full max-w-sm bg-white p-3 rounded-lg shadow-xl">
-                  <span className="text-label-sm font-bold text-on-surface">Nhập đường dẫn ảnh (URL):</span>
-                  <input 
-                    type="text" 
-                    autoFocus
-                    placeholder="https://example.com/image.jpg"
-                    value={formData.ImageUrl || ''}
-                    onChange={(e) => setFormData({...formData, ImageUrl: e.target.value})}
-                    className="w-full px-3 py-2 border border-outline-variant rounded font-mono text-body-sm focus:outline-none focus:border-admin-primary"
-                  />
-                  <div className="flex gap-2 justify-end mt-1">
-                    <button type="button" onClick={() => setIsEditingImage(false)} className="px-4 py-1.5 bg-admin-primary text-white font-bold text-label-sm rounded hover:brightness-110">Xong</button>
-                  </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center text-center p-4 gap-2">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="material-symbols-outlined text-2xl">cloud_upload</span>
                 </div>
-             </div>
-           )}
+                <div className="flex flex-col gap-0.5">
+                  <p className="text-sm font-bold text-slate-800">
+                    Bấm vào đây để chọn ảnh từ máy tính
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Chỉ hỗ trợ file ảnh <strong>PNG</strong> hoặc <strong>JPG/JPEG</strong> (từ 1KB đến 5MB)
+                  </p>
+                  {imgBroken && (
+                    <span className="inline-block mt-1 text-[11px] font-semibold text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                      ⚠️ Ảnh cũ không tồn tại. Vui lòng bấm chọn ảnh mới từ máy tính.
+                    </span>
+                  )}
+                </div>
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-emerald-700 text-white text-xs font-semibold shadow-xs">
+                  <span className="material-symbols-outlined text-[14px]">folder_open</span>
+                  Duyệt File
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Thông báo lỗi upload chi tiết */}
+          {uploadError && (
+            <div className="flex items-start gap-1.5 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs animate-shake">
+              <span className="material-symbols-outlined text-[18px] text-rose-600 shrink-0">error</span>
+              <span className="font-medium leading-relaxed">{uploadError}</span>
+            </div>
+          )}
         </div>
 
         {/*  Financial & Margin Cost Breakdown  */}
@@ -97,10 +276,27 @@ const MenuForm = ({
             <div className="flex flex-col gap-1">
               <span className="text-body-sm font-body-sm text-on-surface-variant">Giá Bán Niêm Yết (VNĐ) *</span>
               <input 
-                type="number" 
-                min="0" 
-                value={formData.Price} 
-                onChange={e => setFormData({...formData, Price: Number(e.target.value)})}
+                type="text" 
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Nhập giá bán (VD: 55000)..."
+                value={
+                  formData.Price === 0 || formData.Price === '0' || formData.Price === '' || formData.Price === null || formData.Price === undefined
+                    ? '' 
+                    : formData.Price
+                } 
+                onFocus={(e) => {
+                  e.target.select();
+                }}
+                onChange={(e) => {
+                  const rawVal = e.target.value.replace(/[^0-9]/g, '');
+                  if (rawVal === '') {
+                    setFormData({ ...formData, Price: '' });
+                  } else {
+                    const cleanNum = parseInt(rawVal, 10);
+                    setFormData({ ...formData, Price: isNaN(cleanNum) ? '' : cleanNum });
+                  }
+                }}
                 className="font-mono font-bold text-body-lg text-on-surface bg-surface border border-outline-variant rounded-lg px-3 py-2.5 focus:border-admin-primary outline-none w-full shadow-inner"
               />
             </div>

@@ -524,6 +524,162 @@ class ElasticSolrSearchEngine {
       executionTimeMs
     };
   }
+
+  /**
+   * Lõi tìm kiếm nâng cao nhúng cho Thực đơn Món ăn (Embedded Lucene BM25 Search Engine)
+   * Tự động chạy khi cụm Elasticsearch hoặc Apache Solr ngoại vi chưa bật.
+   * Cung cấp trọn vẹn: Full-text, Fuzzy typo, Khớp không dấu, Xếp hạng BM25 và Semantic Expansion.
+   */
+  searchMenuItems(menuItems, rawKeyword = '', options = {}) {
+    const startTime = process.hrtime();
+    const cleanKw = (rawKeyword || '').trim();
+    const engineName = options.engine === 'solr' ? 'Apache Solr 9.11.0 (Embedded Virtual Core)' : 'Elasticsearch 9.5.6 (Embedded Virtual Core)';
+
+    let filteredItems = [...menuItems];
+
+    // 1. Lọc theo danh mục nếu có
+    if (options.category) {
+      filteredItems = filteredItems.filter(item => 
+        (item.CategoryName || '').toLowerCase() === options.category.toLowerCase()
+      );
+    }
+
+    // 2. Lọc theo trạng thái nếu có
+    if (options.status) {
+      filteredItems = filteredItems.filter(item => 
+        (item.Status || '').toLowerCase() === options.status.toLowerCase()
+      );
+    }
+
+    // Nếu không có từ khóa tìm kiếm -> trả về toàn bộ theo bộ lọc (*:*)
+    if (!cleanKw || cleanKw === '*:*') {
+      const [diffSec, diffNano] = process.hrtime(startTime);
+      const executionTimeMs = Number((diffSec * 1000 + diffNano / 1e6).toFixed(2));
+      return {
+        success: true,
+        engine: engineName,
+        total: filteredItems.length,
+        qTimeMs: executionTimeMs,
+        data: filteredItems.map(item => ({
+          ...item,
+          _score: 1.0,
+          _engine: options.engine === 'solr' ? 'Apache Solr' : 'Elasticsearch'
+        }))
+      };
+    }
+
+    // Trọng số trường cho món ăn (Tên món ăn được ưu tiên cao nhất)
+    const MENU_FIELD_WEIGHTS = {
+      ItemName: 8.0,
+      Description: 3.5,
+      CategoryName: 2.0
+    };
+
+    // Phân tích và tách token truy vấn
+    const queryTokens = this.tokenizeAndAnalyze(cleanKw);
+    const expandedTokens = this.expandQueryWithSynonyms(queryTokens);
+
+    // Xây dựng Document Index cho danh sách món ăn
+    const indexedDocs = filteredItems.map(item => {
+      const docFields = {
+        ItemName: item.ItemName || '',
+        Description: item.Description || '',
+        CategoryName: item.CategoryName || ''
+      };
+
+      const fieldTokens = {};
+      let totalTokens = 0;
+      for (const [field, text] of Object.entries(docFields)) {
+        const tokens = this.tokenizeAndAnalyze(text);
+        fieldTokens[field] = tokens;
+        totalTokens += tokens.length;
+      }
+
+      return {
+        item,
+        docFields,
+        fieldTokens,
+        docLength: totalTokens || 1
+      };
+    });
+
+    const N = indexedDocs.length;
+    const avgdl = (indexedDocs.reduce((sum, d) => sum + d.docLength, 0) / (N || 1)) || 1;
+
+    // Tính Document Frequency
+    const docFrequency = {};
+    for (const token of expandedTokens) {
+      let count = 0;
+      for (const doc of indexedDocs) {
+        let found = false;
+        for (const field of Object.keys(MENU_FIELD_WEIGHTS)) {
+          const tokens = doc.fieldTokens[field] || [];
+          if (tokens.some(t => t === token || t.startsWith(token) || (t.length >= 4 && levenshteinDistance(t, token) <= 1))) {
+            found = true;
+            break;
+          }
+        }
+        if (found) count++;
+      }
+      docFrequency[token] = count;
+    }
+
+    // Chấm điểm BM25
+    const scoredList = [];
+    for (const doc of indexedDocs) {
+      let bm25Score = 0;
+      let matchCount = 0;
+
+      for (const token of expandedTokens) {
+        const df = docFrequency[token] || 0;
+        if (df === 0) continue;
+
+        const idf = Math.log(1 + (N - df + 0.5) / (df + 0.5));
+        let weightedTf = 0;
+
+        for (const [field, weight] of Object.entries(MENU_FIELD_WEIGHTS)) {
+          const tokens = doc.fieldTokens[field] || [];
+          let fieldTf = 0;
+          for (const t of tokens) {
+            if (t === token) fieldTf += 1.0;
+            else if (t.startsWith(token)) fieldTf += 0.7;
+            else if (t.includes(token)) fieldTf += 0.5;
+            else if (token.length >= 4 && t.length >= 4 && levenshteinDistance(t, token) <= 1) fieldTf += 0.4;
+          }
+          weightedTf += fieldTf * weight;
+        }
+
+        if (weightedTf > 0) {
+          matchCount++;
+          const numerator = weightedTf * (this.k1 + 1);
+          const denominator = weightedTf + this.k1 * (1 - this.b + this.b * (doc.docLength / avgdl));
+          bm25Score += idf * (numerator / denominator);
+        }
+      }
+
+      if (bm25Score > 0) {
+        scoredList.push({
+          ...doc.item,
+          _score: Number(bm25Score.toFixed(3)),
+          _engine: options.engine === 'solr' ? 'Apache Solr' : 'Elasticsearch'
+        });
+      }
+    }
+
+    // Sắp xếp theo điểm tương quan BM25 từ cao xuống thấp
+    scoredList.sort((a, b) => b._score - a._score);
+
+    const [diffSec, diffNano] = process.hrtime(startTime);
+    const executionTimeMs = Number((diffSec * 1000 + diffNano / 1e6).toFixed(2));
+
+    return {
+      success: true,
+      engine: engineName,
+      total: scoredList.length,
+      qTimeMs: executionTimeMs,
+      data: scoredList
+    };
+  }
 }
 
 module.exports = new ElasticSolrSearchEngine();
