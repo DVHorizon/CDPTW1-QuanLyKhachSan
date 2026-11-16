@@ -3,13 +3,29 @@
  * API Client cho Phân hệ Trợ lý AI Concierge (C13) & Quản trị Cơ sở Tri thức AI (C14)
  */
 
-const BASE_URL = 'http://localhost:5000/api/v1/ai';
+import { getAccessToken } from '../utils/tokenStore.js';
+
+const resolveToken = () =>
+  getAccessToken() ||
+  (typeof localStorage !== 'undefined'
+    ? localStorage.getItem('hotel_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('authToken')
+    : null);
+
+const getApiRoot = () => {
+  const envUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+    (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) ||
+    (typeof window === 'undefined' ? 'http://localhost:5000/api' : '/api');
+  const cleaned = String(envUrl).replace(/\/+$/, '');
+  return cleaned.endsWith('/v1') ? cleaned.slice(0, -3) : cleaned;
+};
+
+const BASE_URL = `${getApiRoot()}/v1/ai`;
 
 const getAuthHeaders = () => {
-  const token =
-    localStorage.getItem('hotel_token') ||
-    localStorage.getItem('token') ||
-    localStorage.getItem('authToken');
+  const token = resolveToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -30,7 +46,7 @@ export const sendChatMessageApi = async ({ message, conversationId = null }) => 
     }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -48,7 +64,7 @@ export const fetchKnowledgeBaseApi = async (params = {}) => {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -62,7 +78,7 @@ export const createKnowledgeItemApi = async (payload) => {
     body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -76,7 +92,7 @@ export const updateKnowledgeItemApi = async (id, payload) => {
     body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -90,7 +106,7 @@ export const toggleKnowledgeStatusApi = async (id, status) => {
     body: JSON.stringify(status ? { status } : {}),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -103,7 +119,7 @@ export const deleteKnowledgeItemApi = async (id) => {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -116,7 +132,7 @@ export const testKnowledgeRelevanceApi = async (queryText) => {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -132,7 +148,7 @@ export const fetchConversationsApi = async (params = {}) => {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -144,7 +160,7 @@ export const fetchConversationDetailApi = async (conversationId) => {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -158,7 +174,7 @@ export const claimHandoverApi = async (conversationId, action = 'to_staff') => {
     body: JSON.stringify({ action }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -172,7 +188,7 @@ export const sendStaffReplyApi = async (conversationId, message) => {
     body: JSON.stringify({ message }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -185,6 +201,6 @@ export const resolveConversationApi = async (conversationId) => {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };

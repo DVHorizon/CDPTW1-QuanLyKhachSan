@@ -1,0 +1,29 @@
+{
+  "generatedAt": "2026-11-18T05:36:50.877Z",
+  "mode": "api",
+  "tier": "1",
+  "smoke": null,
+  "counts": {
+    "total": 0,
+    "pass": 0,
+    "fail": 0,
+    "na": 0,
+    "skip": 0,
+    "byApplicability": {
+      "APP": {
+        "pass": 0,
+        "fail": 0,
+        "skip": 0
+      },
+      "API-ONLY": {
+        "pass": 0,
+        "fail": 0,
+        "skip": 0
+      },
+      "N/A": {
+        "na": 0
+      }
+    }
+  },
+  "results": []
+}

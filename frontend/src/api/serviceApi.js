@@ -4,13 +4,29 @@
  * Chuẩn hóa theo đặc tả FEAT-SERVICE-01
  */
 
-const BASE_URL = 'http://localhost:5000/api/v1/services';
+import { getAccessToken } from '../utils/tokenStore.js';
+
+const resolveToken = () =>
+  getAccessToken() ||
+  (typeof localStorage !== 'undefined'
+    ? localStorage.getItem('hotel_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('authToken')
+    : null);
+
+const getApiRoot = () => {
+  const envUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+    (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) ||
+    (typeof window === 'undefined' ? 'http://localhost:5000/api' : '/api');
+  const cleaned = String(envUrl).replace(/\/+$/, '');
+  return cleaned.endsWith('/v1') ? cleaned.slice(0, -3) : cleaned;
+};
+
+const BASE_URL = `${getApiRoot()}/v1/services`;
 
 const getAuthHeaders = () => {
-  const token =
-    localStorage.getItem('hotel_token') ||
-    localStorage.getItem('token') ||
-    localStorage.getItem('authToken');
+  const token = resolveToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -38,7 +54,7 @@ export const fetchServicesApi = async (params = {}) => {
   const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw err;
+    throw { status: res.status, ...err };
   }
   return await res.json();
 };
@@ -53,7 +69,7 @@ export const fetchCategoriesApi = async (params = {}) => {
   const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw err;
+    throw { status: res.status, ...err };
   }
   return await res.json();
 };
@@ -79,8 +95,8 @@ export const createServiceApi = async (serviceData) => {
       description: String(desc || ''),
     }),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -105,8 +121,8 @@ export const updateServiceApi = async (id, serviceData) => {
       description: String(desc || ''),
     }),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -118,8 +134,8 @@ export const deactivateServiceApi = async (id) => {
     method: 'PATCH',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -131,8 +147,8 @@ export const reactivateServiceApi = async (id) => {
     method: 'PATCH',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -145,13 +161,13 @@ export const createCategoryApi = async (categoryData) => {
     headers: getAuthHeaders(),
     body: JSON.stringify(categoryData),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
 // ─── FEAT-SERVICE-03: ĐẶT DỊCH VỤ & SERVICE ORDERS ───────────────────────────
-const ORDERS_BASE_URL = 'http://localhost:5000/api/v1/service-orders';
+const ORDERS_BASE_URL = `${getApiRoot()}/v1/service-orders`;
 
 /**
  * 8. Lấy danh sách các phòng đang lưu trú (CheckedIn hoặc Extended) cho Lễ tân
@@ -160,8 +176,8 @@ export const fetchActiveStaysApi = async () => {
   const res = await fetch(`${ORDERS_BASE_URL}/active-stays`, {
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -172,8 +188,8 @@ export const fetchMyActiveStayApi = async () => {
   const res = await fetch(`${ORDERS_BASE_URL}/my-stay`, {
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -186,8 +202,8 @@ export const createServiceOrderApi = async (orderPayload) => {
     headers: getAuthHeaders(),
     body: JSON.stringify(orderPayload),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -203,8 +219,8 @@ export const fetchServiceOrdersApi = async (params = {}) => {
   const res = await fetch(url, {
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -220,8 +236,8 @@ export const updateServiceOrderStatusApi = async (orderId, payload) => {
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 };
 
@@ -244,7 +260,7 @@ export const exportServicesExcelApi = async (params = {}) => {
   const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw err;
+    throw { status: res.status, ...err };
   }
   const blob = await res.blob();
   const contentDisposition = res.headers.get('Content-Disposition') || '';

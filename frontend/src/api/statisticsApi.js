@@ -1,26 +1,47 @@
 // frontend/src/api/statisticsApi.js
+import { getAccessToken } from '../utils/tokenStore.js';
 
-const getApiBase = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/v1/statistics`;
-  }
-  return 'http://localhost:5000/api/v1/statistics';
+const resolveToken = () =>
+  getAccessToken() ||
+  (typeof localStorage !== 'undefined'
+    ? localStorage.getItem('hotel_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('authToken')
+    : null);
+
+const getApiRoot = () => {
+  const envUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+    (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) ||
+    (typeof window === 'undefined' ? 'http://localhost:5000/api' : '/api');
+  const cleaned = String(envUrl).replace(/\/+$/, '');
+  return cleaned.endsWith('/v1') ? cleaned.slice(0, -3) : cleaned;
 };
 
+const getApiBase = () => `${getApiRoot()}/v1/statistics`;
+
 export const getWsDashboardUrl = () => {
-  if (import.meta.env.VITE_WS_URL) {
-    return `${import.meta.env.VITE_WS_URL.replace(/\/$/, '')}/ws/v1/dashboard`;
+  const envWs =
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_WS_URL) ||
+    (typeof process !== 'undefined' && process.env && process.env.VITE_WS_URL);
+  if (envWs) {
+    return `${String(envWs).replace(/\/+$/, '')}/ws/v1/dashboard`;
+  }
+  const envApi =
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+    (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL);
+  if (envApi && /^https?:\/\//i.test(envApi)) {
+    return `${String(envApi).replace(/^http/i, 'ws').replace(/\/api(\/v1)?\/?$/i, '').replace(/\/+$/, '')}/ws/v1/dashboard`;
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}/ws/v1/dashboard`;
   }
   return 'ws://localhost:5000/ws/v1/dashboard';
 };
 
 function getAuthHeaders() {
-  const token =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('hotel_token') ||
-        localStorage.getItem('token') ||
-        localStorage.getItem('authToken')
-      : null;
+  const token = resolveToken();
   return {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -37,9 +58,10 @@ export async function getRevenueDashboard(date) {
   const res = await fetch(`${getApiBase()}/revenue${query}`, {
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.message || 'Không thể tải dữ liệu thống kê doanh thu.');
+    err.status = res.status;
     err.code = data.code;
     err.data = data;
     throw err;
@@ -54,10 +76,12 @@ export async function getDashboardWsInfo() {
   const res = await fetch(`${getApiBase()}/dashboard/ws-info`, {
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.message || 'Không thể lấy thông tin kết nối thời gian thực.');
+    err.status = res.status;
     err.code = data.code;
+    err.data = data;
     throw err;
   }
   return data;
@@ -76,9 +100,10 @@ export async function getOccupancyReport({ fromDate, toDate } = {}) {
   const res = await fetch(`${getApiBase()}/occupancy${qs}`, {
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.message || 'Không thể tải báo cáo công suất phòng & RevPAR.');
+    err.status = res.status;
     err.code = data.code;
     err.data = data;
     throw err;
@@ -111,6 +136,7 @@ export async function exportOccupancyExcel({ fromDate, toDate, format = 'xlsx' }
       // ignore parse error
     }
     const err = new Error(errMsg);
+    err.status = res.status;
     err.code = errCode;
     throw err;
   }

@@ -36,6 +36,11 @@ module.exports = (sequelize) => {
         key: 'UserId',
       },
     },
+    Version: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
   }, {
     tableName: 'ChatbotConversations',
     timestamps: false,

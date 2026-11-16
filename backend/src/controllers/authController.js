@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
-const { JWT_SECRET } = require('../middlewares/authMiddleware');
+const { JWT_SECRET, loadRolePermissions } = require('../middlewares/authMiddleware');
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
 const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || `${JWT_SECRET}_REFRESH`;
@@ -172,6 +172,8 @@ const serializeUser = (user) => ({
   discountRate: Number(user.DiscountRate || 0),
   pointMultiplier: Number(user.PointMultiplier || 1),
   status: user.Status || 'Active',
+  permissions: Array.isArray(user.permissions) ? user.permissions : [],
+  version: Number(user.Version ?? 1),
   createdAt: user.CreatedAt || null
 });
 
@@ -417,6 +419,7 @@ const register = async (req, res) => {
     };
     const token = signAccessToken(userPayload);
     setRefreshCookie(res, userPayload, req);
+    const permissions = await loadRolePermissions(assignedRoleId);
 
     return res.status(201).json({
       success: true,
@@ -432,7 +435,8 @@ const register = async (req, res) => {
         RoleName: assignedRoleName,
         TierId: membershipTierId,
         TierName: membershipTierId ? 'Standard' : 'Chưa xếp hạng',
-        Status: 'Active'
+        Status: 'Active',
+        permissions
       })
     });
   } catch (error) {
@@ -553,13 +557,14 @@ const login = async (req, res) => {
 
     const token = signAccessToken(user);
     setRefreshCookie(res, user, req);
+    const permissions = await loadRolePermissions(user.RoleId);
 
     return res.status(200).json({
       success: true,
       code: 'SUCCESS_0001_AUTH',
       message: 'Thao tác thành công',
       token,
-      user: serializeUser(user)
+      user: serializeUser({ ...user, permissions })
     });
   } catch (error) {
     console.error('Lỗi API login:', error);
@@ -779,10 +784,12 @@ const getMe = async (req, res) => {
       });
     }
 
+    const permissions = await loadRolePermissions(users[0].RoleId);
+
     return res.status(200).json({
       success: true,
       code: 'SUCCESS_0001_AUTH',
-      user: serializeUser(users[0])
+      user: serializeUser({ ...users[0], permissions })
     });
   } catch (error) {
     console.error('Lỗi API getMe:', error);
@@ -966,11 +973,13 @@ const updateProfile = async (req, res) => {
       });
     }
 
+    const permissions = await loadRolePermissions(users[0].RoleId);
+
     return res.status(200).json({
       success: true,
       code: 'SUCCESS_0001_AUTH',
       message: 'Thao tác thành công',
-      user: serializeUser(users[0])
+      user: serializeUser({ ...users[0], permissions })
     });
   } catch (error) {
     console.error('Lỗi API updateProfile:', error);
@@ -1373,7 +1382,7 @@ const refreshAccessToken = async (req, res) => {
        FROM Users u
        LEFT JOIN Roles r ON u.RoleId = r.RoleId
        LEFT JOIN MembershipTiers mt ON u.TierId = mt.TierId
-       WHERE u.UserId = ? AND u.Status = 'Active'
+       WHERE u.UserId = ? AND u.Status = 'Active' AND (u.IsDeleted = 0 OR u.IsDeleted IS NULL)
        LIMIT 1`,
       [decoded.userId]
     );
@@ -1388,11 +1397,12 @@ const refreshAccessToken = async (req, res) => {
 
     const user = users[0];
     const token = signAccessToken(user);
+    const permissions = await loadRolePermissions(user.RoleId);
     return res.status(200).json({
       success: true,
       code: 'SUCCESS_0001_AUTH',
       token,
-      user: serializeUser(user)
+      user: serializeUser({ ...user, permissions })
     });
   } catch (err) {
     clearRefreshCookie(res);
