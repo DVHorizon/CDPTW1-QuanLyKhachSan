@@ -47,12 +47,13 @@ async function runTests() {
 
   // 2. Tạo một đơn Booking mới ở trạng thái Pending để dùng cho kiểm thử
   console.log('👉 [2] Tạo đơn đặt phòng mới (Pending) để kiểm thử thanh toán cọc...');
-  const createBookingRes = await request('http://localhost:5000/bookings', {
+  const createBookingRes = await request('/guest/bookings', {
     method: 'POST',
+    headers: { Authorization: `Bearer ${guestToken}` },
     body: JSON.stringify({
       roomTypeId: 1,
-      checkInDate: '2026-11-10',
-      checkOutDate: '2026-11-12',
+      checkInDate: '2026-11-20',
+      checkOutDate: '2026-11-22',
       firstName: 'Dang',
       lastName: 'Ha Test',
       email: 'guest@hoteldomain.vn',
@@ -104,7 +105,7 @@ async function runTests() {
     method: 'POST',
     headers: { Authorization: `Bearer ${adminToken}` },
     body: JSON.stringify({
-      bookingId: 998, // Booking đã checked in từ trước
+      bookingId: 1, // Booking đã checked in thực tế từ database
       amount: 100000,
       method: 'Cash',
     }),
@@ -263,6 +264,18 @@ async function runTests() {
   assert.strictEqual(refundSuccessRes.data.data.Status, 'Refunded');
   assert.strictEqual(refundSuccessRes.data.data.RefundReason, 'Khách huỷ đặt cọc phòng có báo trước theo quy định');
   console.log('   ✅ [PASS] TC11: Hoàn tiền thành công, Status = Refunded.\n');
+
+  // Cleanup dữ liệu sau khi chạy test để không chiếm giữ phòng
+  try {
+    const { Payment, Booking, BookingGuest } = require('../src/models');
+    if (testBookingId) {
+      await Payment.destroy({ where: { BookingId: testBookingId } });
+      await BookingGuest.destroy({ where: { BookingId: testBookingId } });
+      await Booking.destroy({ where: { BookingId: testBookingId } });
+    }
+  } catch (cleanErr) {
+    // Không làm gián đoạn kết quả test nếu cleanup gặp cảnh báo
+  }
 
   console.log('====================================================');
   console.log('🎉 TẤT CẢ 11/11 TEST CASES C5 (FEAT-PAYMENT-01) ĐÃ PASS 100%!');

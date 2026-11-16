@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { loginUser, registerUser, fetchCurrentUser, loginWithGoogle, loginWithFacebook } from '../api/authApi';
+import { loginUser, registerUser, fetchCurrentUser, loginWithGoogle, loginWithFacebook, refreshAuthToken, logoutUserSession } from '../api/authApi';
+import { getAccessToken, setAccessToken, clearAccessToken } from '../utils/tokenStore';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(() => {
-    return localStorage.getItem('hotel_token') || null;
+    return getAccessToken() || null;
   });
 
   const [user, setUser] = useState(() => {
@@ -19,7 +20,7 @@ export const AuthProvider = ({ children }) => {
 
   const [isLoading, setIsLoading] = useState(true);
 
-  // Đồng bộ hóa trạng thái tài khoản khi khởi chạy
+  // Đồng bộ hóa trạng thái tài khoản khi khởi chạy qua accessToken memory hoặc HttpOnly refresh cookie
   useEffect(() => {
     const verifyUser = async () => {
       if (token) {
@@ -28,8 +29,23 @@ export const AuthProvider = ({ children }) => {
           setUser(freshUser);
           localStorage.setItem('hotel_user', JSON.stringify(freshUser));
         } else {
-          // Token không còn hợp lệ
           handleLogout();
+        }
+      } else {
+        const hasSessionHint = Boolean(localStorage.getItem('hotel_user'));
+        const refreshed = hasSessionHint ? await refreshAuthToken() : null;
+        if (refreshed?.success && refreshed.token) {
+          setAccessToken(refreshed.token);
+          setToken(refreshed.token);
+          if (refreshed.user) {
+            setUser(refreshed.user);
+            localStorage.setItem('hotel_user', JSON.stringify(refreshed.user));
+          }
+        } else {
+          // Nếu có legacy hotel_token trong localStorage thì dọn sạch để tuân thủ in-memory accessToken
+          localStorage.removeItem('hotel_token');
+          localStorage.removeItem('hotel_user');
+          setUser(null);
         }
       }
       setIsLoading(false);
@@ -38,12 +54,13 @@ export const AuthProvider = ({ children }) => {
     verifyUser();
   }, [token]);
 
-  const handleLogin = async (identifier, password) => {
-    const response = await loginUser({ identifier, password });
+  const handleLogin = async (identifier, password, expectedRole) => {
+    const response = await loginUser({ identifier, password, expectedRole });
     if (response.success && response.token) {
+      setAccessToken(response.token);
       setToken(response.token);
       setUser(response.user);
-      localStorage.setItem('hotel_token', response.token);
+      localStorage.removeItem('hotel_token');
       localStorage.setItem('hotel_user', JSON.stringify(response.user));
     }
     return response;
@@ -52,9 +69,10 @@ export const AuthProvider = ({ children }) => {
   const handleRegister = async (formData) => {
     const response = await registerUser(formData);
     if (response.success && response.token) {
+      setAccessToken(response.token);
       setToken(response.token);
       setUser(response.user);
-      localStorage.setItem('hotel_token', response.token);
+      localStorage.removeItem('hotel_token');
       localStorage.setItem('hotel_user', JSON.stringify(response.user));
     }
     return response;
@@ -63,9 +81,10 @@ export const AuthProvider = ({ children }) => {
   const handleGoogleLogin = async (payload) => {
     const response = await loginWithGoogle(payload);
     if (response.success && response.token) {
+      setAccessToken(response.token);
       setToken(response.token);
       setUser(response.user);
-      localStorage.setItem('hotel_token', response.token);
+      localStorage.removeItem('hotel_token');
       localStorage.setItem('hotel_user', JSON.stringify(response.user));
     }
     return response;
@@ -74,15 +93,26 @@ export const AuthProvider = ({ children }) => {
   const handleFacebookLogin = async (payload) => {
     const response = await loginWithFacebook(payload);
     if (response.success && response.token) {
+      setAccessToken(response.token);
       setToken(response.token);
       setUser(response.user);
-      localStorage.setItem('hotel_token', response.token);
+      localStorage.removeItem('hotel_token');
       localStorage.setItem('hotel_user', JSON.stringify(response.user));
     }
     return response;
   };
 
+  const handleUpdateUser = (updatedData) => {
+    setUser((prev) => {
+      const merged = typeof updatedData === 'function' ? updatedData(prev) : { ...(prev || {}), ...updatedData };
+      localStorage.setItem('hotel_user', JSON.stringify(merged));
+      return merged;
+    });
+  };
+
   const handleLogout = () => {
+    logoutUserSession().catch(() => {});
+    clearAccessToken();
     setToken(null);
     setUser(null);
     localStorage.removeItem('hotel_token');
@@ -98,6 +128,7 @@ export const AuthProvider = ({ children }) => {
     register: handleRegister,
     loginGoogle: handleGoogleLogin,
     loginFacebook: handleFacebookLogin,
+    updateUser: handleUpdateUser,
     logout: handleLogout
   };
 

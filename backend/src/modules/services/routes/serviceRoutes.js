@@ -36,6 +36,7 @@ const checkServicePermission = (req, res, next) => {
 
 // ─── ENDPOINTS QUẢN LÝ DỊCH VỤ ───────────────────────────────────────────────
 router.get('/', serviceController.getAllServices);
+router.get('/export', serviceController.exportServicesExcel);
 router.get('/categories', serviceController.getCategories);
 router.post('/categories', checkServicePermission, serviceController.createCategory);
 

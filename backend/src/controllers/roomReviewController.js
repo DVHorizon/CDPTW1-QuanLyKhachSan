@@ -16,7 +16,11 @@
  * - ERROR_0042_FILE_TOO_LARGE:   "Mỗi ảnh tải lên không được vượt quá dung lượng 15MB"
  */
 
+const fs = require('fs');
+const path = require('path');
 const { Op } = require('sequelize');
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../middlewares/authMiddleware');
 const {
   sequelize,
   Review,
@@ -56,6 +60,15 @@ function resolveUserId(req) {
   if (req.user && (req.user.userId || req.user.id || req.user.UserId)) {
     return Number(req.user.userId || req.user.id || req.user.UserId);
   }
+  if (req.headers && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    try {
+      const token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      if (decoded && (decoded.userId || decoded.id || decoded.UserId)) {
+        return Number(decoded.userId || decoded.id || decoded.UserId);
+      }
+    } catch (_) {}
+  }
   if (req.headers && req.headers['x-user-id']) {
     return Number(req.headers['x-user-id']);
   }
@@ -63,6 +76,23 @@ function resolveUserId(req) {
     return Number(req.body.userId);
   }
   return null;
+}
+
+/**
+ * Helper: Lưu ảnh Base64 (Data URL) ra file /uploads/reviews để tránh tràn VARCHAR(1000)
+ */
+function persistReviewPhotoUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const match = rawUrl.match(/^data:image\/(png|jpe?g|webp);base64,(.+)$/i);
+  if (!match) return rawUrl.slice(0, 1000);
+
+  const ext = match[1].toLowerCase() === 'jpeg' ? 'jpg' : match[1].toLowerCase();
+  const buffer = Buffer.from(match[2], 'base64');
+  const uploadDir = path.join(__dirname, '../../uploads/reviews');
+  fs.mkdirSync(uploadDir, { recursive: true });
+  const fileName = `review-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  fs.writeFileSync(path.join(uploadDir, fileName), buffer);
+  return `/uploads/reviews/${fileName}`;
 }
 
 /**
@@ -211,6 +241,33 @@ exports.createRoomReview = async (req, res) => {
         include: [{ model: Booking }],
         transaction
       });
+
+      // Fallback nếu Booking đã Completed/CheckedOut nhưng chưa có bản ghi Stay tương ứng
+      if (!targetStay) {
+        const completedBooking = await Booking.findOne({
+          where: {
+            BookingId: bookingId,
+            Status: { [Op.in]: ['Completed', 'CheckedOut'] }
+          },
+          transaction
+        });
+        if (completedBooking) {
+          const fallbackRoom = await Room.findOne({
+            where: { RoomTypeId: completedBooking.RoomTypeId },
+            transaction
+          });
+          if (fallbackRoom) {
+            targetStay = await Stay.create({
+              BookingId: completedBooking.BookingId,
+              RoomId: fallbackRoom.RoomId,
+              ActualCheckIn: completedBooking.CheckInDate || new Date(),
+              ActualCheckOut: completedBooking.CheckOutDate || new Date(),
+              Status: 'CheckedOut'
+            }, { transaction });
+            targetStay.Booking = completedBooking;
+          }
+        }
+      }
     }
 
     // Nếu không truyền cụ thể, tìm lượt lưu trú completed gần nhất của User cho phòng / loại phòng này
@@ -286,7 +343,10 @@ exports.createRoomReview = async (req, res) => {
 
     // 4. Kiểm tra điều kiện tiên quyết: Mỗi lượt lưu trú chỉ được đánh giá duy nhất 1 lần (ERROR_0041 - TC02)
     const existingReview = await Review.findOne({
-      where: { StayId: targetStay.StayId },
+      where: {
+        StayId: targetStay.StayId,
+        IsDeleted: { [Op.or]: [0, false, null] }
+      },
       transaction
     });
 
@@ -338,12 +398,14 @@ exports.createRoomReview = async (req, res) => {
       IsAnonymous: Boolean(isAnonymous)
     }, { transaction });
 
-    // 7. Lưu ReviewPhotos
+    // 7. Lưu ReviewPhotos (chuyển Base64 data URL thành file tĩnh dưới /uploads/reviews)
     const savedPhotos = [];
     for (const pUrl of photosToSave) {
+      const persistedUrl = persistReviewPhotoUrl(pUrl);
+      if (!persistedUrl) continue;
       const p = await ReviewPhoto.create({
         ReviewId: newReview.ReviewId,
-        PhotoUrl: pUrl
+        PhotoUrl: persistedUrl
       }, { transaction });
       savedPhotos.push({
         photoId: p.PhotoId,
@@ -427,7 +489,8 @@ exports.getRoomReviews = async (req, res) => {
     const stayIds = matchingStays.map(s => s.StayId);
 
     const reviewWhere = {
-      StayId: { [Op.in]: stayIds.length > 0 ? stayIds : [-1] }
+      StayId: { [Op.in]: stayIds.length > 0 ? stayIds : [-1] },
+      IsDeleted: false
     };
     if (tripType && tripType !== 'ALL') {
       reviewWhere.TripClassification = tripType.toUpperCase();
@@ -541,6 +604,56 @@ exports.getRoomReviews = async (req, res) => {
       success: false,
       message: 'Lỗi tải danh sách đánh giá phòng.'
     });
+  }
+};
+
+/**
+ * Xóa mềm đánh giá (Soft Delete: IsDeleted 0 -> 1)
+ * DELETE /api/v1/rooms/reviews/:reviewId
+ */
+exports.softDeleteReview = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.UserId;
+    const { reviewId } = req.params;
+    const review = await Review.findOne({ where: { ReviewId: reviewId, UserId: userId, IsDeleted: false } });
+    if (!review) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy đánh giá.' });
+    }
+    review.IsDeleted = true;
+    review.DeletedAt = new Date();
+    await review.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Đã chuyển đánh giá vào thùng rác (IsDeleted = 1).',
+      data: { reviewId: review.ReviewId, isDeleted: true }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Lỗi xóa mềm đánh giá.' });
+  }
+};
+
+/**
+ * Khôi phục đánh giá từ thùng rác (IsDeleted 1 -> 0)
+ * PATCH /api/v1/rooms/reviews/:reviewId/restore
+ */
+exports.restoreReview = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.UserId;
+    const { reviewId } = req.params;
+    const review = await Review.findOne({ where: { ReviewId: reviewId, UserId: userId, IsDeleted: true } });
+    if (!review) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy đánh giá trong thùng rác.' });
+    }
+    review.IsDeleted = false;
+    review.DeletedAt = null;
+    await review.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Đã khôi phục đánh giá (IsDeleted = 0).',
+      data: { reviewId: review.ReviewId, isDeleted: false }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Lỗi khôi phục đánh giá.' });
   }
 };
 

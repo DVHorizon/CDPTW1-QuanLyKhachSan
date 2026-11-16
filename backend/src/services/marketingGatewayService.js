@@ -225,7 +225,8 @@ async function initMarketingDatabase() {
 
     console.log('[Marketing DB] Đã đồng bộ bảng và dữ liệu tiếp thị đa kênh vào Database thành công.');
   } catch (error) {
-    console.error('[Marketing DB] Lỗi khởi tạo bảng:', error.message);
+    const detail = error.errors ? error.errors.map(e => e.message).join(', ') : error.message;
+    console.error('[Marketing DB] Lỗi khởi tạo bảng:', detail);
   }
 }
 

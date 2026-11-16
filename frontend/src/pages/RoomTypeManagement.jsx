@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import AdminLayout from '../components/admin/layout/AdminLayout';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import ConfirmSoftDeleteModal from '../components/modals/ConfirmSoftDeleteModal';
 
 const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '3000'
   ? '/api/v1/room-types'
@@ -105,7 +106,14 @@ const RoomTypeManagement = () => {
   }, [user]);
 
   const showToast = (msg, type = 'success', code = '') => {
-    setToast({ msg, type, code });
+    if (code) {
+      if (type === 'error') {
+        console.error('[Mã lỗi hệ thống]: ' + code, { msg });
+      } else {
+        console.log('[Mã phản hồi]: ' + code, { msg });
+      }
+    }
+    setToast({ msg, type });
     setTimeout(() => setToast(null), 4500);
   };
 
@@ -920,9 +928,7 @@ const RoomTypeManagement = () => {
             </span>
             <div className="flex flex-col">
               <span className="text-[14px] leading-snug">{toast.msg}</span>
-              {toast.code && (
-                <span className="text-[11px] font-mono opacity-80 mt-0.5">Mã lỗi: {toast.code}</span>
-              )}
+              
             </div>
           </div>
         )}
@@ -1925,50 +1931,19 @@ const RoomTypeManagement = () => {
           </div>
         )}
 
-        {/* ─── HỘP THOẠI XÁC NHẬN XÓA LOẠI PHÒNG (Mục 3.9) ──────────────────── */}
-        {deleteTarget && (
-          <div className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden p-6 border border-gray-200">
-              <div className="flex items-center gap-3 text-red-600 mb-3">
-                <span className="material-symbols-outlined text-[32px]">warning</span>
-                <h3 className="text-lg font-bold text-gray-900">Xác Nhận Xóa Loại Phòng</h3>
-              </div>
-
-              <p className="text-sm text-gray-700 leading-relaxed mb-6">
-                Bạn có chắc chắn muốn xóa loại phòng{' '}
-                <strong className="text-gray-900">
-                  [{deleteTarget.typeName || deleteTarget.name}]
-                </strong>
-                ? Hành động này có thể khôi phục trong vòng 30 ngày.
-              </p>
-
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(null)}
-                  disabled={isDeleting}
-                  className="px-4 py-2 bg-white border border-[#999999] text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-100 transition"
-                >
-                  Hủy
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleConfirmDelete}
-                  disabled={isDeleting}
-                  className="px-5 py-2 bg-[#D93025] text-white text-sm font-bold rounded-lg hover:bg-red-700 transition flex items-center gap-1.5 shadow-sm"
-                >
-                  {isDeleting && (
-                    <span className="material-symbols-outlined text-[16px] animate-spin">
-                      progress_activity
-                    </span>
-                  )}
-                  <span>Xác nhận xóa</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* ─── HỘP THOẠI XÁC NHẬN XÓA LOẠI PHÒNG (MODAL M3 SOFT DELETE) ──────────────────── */}
+        <ConfirmSoftDeleteModal
+          isOpen={Boolean(deleteTarget)}
+          title="XÁC NHẬN XÓA HẠNG PHÒNG NÀY?"
+          subtitle="Bạn sắp xóa đối tượng khỏi danh mục kinh doanh hiện hành. Dữ liệu sẽ được ẩn khỏi hệ sinh thái bán phòng trực tuyến và chuyển vào kho lưu trữ (Cơ chế Soft Delete — IsDeleted: 0 → 1)."
+          entityCode={deleteTarget?.roomTypeId ? `RT-${deleteTarget.roomTypeId}` : ''}
+          entityName={deleteTarget?.typeName || deleteTarget?.name || ''}
+          entityMeta={deleteTarget?.basePrice ? `Giá niêm yết: ${new Intl.NumberFormat('vi-VN').format(deleteTarget.basePrice)} đ/đêm` : 'Có thể khôi phục trong vòng 30 ngày'}
+          confirmLabel="XÓA HẠNG PHÒNG"
+          isSubmitting={isDeleting}
+          onClose={() => !isDeleting && setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+        />
 
         {/* ─── HỘP THOẠI CẢNH BÁO RÀNG BUỘC KHI XÓA & HƯỚNG DẪN XÓA (ERROR_0015) ─── */}
         {deleteErrorPrompt && (

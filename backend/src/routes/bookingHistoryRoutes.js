@@ -15,11 +15,21 @@
 const express = require('express');
 const router = express.Router();
 const bookingHistoryController = require('../controllers/bookingHistoryController');
+const authController = require('../controllers/authController');
 const { verifyToken } = require('../middlewares/authMiddleware');
+
+// FEAT-GUEST-01: Hồ sơ cá nhân (/api/v1/me/profile, /api/me/profile, /me/profile)
+router.get('/profile', verifyToken, authController.getMe);
+router.put('/profile', verifyToken, authController.updateProfile);
 
 // Middleware hỗ trợ cả JWT auth chính thống và kiểm thử linh hoạt
 router.get('/bookings', verifyToken, bookingHistoryController.getMyBookings);
 router.get('/bookings/:bookingId', verifyToken, bookingHistoryController.getMyBookingDetail);
 router.patch('/bookings/:bookingId/cancel', verifyToken, bookingHistoryController.cancelMyBooking);
+router.delete('/bookings/:bookingId', verifyToken, bookingHistoryController.softDeleteMyBooking);
+router.patch('/bookings/:bookingId/restore', verifyToken, bookingHistoryController.restoreMyBooking);
+
+// FEAT-GUEST-13C: Wishlist sub-route
+router.use('/wishlist', require('./wishlistRoutes'));
 
 module.exports = router;

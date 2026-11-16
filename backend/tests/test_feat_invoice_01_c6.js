@@ -81,22 +81,24 @@ async function runTests() {
 
   // TC04: Booking chưa check-in (chưa có Stay nào) -> estimated=true, stays=[], grandTotal = Bookings.TotalAmount (Spec TC3)
   console.log('👉 [5] TC04: Booking chưa check-in (chưa có Stay nào)...');
-  const createBookingRes = await request('http://localhost:5000/bookings', {
-    method: 'POST',
-    body: JSON.stringify({
-      roomTypeId: 1,
-      checkInDate: '2026-11-20',
-      checkOutDate: '2026-11-22',
-      firstName: 'Dang',
-      lastName: 'Ha Estimated Test',
-      email: 'guest@hoteldomain.vn',
-      phoneNumber: '0987654321',
-      isPolicyAccepted: true,
-    }),
+  const estimatedBooking = await Booking.create({
+    UserId: 5,
+    RoomTypeId: 1,
+    ConfirmationCode: 'CONF-EST-' + Date.now(),
+    CheckInDate: '2026-12-01',
+    CheckOutDate: '2026-12-03',
+    NumberOfNights: 2,
+    RoomQuantity: 1,
+    RoomSubtotal: 2000000,
+    TotalAmount: 2000000,
+    DepositAmount: 500000,
+    SurchargeAmount: 0,
+    DiscountAmount: 0,
+    Status: 'Confirmed',
+    CreatedAt: new Date(),
   });
-  assert.strictEqual(createBookingRes.status, 201, 'Tạo booking mới thất bại');
-  const estimatedBookingId = createBookingRes.data.data.bookingId;
-  const expectedTotal = Number(createBookingRes.data.data.totalAmount);
+  const estimatedBookingId = estimatedBooking.BookingId;
+  const expectedTotal = Number(estimatedBooking.TotalAmount);
 
   const tc04Res = await request(`/bookings/${estimatedBookingId}/charges`, {
     headers: { Authorization: `Bearer ${adminToken}` },
@@ -111,6 +113,7 @@ async function runTests() {
   // Chuẩn bị dữ liệu kiểm thử có Stay thực tế
   console.log('👉 [6] Tạo Booking có 1 Stay thực tế để kiểm thử tính chi tiết phát sinh...');
   const testBooking = await Booking.create({
+    UserId: 5,
     RoomTypeId: 1,
     ConfirmationCode: 'CONF-TEST-C6-' + Date.now(),
     CheckInDate: '2026-10-20',
@@ -128,8 +131,8 @@ async function runTests() {
 
   const testStay = await Stay.create({
     BookingId: testBooking.BookingId,
-    RoomId: 101,
-    ActualCheckIn: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // Check-in 3 ngày trước
+    RoomId: 1,
+    ActualCheckIn: new Date(Date.now() - 2.95 * 24 * 60 * 60 * 1000), // Check-in 3 ngày trước
     ActualCheckOut: null, // Chưa check-out
     Status: 'CheckedIn',
   });

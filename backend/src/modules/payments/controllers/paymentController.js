@@ -6,6 +6,8 @@
  * Cung cấp dịch vụ thanh toán dùng chung: Cash / Card / BankTransfer / VNPay / MoMo / VietQR
  */
 
+const fs = require('fs');
+const path = require('path');
 const { Op } = require('sequelize');
 const {
   Payment,
@@ -43,10 +45,13 @@ exports.createPayment = async (req, res) => {
       bookingId,
       invoiceId,
       amount,
-      method,
+      method: rawMethod,
+      paymentMethod: aliasMethod,
       returnUrl,
       depositOption,
+      transactionCode: requestedTxCode,
     } = req.body;
+    const method = rawMethod || aliasMethod;
 
     // 1. Phân quyền phương thức thanh toán theo Actor (Mục 1.4.a)
     if (!isStaffOrAdmin) {
@@ -123,9 +128,12 @@ exports.createPayment = async (req, res) => {
         });
       }
 
-      // Guest chỉ được thanh toán cho booking của chính mình
-      if (!isStaffOrAdmin) {
+      // Guest chỉ được thanh toán cho booking của chính mình (hoặc đơn DirectWeb vừa đặt trực tuyến)
+      if (!isStaffOrAdmin && userId) {
         let isOwner = targetBooking.UserId && Number(targetBooking.UserId) === Number(userId);
+        if (!isOwner && Number(targetBooking.UserId) === 1 && targetBooking.BookingSource === 'DirectWeb') {
+          isOwner = true;
+        }
         if (!isOwner && userEmail && BookingGuest) {
           const guest = await BookingGuest.findOne({
             where: { BookingId: targetBooking.BookingId, Email: userEmail },
@@ -176,6 +184,15 @@ exports.createPayment = async (req, res) => {
       }
     } else {
       // hasInvoice
+      if (!isStaffOrAdmin && !userId) {
+        await transaction.rollback();
+        return res.status(401).json({
+          success: false,
+          code: 'ERROR_0009_UNAUTHENTICATED',
+          message: 'Bạn cần đăng nhập để thực hiện chức năng này',
+        });
+      }
+
       targetInvoice = await Invoice.findByPk(Number(invoiceId), {
         include: [
           {
@@ -265,6 +282,16 @@ exports.createPayment = async (req, res) => {
           existingPending.GatewayResponse = JSON.stringify({ reason: 'Timeout' });
           await existingPending.save({ transaction });
         } else {
+          // Nếu client truyền mã PMT hợp lệ hoặc đổi số tiền/phương thức, đồng bộ lại bản ghi Pending
+          const cleanReqCode = requestedTxCode && /^PMT-\d{14}-\d{4}$/.test(String(requestedTxCode).trim())
+            ? String(requestedTxCode).trim()
+            : null;
+          if (cleanReqCode && existingPending.TransactionCode !== cleanReqCode) {
+            existingPending.TransactionCode = cleanReqCode;
+            existingPending.Amount = numAmount;
+            existingPending.PaymentMethod = method;
+            await existingPending.save({ transaction });
+          }
           // Vẫn còn hạn -> Trả về giao dịch Pending cũ, KHÔNG tạo bản ghi mới
           await transaction.commit();
           const gwData = await createGatewayTransaction({
@@ -291,7 +318,10 @@ exports.createPayment = async (req, res) => {
     }
 
     // 7. Tạo giao dịch Payment mới
-    const transactionCode = generateTransactionCode();
+    const transactionCode =
+      requestedTxCode && /^PMT-\d{14}-\d{4}$/.test(String(requestedTxCode).trim())
+        ? String(requestedTxCode).trim()
+        : generateTransactionCode();
     const isOnline = ['VNPay', 'MoMo', 'VietQR'].includes(method);
     const initialStatus = isOnline ? 'Pending' : 'Paid';
 
@@ -299,7 +329,7 @@ exports.createPayment = async (req, res) => {
       {
         InvoiceId: hasInvoice ? targetInvoice.InvoiceId : null,
         BookingId: hasBooking ? targetBooking.BookingId : null,
-        UserId: userId || null,
+        UserId: userId || (hasBooking ? targetBooking.UserId : null) || null,
         Amount: numAmount,
         PaymentMethod: method,
         PaymentDate: new Date(),
@@ -328,12 +358,19 @@ exports.createPayment = async (req, res) => {
         }
         await targetInvoice.save({ transaction });
       }
-
-      // Quyết định C5 (ticket 03): Không tự đổi Booking.Status sang Confirmed trong Core Payment,
-      // để module Booking (A8) phụ trách vòng đời booking và broadcast websocket.
     }
 
     await transaction.commit();
+
+    try {
+      const { notifyDashboardEvent } = require('../../../sockets/socketHandler');
+      if (typeof notifyDashboardEvent === 'function' && !isOnline) {
+        notifyDashboardEvent('PAYMENT_SUCCESS', {
+          paymentId: newPayment.PaymentId,
+          amount: newPayment.Amount,
+        });
+      }
+    } catch (_) {}
 
     // 9. Sinh dữ liệu cổng thanh toán (Mock / Real)
     let gatewayResult = {};
@@ -526,11 +563,57 @@ exports.handleWebhook = async (req, res) => {
         }
       }
 
-      // Quyết định C5 (ticket 03): C5 chỉ ghi nhận Payment thành công,
-      // không tự động thay đổi Booking.Status để nhường quyền quản lý vòng đời cho module Booking (A8).
+      if (payment.BookingId && !payment.InvoiceId) {
+        const booking = await Booking.findByPk(payment.BookingId, { transaction });
+        if (booking) {
+          const allBookingPaid = await Payment.findAll({
+            where: {
+              BookingId: booking.BookingId,
+              Status: { [Op.in]: PAID_STATUSES },
+            },
+            transaction,
+          });
+          const totalBookingPaid = allBookingPaid.reduce((sum, p) => sum + Number(p.Amount || 0), 0);
+          booking.DepositAmount = totalBookingPaid;
+          if (booking.Status === 'Pending') {
+            booking.Status = 'Confirmed';
+          }
+          if (!booking.BookingQrCode && booking.ConfirmationCode) {
+            booking.BookingQrCode = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${booking.ConfirmationCode}`;
+          }
+          await booking.save({ transaction });
+        }
+      }
     }
 
     await transaction.commit();
+
+    if (isSuccess) {
+      try {
+        const { broadcastRoomEvent, notifyDashboardEvent } = require('../../../sockets/socketHandler');
+        if (typeof notifyDashboardEvent === 'function') {
+          notifyDashboardEvent('PAYMENT_SUCCESS', {
+            paymentId: payment.PaymentId,
+            bookingId: payment.BookingId,
+            invoiceId: payment.InvoiceId,
+            amount: Number(payment.Amount),
+          });
+        }
+        if (payment.BookingId && typeof broadcastRoomEvent === 'function') {
+          broadcastRoomEvent('PAYMENT_COMPLETED', {
+            bookingId: payment.BookingId,
+            transactionCode: payment.TransactionCode,
+            amountPaid: Number(payment.Amount),
+            paymentMethod: payment.PaymentMethod,
+            status: 'Confirmed',
+          });
+          broadcastRoomEvent('BOOKING_CONFIRMED', {
+            bookingId: payment.BookingId,
+            status: 'Confirmed',
+          });
+        }
+      } catch (_) {}
+    }
 
     return res.status(200).json({
       success: true,
@@ -574,12 +657,16 @@ exports.refundPayment = async (req, res) => {
 
     let payment = null;
     if (!isNaN(Number(paymentId))) {
-      payment = await Payment.findByPk(Number(paymentId), { transaction });
+      payment = await Payment.findByPk(Number(paymentId), {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
     }
     if (!payment) {
       payment = await Payment.findOne({
         where: { TransactionCode: paymentId },
         transaction,
+        lock: transaction.LOCK.UPDATE,
       });
     }
 
@@ -623,7 +710,9 @@ exports.refundPayment = async (req, res) => {
     }
 
     // Validate refundAmount
-    const amountVal = refundAmount ? Number(refundAmount) : Number(payment.Amount);
+    const amountVal = (refundAmount !== undefined && refundAmount !== null)
+      ? Number(refundAmount)
+      : Number(payment.Amount);
     if (isNaN(amountVal) || amountVal <= 0 || amountVal > Number(payment.Amount)) {
       await transaction.rollback();
       return res.status(400).json({
@@ -654,7 +743,68 @@ exports.refundPayment = async (req, res) => {
     payment.GatewayResponse = JSON.stringify(currentGw);
 
     await payment.save({ transaction });
+
+    // R2-ISSUE-06 & C10: Cập nhật lại trạng thái Invoice tương ứng khi có hoàn tiền
+    if (payment.InvoiceId) {
+      const invoice = await Invoice.findByPk(payment.InvoiceId, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (invoice) {
+        const allPayments = await Payment.findAll({
+          where: { InvoiceId: invoice.InvoiceId },
+          transaction,
+        });
+
+        // Tính trực tiếp Net Paid: tổng (Amount - RefundAmount) của các giao dịch hợp lệ
+        let netPaid = 0;
+        for (const p of allPayments) {
+          const origAmt = Number(p.Amount || 0);
+          const refAmt = Number(p.RefundAmount || 0);
+
+          if (PAID_STATUSES.includes(p.Status)) {
+            netPaid += Math.max(0, origAmt - refAmt);
+          } else if (p.Status === 'Refunded') {
+            const actualRef = refAmt > 0 ? refAmt : origAmt;
+            netPaid += Math.max(0, origAmt - actualRef);
+          }
+        }
+
+        const totalAmount = Number(invoice.TotalAmount || 0);
+
+        if (netPaid <= 0) {
+          invoice.Status = 'Cancelled';
+        } else if (netPaid < totalAmount) {
+          invoice.Status = 'PartiallyPaid';
+        } else {
+          invoice.Status = 'Paid';
+        }
+
+        invoice.PdfPath = null;
+        await invoice.save({ transaction });
+
+        // Xoá file vật lý PDF đã cache
+        if (invoice.InvoiceNumber) {
+          const fileName = `INV-${invoice.InvoiceNumber}.pdf`;
+          const filePath = path.join(__dirname, '../../../../public/uploads/invoices', fileName);
+          if (fs.existsSync(filePath)) {
+            try { fs.unlinkSync(filePath); } catch (e) {}
+          }
+        }
+      }
+    }
+
     await transaction.commit();
+
+    try {
+      const { notifyDashboardEvent } = require('../../../sockets/socketHandler');
+      if (typeof notifyDashboardEvent === 'function') {
+        notifyDashboardEvent('PAYMENT_REFUNDED', {
+          paymentId: payment.PaymentId,
+          refundAmount: amountVal,
+        });
+      }
+    } catch (_) {}
 
     return res.status(200).json({
       success: true,

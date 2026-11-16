@@ -15,7 +15,12 @@ const roomSearchController = require('../../controllers/roomSearchController');
 const roomAvailabilityController = require('../../controllers/roomAvailabilityController');
 const bookingEngineController = require('../../controllers/bookingEngineController');
 const onlineDepositPaymentController = require('../../controllers/onlineDepositPaymentController');
-const { verifyToken } = require('../../middlewares/authMiddleware');
+const aiRoomRecommendationController = require('../../controllers/aiRoomRecommendationController');
+const { verifyToken, optionalVerifyToken } = require('../../middlewares/authMiddleware');
+
+// ─── AI GỢI Ý PHÒNG THÔNG MINH (RAG + GEMINI API) ───────────────────────────
+router.post('/rooms/ai-recommend',    optionalVerifyToken, aiRoomRecommendationController.getAiRoomRecommendations);
+router.get('/rooms/ai-recommend',     optionalVerifyToken, aiRoomRecommendationController.getAiRoomRecommendations);
 
 // ─── TÍNH NĂNG 4: REAL-TIME AVAILABILITY & LOCK (FEAT-GUEST-04) ─────────────
 router.get('/rooms/availability',    roomAvailabilityController.checkRoomAvailability);
@@ -39,6 +44,10 @@ router.get('/me/bookings', verifyToken, bookingHistoryController.getMyBookings);
 router.get('/me/bookings/:bookingId', verifyToken, bookingHistoryController.getMyBookingDetail);
 router.patch('/me/bookings/:bookingId/cancel', verifyToken, bookingHistoryController.cancelMyBooking);
 
+// ─── TÍNH NĂNG 13B: SO SÁNH PHÒNG TRỰC QUAN (FEAT-GUEST-13B / A13) ────────────
+const roomCompareController = require('../../controllers/roomCompareController');
+router.get('/rooms/compare', roomCompareController.compareRooms);
+
 // ─── TÌM KIẾM & XEM PHÒNG ──────────────────────────────────────────────────
 router.get('/rooms/search',          roomSearchController.searchRooms);
 router.get('/rooms/suggest',         roomSearchController.suggestRooms);
@@ -50,4 +59,10 @@ router.get('/branches',              roomSearchController.getBranches);
 const bookingQrNotificationController = require('../../controllers/bookingQrNotificationController');
 router.get('/bookings/:bookingId/qr-code', bookingQrNotificationController.getBookingQRCode);
 router.post('/notifications/email-confirmation', bookingQrNotificationController.sendEmailConfirmation);
+
+// ─── TÍNH NĂNG 11: ĐÁNH GIÁ VÀ CHẤM ĐIỂM SAO PHÒNG LƯU TRÚ (FEAT-GUEST-11 / A11) ───
+const roomReviewController = require('../../controllers/roomReviewController');
+router.post('/rooms/:roomId/reviews', roomReviewController.createRoomReview);
+router.get('/rooms/:roomId/reviews', roomReviewController.getRoomReviews);
+
 module.exports = router;

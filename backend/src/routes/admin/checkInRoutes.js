@@ -5,6 +5,7 @@ const router = express.Router();
 const pool = require('../../config/db');
 const { verifyToken, requirePermission } = require('../../middlewares/authMiddleware');
 const checkInController = require('../../controllers/admin/checkInController');
+const { generateTransactionCode } = require('../../modules/payments/services/paymentGatewayService');
 
 // Tiện ích format ngày
 const toDateStr = (d) => {
@@ -15,16 +16,44 @@ const toDateStr = (d) => {
   return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
 };
 
+// Wrapper xử lý quét QR với kiểm tra trạng thái booking Cancelled (Spec 8)
+const handleScanQr = async (req, res, next) => {
+  const { qrPayload } = req.body || {};
+  if (qrPayload && typeof qrPayload === 'string') {
+    const raw = qrPayload.trim();
+    const isNum = /^\d+$/.test(raw);
+    try {
+      const [rows] = await pool.query(
+        `SELECT Status FROM Bookings WHERE (ConfirmationCode = ? ${isNum ? 'OR BookingId = ?' : ''}) LIMIT 1`,
+        isNum ? [raw, Number(raw)] : [raw]
+      );
+      if (rows.length > 0 && rows[0].Status === 'Cancelled') {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0018_BOOKING_STATUS',
+          errorCode: 'ERROR_0018_BOOKING_STATUS',
+          message: 'Đơn đặt phòng này đã bị hủy, không thể làm thủ tục check-in',
+        });
+      }
+    } catch (_) {
+      // Tiếp tục chuyển cho controller xử lý
+    }
+  }
+  return checkInController.scanQrCode(req, res, next);
+};
+
 // ─── SPEC 8: ENDPOINTS CHUẨN (FEAT-CHECKIN-01) ──────────────────────────────
 // 1. Quét & decode mã QR booking: POST /api/v1/check-ins/scan-qr
-router.post('/scan-qr', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.scanQrCode);
+router.post('/scan-qr', verifyToken, requirePermission('CHECKIN_CREATE'), handleScanQr);
 
 // 2. Tra cứu booking theo mã: GET /api/v1/check-ins/bookings/:bookingCode
 router.get('/bookings/:bookingCode', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.getBookingByCode);
 
-// 3. Hoàn tất Check-in & lưu CCCD/Passport: POST /api/v1/check-ins (và alias /complete)
+// 3. Hoàn tất Check-in & lưu CCCD/Passport: POST /api/v1/check-ins (và aliases /complete, /checkin, /check-in)
 router.post('/', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.processCheckIn);
 router.post('/complete', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.processCheckIn);
+router.post('/checkin', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.processCheckIn);
+router.post('/check-in', verifyToken, requirePermission('CHECKIN_CREATE'), checkInController.processCheckIn);
 
 // ─── CÁC ROUTE PHỤ TRỢ PMS & FRONT DESK TERMINAL (Backward Compatible) ──────
 // GET /arrivals: Lấy danh sách booking hôm nay/gần đây để lễ tân tra cứu nhanh
@@ -60,6 +89,7 @@ router.get('/arrivals', async (req, res) => {
       LEFT JOIN Stays s ON b.BookingId = s.BookingId
       LEFT JOIN Rooms r ON s.RoomId = r.RoomId
       WHERE ${statusFilter}
+        AND b.Status != 'Cancelled'
       ORDER BY b.BookingId DESC
       LIMIT ?
     `;
@@ -130,6 +160,7 @@ router.get('/lookup', async (req, res) => {
          OR b.BookingId = ?
          OR bg.Phone = ?
          OR bg.IdNumber = ?)
+      ORDER BY (b.Status != 'Cancelled') DESC, b.BookingId DESC
       LIMIT 1
     `;
 
@@ -348,10 +379,10 @@ router.post('/encode-keycard', async (req, res) => {
   }
 });
 
-// POST /process-payment: Xử lý thanh toán POS
+// POST /process-payment: Xử lý thanh toán POS (Chuẩn hóa theo C5 Core Payment)
 router.post('/process-payment', async (req, res) => {
   try {
-    const { bookingId, amount, preAuthAmount, cardLast4 = '4092' } = req.body;
+    const { bookingId, amount, preAuthAmount, cardLast4 = '4092', method = 'Card' } = req.body;
 
     if (!bookingId) {
       return res.status(400).json({ success: false, message: 'Thiếu mã đặt phòng.' });
@@ -359,15 +390,19 @@ router.post('/process-payment', async (req, res) => {
 
     const totalCharge = Number(amount) || 0;
     const preAuth = Number(preAuthAmount) || 0;
-    const txCode = `POS-VERIFONE-${Date.now().toString().slice(-6)}`;
+    const txCode = generateTransactionCode();
+    const validMethod = ['Cash', 'Card', 'BankTransfer', 'VNPay', 'MoMo', 'VietQR'].includes(method)
+      ? method
+      : 'Card';
 
     try {
       await pool.query(
         `INSERT INTO Payments (BookingId, UserId, Amount, PaymentMethod, PaymentDate, TransactionCode, Status, GatewayResponse)
-         VALUES (?, 1, ?, 'POS_CARD', NOW(), ?, 'Success', ?)`,
+         VALUES (?, 1, ?, ?, NOW(), ?, 'Paid', ?)`,
         [
           bookingId,
           totalCharge,
+          validMethod,
           txCode,
           JSON.stringify({
             cardLast4,
@@ -377,6 +412,12 @@ router.post('/process-payment', async (req, res) => {
           }),
         ]
       );
+      if (totalCharge > 0) {
+        await pool.query(
+          `UPDATE Bookings SET DepositAmount = COALESCE(DepositAmount, 0) + ? WHERE BookingId = ?`,
+          [totalCharge, bookingId]
+        );
+      }
     } catch (payErr) {
       console.warn('Payments record warning:', payErr.message);
     }

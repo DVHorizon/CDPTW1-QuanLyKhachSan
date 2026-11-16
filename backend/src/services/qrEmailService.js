@@ -11,7 +11,49 @@
 
 const QRCode = require('qrcode');
 const nodemailer = require('nodemailer');
+const PDFDocument = require('pdfkit');
 const { Booking, BookingGuest, RoomType, User } = require('../models');
+
+/**
+ * Tạo tệp PDF xác nhận đặt phòng / phiếu thu cọc đính kèm Email (FEAT-GUEST-10)
+ */
+function generateBookingConfirmationPdfBuffer({ booking, primaryGuest, roomType, confirmationCode, qrBase64 }) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 48 });
+      const chunks = [];
+      doc.on('data', (c) => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.fontSize(18).fillColor('#131B2E').text('GRAND HORIZON RESORT & SUITES', { align: 'center' });
+      doc.fontSize(11).fillColor('#725B38').text('CONFIRMATION & CONTACTLESS CHECK-IN PASS', { align: 'center' });
+      doc.moveDown(1);
+
+      doc.fontSize(12).fillColor('#0F172A').text(`Confirmation Code: ${confirmationCode}`);
+      doc.text(`Booking ID: #${booking.BookingId}`);
+      doc.text(`Status: ${booking.Status}`);
+      doc.text(`Guest Name: ${primaryGuest?.FullName || booking.user?.FullName || 'Guest'}`);
+      doc.text(`Guest Email: ${primaryGuest?.Email || booking.user?.Email || '-'}`);
+      doc.text(`Room Type: ${roomType?.Name || 'Luxury Suite'} (x${booking.RoomQuantity || 1})`);
+      doc.text(`Check-in: ${booking.CheckInDate} (15:00)`);
+      doc.text(`Check-out: ${booking.CheckOutDate} (11:00)`);
+      doc.text(`Total Amount: ${formatVND(booking.TotalAmount)}`);
+      doc.text(`Deposit Paid: ${formatVND(booking.DepositAmount)}`);
+      doc.moveDown(1);
+
+      if (qrBase64 && qrBase64.startsWith('data:image/png;base64,')) {
+        const imgBuf = Buffer.from(qrBase64.split(';base64,').pop(), 'base64');
+        doc.image(imgBuf, { width: 140, align: 'center' });
+      }
+      doc.moveDown(1);
+      doc.fontSize(9).fillColor('#64748B').text('Present this confirmation or QR code at the Front Desk upon arrival.', { align: 'center' });
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
 
 // Khởi tạo Transporter cho Nodemailer
 let transporter = null;
@@ -279,7 +321,7 @@ async function sendBookingConfirmationEmail(bookingId, customRecipientEmail = nu
     });
   }
 
-  // Tạo nội dung email HTML
+  // Tạo nội dung email HTML và PDF đính kèm
   const emailHtml = buildConfirmationEmailHtml({
     booking,
     primaryGuest,
@@ -287,19 +329,38 @@ async function sendBookingConfirmationEmail(bookingId, customRecipientEmail = nu
     qrBase64
   });
 
+  const attachments = [
+    {
+      filename: `QR_Pass_${confirmationCode}.png`,
+      content: qrBase64.split(';base64,').pop(),
+      encoding: 'base64',
+      cid: 'bookingQrPass'
+    }
+  ];
+
+  try {
+    const pdfBuffer = await generateBookingConfirmationPdfBuffer({
+      booking,
+      primaryGuest,
+      roomType: booking.roomType,
+      confirmationCode,
+      qrBase64
+    });
+    attachments.push({
+      filename: `Booking_Confirmation_${confirmationCode}.pdf`,
+      content: pdfBuffer,
+      contentType: 'application/pdf'
+    });
+  } catch (pdfErr) {
+    console.warn('[QR Email Service] Không thể tạo PDF đính kèm:', pdfErr.message);
+  }
+
   const mailOptions = {
     from: process.env.SMTP_FROM || '"Grand Horizon Resort & Suites" <no-reply@grandhorizonresort.com>',
     to: recipientEmail,
     subject: `[Grand Horizon] Xác Nhận Đặt Phòng Thành Công #${confirmationCode} - Contactless Pass`,
     html: emailHtml,
-    attachments: [
-      {
-        filename: `QR_Pass_${confirmationCode}.png`,
-        content: qrBase64.split(';base64,').pop(),
-        encoding: 'base64',
-        cid: 'bookingQrPass'
-      }
-    ]
+    attachments
   };
 
   const mailTransporter = getMailTransporter();

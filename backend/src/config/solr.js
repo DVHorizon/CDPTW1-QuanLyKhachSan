@@ -5,6 +5,22 @@ const solrHost = (process.env.SOLR_HOST) || (process.env.DB_HOST === 'mysql' ? '
 const solrPort = process.env.SOLR_PORT || 8983;
 const solrBaseUrl = `http://${solrHost}:${solrPort}/solr`;
 const COLLECTION_NAME = 'hotel_rooms';
+const SOLR_TIMEOUT_MS = 800;
+const SOLR_CIRCUIT_COOLDOWN_MS = 60000;
+let solrOfflineUntil = 0;
+
+function fetchWithTimeout(url, options = {}) {
+  if (Date.now() < solrOfflineUntil) {
+    return Promise.reject(new Error('Solr offline circuit breaker open'));
+  }
+  return fetch(url, {
+    ...options,
+    signal: AbortSignal.timeout(SOLR_TIMEOUT_MS)
+  }).catch((err) => {
+    solrOfflineUntil = Date.now() + SOLR_CIRCUIT_COOLDOWN_MS;
+    throw err;
+  });
+}
 
 const solrClient = {
   collection: COLLECTION_NAME,
@@ -16,7 +32,7 @@ const solrClient = {
    * Kiểm tra kết nối Solr
    */
   async ping() {
-    const res = await fetch(`${solrBaseUrl}/admin/info/system?wt=json`);
+    const res = await fetchWithTimeout(`${solrBaseUrl}/admin/info/system?wt=json`);
     if (!res.ok) throw new Error(`Solr ping failed with status ${res.status}`);
     return res.json();
   },
@@ -25,7 +41,7 @@ const solrClient = {
    * Đẩy bulk tài liệu lên Solr
    */
   async addDocuments(docs) {
-    const res = await fetch(`${solrBaseUrl}/${COLLECTION_NAME}/update?commit=true`, {
+    const res = await fetchWithTimeout(`${solrBaseUrl}/${COLLECTION_NAME}/update?commit=true`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(docs)
@@ -84,7 +100,7 @@ const solrClient = {
       url.searchParams.append('fq', options.filterQuery);
     }
 
-    const res = await fetch(url.toString());
+    const res = await fetchWithTimeout(url.toString());
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`Solr search error: ${res.status} - ${errText}`);

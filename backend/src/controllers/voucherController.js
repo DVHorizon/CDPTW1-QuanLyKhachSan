@@ -3,6 +3,114 @@
 const { Op } = require('sequelize');
 const { sequelize, Voucher, Booking } = require('../models');
 
+let defaultVouchersPromise = null;
+
+async function ensureDefaultVouchers() {
+  if (defaultVouchersPromise) return defaultVouchersPromise;
+  defaultVouchersPromise = (async () => {
+    try {
+      const now = new Date();
+      const nextYear = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+      const pastStart = new Date('2020-01-01T00:00:00Z');
+      const pastEnd = new Date('2020-12-31T23:59:59Z');
+      const seeds = [
+        {
+          Code: 'SUMMER20',
+          DiscountType: 'Percentage',
+          DiscountValue: 20,
+          MinOrderAmount: 3000000,
+          MaxDiscountAmount: 1000000,
+          StartDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+          EndDate: nextYear,
+          UsageLimit: 1000,
+          UsedCount: 0,
+          Status: 'Active',
+          IsDeleted: false
+        },
+        {
+          Code: 'ELITE10',
+          DiscountType: 'Percentage',
+          DiscountValue: 10,
+          MinOrderAmount: 2000000,
+          MaxDiscountAmount: 2000000,
+          StartDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+          EndDate: nextYear,
+          UsageLimit: 2000,
+          UsedCount: 0,
+          Status: 'Active',
+          IsDeleted: false
+        },
+        {
+          Code: 'HORIZON500',
+          DiscountType: 'Fixed',
+          DiscountValue: 500000,
+          MinOrderAmount: 2500000,
+          MaxDiscountAmount: 500000,
+          StartDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+          EndDate: nextYear,
+          UsageLimit: 1000,
+          UsedCount: 0,
+          Status: 'Active',
+          IsDeleted: false
+        },
+        {
+          Code: 'VIPMILLION',
+          DiscountType: 'Fixed',
+          DiscountValue: 1000000,
+          MinOrderAmount: 10000000,
+          MaxDiscountAmount: 1000000,
+          StartDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+          EndDate: nextYear,
+          UsageLimit: 500,
+          UsedCount: 0,
+          Status: 'Active',
+          IsDeleted: false
+        },
+        {
+          Code: 'EXPIRED2020',
+          DiscountType: 'Percentage',
+          DiscountValue: 15,
+          MinOrderAmount: 1000000,
+          MaxDiscountAmount: 500000,
+          StartDate: pastStart,
+          EndDate: pastEnd,
+          UsageLimit: 100,
+          UsedCount: 0,
+          Status: 'Active',
+          IsDeleted: false
+        },
+        {
+          Code: 'SOLDOUT10',
+          DiscountType: 'Percentage',
+          DiscountValue: 10,
+          MinOrderAmount: 1000000,
+          MaxDiscountAmount: 500000,
+          StartDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+          EndDate: nextYear,
+          UsageLimit: 5,
+          UsedCount: 5,
+          Status: 'Active',
+          IsDeleted: false
+        }
+      ];
+
+      for (const item of seeds) {
+        const existing = await Voucher.findOne({ where: { Code: item.Code } });
+        if (!existing) {
+          await Voucher.create(item);
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi seed voucher mặc định:', err.message);
+      defaultVouchersPromise = null;
+    }
+  })();
+  return defaultVouchersPromise;
+}
+
+exports.ensureDefaultVouchers = ensureDefaultVouchers;
+setTimeout(() => { ensureDefaultVouchers().catch(() => {}); }, 2500);
+
 /**
  * Helper định dạng tiền tệ hiển thị cho thông báo voucher
  */
@@ -238,13 +346,17 @@ exports.applyVoucherToBooking = async (req, res) => {
     }
 
     // 3. Concurrency Protection & Atomic update UsedCount
-    // Tăng UsedCount an toàn với WHERE UsedCount < UsageLimit
+    // Tăng UsedCount an toàn với WHERE (UsageLimit IS NULL OR UsageLimit = 0 OR UsedCount < UsageLimit)
     const [affectedCount] = await Voucher.update(
       { UsedCount: sequelize.literal('UsedCount + 1') },
       {
         where: {
           VoucherId: voucher.VoucherId,
-          UsedCount: { [Op.lt]: voucher.UsageLimit }
+          [Op.or]: [
+            { UsageLimit: null },
+            { UsageLimit: 0 },
+            { UsedCount: { [Op.lt]: voucher.UsageLimit } }
+          ]
         },
         transaction
       }
@@ -317,6 +429,7 @@ exports.applyVoucherToBooking = async (req, res) => {
  */
 exports.getAvailableVouchers = async (req, res) => {
   try {
+    await ensureDefaultVouchers();
     const now = new Date();
     const vouchers = await Voucher.findAll({
       where: {
@@ -335,11 +448,7 @@ exports.getAvailableVouchers = async (req, res) => {
               { EndDate: { [Op.gte]: now } }
             ]
           },
-          sequelize.where(
-            sequelize.col('UsedCount'),
-            Op.lt,
-            sequelize.col('UsageLimit')
-          )
+          sequelize.literal('COALESCE(UsageLimit, 0) = 0 OR UsedCount < UsageLimit')
         ]
       },
       attributes: ['VoucherId', 'Code', 'DiscountType', 'DiscountValue', 'MinOrderAmount', 'MaxDiscountAmount', 'EndDate'],
