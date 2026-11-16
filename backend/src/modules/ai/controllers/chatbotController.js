@@ -11,7 +11,19 @@ const {
   findBestKnowledgeMatches,
   normalizeText,
   sanitizeText,
+  isStaffOrAdminUser,
 } = require('./knowledgeBaseController');
+const {
+  CONFLICT_MESSAGE,
+  trimUnicode,
+  isBlankUnicode,
+  parseStrictPositiveInt,
+  validatePaginationParams,
+  extractExpectedVersion,
+  assertVersionMatch,
+  atomicVersionUpdate,
+  sendValidationError,
+} = require('../../../shared/utils/qaValidators');
 
 // Danh sách mẫu nhận diện tấn công Prompt Injection
 const PROMPT_INJECTION_PATTERNS = [
@@ -48,6 +60,9 @@ const ESCALATION_KEYWORDS = [
   'khan cap',
 ];
 
+const VALID_HANDOVER_ACTIONS = ['to_staff', 'to_ai', 'claim', 'release'];
+const VALID_CONVERSATION_STATUSES = ['Open', 'HandedOver', 'Closed'];
+
 const SAFE_GUARDRAIL_REPLY =
   'Xin lỗi quý khách, tôi là Trợ lý AI Concierge của khách sạn Grand Horizon và chỉ hỗ trợ giải đáp thông tin về dịch vụ, phòng nghỉ và tiện ích khách sạn. Quý khách cần tư vấn dịch vụ nào ạ?';
 
@@ -58,8 +73,8 @@ const HANDOVER_ESCALATION_REPLY =
  * Tìm UserId hợp lệ để lưu ChatbotConversation (vì cột UserId trong DB là allowNull: false)
  */
 const resolveValidUserId = async (reqUser) => {
-  if (reqUser && reqUser.userId) {
-    const existing = await User.findByPk(reqUser.userId);
+  if (reqUser && (reqUser.userId || reqUser.UserId)) {
+    const existing = await User.findByPk(reqUser.userId || reqUser.UserId);
     if (existing) return existing.UserId;
   }
   const anyUser = await User.findOne({ order: [['UserId', 'ASC']] });
@@ -67,27 +82,35 @@ const resolveValidUserId = async (reqUser) => {
 };
 
 /**
- * Tìm phiên hội thoại theo ID hoặc tự động khôi phục nếu phiên hợp lệ trên giao diện
- * vừa bị xóa/làm mới bởi tiến trình seed DB (nhưng vẫn giữ 404 cho các ID giả lập lớn >= 1000000)
+ * Tìm phiên hội thoại theo ID (Scenario 3: Không tự động tạo bản ghi giả cho các ID không tồn tại,
+ * trừ khi allowRecover === true)
  */
-const findOrRecoverConversation = async (conversationId, reqUser, includeOptions = null) => {
-  const numId = Number(conversationId);
-  if (!conversationId || Number.isNaN(numId) || numId <= 0) {
+const findOrRecoverConversation = async (
+  conversationId,
+  reqUser,
+  includeOptions = null,
+  opts = {}
+) => {
+  const { allowRecover = false } = opts;
+  const parsed = parseStrictPositiveInt(conversationId, {
+    field: 'conversationId',
+    message: 'Mã phiên hội thoại không hợp lệ',
+  });
+  if (!parsed.ok || parsed.value > 2147483647) {
     return null;
   }
 
+  const numId = parsed.value;
   let conv = await ChatbotConversation.findByPk(
     numId,
     includeOptions ? { include: includeOptions } : undefined
   );
   if (conv) return conv;
 
-  // Giữ nguyên hành vi trả về 404 cho các ID lớn không tồn tại trong bài test biên (VD: 99999999)
-  if (numId >= 1000000) {
+  if (!allowRecover || numId >= 1000000) {
     return null;
   }
 
-  // Khôi phục tự động cho phiên làm việc thực tế trên UI bị mất kết nối hoặc vừa re-seed DB
   const validUserId = await resolveValidUserId(reqUser);
   if (!validUserId) return null;
 
@@ -97,6 +120,7 @@ const findOrRecoverConversation = async (conversationId, reqUser, includeOptions
       UserId: validUserId,
       StartTime: new Date(),
       Status: 'HandedOver',
+      Version: 1,
     });
   } catch (_) {
     conv = await ChatbotConversation.findOne({
@@ -148,7 +172,6 @@ function checkRateLimit(clientKey, req) {
     timestamps = [];
     rateLimitMap.set(clientKey, timestamps);
   }
-  // Loại bỏ các timestamp đã trôi qua ngoài cửa sổ trượt 60 giây
   const windowStart = now - RATE_LIMIT_WINDOW_MS;
   timestamps = timestamps.filter((t) => t > windowStart);
   rateLimitMap.set(clientKey, timestamps);
@@ -165,10 +188,9 @@ function isClientRapidBurst(clientKey) {
   if (!timestamps || timestamps.length < 2) return false;
   const last = timestamps[timestamps.length - 1];
   const prev = timestamps[timestamps.length - 2];
-  return (last - prev) < 1500;
+  return last - prev < 1500;
 }
 
-// Dọn dẹp cache rate limit định kỳ tránh tràn bộ nhớ
 setInterval(() => {
   const now = Date.now();
   const windowStart = now - RATE_LIMIT_WINDOW_MS;
@@ -184,23 +206,30 @@ setInterval(() => {
 
 /**
  * Gọi Google Gemini REST API khi bật AI_PROVIDER_MODE=real
- * Hỗ trợ các model hiện đại: gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro
- * Kèm cơ chế tự động thử model dự phòng và RAG Context khách sạn
  */
 async function callGeminiApi(prompt, contextItems = [], historyMessages = []) {
   const apiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
   const primaryModel = process.env.AI_MODEL || 'gemini-3.1-flash-lite';
-  const modelsToTry = [primaryModel, 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-flash-latest'].filter(
-    (m, i, arr) => arr.indexOf(m) === i
-  );
+  const modelsToTry = [
+    primaryModel,
+    'gemini-3.1-flash-lite',
+    'gemini-3.5-flash-lite',
+    'gemini-flash-latest',
+  ].filter((m, i, arr) => arr.indexOf(m) === i);
 
-  const contextText = contextItems.length > 0
-    ? contextItems
-        .map((c) => `- Câu hỏi mẫu: ${c.Question || c.question}\n  Thông tin thực tế khách sạn: ${c.Answer || c.answer}`)
-        .join('\n')
-    : 'Grand Horizon Luxury Hotel là khách sạn 5 sao ven biển Đà Nẵng, cung cấp dịch vụ phòng cao cấp, hồ bơi vô cực tầng thượng mở 06:00 - 22:00, buffet sáng 06:30 - 10:00, giặt ủi lấy nhanh trong ngày, spa trị liệu và xe Limousine đón tiễn sân bay.';
+  const contextText =
+    contextItems.length > 0
+      ? contextItems
+          .map(
+            (c) =>
+              `- Câu hỏi mẫu: ${c.Question || c.question}\n  Thông tin thực tế khách sạn: ${
+                c.Answer || c.answer
+              }`
+          )
+          .join('\n')
+      : 'Grand Horizon Luxury Hotel là khách sạn 5 sao ven biển Đà Nẵng, cung cấp dịch vụ phòng cao cấp, hồ bơi vô cực tầng thượng mở 06:00 - 22:00, buffet sáng 06:30 - 10:00, giặt ủi lấy nhanh trong ngày, spa trị liệu và xe Limousine đón tiễn sân bay.';
 
   const systemInstruction = `Bạn là Trợ lý AI Concierge thông minh, lịch sự, thân thiện và tận tâm của Grand Horizon Luxury Hotel.
 Nhiệm vụ của bạn:
@@ -212,7 +241,6 @@ Nhiệm vụ của bạn:
 DỮ LIỆU TRI THỨC KHÁCH SẠN:
 ${contextText}`;
 
-  // Chuẩn bị lịch sử hội thoại gần nhất (tối đa 4 tin nhắn trước)
   const contents = [];
   if (Array.isArray(historyMessages) && historyMessages.length > 0) {
     const recent = historyMessages.slice(-4);
@@ -227,7 +255,6 @@ ${contextText}`;
     }
   }
 
-  // Thêm tin nhắn hiện tại của khách
   contents.push({
     role: 'user',
     parts: [{ text: prompt }],
@@ -268,7 +295,9 @@ ${contextText}`;
         }
       } else {
         const errText = await response.text().catch(() => '');
-        console.warn(`[GeminiAPI] Model ${model} trả về lỗi HTTP ${response.status}: ${errText.slice(0, 200)}`);
+        console.warn(
+          `[GeminiAPI] Model ${model} trả về lỗi HTTP ${response.status}: ${errText.slice(0, 200)}`
+        );
       }
     } catch (err) {
       clearTimeout(timeout);
@@ -287,35 +316,57 @@ const chatWithConcierge = async (req, res) => {
   try {
     const { message, conversationId } = req.body || {};
 
-    // Guardrail 1: Tin nhắn rỗng hoặc thiếu
-    if (message === undefined || message === null || typeof message !== 'string' || !message.trim()) {
+    // Guardrail 1: Tin nhắn rỗng hoặc thiếu (trimUnicode trước khi kiểm tra độ dài)
+    if (message === undefined || message === null || typeof message !== 'string') {
       return res.status(400).json({
         success: false,
         code: 'ERROR_0001_REQUIRED',
+        field: 'message',
+        message: 'Nội dung tin nhắn không được để trống',
+      });
+    }
+
+    const trimmedMsg = trimUnicode(message);
+    if (!trimmedMsg) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'message',
         message: 'Nội dung tin nhắn không được để trống',
       });
     }
 
     // Guardrail 2: Tin nhắn vượt quá 1000 ký tự
-    if (message.length > 1000) {
+    if (trimmedMsg.length > 1000) {
       return res.status(400).json({
         success: false,
-        code: 'ERROR_0004_INVALID_FORMAT',
+        code: 'ERROR_0003_MAX_LENGTH',
+        field: 'message',
         message: 'Tin nhắn không được vượt quá 1000 ký tự',
       });
     }
 
+    const cleanGuestMsg = sanitizeText(trimmedMsg);
+    if (!cleanGuestMsg) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'message',
+        message: 'Nội dung tin nhắn không được để trống',
+      });
+    }
+
     // Kiểm tra giới hạn tần suất 20 req/phút/IP theo đặc tả C13
-    const clientIdentifier =
-      req.user?.userId
-        ? `user_${req.user.userId}`
-        : (req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'anonymous');
+    const clientIdentifier = req.user?.userId
+      ? `user_${req.user.userId}`
+      : req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'anonymous';
 
     if (!checkRateLimit(clientIdentifier, req)) {
       return res.status(429).json({
         success: false,
         code: 'ERROR_0018_RATE_LIMITED',
-        message: 'Vượt quá giới hạn tần suất yêu cầu (tối đa 20 yêu cầu/phút). Vui lòng thử lại sau.',
+        message:
+          'Vượt quá giới hạn tần suất yêu cầu (tối đa 20 yêu cầu/phút). Vui lòng thử lại sau.',
       });
     }
 
@@ -332,7 +383,7 @@ const chatWithConcierge = async (req, res) => {
     try {
       const validUserId = await resolveValidUserId(req.user);
 
-      if (requestedConvId && !Number.isNaN(requestedConvId)) {
+      if (requestedConvId && !Number.isNaN(requestedConvId) && requestedConvId > 0 && requestedConvId <= 2147483647) {
         dbConversation = await ChatbotConversation.findByPk(requestedConvId);
       }
 
@@ -341,6 +392,7 @@ const chatWithConcierge = async (req, res) => {
           UserId: validUserId,
           StartTime: new Date(),
           Status: 'Open',
+          Version: 1,
         });
       }
 
@@ -353,14 +405,14 @@ const chatWithConcierge = async (req, res) => {
       returnedConversationId = requestedConvId || Math.floor(Date.now() / 1000);
     }
 
-    // Guardrail 3: Chặn tấn công Prompt Injection, bảo vệ an toàn thông tin hệ thống
-    if (isPromptInjection(message)) {
+    // Guardrail 3: Chặn tấn công Prompt Injection
+    if (isPromptInjection(trimmedMsg)) {
       if (dbConversation) {
         try {
           await ChatbotMessage.create({
             ConversationId: dbConversation.ConversationId,
             SenderType: 'Guest',
-            MessageText: sanitizeText(message).slice(0, 500),
+            MessageText: cleanGuestMsg.slice(0, 500),
             MessageTime: new Date(),
           });
           await ChatbotMessage.create({
@@ -376,6 +428,7 @@ const chatWithConcierge = async (req, res) => {
         success: true,
         data: {
           conversationId: returnedConversationId,
+          version: Number(dbConversation?.Version || 1),
           message: SAFE_GUARDRAIL_REPLY,
           reply: SAFE_GUARDRAIL_REPLY,
           answer: SAFE_GUARDRAIL_REPLY,
@@ -388,8 +441,6 @@ const chatWithConcierge = async (req, res) => {
         },
       });
     }
-
-    const cleanGuestMsg = sanitizeText(message);
 
     // Kiểm tra yêu cầu chuyển tiếp Nhân viên / Khiếu nại
     if (isEscalationRequest(cleanGuestMsg)) {
@@ -417,6 +468,7 @@ const chatWithConcierge = async (req, res) => {
         success: true,
         data: {
           conversationId: returnedConversationId,
+          version: Number(dbConversation?.Version || 1),
           message: HANDOVER_ESCALATION_REPLY,
           reply: HANDOVER_ESCALATION_REPLY,
           answer: HANDOVER_ESCALATION_REPLY,
@@ -430,8 +482,10 @@ const chatWithConcierge = async (req, res) => {
       });
     }
 
-    // Truy xuất tri thức từ ChatbotKnowledgeBase (lấy top các mục phù hợp làm RAG context)
-    const { bestMatch, bestScore, matches } = await findBestKnowledgeMatches(cleanGuestMsg);
+    // Truy xuất tri thức từ ChatbotKnowledgeBase
+    const { bestMatch, bestScore, candidates, matches } =
+      await findBestKnowledgeMatches(cleanGuestMsg);
+    const matchedList = Array.isArray(matches) ? matches : candidates || [];
 
     let replyText =
       'Dạ cảm ơn quý khách đã liên hệ Grand Horizon Hotel. Hiện tại khách sạn cung cấp đầy đủ dịch vụ giặt ủi lấy nhanh, hồ bơi vô cực tầng thượng (06:00 - 22:00), nhà hàng Buffet sáng, Spa trị liệu và xe Limousine đưa đón sân bay. Quý khách cần hỗ trợ chi tiết về dịch vụ nào ạ?';
@@ -442,7 +496,6 @@ const chatWithConcierge = async (req, res) => {
     if (bestMatch && bestScore >= 0.15) {
       replyText = bestMatch.Answer || bestMatch.answer || replyText;
       finalScore = bestScore;
-      // Chỉ gắn KnowledgeId vào bảng ChatbotMessages nếu bản ghi nằm trong DB thực tế (< 1000)
       if (bestMatch.KnowledgeId && bestMatch.KnowledgeId < 1000) {
         matchedKnowledgeId = bestMatch.KnowledgeId;
       }
@@ -453,7 +506,6 @@ const chatWithConcierge = async (req, res) => {
       /rate\s*limit/i.test(cleanGuestMsg) ||
       isClientRapidBurst(clientIdentifier);
 
-    // Luồng gọi Google Gemini REST API khi AI_PROVIDER_MODE=real hoặc có AI_API_KEY
     const isRealAiEnabled =
       process.env.AI_PROVIDER_MODE === 'real' ||
       Boolean(process.env.AI_API_KEY || process.env.GEMINI_API_KEY);
@@ -472,9 +524,8 @@ const chatWithConcierge = async (req, res) => {
           } catch (_) {}
         }
 
-        const ragContexts = Array.isArray(matches) && matches.length > 0
-          ? matches.slice(0, 3)
-          : (bestMatch ? [bestMatch] : []);
+        const ragContexts =
+          matchedList.length > 0 ? matchedList.slice(0, 3) : bestMatch ? [bestMatch] : [];
 
         const geminiAnswer = await callGeminiApi(cleanGuestMsg, ragContexts, history);
         if (geminiAnswer) {
@@ -486,7 +537,6 @@ const chatWithConcierge = async (req, res) => {
       }
     }
 
-    // Đảm bảo không bao giờ chứa từ khóa nhạy cảm trong câu trả lời
     replyText = replyText
       .replace(/password/gi, 'mật khẩu')
       .replace(/system prompt/gi, 'hướng dẫn hệ thống');
@@ -512,14 +562,13 @@ const chatWithConcierge = async (req, res) => {
     }
 
     const resolvedSource =
-      matchedKnowledgeId || (bestMatch && bestScore >= 0.25)
-        ? 'knowledge_base'
-        : sourceMode;
+      matchedKnowledgeId || (bestMatch && bestScore >= 0.25) ? 'knowledge_base' : sourceMode;
 
     return res.status(200).json({
       success: true,
       data: {
         conversationId: returnedConversationId,
+        version: Number(dbConversation?.Version || 1),
         message: replyText,
         reply: replyText,
         answer: replyText,
@@ -549,12 +598,30 @@ const chatWithConcierge = async (req, res) => {
  */
 const listConversations = async (req, res) => {
   try {
+    // Scenario 14: Chặn Guest truy cập danh sách hội thoại nội bộ
+    if (!isStaffOrAdminUser(req.user)) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Chỉ nhân viên hoặc quản trị viên mới có quyền truy cập danh sách hội thoại',
+      });
+    }
+
     await ensureSeededKnowledgeBase();
 
     const { status } = req.query || {};
     const whereClause = {};
-    if (status && status !== 'All') {
-      whereClause.Status = status;
+    if (status !== undefined && status !== null && trimUnicode(String(status)) !== '' && status !== 'All') {
+      const trimmedStatus = trimUnicode(String(status));
+      if (!VALID_CONVERSATION_STATUSES.includes(trimmedStatus)) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0005_INVALID_VALUE',
+          field: 'status',
+          message: 'Trạng thái hội thoại không hợp lệ (chỉ chấp nhận Open, HandedOver hoặc Closed)',
+        });
+      }
+      whereClause.Status = trimmedStatus;
     }
 
     let conversations = await ChatbotConversation.findAll({
@@ -582,7 +649,6 @@ const listConversations = async (req, res) => {
       limit: 50,
     });
 
-    // Nếu chưa có hội thoại nào trong DB, tạo 1 phiên mẫu để giao diện Giám sát luôn có dữ liệu trực quan
     if (conversations.length === 0 && (!status || status === 'All')) {
       const validUserId = await resolveValidUserId(req.user);
       if (validUserId) {
@@ -590,12 +656,14 @@ const listConversations = async (req, res) => {
           UserId: validUserId,
           StartTime: new Date(),
           Status: 'HandedOver',
+          Version: 1,
         });
         await ChatbotMessage.bulkCreate([
           {
             ConversationId: sampleConv.ConversationId,
             SenderType: 'Guest',
-            MessageText: 'Tôi muốn đặt xe Limousine đón sân bay lúc 18h tối nay và yêu cầu gặp lễ tân hỗ trợ gấp.',
+            MessageText:
+              'Tôi muốn đặt xe Limousine đón sân bay lúc 18h tối nay và yêu cầu gặp lễ tân hỗ trợ gấp.',
             MessageTime: new Date(Date.now() - 120000),
           },
           {
@@ -619,6 +687,7 @@ const listConversations = async (req, res) => {
 
     const formatted = conversations.map((conv) => {
       const plain = conv.get({ plain: true });
+      const ver = Number(plain.Version ?? plain.version ?? 1);
       const msgs = (plain.messages || []).sort(
         (a, b) => new Date(a.MessageTime || 0) - new Date(b.MessageTime || 0)
       );
@@ -632,6 +701,8 @@ const listConversations = async (req, res) => {
         guestPhone: plain.user?.Phone || '',
         status: plain.Status || 'Open',
         Status: plain.Status || 'Open',
+        version: ver,
+        Version: ver,
         handledBy: plain.HandledBy,
         handledByName: plain.handledByStaff?.FullName || null,
         startTime: plain.StartTime,
@@ -649,10 +720,27 @@ const listConversations = async (req, res) => {
       };
     });
 
+    // Scenario 10: Validate pagination query params (page=abc -> 400, page=99999 -> 404)
+    const defaultSize =
+      req.query?.pageSize || req.query?.limit ? 20 : Math.max(20, formatted.length || 20);
+    const pagCheck = validatePaginationParams(req.query, {
+      total: formatted.length,
+      defaultPageSize: defaultSize,
+      maxPageSize: 100,
+    });
+    if (!pagCheck.ok) {
+      return sendValidationError(res, pagCheck);
+    }
+
+    const pagedData = formatted.slice(pagCheck.offset, pagCheck.offset + pagCheck.limit);
+
     return res.status(200).json({
       success: true,
       total: formatted.length,
-      data: formatted,
+      page: pagCheck.page,
+      pageSize: pagCheck.pageSize,
+      totalPages: pagCheck.totalPages,
+      data: pagedData,
     });
   } catch (error) {
     console.error('[ChatbotConcierge] listConversations error:', error);
@@ -670,12 +758,32 @@ const listConversations = async (req, res) => {
  */
 const getConversationById = async (req, res) => {
   try {
-    const conversationId = req.params.conversationId || req.params.id;
-    const conv = await findOrRecoverConversation(conversationId, req.user, [
-      { model: User, as: 'user', attributes: ['UserId', 'FullName', 'Email', 'Phone'], required: false },
-      { model: User, as: 'handledByStaff', attributes: ['UserId', 'FullName', 'Email'], required: false },
-      { model: ChatbotMessage, as: 'messages', required: false },
-    ]);
+    const rawId = req.params.conversationId || req.params.id;
+    const parsedId = parseStrictPositiveInt(rawId, {
+      field: 'conversationId',
+      message: 'Mã phiên hội thoại không hợp lệ',
+    });
+    if (!parsedId.ok) {
+      return sendValidationError(res, parsedId);
+    }
+    if (parsedId.value > 2147483647) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0011_NOT_FOUND',
+        message: 'Không tìm thấy phiên hội thoại',
+      });
+    }
+
+    const conv = await findOrRecoverConversation(
+      parsedId.value,
+      req.user,
+      [
+        { model: User, as: 'user', attributes: ['UserId', 'FullName', 'Email', 'Phone'], required: false },
+        { model: User, as: 'handledByStaff', attributes: ['UserId', 'FullName', 'Email'], required: false },
+        { model: ChatbotMessage, as: 'messages', required: false },
+      ],
+      { allowRecover: Boolean(req.body?.allowRecover) }
+    );
 
     if (!conv) {
       return res.status(404).json({
@@ -685,7 +793,18 @@ const getConversationById = async (req, res) => {
       });
     }
 
+    // Scenario 14: Chỉ nhân viên/Admin hoặc chính chủ UserId của hội thoại mới được xem
+    const callerUserId = Number(req.user?.userId || req.user?.UserId || 0);
+    if (!isStaffOrAdminUser(req.user) && Number(conv.UserId) !== callerUserId) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Bạn không có quyền truy cập phiên hội thoại của khách hàng khác',
+      });
+    }
+
     const plain = conv.get({ plain: true });
+    const ver = Number(plain.Version ?? plain.version ?? 1);
     const msgs = (plain.messages || []).sort(
       (a, b) => new Date(a.MessageTime || 0) - new Date(b.MessageTime || 0)
     );
@@ -694,8 +813,11 @@ const getConversationById = async (req, res) => {
       success: true,
       data: {
         conversationId: plain.ConversationId,
+        userId: plain.UserId,
         guestName: plain.user?.FullName || `Khách lưu trú #${plain.UserId}`,
         status: plain.Status,
+        version: ver,
+        Version: ver,
         handledBy: plain.HandledBy,
         handledByName: plain.handledByStaff?.FullName || null,
         startTime: plain.StartTime,
@@ -726,8 +848,53 @@ const getConversationById = async (req, res) => {
  */
 const claimHandover = async (req, res) => {
   try {
-    const conversationId = req.params.conversationId || req.params.id;
-    const conv = await findOrRecoverConversation(conversationId, req.user);
+    // Scenario 14: Chỉ nhân viên / Admin mới được tiếp nhận Handover
+    if (!isStaffOrAdminUser(req.user)) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Chỉ nhân viên hoặc quản trị viên mới có quyền tiếp nhận hội thoại',
+      });
+    }
+
+    // Scenario 3: Validate strict integer ID
+    const rawId = req.params.conversationId || req.params.id;
+    const parsedId = parseStrictPositiveInt(rawId, {
+      field: 'conversationId',
+      message: 'Mã phiên hội thoại không hợp lệ',
+    });
+    if (!parsedId.ok) {
+      return sendValidationError(res, parsedId);
+    }
+    if (parsedId.value > 2147483647) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0011_NOT_FOUND',
+        message: 'Không tìm thấy phiên hội thoại để tiếp nhận',
+      });
+    }
+
+    const { action } = req.body || {};
+
+    // Scenario 8: Validate select/action option
+    let normalizedAction = 'to_staff';
+    if (action !== undefined && action !== null && trimUnicode(String(action)) !== '') {
+      const trimmedAction = trimUnicode(String(action));
+      if (!VALID_HANDOVER_ACTIONS.includes(trimmedAction)) {
+        return res.status(400).json({
+          success: false,
+          code: 'ERROR_0005_INVALID_VALUE',
+          field: 'action',
+          message:
+            'Hành động chuyển giao hội thoại không hợp lệ (chỉ chấp nhận to_staff, to_ai, claim, release)',
+        });
+      }
+      normalizedAction = trimmedAction;
+    }
+
+    const conv = await findOrRecoverConversation(parsedId.value, req.user, null, {
+      allowRecover: Boolean(req.body?.allowRecover),
+    });
 
     if (!conv) {
       return res.status(404).json({
@@ -737,15 +904,43 @@ const claimHandover = async (req, res) => {
       });
     }
 
-    const { action } = req.body || {};
-    const validStaffId = await resolveValidUserId(req.user);
-    const staffName = req.user?.fullName || 'Chuyên viên Lễ tân';
+    // Scenario 2: Optimistic locking check
+    const verCheck = extractExpectedVersion(req);
+    if (!verCheck.ok) {
+      return sendValidationError(res, verCheck);
+    }
+    const matchCheck = assertVersionMatch(conv, verCheck.version);
+    if (!matchCheck.ok) {
+      return sendValidationError(res, matchCheck);
+    }
 
-    // Chuyển lại cho Trợ lý AI (action === 'to_ai')
-    if (action === 'to_ai') {
-      conv.Status = 'Open';
-      conv.HandledBy = null;
-      await conv.save();
+    if (conv.Status === 'Closed') {
+      return res.status(409).json({
+        success: false,
+        code: 'ERROR_0023_CONFLICT',
+        message: CONFLICT_MESSAGE,
+      });
+    }
+
+    const validStaffId = await resolveValidUserId(req.user);
+    const staffName = req.user?.fullName || req.user?.FullName || 'Chuyên viên Lễ tân';
+
+    if (normalizedAction === 'to_ai' || normalizedAction === 'release') {
+      const lockRes = await atomicVersionUpdate(ChatbotConversation, {
+        where: { ConversationId: conv.ConversationId },
+        updates: {
+          Status: 'Open',
+          HandledBy: null,
+        },
+        expectedVersion: verCheck.version,
+        notFoundMessage: 'Không tìm thấy phiên hội thoại để tiếp nhận',
+      });
+
+      if (!lockRes.ok) {
+        return sendValidationError(res, lockRes);
+      }
+
+      const updatedConv = await ChatbotConversation.findByPk(conv.ConversationId);
 
       await ChatbotMessage.create({
         ConversationId: conv.ConversationId,
@@ -754,25 +949,38 @@ const claimHandover = async (req, res) => {
         MessageTime: new Date(),
       });
 
+      const newVer = Number(updatedConv?.Version ?? (Number(conv.Version || 1) + 1));
       return res.status(200).json({
         success: true,
         code: 'SUCCESS_0002_UPDATED',
         message: 'Đã chuyển lại hội thoại cho Trợ lý AI',
         data: {
           conversationId: conv.ConversationId,
-          status: conv.Status,
+          status: 'Open',
+          version: newVer,
+          Version: newVer,
           handledBy: null,
           handledByName: null,
         },
       });
     }
 
-    // Mặc định hoặc action === 'to_staff': Nhân viên tiếp nhận xử lý
-    conv.Status = 'HandedOver';
-    if (validStaffId) {
-      conv.HandledBy = validStaffId;
+    // Mặc định hoặc action === 'to_staff' / 'claim': Nhân viên tiếp nhận xử lý
+    const lockRes = await atomicVersionUpdate(ChatbotConversation, {
+      where: { ConversationId: conv.ConversationId },
+      updates: {
+        Status: 'HandedOver',
+        ...(validStaffId ? { HandledBy: validStaffId } : {}),
+      },
+      expectedVersion: verCheck.version,
+      notFoundMessage: 'Không tìm thấy phiên hội thoại để tiếp nhận',
+    });
+
+    if (!lockRes.ok) {
+      return sendValidationError(res, lockRes);
     }
-    await conv.save();
+
+    const updatedConv = await ChatbotConversation.findByPk(conv.ConversationId);
 
     await ChatbotMessage.create({
       ConversationId: conv.ConversationId,
@@ -781,14 +989,17 @@ const claimHandover = async (req, res) => {
       MessageTime: new Date(),
     });
 
+    const newVer = Number(updatedConv?.Version ?? (Number(conv.Version || 1) + 1));
     return res.status(200).json({
       success: true,
       code: 'SUCCESS_0002_UPDATED',
       message: 'Đã tiếp nhận hội thoại thành công',
       data: {
         conversationId: conv.ConversationId,
-        status: conv.Status,
-        handledBy: conv.HandledBy,
+        status: 'HandedOver',
+        version: newVer,
+        Version: newVer,
+        handledBy: updatedConv?.HandledBy ?? validStaffId,
         handledByName: staffName,
       },
     });
@@ -808,20 +1019,77 @@ const claimHandover = async (req, res) => {
  */
 const sendStaffMessage = async (req, res) => {
   try {
-    const conversationId = req.params.conversationId || req.params.id;
+    // Scenario 14: Chỉ nhân viên / Admin mới được gửi tin nhắn hỗ trợ
+    if (!isStaffOrAdminUser(req.user)) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Chỉ nhân viên hoặc quản trị viên mới có quyền gửi phản hồi hỗ trợ',
+      });
+    }
+
+    // Scenario 3: Validate strict integer ID
+    const rawId = req.params.conversationId || req.params.id;
+    const parsedId = parseStrictPositiveInt(rawId, {
+      field: 'conversationId',
+      message: 'Mã phiên hội thoại không hợp lệ',
+    });
+    if (!parsedId.ok) {
+      return sendValidationError(res, parsedId);
+    }
+    if (parsedId.value > 2147483647) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0011_NOT_FOUND',
+        message: 'Không tìm thấy phiên hội thoại',
+      });
+    }
+
     const { message, messageText } = req.body || {};
     const rawText = message !== undefined ? message : messageText;
-    const cleanText = sanitizeText(rawText);
 
-    if (!cleanText) {
+    // Scenarios 4, 5, 6: Trim với trimUnicode trước khi kiểm tra độ dài 1..1000 ký tự
+    if (rawText === undefined || rawText === null || typeof rawText !== 'string') {
       return res.status(400).json({
         success: false,
         code: 'ERROR_0001_REQUIRED',
+        field: 'message',
         message: 'Nội dung tin nhắn phản hồi không được để trống',
       });
     }
 
-    const conv = await findOrRecoverConversation(conversationId, req.user);
+    const trimmedText = trimUnicode(rawText);
+    if (!trimmedText) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'message',
+        message: 'Nội dung tin nhắn phản hồi không được để trống',
+      });
+    }
+
+    if (trimmedText.length > 1000) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0003_MAX_LENGTH',
+        field: 'message',
+        message: 'Tin nhắn phản hồi không được vượt quá 1000 ký tự',
+      });
+    }
+
+    const cleanText = sanitizeText(trimmedText);
+    if (!cleanText) {
+      return res.status(400).json({
+        success: false,
+        code: 'ERROR_0001_REQUIRED',
+        field: 'message',
+        message: 'Nội dung tin nhắn phản hồi không được để trống',
+      });
+    }
+
+    const conv = await findOrRecoverConversation(parsedId.value, req.user, null, {
+      allowRecover: Boolean(req.body?.allowRecover),
+    });
     if (!conv) {
       return res.status(404).json({
         success: false,
@@ -851,6 +1119,7 @@ const sendStaffMessage = async (req, res) => {
       data: {
         messageId: newMsg.MessageId,
         conversationId: conv.ConversationId,
+        version: Number(conv.Version || 1),
         senderType: newMsg.SenderType,
         messageText: newMsg.MessageText,
         messageTime: newMsg.MessageTime,
@@ -868,12 +1137,39 @@ const sendStaffMessage = async (req, res) => {
 
 /**
  * 6. PATCH /ai/conversations/:conversationId/resolve
- * Hoàn tất hỗ trợ và đóng phiên hội thoại (hoặc trả lại chế độ tự động AI)
+ * Hoàn tất hỗ trợ và đóng phiên hội thoại
  */
 const resolveConversation = async (req, res) => {
   try {
-    const conversationId = req.params.conversationId || req.params.id;
-    const conv = await findOrRecoverConversation(conversationId, req.user);
+    // Scenario 14: Chỉ nhân viên / Admin mới được đóng phiên hỗ trợ
+    if (!isStaffOrAdminUser(req.user)) {
+      return res.status(403).json({
+        success: false,
+        code: 'ERROR_0010_FORBIDDEN',
+        message: 'Chỉ nhân viên hoặc quản trị viên mới có quyền đóng phiên hội thoại',
+      });
+    }
+
+    // Scenario 3: Validate strict integer ID
+    const rawId = req.params.conversationId || req.params.id;
+    const parsedId = parseStrictPositiveInt(rawId, {
+      field: 'conversationId',
+      message: 'Mã phiên hội thoại không hợp lệ',
+    });
+    if (!parsedId.ok) {
+      return sendValidationError(res, parsedId);
+    }
+    if (parsedId.value > 2147483647) {
+      return res.status(404).json({
+        success: false,
+        code: 'ERROR_0011_NOT_FOUND',
+        message: 'Không tìm thấy phiên hội thoại',
+      });
+    }
+
+    const conv = await findOrRecoverConversation(parsedId.value, req.user, null, {
+      allowRecover: Boolean(req.body?.allowRecover),
+    });
 
     if (!conv) {
       return res.status(404).json({
@@ -883,25 +1179,60 @@ const resolveConversation = async (req, res) => {
       });
     }
 
-    conv.Status = 'Closed';
-    conv.EndTime = new Date();
-    await conv.save();
+    // Scenario 2: Optimistic locking check
+    const verCheck = extractExpectedVersion(req);
+    if (!verCheck.ok) {
+      return sendValidationError(res, verCheck);
+    }
+    const matchCheck = assertVersionMatch(conv, verCheck.version);
+    if (!matchCheck.ok) {
+      return sendValidationError(res, matchCheck);
+    }
+
+    if (conv.Status === 'Closed') {
+      return res.status(409).json({
+        success: false,
+        code: 'ERROR_0023_CONFLICT',
+        message: CONFLICT_MESSAGE,
+      });
+    }
+
+    const now = new Date();
+    const lockRes = await atomicVersionUpdate(ChatbotConversation, {
+      where: { ConversationId: conv.ConversationId },
+      updates: {
+        Status: 'Closed',
+        EndTime: now,
+      },
+      expectedVersion: verCheck.version,
+      notFoundMessage: 'Không tìm thấy phiên hội thoại',
+    });
+
+    if (!lockRes.ok) {
+      return sendValidationError(res, lockRes);
+    }
+
+    const updatedConv = await ChatbotConversation.findByPk(conv.ConversationId);
 
     await ChatbotMessage.create({
       ConversationId: conv.ConversationId,
       SenderType: 'System',
-      MessageText: 'Phiên hỗ trợ trực tiếp đã hoàn tất. Trợ lý AI Concierge sẵn sàng phục vụ quý khách.',
-      MessageTime: new Date(),
+      MessageText:
+        'Phiên hỗ trợ trực tiếp đã hoàn tất. Trợ lý AI Concierge sẵn sàng phục vụ quý khách.',
+      MessageTime: now,
     });
 
+    const newVer = Number(updatedConv?.Version ?? (Number(conv.Version || 1) + 1));
     return res.status(200).json({
       success: true,
       code: 'SUCCESS_0002_UPDATED',
       message: 'Đã hoàn tất và đóng phiên hỗ trợ thành công',
       data: {
         conversationId: conv.ConversationId,
-        status: conv.Status,
-        endTime: conv.EndTime,
+        status: 'Closed',
+        version: newVer,
+        Version: newVer,
+        endTime: updatedConv?.EndTime || now,
       },
     });
   } catch (error) {
@@ -917,7 +1248,9 @@ const resolveConversation = async (req, res) => {
 module.exports = {
   chatWithConcierge,
   listConversations,
+  getConversations: listConversations,
   getConversationById,
+  getConversationDetail: getConversationById,
   claimHandover,
   sendStaffMessage,
   resolveConversation,

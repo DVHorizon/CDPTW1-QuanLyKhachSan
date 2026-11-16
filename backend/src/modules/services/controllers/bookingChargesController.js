@@ -22,9 +22,39 @@ const {
 } = require('../../../models');
 const { Op } = require('sequelize');
 const pool = require('../../../config/db');
+const {
+  trimUnicode,
+  isBlankUnicode,
+  parseStrictPositiveInt,
+  sendValidationError,
+} = require('../../../shared/utils/qaValidators');
 
 // Quyết định D6: coi PAID_STATUSES = ['Paid', 'Success', 'Completed'] là đã thu
 const PAID_STATUSES = ['Paid', 'Success', 'Completed'];
+
+function resolveBookingIdentifier(rawBookingId) {
+  if (rawBookingId === undefined || rawBookingId === null || isBlankUnicode(String(rawBookingId))) {
+    return {
+      ok: false,
+      status: 400,
+      code: 'ERROR_0004_INVALID_FORMAT',
+      field: 'bookingId',
+      message: 'Mã đặt phòng (bookingId) không hợp lệ',
+    };
+  }
+  const str = trimUnicode(String(rawBookingId));
+  if (/^(GH|BK)-[A-Za-z0-9-]+$/i.test(str)) {
+    return { ok: true, byCode: true, confirmationCode: str };
+  }
+  const parsed = parseStrictPositiveInt(rawBookingId, {
+    field: 'bookingId',
+    message: 'Mã đặt phòng (bookingId) không hợp lệ',
+  });
+  if (!parsed.ok) {
+    return parsed;
+  }
+  return { ok: true, byCode: false, bookingId: parsed.value };
+}
 
 /**
  * Tính số đêm thực tế hoặc tạm tính cho 1 Stay (Mục 1.4.b & Quyết định D15)
