@@ -1,6 +1,8 @@
 'use strict';
 
 const { searchRooms: searchES } = require('../services/esSearchService');
+const { INDEX_NAME: ES_INDEX } = require('../services/esIndexManager');
+const esClient = require('../config/elasticsearch');
 const solrClient = require('../config/solr');
 const { RoomType, Amenity, Branch, Room } = require('../models');
 const { Op } = require('sequelize');
@@ -137,11 +139,16 @@ async function unifiedSearchRooms(req, res) {
   // Helper enrich room item
   const formatRoomItem = (r) => {
     const roomTypeId = Number(r.RoomTypeId || r.id || 1);
-    const typeName = r.TypeName || r.name || (Array.isArray(r.name) ? r.name[0] : 'Deluxe Ocean View');
-    const desc = r.Description || r.description || (Array.isArray(r.description) ? r.description[0] : '');
-    const price = Number(r.BasePrice || r.price || (Array.isArray(r.price) ? r.price[0] : 2500000));
-    const cap = Number(r.AdultCapacity || r.capacity || (Array.isArray(r.capacity) ? r.capacity[0] : 2));
-    const img = r.ImageUrl || r.image || (Array.isArray(r.image) ? r.image[0] : null) || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop';
+    const rawName = r.TypeName || r.name;
+    const typeName = Array.isArray(rawName) ? rawName[0] : (rawName || 'Deluxe Ocean View');
+    const rawDesc = r.Description || r.description;
+    const desc = Array.isArray(rawDesc) ? rawDesc[0] : (rawDesc || '');
+    const rawPrice = r.BasePrice || r.price;
+    const price = Number(Array.isArray(rawPrice) ? rawPrice[0] : (rawPrice || 2500000));
+    const rawCap = r.AdultCapacity || r.capacity;
+    const cap = Number(Array.isArray(rawCap) ? rawCap[0] : (rawCap || 2));
+    const rawImg = r.ImageUrl || r.image;
+    const img = (Array.isArray(rawImg) ? rawImg[0] : rawImg) || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop';
 
     return {
       RoomTypeId: roomTypeId,
@@ -149,6 +156,8 @@ async function unifiedSearchRooms(req, res) {
       Description: desc,
       BasePrice: price,
       AdultCapacity: cap,
+      MaxOccupancy: Number(r.MaxOccupancy || cap),
+      AvailableRooms: Number(r.AvailableRooms || r.TotalRooms || 5),
       ImageUrl: img,
       BranchId: branchInfo.BranchId,
       BranchName: branchInfo.BranchName,
@@ -172,12 +181,161 @@ async function unifiedSearchRooms(req, res) {
     };
   };
 
+  // Helper đối chiếu kết quả Search Engine (ES/Solr) với MySQL để loại bỏ bản ghi cũ/đã xóa
+  // và bổ sung + tự đồng bộ các phòng mới chưa kịp index
+  const reconcileEngineDocsWithMySQL = async (docs, kw, maxP, minCap, allowedIds, engineType = 'solr') => {
+    try {
+      const returnedIds = (docs || [])
+        .map(d => Number(d.RoomTypeId || d.id))
+        .filter(n => !isNaN(n) && n > 0);
+
+      // 1. Giữ lại & cập nhật thông tin mới nhất cho các bản ghi thực sự còn active trong MySQL
+      const activeById = new Map();
+      if (returnedIds.length > 0) {
+        const activeRows = await RoomType.findAll({
+          where: {
+            RoomTypeId: { [Op.in]: returnedIds },
+            IsDeleted: false,
+            Status: 'Active'
+          },
+          include: [
+            {
+              model: Amenity,
+              as: 'amenityList',
+              through: { attributes: [] },
+              required: false
+            }
+          ]
+        });
+        for (const row of activeRows) {
+          activeById.set(Number(row.RoomTypeId), row);
+        }
+      }
+
+      const validDocs = [];
+      const staleIds = [];
+      const seenIds = new Set();
+
+      for (const doc of (docs || [])) {
+        const idNum = Number(doc.RoomTypeId || doc.id);
+        if (activeById.has(idNum) && !seenIds.has(idNum)) {
+          validDocs.push(activeById.get(idNum));
+          seenIds.add(idNum);
+        } else if (!isNaN(idNum) && idNum > 0 && !activeById.has(idNum)) {
+          staleIds.push(String(idNum));
+        }
+      }
+
+      // Dọn các tài liệu mồ côi/đã xóa khỏi engine ở chế độ nền
+      if (staleIds.length > 0) {
+        if (engineType === 'solr') {
+          Promise.all(staleIds.map(id => solrClient.deleteById(id).catch(() => {}))).catch(() => {});
+        } else if (engineType === 'elasticsearch') {
+          esClient.bulk({
+            operations: staleIds.map(id => ({ delete: { _index: ES_INDEX, _id: id } }))
+          }).catch(() => {});
+        }
+      }
+
+      // 2. Nếu có từ khóa (hoặc engine chưa có dữ liệu), bổ sung phòng khớp từ MySQL chưa kịp index
+      if (!kw && validDocs.length > 0) {
+        return validDocs;
+      }
+
+      const whereClause = { IsDeleted: false, Status: 'Active' };
+      if (kw) {
+        whereClause[Op.or] = [
+          { TypeName: { [Op.like]: `%${kw}%` } },
+          { Description: { [Op.like]: `%${kw}%` } },
+          { TypeCode: { [Op.like]: `%${kw}%` } }
+        ];
+      }
+      if (maxP) {
+        whereClause.BasePrice = { [Op.lte]: Number(maxP) };
+      }
+      if (minCap) {
+        whereClause[Op.and] = [
+          ...(whereClause[Op.and] || []),
+          {
+            [Op.or]: [
+              { MaxOccupancy: { [Op.gte]: Number(minCap) } },
+              { AdultCapacity: { [Op.gte]: Number(minCap) } }
+            ]
+          }
+        ];
+      }
+      if (allowedIds && allowedIds.length > 0) {
+        whereClause.RoomTypeId = { [Op.in]: allowedIds };
+      }
+
+      const dbMatches = await RoomType.findAll({
+        where: whereClause,
+        include: [
+          {
+            model: Amenity,
+            as: 'amenityList',
+            through: { attributes: [] },
+            required: false
+          }
+        ],
+        limit: 20,
+        order: [['RoomTypeId', 'DESC']]
+      });
+
+      if (!dbMatches || dbMatches.length === 0) return validDocs;
+
+      const missingSolrDocs = [];
+      const missingEsOps = [];
+
+      for (const room of dbMatches) {
+        const rIdNum = Number(room.RoomTypeId);
+        if (!seenIds.has(rIdNum)) {
+          const amenitiesText = Array.isArray(room.amenityList)
+            ? room.amenityList.map(a => a.Name || a.AmenityName).join(', ')
+            : '';
+          missingSolrDocs.push({
+            id: String(rIdNum),
+            name: room.TypeName,
+            description: room.Description || '',
+            price: Number(room.BasePrice) || 0,
+            capacity: room.MaxOccupancy || room.AdultCapacity || 2,
+            amenities: amenitiesText
+          });
+          missingEsOps.push(
+            { index: { _index: ES_INDEX, _id: String(rIdNum) } },
+            {
+              RoomTypeId: rIdNum,
+              TypeName: room.TypeName,
+              Description: room.Description || '',
+              BasePrice: Number(room.BasePrice) || 0,
+              AdultCapacity: room.MaxOccupancy || room.AdultCapacity || 2,
+              Amenities: amenitiesText
+            }
+          );
+          validDocs.unshift(room);
+          seenIds.add(rIdNum);
+        }
+      }
+
+      if (missingSolrDocs.length > 0 && engineType === 'solr') {
+        solrClient.addDocuments(missingSolrDocs).catch(() => {});
+      }
+      if (missingEsOps.length > 0 && engineType === 'elasticsearch') {
+        esClient.bulk({ refresh: true, operations: missingEsOps }).catch(() => {});
+      }
+
+      return validDocs;
+    } catch (_) {
+      return docs || [];
+    }
+  };
+
   try {
     const q = req.query || {};
     keyword = typeof q.keyword === 'string' ? q.keyword : '';
-    maxPrice = q.maxPrice;
-    adults = q.adults;
-    capacity = q.capacity;
+    maxPrice = q.maxPrice || q.priceMax;
+    adults = q.adults || q.totalGuests;
+    capacity = q.capacity || q.totalGuests;
 
     // 1. Tự động nhận diện và chuẩn hóa Full-width (全角) -> Half-width (半角)
     isFullWidthInput = containsFullWidth(keyword);
@@ -200,7 +358,8 @@ async function unifiedSearchRooms(req, res) {
       if (cleanKeyword) {
         whereClause[Op.or] = [
           { TypeName: { [Op.like]: `%${cleanKeyword}%` } },
-          { Description: { [Op.like]: `%${cleanKeyword}%` } }
+          { Description: { [Op.like]: `%${cleanKeyword}%` } },
+          { TypeCode: { [Op.like]: `%${cleanKeyword}%` } }
         ];
       }
 
@@ -210,7 +369,15 @@ async function unifiedSearchRooms(req, res) {
 
       const cap = capacity || adults;
       if (cap) {
-        whereClause.AdultCapacity = { [Op.gte]: Number(cap) };
+        whereClause[Op.and] = [
+          ...(whereClause[Op.and] || []),
+          {
+            [Op.or]: [
+              { MaxOccupancy: { [Op.gte]: Number(cap) } },
+              { AdultCapacity: { [Op.gte]: Number(cap) } }
+            ]
+          }
+        ];
       }
 
       if (candidateRoomTypeIds && candidateRoomTypeIds.length > 0) {
@@ -274,7 +441,8 @@ async function unifiedSearchRooms(req, res) {
         filterQuery
       });
 
-      const docs = (solrRes.response && solrRes.response.docs) || [];
+      let docs = (solrRes.response && solrRes.response.docs) || [];
+      docs = await reconcileEngineDocsWithMySQL(docs, cleanKeyword, maxPrice, cap, candidateRoomTypeIds, 'solr');
       const executionTimeMs = Date.now() - startTime;
       const formattedData = docs.map(formatRoomItem);
 
@@ -296,11 +464,23 @@ async function unifiedSearchRooms(req, res) {
     // ------------------------------------------------------------------
     // B. NHÁNH 2: ELASTICSEARCH (MẶC ĐỊNH)
     // ------------------------------------------------------------------
-    let esResults = await searchES(cleanKeyword, { maxPrice, adults: adults || capacity });
+    let esResults = await searchES(cleanKeyword, {
+      maxPrice,
+      adults: adults || capacity,
+      allowedIds: candidateRoomTypeIds
+    });
     if (candidateRoomTypeIds && candidateRoomTypeIds.length > 0) {
       const allowedSet = new Set(candidateRoomTypeIds.map(Number));
       esResults = esResults.filter(r => allowedSet.has(Number(r.RoomTypeId || r.id)));
     }
+    esResults = await reconcileEngineDocsWithMySQL(
+      esResults,
+      cleanKeyword,
+      maxPrice,
+      adults || capacity,
+      candidateRoomTypeIds,
+      'elasticsearch'
+    );
     const executionTimeMs = Date.now() - startTime;
     const formattedData = esResults.map(formatRoomItem);
 
@@ -327,14 +507,15 @@ async function unifiedSearchRooms(req, res) {
     console.warn(`[DualSearch] Engine "${selectedEngine}" gặp lỗi (${error.message}). Đang kích hoạt Failover...`);
 
     try {
-      if (selectedEngine === 'elasticsearch') {
+      if (selectedEngine === 'elasticsearch' || selectedEngine === 'dual' || selectedEngine === 'auto') {
         // Fallback sang Solr
-        const solrRes = await solrClient.search(keyword, { rows: 30 });
+        const solrRes = await solrClient.search(cleanKeyword, { rows: 30 });
         let docs = (solrRes.response && solrRes.response.docs) || [];
         if (candidateRoomTypeIds && candidateRoomTypeIds.length > 0) {
           const allowedSet = new Set(candidateRoomTypeIds.map(Number));
           docs = docs.filter(d => allowedSet.has(Number(d.id)));
         }
+        docs = await reconcileEngineDocsWithMySQL(docs, cleanKeyword, maxPrice, capacity || adults, candidateRoomTypeIds, 'solr');
         const executionTimeMs = Date.now() - startTime;
         const formattedData = docs.map(formatRoomItem);
 
@@ -351,11 +532,23 @@ async function unifiedSearchRooms(req, res) {
         });
       } else {
         // Fallback sang Elasticsearch
-        let esResults = await searchES(keyword, { maxPrice, adults });
+        let esResults = await searchES(cleanKeyword, {
+          maxPrice,
+          adults: adults || capacity,
+          allowedIds: candidateRoomTypeIds
+        });
         if (candidateRoomTypeIds && candidateRoomTypeIds.length > 0) {
           const allowedSet = new Set(candidateRoomTypeIds.map(Number));
           esResults = esResults.filter(r => allowedSet.has(Number(r.RoomTypeId || r.id)));
         }
+        esResults = await reconcileEngineDocsWithMySQL(
+          esResults,
+          cleanKeyword,
+          maxPrice,
+          adults || capacity,
+          candidateRoomTypeIds,
+          'elasticsearch'
+        );
         const executionTimeMs = Date.now() - startTime;
         const formattedData = esResults.map(formatRoomItem);
 

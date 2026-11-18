@@ -18,9 +18,9 @@ async function syncBothEngines() {
     // 1. Chuẩn bị Elasticsearch Index
     await createRoomIndex().catch(err => console.warn('Lưu ý ES Index:', err.message));
 
-    // 2. Lấy dữ liệu 1000 phòng từ MySQL
+    // 2. Lấy dữ liệu các loại phòng còn hoạt động từ MySQL
     const roomTypes = await RoomType.findAll({
-      where: { IsDeleted: false },
+      where: { IsDeleted: false, Status: 'Active' },
       include: [
         {
           model: Amenity,
@@ -32,6 +32,16 @@ async function syncBothEngines() {
     });
 
     console.log(`📦 Tìm thấy ${roomTypes.length} loại phòng trong MySQL.`);
+
+    // Dọn bản ghi cũ/mồ côi trên cả 2 engine trước khi đồng bộ lại để khớp 1-1 với MySQL
+    await Promise.allSettled([
+      esClient.deleteByQuery({ index: ES_INDEX, refresh: true, query: { match_all: {} } }),
+      fetch(`http://${process.env.SOLR_HOST || (process.env.DB_HOST === 'mysql' ? 'host.docker.internal' : '127.0.0.1')}:${process.env.SOLR_PORT || 8983}/solr/${solrClient.collection}/update?commit=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delete: { query: '*:*' } })
+      })
+    ]);
 
     if (roomTypes.length === 0) {
       console.log('Không có dữ liệu để đồng bộ.');

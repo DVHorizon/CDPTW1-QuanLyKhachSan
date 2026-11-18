@@ -5,8 +5,8 @@ const solrHost = (process.env.SOLR_HOST) || (process.env.DB_HOST === 'mysql' ? '
 const solrPort = process.env.SOLR_PORT || 8983;
 const solrBaseUrl = `http://${solrHost}:${solrPort}/solr`;
 const COLLECTION_NAME = 'hotel_rooms';
-const SOLR_TIMEOUT_MS = 800;
-const SOLR_CIRCUIT_COOLDOWN_MS = 60000;
+const SOLR_TIMEOUT_MS = 2500;
+const SOLR_CIRCUIT_COOLDOWN_MS = 5000;
 let solrOfflineUntil = 0;
 
 function fetchWithTimeout(url, options = {}) {
@@ -41,14 +41,31 @@ const solrClient = {
    * Đẩy bulk tài liệu lên Solr
    */
   async addDocuments(docs) {
+    const payload = Array.isArray(docs) ? docs : [docs];
     const res = await fetchWithTimeout(`${solrBaseUrl}/${COLLECTION_NAME}/update?commit=true`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(docs)
+      body: JSON.stringify(payload)
     });
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`Solr update error: ${res.status} - ${errText}`);
+    }
+    return res.json();
+  },
+
+  /**
+   * Xóa tài liệu khỏi Solr theo ID
+   */
+  async deleteById(id) {
+    const res = await fetchWithTimeout(`${solrBaseUrl}/${COLLECTION_NAME}/update?commit=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delete: { id: String(id) } })
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Solr delete error: ${res.status} - ${errText}`);
     }
     return res.json();
   },

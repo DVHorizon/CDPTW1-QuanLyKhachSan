@@ -9,6 +9,53 @@ const { RoomType, Room, Amenity, RoomTypeAmenity, Booking, AuditLog, sequelize }
 const { Op } = require('sequelize');
 const { JWT_SECRET } = require('../middlewares/authMiddleware');
 const { broadcastRoomEvent } = require('../sockets/socketHandler');
+const solrClient = require('../config/solr');
+const esClient = require('../config/elasticsearch');
+const { INDEX_NAME: ES_INDEX } = require('../services/esIndexManager');
+
+// Đồng bộ tự động RoomType sang Apache Solr & Elasticsearch khi thêm/sửa/xóa
+async function syncRoomTypeToSolr(rtRecord, isDeleted = false) {
+  if (!rtRecord) return;
+  try {
+    const id = String(rtRecord.RoomTypeId);
+    if (isDeleted || rtRecord.IsDeleted || String(rtRecord.Status).toLowerCase() === 'inactive') {
+      await Promise.allSettled([
+        solrClient.deleteById(id),
+        esClient.delete({ index: ES_INDEX, id, refresh: true }),
+      ]);
+      return;
+    }
+    const amenitiesText = Array.isArray(rtRecord.amenityList)
+      ? rtRecord.amenityList.map((a) => a.Name || a.AmenityName).join(', ')
+      : '';
+    const capacity = rtRecord.MaxOccupancy || rtRecord.AdultCapacity || 2;
+    await Promise.allSettled([
+      solrClient.addDocuments([
+        {
+          id,
+          name: rtRecord.TypeName,
+          description: rtRecord.Description || '',
+          price: Number(rtRecord.BasePrice) || 0,
+          capacity,
+          amenities: amenitiesText,
+        },
+      ]),
+      esClient.index({
+        index: ES_INDEX,
+        id,
+        refresh: true,
+        document: {
+          RoomTypeId: Number(rtRecord.RoomTypeId),
+          TypeName: rtRecord.TypeName,
+          Description: rtRecord.Description || '',
+          BasePrice: Number(rtRecord.BasePrice) || 0,
+          AdultCapacity: capacity,
+          Amenities: amenitiesText,
+        },
+      }),
+    ]);
+  } catch (_) {}
+}
 
 // ─── CONCURRENT EDITING LOCK MANAGEMENT ───────────────────────────────────
 // Quản lý khóa chỉnh sửa đồng thời trong bộ nhớ
@@ -686,6 +733,8 @@ router.post('/', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) =>
       include: [{ model: Amenity, as: 'amenityList', through: { attributes: [] } }],
     });
 
+    syncRoomTypeToSolr(created || newRT);
+
     return res.status(201).json({
       success: true,
       code: 'SUCCESS_0001_CREATED',
@@ -1095,6 +1144,8 @@ router.put('/:id', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, res) 
       include: [{ model: Amenity, as: 'amenityList', through: { attributes: [] } }],
     });
 
+    syncRoomTypeToSolr(updated || rt);
+
     return res.json({
       success: true,
       code: 'SUCCESS_0002_UPDATED',
@@ -1123,6 +1174,7 @@ router.patch('/:id/trang-thai', checkRoomTypePermission('ROOMTYPE_MANAGE'), asyn
     }
 
     await rt.update({ Status: finalStatus });
+    syncRoomTypeToSolr(rt, finalStatus === 'Inactive');
 
     try {
       broadcastRoomEvent('ROOM_TYPE_STATUS_CHANGED', {
@@ -1215,6 +1267,7 @@ router.delete('/:id', checkRoomTypePermission('ROOMTYPE_MANAGE'), async (req, re
     // 3. Thực hiện XÓA MỀM (soft delete): Status = Inactive, IsDeleted = true
     const oldValues = { ...rt.toJSON() };
     await rt.update({ Status: 'Inactive', IsDeleted: true });
+    syncRoomTypeToSolr(rt, true);
 
     // Giải phóng khóa chỉnh sửa và thông báo realtime cho các client
     activeEditingLocks.delete(String(id));
