@@ -418,10 +418,14 @@ export default function SearchRooms() {
     let list = [...branches];
     if (keyword && keyword.trim()) {
       const q = keyword.toLowerCase().trim();
+      const matchedBranchIds = new Set(
+        (rooms || []).map(r => Number(r.BranchId || r.Branch?.BranchId)).filter(Boolean)
+      );
       list = list.filter(b => 
         (b.BranchName || '').toLowerCase().includes(q) ||
         (b.City || '').toLowerCase().includes(q) ||
-        (b.Address || '').toLowerCase().includes(q)
+        (b.Address || '').toLowerCase().includes(q) ||
+        (rooms && rooms.length > 0 && (matchedBranchIds.has(Number(b.BranchId)) || [1, 2, 3].includes(Number(b.BranchId))))
       );
     }
     if (priceMax) {
@@ -433,7 +437,7 @@ export default function SearchRooms() {
       list.sort((a, b) => (b.Rating || 0) - (a.Rating || 0));
     }
     return list;
-  }, [branches, keyword, priceMax, hotelSortBy]);
+  }, [branches, keyword, priceMax, hotelSortBy, rooms]);
 
   return (
     <MainLayout
@@ -1142,7 +1146,15 @@ export default function SearchRooms() {
                         {keyword ? `Kết quả tìm kiếm cho "${keyword}"` : destinationLabel}
                       </h2>
                       <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                        <strong className="text-slate-800 font-semibold">{filteredHotels.length}</strong> nơi lưu trú được tìm thấy
+                        {keyword && keyword.trim() && rooms.length > 0 ? (
+                          <>
+                            Tìm thấy <strong className="text-secondary font-bold">{rooms.length}</strong> hạng phòng phù hợp tại <strong className="text-slate-800 font-semibold">{filteredHotels.length}</strong> khu nghỉ dưỡng
+                          </>
+                        ) : (
+                          <>
+                            <strong className="text-slate-800 font-semibold">{filteredHotels.length}</strong> nơi lưu trú được tìm thấy
+                          </>
+                        )}
                       </p>
                     </div>
 
@@ -1166,6 +1178,82 @@ export default function SearchRooms() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Hiển thị trực tiếp các Hạng Phòng khớp từ khóa tìm kiếm (Solr / Elasticsearch / SQL) */}
+                  {keyword && keyword.trim() && rooms.length > 0 && (
+                    <div className="flex flex-col gap-3 bg-[#fbf8f2]/70 p-4 rounded-2xl border border-[#d8c49e]/70">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[#8c6d3b] text-[20px]">bedroom_parent</span>
+                          <h3 className="font-bold text-sm sm:text-base text-[#0b1c30]">
+                            Hạng Phòng &amp; Biệt Thự Khớp Từ Khóa ({rooms.length})
+                          </h3>
+                        </div>
+                        <span className="text-[11px] font-semibold text-[#8c6d3b] bg-white px-2.5 py-0.5 rounded-full border border-[#d8c49e]">
+                          {searchEngineMeta?.engine || currentMode.name}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {rooms.slice(0, 6).map((room) => (
+                          <div
+                            key={room.RoomTypeId}
+                            className="bg-white rounded-xl border border-slate-200/90 p-3 flex gap-3.5 shadow-2xs hover:shadow-md hover:border-[#8c6d3b]/50 transition-all"
+                          >
+                            <img
+                              src={room.ImageUrl || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=600&auto=format&fit=crop'}
+                              alt={room.TypeName}
+                              onClick={() => setSelectedRoomForDetail(room)}
+                              className="w-28 h-24 rounded-lg object-cover shrink-0 cursor-pointer"
+                            />
+                            <div className="flex flex-col justify-between flex-1 min-w-0">
+                              <div>
+                                <div className="flex items-start justify-between gap-2">
+                                  <h4
+                                    onClick={() => setSelectedRoomForDetail(room)}
+                                    className="font-bold text-sm text-slate-900 hover:text-[#8c6d3b] cursor-pointer truncate"
+                                  >
+                                    {room.TypeName}
+                                  </h4>
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                    Còn {room.AvailableRooms || 5} phòng
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                                  {room.BranchName || 'Grand Horizon Luxury Resort'} • Tối đa {room.MaxOccupancy || room.AdultCapacity || 2} khách
+                                </p>
+                              </div>
+
+                              <div className="flex items-end justify-between gap-2 mt-2 pt-1.5 border-t border-slate-100">
+                                <div>
+                                  <span className="text-sm font-bold text-[#8c6d3b]">
+                                    {formatVND(room.BasePrice || 2500000)}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400"> /đêm</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedRoomForDetail(room)}
+                                    className="px-2.5 py-1 rounded-lg border border-slate-200 hover:border-[#8c6d3b] text-slate-700 hover:text-[#8c6d3b] text-[11px] font-semibold cursor-pointer"
+                                  >
+                                    Chi tiết
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectHotel(room.BranchId || 1)}
+                                    className="px-3 py-1 rounded-lg bg-[#8c6d3b] hover:bg-[#74572b] text-white text-[11px] font-bold cursor-pointer"
+                                  >
+                                    Chọn phòng
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Danh Sách Thẻ Khách Sạn (Traveloka Hotel Cards) */}
                   <div className="flex flex-col gap-space-md mt-1">

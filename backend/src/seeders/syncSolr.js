@@ -5,10 +5,10 @@ const solrClient = require('../config/solr');
 const { RoomType, Amenity } = require('../models');
 
 async function syncSolr() {
-  console.log('--- Bắt đầu đồng bộ 1000 phòng vào Apache Solr ---');
+  console.log('--- Bắt đầu đồng bộ loại phòng vào Apache Solr ---');
   try {
     const roomTypes = await RoomType.findAll({
-      where: { IsDeleted: false },
+      where: { IsDeleted: false, Status: 'Active' },
       include: [
         {
           model: Amenity,
@@ -20,6 +20,15 @@ async function syncSolr() {
     });
 
     console.log(`Tìm thấy ${roomTypes.length} loại phòng trong MySQL.`);
+
+    // Xóa bản ghi cũ/mồ côi trên Solr trước khi nạp mới
+    const solrHost = process.env.SOLR_HOST || (process.env.DB_HOST === 'mysql' ? 'host.docker.internal' : '127.0.0.1');
+    const solrPort = process.env.SOLR_PORT || 8983;
+    await fetch(`http://${solrHost}:${solrPort}/solr/${solrClient.collection}/update?commit=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delete: { query: '*:*' } })
+    }).catch(() => {});
 
     if (roomTypes.length === 0) {
       console.log('Không có dữ liệu phòng để đồng bộ.');
